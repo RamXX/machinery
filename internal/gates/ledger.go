@@ -81,7 +81,11 @@ func CheckLedgerWith(design string, opt LedgerOptions) *Gate {
 	checkDecisionEntries(g, design)
 	checkHouseStyle(g, design)
 	checkDuplicateTables(g, design)
-	checkUndeclaredFactReferences(g, design, opt.Verbose)
+	ratchet, err := LoadRatchet(design)
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+	}
+	checkUndeclaredFactReferences(g, design, opt.Verbose, ratchet)
 	checkValuesEnumCase(g, design)
 	return g
 }
@@ -819,9 +823,30 @@ func nameCount(n int) string {
 
 // emitTokenFindings adds one file's findings: one line each, or, above the
 // threshold and without verbose, one summary line with the class split and
-// the first three tokens. The checked-line counts stay exact either way.
-func emitTokenFindings(g *Gate, rel string, findings []tokenFinding, verbose bool) {
-	attrs, unresolved := 0, 0
+// the first three tokens. all is every finding of the file, which the
+// checked-line counts cover exactly; fresh is the subset not baselined, which
+// alone warns.
+func emitTokenFindings(g *Gate, rel string, all, fresh []tokenFinding, verbose bool) {
+	attrs, unresolved := splitTokenFindings(all)
+	g.Count("undeclared fact references", attrs)
+	g.Count("unresolved backticked tokens", unresolved)
+	if verbose || len(fresh) <= UndeclaredSummaryThreshold {
+		for _, f := range fresh {
+			g.Warns = append(g.Warns, f.text(rel))
+		}
+		return
+	}
+	attrs, unresolved = splitTokenFindings(fresh)
+	var first []string
+	for _, f := range fresh[:3] {
+		first = append(first, "`"+f.tok+"`")
+	}
+	g.Warns = append(g.Warns, rel+": "+strconv.Itoa(len(fresh))+" backticked tokens outside every declaration group ("+
+		nameCount(attrs)+" a model attribute, to declare in USES{} or WRITES{}; "+nameCount(unresolved)+
+		" no declared fact, action, unit or value), first "+strings.Join(first, ", ")+"; machinery check --verbose lists each")
+}
+
+func splitTokenFindings(findings []tokenFinding) (attrs, unresolved int) {
 	for _, f := range findings {
 		if f.unresolved {
 			unresolved++
@@ -829,30 +854,43 @@ func emitTokenFindings(g *Gate, rel string, findings []tokenFinding, verbose boo
 			attrs++
 		}
 	}
-	g.Count("undeclared fact references", attrs)
-	g.Count("unresolved backticked tokens", unresolved)
-	if verbose || len(findings) <= UndeclaredSummaryThreshold {
-		for _, f := range findings {
-			g.Warns = append(g.Warns, f.text(rel))
+	return attrs, unresolved
+}
+
+// emitBaselinedTokens adds one file's baselined findings as notes, under the
+// same per-file summary threshold as the warnings.
+func emitBaselinedTokens(g *Gate, rel string, based []tokenFinding, verbose bool) {
+	if len(based) == 0 {
+		return
+	}
+	if verbose || len(based) <= UndeclaredSummaryThreshold {
+		for _, f := range based {
+			g.Notes = append(g.Notes, baselinedPrefix+f.text(rel))
 		}
 		return
 	}
-	var first []string
-	for _, f := range findings[:3] {
-		first = append(first, "`"+f.tok+"`")
-	}
-	g.Warns = append(g.Warns, rel+": "+strconv.Itoa(len(findings))+" backticked tokens outside every declaration group ("+
-		nameCount(attrs)+" a model attribute, to declare in USES{} or WRITES{}; "+nameCount(unresolved)+
-		" no declared fact, action, unit or value), first "+strings.Join(first, ", ")+"; machinery check --verbose lists each")
+	g.Notes = append(g.Notes, baselinedPrefix+rel+": "+strconv.Itoa(len(based))+" undeclared-fact warning(s) recorded in "+RatchetFile+"; machinery check --verbose lists each")
 }
 
-func checkUndeclaredFactReferences(g *Gate, design string, verbose bool) {
+// undeclaredFile is one matrix's undeclared-fact scan: the findings in row
+// order, and the checked-line label of every token that resolved to a class
+// that never warns, in the order met.
+type undeclaredFile struct {
+	rel      string
+	findings []tokenFinding
+	classes  []string
+}
+
+// scanUndeclaredFacts finds every backticked fact-shaped token outside the
+// declaration groups of every matrix, without reporting anything.
+func scanUndeclaredFacts(design string) []undeclaredFile {
 	paths := sortedGlob(filepath.Join(design, "machines"), "*.matrix.md")
 	if len(paths) == 0 {
-		return
+		return nil
 	}
 	names := designNameTokens(design)
 	vocab := designFactVocabulary(design)
+	var out []undeclaredFile
 	for _, path := range paths {
 		body, ok := readTextOK(design, path)
 		if !ok {
@@ -862,8 +900,7 @@ func checkUndeclaredFactReferences(g *Gate, design string, verbose bool) {
 		if rerr != nil {
 			rel = path
 		}
-		rel = filepath.ToSlash(rel)
-		var findings []tokenFinding
+		file := undeclaredFile{rel: filepath.ToSlash(rel)}
 		for _, r := range walkTableRows(normalizeNewlines([]byte(body))) {
 			cols := factReferenceCells(r.header)
 			if len(cols) == 0 {
@@ -895,14 +932,113 @@ func checkUndeclaredFactReferences(g *Gate, design string, verbose bool) {
 					seen[tok] = true
 					switch class := vocab.classify(tok); class {
 					case tokenAttribute, tokenUnresolved:
-						findings = append(findings, tokenFinding{line: r.line, row: row, tok: tok, unresolved: class == tokenUnresolved})
+						file.findings = append(file.findings, tokenFinding{line: r.line, row: row, tok: tok, unresolved: class == tokenUnresolved})
 					default:
-						g.Count(tokenClassCounts[class])
+						file.classes = append(file.classes, tokenClassCounts[class])
 					}
 				}
 			}
 		}
-		emitTokenFindings(g, rel, findings, verbose)
+		out = append(out, file)
+	}
+	return out
+}
+
+// ObserveUndeclaredDebt returns the Gl-ledger undeclared-fact warnings a
+// design has today, keyed for the ratchet (file, unit, token) with each key's
+// occurrence count.
+func ObserveUndeclaredDebt(design string) []UndeclaredDebt {
+	counts := map[string]*UndeclaredDebt{}
+	var order []string
+	for _, file := range scanUndeclaredFacts(design) {
+		for _, f := range file.findings {
+			d := UndeclaredDebt{File: file.rel, Unit: f.row, Token: f.tok}
+			if prior, ok := counts[d.key()]; ok {
+				prior.Count++
+				continue
+			}
+			d.Count = 1
+			counts[d.key()] = &d
+			order = append(order, d.key())
+		}
+	}
+	out := []UndeclaredDebt{}
+	for _, k := range order {
+		out = append(out, *counts[k])
+	}
+	return out
+}
+
+// checkUndeclaredFactReferences reports the scan. An occurrence the ratchet
+// records (file, unit, token, up to its count) is a baselined NOTE; the rest
+// warn exactly as without a ratchet, and a recorded occurrence no longer seen
+// is a resolved NOTE.
+func checkUndeclaredFactReferences(g *Gate, design string, verbose bool, ratchet *Ratchet) {
+	remaining := map[string]int{}
+	var recorded []UndeclaredDebt
+	if ratchet != nil {
+		recorded = ratchet.Undeclared
+		for _, d := range recorded {
+			remaining[d.key()] = d.Count
+		}
+	}
+	baselined := 0
+	for _, file := range scanUndeclaredFacts(design) {
+		for _, label := range file.classes {
+			g.Count(label)
+		}
+		var fresh, based []tokenFinding
+		for _, f := range file.findings {
+			if k := (UndeclaredDebt{File: file.rel, Unit: f.row, Token: f.tok}).key(); remaining[k] > 0 {
+				remaining[k]--
+				based = append(based, f)
+				continue
+			}
+			fresh = append(fresh, f)
+		}
+		emitTokenFindings(g, file.rel, file.findings, fresh, verbose)
+		emitBaselinedTokens(g, file.rel, based, verbose)
+		baselined += len(based)
+	}
+	if baselined > 0 {
+		g.Count(BaselinedCount, baselined)
+	}
+	emitResolvedTokens(g, recorded, remaining, verbose)
+}
+
+// emitResolvedTokens notes every recorded occurrence the scan no longer
+// found, one line per entry, or one per file past the summary threshold.
+func emitResolvedTokens(g *Gate, recorded []UndeclaredDebt, remaining map[string]int, verbose bool) {
+	byFile := map[string][]UndeclaredDebt{}
+	var files []string
+	total := 0
+	for _, d := range recorded {
+		left := remaining[d.key()]
+		if left <= 0 {
+			continue
+		}
+		if _, ok := byFile[d.File]; !ok {
+			files = append(files, d.File)
+		}
+		byFile[d.File] = append(byFile[d.File], d)
+		total += left
+	}
+	for _, file := range files {
+		entries := byFile[file]
+		if !verbose && len(entries) > UndeclaredSummaryThreshold {
+			g.Notes = append(g.Notes, "baselined undeclared facts in "+file+": "+strconv.Itoa(len(entries))+" entries"+resolvedSuffix+" (machinery check --verbose lists each)")
+			continue
+		}
+		for _, d := range entries {
+			what := "baselined undeclared fact " + d.File + ": row " + ir.Repr(d.Unit) + ": `" + d.Token + "`"
+			if left := remaining[d.key()]; d.Count > 1 {
+				what += " (" + strconv.Itoa(left) + " of " + strconv.Itoa(d.Count) + " occurrences)"
+			}
+			g.Notes = append(g.Notes, what+resolvedSuffix)
+		}
+	}
+	if total > 0 {
+		g.Count(resolvedCount, total)
 	}
 }
 

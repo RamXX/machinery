@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/artifactset"
+	"github.com/RamXX/machinery/internal/ir"
 )
 
 // RatchetFile is the snapshot's filename inside the design directory. It is
@@ -28,11 +29,63 @@ import (
 const RatchetFile = "ratchet.json"
 
 // Ratchet is the committed set-based snapshot: the offender files of every
-// baselined (tolerated-violation) edge at the moment the baseline was taken.
+// baselined (tolerated-violation) edge at the moment the baseline was taken,
+// and, when recorded, the adoption debt of the consistency layer (Gy-rules
+// findings and Gl-ledger undeclared-fact warnings).
+//
+// Each section is optional in the file and nil when absent, which is not the
+// same as empty: a nil Edges means G4 was never baselined (G4 treats the
+// ratchet as absent), and a nil Rules or Undeclared means that gate's debt was
+// never recorded (the next `machinery baseline --gate gy|gl` records every
+// current finding). An empty, present section is a recorded baseline with no
+// debt left, which a later baseline grows only with --grow.
 type Ratchet struct {
 	Date  string              `json:"date"`
 	Edges map[string][]string `json:"edges"`
+	// Rules is the baselined Gy-rules findings, one per output tuple.
+	Rules []RuleDebt `json:"-"`
+	// Undeclared is the baselined Gl-ledger undeclared-fact warnings.
+	Undeclared []UndeclaredDebt `json:"-"`
 }
+
+// Ratchet section names in ratchet.json.
+const (
+	ratchetRulesKey      = "rule_findings"
+	ratchetUndeclaredKey = "undeclared_facts"
+)
+
+// RuleDebt is one baselined Gy-rules finding, keyed by the rule's output
+// relation and the finding tuple (its subject ids, first column first). A
+// Datalog output is a set, so the key never repeats and carries no count;
+// no line number takes part, so the key survives unrelated edits.
+type RuleDebt struct {
+	Relation string   `json:"relation"`
+	Tuple    []string `json:"tuple"`
+}
+
+func (d RuleDebt) key() string { return d.Relation + "\x00" + strings.Join(d.Tuple, "\x00") }
+
+// String renders the key as the notes print it: relation('a', 'b').
+func (d RuleDebt) String() string {
+	parts := make([]string, len(d.Tuple))
+	for i, v := range d.Tuple {
+		parts[i] = ir.Repr(v)
+	}
+	return d.Relation + "(" + strings.Join(parts, ", ") + ")"
+}
+
+// UndeclaredDebt is one baselined Gl-ledger undeclared-fact warning, keyed by
+// the matrix file (relative to the design), the row's unit name and the
+// token. One key can legitimately occur more than once (two rows of one name
+// in one file), so it records how many occurrences are tolerated.
+type UndeclaredDebt struct {
+	File  string `json:"file"`
+	Unit  string `json:"unit"`
+	Token string `json:"token"`
+	Count int    `json:"count"`
+}
+
+func (d UndeclaredDebt) key() string { return d.File + "\x00" + d.Unit + "\x00" + d.Token }
 
 // LoadRatchet reads design/ratchet.json. A missing file is (nil, nil): the
 // ratchet is optional until the contract carries baseline: rules.
@@ -60,7 +113,7 @@ func decodeRatchet(raw []byte) (*Ratchet, error) {
 	if delim, ok := start.(json.Delim); !ok || delim != '{' {
 		return nil, fmt.Errorf("root must be a JSON object")
 	}
-	r := &Ratchet{Edges: map[string][]string{}}
+	r := &Ratchet{}
 	seen := map[string]bool{}
 	for dec.More() {
 		tok, err := dec.Token()
@@ -92,17 +145,40 @@ func decodeRatchet(raw []byte) (*Ratchet, error) {
 				return nil, err
 			}
 			r.Edges = edges
+		case ratchetRulesKey:
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return nil, err
+			}
+			rules, err := decodeRuleDebt(raw)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", ratchetRulesKey, err)
+			}
+			r.Rules = rules
+		case ratchetUndeclaredKey:
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return nil, err
+			}
+			undeclared, err := decodeUndeclaredDebt(raw)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", ratchetUndeclaredKey, err)
+			}
+			r.Undeclared = undeclared
 		default:
-			return nil, fmt.Errorf("unknown root key %q (supported: date, edges)", key)
+			return nil, fmt.Errorf("unknown root key %q (supported: date, edges, %s, %s)", key, ratchetRulesKey, ratchetUndeclaredKey)
 		}
 	}
 	if _, err := dec.Token(); err != nil {
 		return nil, err
 	}
-	for _, required := range []string{"date", "edges"} {
-		if !seen[required] {
-			return nil, fmt.Errorf("missing required root key %q", required)
-		}
+	if !seen["date"] {
+		return nil, fmt.Errorf("missing required root key %q", "date")
+	}
+	// edges is required unless the file records consistency debt instead: a
+	// ratchet with no section at all records nothing
+	if !seen["edges"] && !seen[ratchetRulesKey] && !seen[ratchetUndeclaredKey] {
+		return nil, fmt.Errorf("missing required root key %q", "edges")
 	}
 	var trailing any
 	if err := dec.Decode(&trailing); err != io.EOF {
@@ -165,6 +241,91 @@ func decodeRatchetEdges(dec *json.Decoder) (map[string][]string, error) {
 	return edges, nil
 }
 
+// decodeRuleDebt reads the rule_findings section strictly: an array of
+// {relation, tuple} objects, no unknown field, no duplicate key.
+func decodeRuleDebt(raw []byte) ([]RuleDebt, error) {
+	var entries []RuleDebt
+	if err := decodeStrictArray(raw, &entries); err != nil {
+		return nil, err
+	}
+	out := []RuleDebt{}
+	seen := map[string]bool{}
+	for i, e := range entries {
+		code := ""
+		switch {
+		case strings.HasPrefix(e.Relation, findingPrefix):
+			code = strings.TrimPrefix(e.Relation, findingPrefix)
+		case strings.HasPrefix(e.Relation, warnPrefix):
+			code = strings.TrimPrefix(e.Relation, warnPrefix)
+		}
+		if code == "" {
+			return nil, fmt.Errorf("entry %d: relation %q is not named finding_<code> or warn_<code>", i, e.Relation)
+		}
+		if len(e.Tuple) == 0 {
+			return nil, fmt.Errorf("entry %d: tuple must name the finding's subject ids", i)
+		}
+		if seen[e.key()] {
+			return nil, fmt.Errorf("entry %d: duplicate finding %s", i, e)
+		}
+		seen[e.key()] = true
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+// decodeUndeclaredDebt reads the undeclared_facts section strictly: an array
+// of {file, unit, token, count} objects, every string non-empty, count at
+// least 1, no duplicate key.
+func decodeUndeclaredDebt(raw []byte) ([]UndeclaredDebt, error) {
+	var entries []UndeclaredDebt
+	if err := decodeStrictArray(raw, &entries); err != nil {
+		return nil, err
+	}
+	out := []UndeclaredDebt{}
+	seen := map[string]bool{}
+	for i, e := range entries {
+		switch {
+		case e.File == "":
+			return nil, fmt.Errorf("entry %d: file is required", i)
+		case e.Unit == "":
+			return nil, fmt.Errorf("entry %d: unit is required", i)
+		case e.Token == "":
+			return nil, fmt.Errorf("entry %d: token is required", i)
+		case e.Count < 1:
+			return nil, fmt.Errorf("entry %d: count must be at least 1", i)
+		}
+		if seen[e.key()] {
+			return nil, fmt.Errorf("entry %d: duplicate key %s row %s token %s; one entry carries the count", i, e.File, ir.Repr(e.Unit), e.Token)
+		}
+		seen[e.key()] = true
+		out = append(out, e)
+	}
+	return out, nil
+}
+
+// decodeStrictArray decodes a JSON array of objects into into, rejecting any
+// field the entry type does not declare.
+func decodeStrictArray(raw []byte, into any) error {
+	if trimmed := bytes.TrimSpace(raw); len(trimmed) == 0 || trimmed[0] != '[' {
+		return fmt.Errorf("must be an array of objects")
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	return dec.Decode(into)
+}
+
+// RatchetArmsImports reports whether the design's ratchet arms import
+// blocking at turn end: the file exists and records a G4 edges section (an
+// unreadable or malformed file arms it too, failing closed). A ratchet that
+// records only Gy/Gl debt carries no G4 snapshot and arms nothing.
+func RatchetArmsImports(design string) bool {
+	if fi, err := os.Stat(filepath.Join(design, RatchetFile)); err != nil || fi.IsDir() {
+		return false
+	}
+	r, err := LoadRatchet(design)
+	return err != nil || r == nil || r.Edges != nil
+}
+
 // WriteRatchet writes the snapshot deterministically (sorted keys via
 // encoding/json, sorted file lists, trailing newline) so it diffs cleanly.
 func WriteRatchet(design string, r *Ratchet) error {
@@ -186,11 +347,31 @@ func WriteRatchetInSnapshot(design string, r *Ratchet) error {
 }
 
 // RenderRatchet returns the exact deterministic bytes written by WriteRatchet.
+// An edges-only ratchet renders exactly as it did before the consistency
+// sections existed; an absent (nil) section is omitted, and a present one is
+// sorted by its key.
 func RenderRatchet(r *Ratchet) ([]byte, error) {
 	for _, files := range r.Edges {
 		sort.Strings(files)
 	}
-	data, err := json.MarshalIndent(r, "", "  ")
+	out := struct {
+		Date       string               `json:"date"`
+		Edges      *map[string][]string `json:"edges,omitempty"`
+		Rules      *[]RuleDebt          `json:"rule_findings,omitempty"`
+		Undeclared *[]UndeclaredDebt    `json:"undeclared_facts,omitempty"`
+	}{Date: r.Date}
+	if r.Edges != nil {
+		out.Edges = &r.Edges
+	}
+	if r.Rules != nil {
+		sort.Slice(r.Rules, func(i, j int) bool { return r.Rules[i].key() < r.Rules[j].key() })
+		out.Rules = &r.Rules
+	}
+	if r.Undeclared != nil {
+		sort.Slice(r.Undeclared, func(i, j int) bool { return r.Undeclared[i].key() < r.Undeclared[j].key() })
+		out.Undeclared = &r.Undeclared
+	}
+	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return nil, err
 	}

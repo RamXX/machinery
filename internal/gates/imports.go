@@ -1766,6 +1766,12 @@ func checkImportsWithWorkspace(design, impl string, scan *importScan, cargoWorks
 	if ratchetErr != nil {
 		g.Errs = append(g.Errs, ratchetErr.Error())
 	}
+	// a ratchet that records only consistency-layer debt carries no G4
+	// snapshot: G4 judges as if there were no ratchet at all
+	edgesAbsent := ratchet != nil && ratchet.Edges == nil
+	if edgesAbsent {
+		ratchet = nil
+	}
 	if ratchet != nil && ratchet.Date != "" {
 		g.Notes = append(g.Notes, ratchetSnapshotNote(ratchet.Date))
 	}
@@ -2065,7 +2071,10 @@ func checkImportsWithWorkspace(design, impl string, scan *importScan, cargoWorks
 			g.Count("baselined edges")
 			key := srcB + " -> " + dstB
 			if ratchet == nil {
-				if !missingRatchetReported {
+				if !missingRatchetReported && edgesAbsent {
+					g.Errs = append(g.Errs, "contract has baseline: rules but "+RatchetFile+" records no G4 edges; run 'machinery baseline <design> --impl <dir>' to record the snapshot")
+					missingRatchetReported = true
+				} else if !missingRatchetReported {
 					g.Errs = append(g.Errs, "contract has baseline: rules but design has no "+RatchetFile+"; run 'machinery baseline <design> --impl <dir>' to record the snapshot")
 					missingRatchetReported = true
 				}

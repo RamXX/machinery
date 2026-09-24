@@ -611,7 +611,9 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 		out = append(out, CheckPack(design))
 	}
 	if opt.Complete {
-		out = append(out, CheckFinalHandoff(design))
+		final := CheckFinalHandoff(design)
+		requireNoBaselinedDebt(final, out)
+		out = append(out, final)
 	}
 	return out
 }

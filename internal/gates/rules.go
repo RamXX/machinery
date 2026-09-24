@@ -386,8 +386,54 @@ func CheckRulesImpl(design, impl string, explain bool) *Gate {
 			g.Errs = append(g.Errs, "cannot read the implementation's oracle bindings for the consistency rules: "+p)
 		}
 	}
-	checkRulesOver(g, set, facts, explain, len(rep.problems))
+	ratchet, err := LoadRatchet(design)
+	if err != nil {
+		g.Errs = append(g.Errs, err.Error())
+	}
+	checkRulesOver(g, set, facts, explain, len(rep.problems), ratchet)
 	return g
+}
+
+// ObserveRuleDebt returns the Gy-rules findings a design has today, keyed for
+// the ratchet. It refuses (an error) whenever the finding set is not the
+// design's whole debt: the rules do not load, a row cannot be projected (a
+// projection error is a broken design, not debt), the implementation's oracle
+// bindings cannot be read, or a rule file fails to evaluate.
+func ObserveRuleDebt(design, impl string) ([]RuleDebt, error) {
+	set, err := shippedRules()
+	if err != nil {
+		return nil, fmt.Errorf("the shipped consistency rules do not load: %w", err)
+	}
+	rep, err := projectDesignFacts(design)
+	if err != nil {
+		return nil, fmt.Errorf("cannot project the design's facts for the consistency rules: %w", err)
+	}
+	if len(rep.problems) > 0 {
+		return nil, fmt.Errorf("Gy-rules has %d projection error(s); a row the rules cannot read is a broken design, not debt, and is never baselined; fix them and rerun:\n  %s",
+			len(rep.problems), strings.Join(prefixed(projectionErrorPrefix, rep.problems), "\n  "))
+	}
+	if impl != "" {
+		if problems := AddImplBindings(rep.facts, design, impl); len(problems) > 0 {
+			return nil, fmt.Errorf("cannot read the implementation's oracle bindings for the consistency rules: %s", strings.Join(problems, "; "))
+		}
+	}
+	findings, errs := evaluateRules(set, rep.facts)
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("the consistency rules did not evaluate whole: %s", strings.Join(errs, "; "))
+	}
+	out := []RuleDebt{}
+	for _, f := range findings {
+		out = append(out, RuleDebt{Relation: f.output.relation, Tuple: append([]string(nil), f.tuple...)})
+	}
+	return out, nil
+}
+
+func prefixed(prefix string, items []string) []string {
+	out := make([]string, len(items))
+	for i, s := range items {
+		out[i] = prefix + s
+	}
+	return out
 }
 
 // projectionErrorPrefix opens the ERROR of a row Gy-rules could not project.
@@ -401,17 +447,39 @@ func partialProjectionNote(n int) string {
 	return fmt.Sprintf(" [projection partial: %d projection error(s) omitted facts, so this finding may follow from an omitted row]", n)
 }
 
-func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain bool, omitted int) {
+// checkRulesOver evaluates the rules and reports each finding. A finding the
+// ratchet records (its relation and tuple) is a baselined NOTE, never an
+// ERROR or a warning; a recorded entry no longer observed is a resolved NOTE.
+// Without a rule_findings section every finding reports as it always has.
+func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain bool, omitted int, ratchet *Ratchet) {
 	findings, errs := evaluateRules(set, facts)
 	g.Errs = append(g.Errs, errs...)
 	sources := indexFactSources(facts)
 	if omitted > 0 {
 		g.Notes = append(g.Notes, fmt.Sprintf("projection partial: %d projection error(s) omitted facts; the rules ran on the rest and every finding is marked", omitted))
 	}
+	recorded := map[string]bool{}
+	if ratchet != nil {
+		for _, d := range ratchet.Rules {
+			recorded[d.key()] = true
+		}
+	}
+	observed := map[string]bool{}
+	baselined := 0
 	for _, f := range findings {
 		msg := sources.message(f)
 		if omitted > 0 {
 			msg += partialProjectionNote(omitted)
+		}
+		if key := (RuleDebt{Relation: f.output.relation, Tuple: f.tuple}).key(); recorded[key] {
+			observed[key] = true
+			baselined++
+			note := baselinedPrefix + msg
+			g.Notes = append(g.Notes, note)
+			if explain {
+				g.addExplain(note, sources.explainLines(f.file, f.tree))
+			}
+			continue
 		}
 		if f.output.warn {
 			g.Warns = append(g.Warns, msg)
@@ -422,10 +490,27 @@ func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain b
 			g.addExplain(msg, sources.explainLines(f.file, f.tree))
 		}
 	}
+	// a recorded finding missing from a partial projection may be missing
+	// only because its row was omitted, so nothing is called resolved then
+	resolved := 0
+	if ratchet != nil && omitted == 0 {
+		for _, d := range ratchet.Rules {
+			if !observed[d.key()] {
+				resolved++
+				g.Notes = append(g.Notes, "baselined finding "+d.String()+resolvedSuffix)
+			}
+		}
+	}
 	g.Count("rule files evaluated", len(set.files))
 	inputs := 0
 	for _, rows := range ruleInputs(facts) {
 		inputs += len(rows)
 	}
 	g.Count("facts", inputs)
+	if baselined > 0 {
+		g.Count(BaselinedCount, baselined)
+	}
+	if resolved > 0 {
+		g.Count(resolvedCount, resolved)
+	}
 }

@@ -138,7 +138,7 @@ finding_ghost("Nowhere.unit", E) :- entity(E).
 		t.Fatal(err)
 	}
 	g := NewGate(RulesGateTitle)
-	checkRulesOver(g, set, facts, true, 0)
+	checkRulesOver(g, set, facts, true, 0, nil)
 	if len(g.Errs) != 1 || g.Errs[0] != "Nowhere.unit (no source): ghost (fact 'Order')" {
 		t.Fatalf("errs = %q", g.Errs)
 	}
@@ -279,7 +279,7 @@ warn_writer(U) :- unit_writes(U, _).
 		t.Fatal(err)
 	}
 	g := NewGate(RulesGateTitle)
-	checkRulesOver(g, set, facts, false, 0)
+	checkRulesOver(g, set, facts, false, 0, nil)
 	if len(g.Warns) != 1 || g.Warns[0] != "machines/Order.matrix.md:3: row 'Order.recordPay': writer" || len(g.Errs) != 0 {
 		t.Fatalf("warns = %q errs = %q", g.Warns, g.Errs)
 	}

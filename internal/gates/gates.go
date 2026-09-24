@@ -203,6 +203,7 @@ func (g *Gate) Emit(out io.Writer) int {
 	}
 	for _, a := range g.Notes {
 		fmt.Fprintf(out, "  note   %s\n", a)
+		g.emitExplain(out, a)
 	}
 	var parts []string
 	for _, k := range g.countOrder {
