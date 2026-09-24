@@ -8,7 +8,8 @@ labels: [traceability, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:b6f021c3dcadbae0ea8e8e826f2ade5203b8e735b7949422eab1f5607a690687"
+content_hash: "sha256:b6669a9c2da43860f95cc6225835ec3619a741c22f82346ee9e1433db7e3b818"
+blocked_by: [MAC-zti7]
 ---
 
 ## Description
@@ -36,9 +37,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:57Z dep_added: blocked_by MAC-zti7
 
 ## Links
-
+- Blocked by: [[MAC-zti7]]
 
 ## Comments
