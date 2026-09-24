@@ -9,7 +9,7 @@ failure catalog.
 
 | name | kind | signature | pre / post | maps to | test | fixture |
 |---|---|---|---|---|---|---|
-| `persistReservation` | actor | `(reservationId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row, the stock counters, and the outbox event in one transaction, or nothing: committing moves `reserved -> onHand` deduction, releasing returns the hold CARRIES{column:Reservation.status, column:Inventory.onHand, column:Inventory.reserved, outbox:reserved, outbox:released} | C4 `inventorySvc -> inventoryDb`; inv `reserved-within-stock`, `available-nonneg`, `exactly-once-effect` | integration + property | real Postgres; property: concurrent holds never oversell the last unit |
+| `persistReservation` | actor | `(reservationId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row, the stock counters, and the outbox event in one transaction, or nothing: committing moves `reserved -> onHand` deduction, releasing returns the hold | C4 `inventorySvc -> inventoryDb`; inv `reserved-within-stock`, `available-nonneg`, `exactly-once-effect` | integration + property | real Postgres; property: concurrent holds never oversell the last unit |
 | `pendingIsCommitted` / `pendingIsReleased` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) | unit | pure |
 | `priorIsHeld` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus = Held` (the only overlay entry point) | - (rollback routing) | unit | pure |
 | `isErrUnavailable` / `isErrConflict` | guard | `(ctx,evt) -> bool` | true iff `evt.error` is that typed repo error | C4 3 DB failure classes | unit | pure |

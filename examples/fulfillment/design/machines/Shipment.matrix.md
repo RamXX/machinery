@@ -9,8 +9,8 @@ named-unit contract table and the failure catalog.
 
 | name | kind | signature | pre / post | maps to | test | fixture |
 |---|---|---|---|---|---|---|
-| `carrierDispatch` | actor | `(shipmentId, orderId) -> trackingId \| err{retryable, rejected}` | books the parcel once (carrier keyed by shipmentId); returns the tracking id CARRIES{sink:carrier} | C4 `shippingSvc -> carrier` | integration | carrier fake contract-tested against the carrier sandbox |
-| `persistShipment` | actor | `(shipmentId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row and the outbox event in one transaction, or neither CARRIES{column:Shipment.status, outbox:dispatched, outbox:delivered, outbox:lost} | C4 `shippingSvc -> shippingDb`; inv `exactly-once-effect` | integration | real Postgres |
+| `carrierDispatch` | actor | `(shipmentId, orderId) -> trackingId \| err{retryable, rejected}` | books the parcel once (carrier keyed by shipmentId); returns the tracking id | C4 `shippingSvc -> carrier` | integration | carrier fake contract-tested against the carrier sandbox |
+| `persistShipment` | actor | `(shipmentId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row and the outbox event in one transaction, or neither | C4 `shippingSvc -> shippingDb`; inv `exactly-once-effect` | integration | real Postgres |
 | `pendingIsDispatched` / `pendingIsInTransit` / `pendingIsDelivered` / `pendingIsLost` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) | unit | pure |
 | `priorIsPending` / `priorIsDispatched` / `priorIsInTransit` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus` equals that status | - (rollback routing) | unit | pure |
 | `isErrRetryable` | guard | `(ctx,evt) -> bool` | true iff the carrier error is a 5xx or a timeout. `CLAUSES{carrier-5xx, carrier-timeout}` | C4 3 carrier failure classes | unit | pure |
@@ -26,7 +26,7 @@ named-unit contract table and the failure catalog.
 | `incrementRetries` / `incrementCarrierRetries` | action | `(ctx) -> ctx` | increment the respective counter | - | unit | pure |
 | `recordCarrierError` / `recordCarrierTimeout` / `recordCarrierExhausted` / `recordDispatchFailed` | action | `(ctx,evt) -> ctx` | `lastError := classified carrier outcome`; a failed dispatch leaves the shipment truthfully Pending for the saga to compensate | C4 3 carrier posture | unit | pure |
 | `recordError` / `recordConflict` / `recordTimeout` / `recordUnknownError` / `recordRetriesExhausted` / `recordRoutingError` | action | `(ctx,evt) -> ctx` | `lastError := classified repo error` | maps repo errors | unit | pure |
-| `validateAddressCountry` | invariant | `(address) -> bool` | reject dispatch input when `Address.country` is empty before invoking the carrier. USES{Address.country} | inv `address-country-present`; Shipment dispatch boundary | property | generated addresses with empty and non-empty country |
+| `validateAddressCountry` | invariant | `(address) -> bool` | reject dispatch input when `Address.country` is empty before invoking the carrier | inv `address-country-present`; Shipment dispatch boundary | property | generated addresses with empty and non-empty country |
 
 Structural: `shipment-terminal` is enforced by Delivered and Lost being final states.
 

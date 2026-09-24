@@ -575,7 +575,7 @@ func TestElixirAdapterRejectsRuntimeIdentityMismatch(t *testing.T) {
 	}
 	defer func() { _ = handle.Close() }()
 	identity := handle.Identity()
-	identity.Version = "1.19.0/" + runtimeclosure.RequiredOTPVersion + "/" + runtimeclosure.RequiredErtsVersion
+	identity.Version = "1.19.0/29.0.6/17.0.6"
 	suite.Runtime = identity
 	src := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(src, "test"), 0o755); err != nil {

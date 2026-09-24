@@ -41,9 +41,6 @@ type RunOptions struct {
 	// GitImpl is the logical implementation path used with GitDesign for
 	// Gr-reads history queries after the implementation has been snapshotted.
 	GitImpl string
-	// Explain prints, under every Gy-rules finding, the derivation that
-	// produced it (machinery check --explain).
-	Explain bool
 	// cargoWorkspaceManifest is an immutable exact-file snapshot of a Cargo
 	// workspace root above --impl. It is populated only by Snapshot.RunSelected.
 	cargoWorkspaceManifest string
@@ -243,15 +240,6 @@ func remapGatePaths(gs []*Gate, from, to string) {
 		remap(gate.Warns)
 		remap(gate.Notes)
 		remap(gate.checkedExtra)
-		if gate.explain != nil {
-			explain := map[string][]string{}
-			for finding, lines := range gate.explain {
-				lines = append([]string(nil), lines...)
-				remap(lines)
-				explain[strings.ReplaceAll(finding, from, to)] = lines
-			}
-			gate.explain = explain
-		}
 	}
 }
 
@@ -264,7 +252,7 @@ func (s *Snapshot) VersionSkewNote(gs []*Gate) string {
 // KnownGate; two hand-kept lists once drifted.
 var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gu": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
-	"g3": true, "gd": true, "gl": true, "gx": true, "gy": true, "gr": true, "gk": true, "gb": true, "gw": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
+	"g3": true, "gd": true, "gl": true, "gx": true, "gr": true, "gk": true, "gb": true, "gw": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
 }
 
 // KnownGate reports whether name names a gate this suite can run.
@@ -327,7 +315,6 @@ func validateActivationDiscovery(design string) error {
 			return probeRegularFile(design, filepath.Join("formal", alloy.IsolationAnnotationName))
 		}},
 		{"BUILD.md", func() (bool, error) { return probeRegularFile(design, "BUILD.md") }},
-		{"consistency rules", func() (bool, error) { return probeRulesActive(design) }},
 		{"acceptance", func() (bool, error) { return probeRealDir(design, AcceptanceDirName) }},
 		{"adjudications", func() (bool, error) { return probeRealDir(design, AdjudicationDirName) }},
 		{"attestations", func() (bool, error) { return probeRegularFile(design, AttestationsFileName) }},
@@ -362,7 +349,7 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 	if err := validateActivationDiscovery(design); err != nil {
 		return sel, err
 	}
-	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5"
+	list := "gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5"
 	if !sel.Explicit && pack.HasDecomposition(design) {
 		if !HasMachines(design) {
 			// a pure decomposed parent authors no machines: its behavior
@@ -406,10 +393,6 @@ func selectInSnapshot(design, gateList, impl string) (Selection, error) {
 				}
 			}
 			parts = append(parts, "g2", "gl")
-			if RulesActive(design) {
-				// a machine-less parent can still carry AUTHORIZATION.md
-				parts = append(parts, "gy")
-			}
 			if HasDeclaredReads(design) {
 				parts = append(parts, "gr")
 			}
@@ -502,7 +485,7 @@ func SelectRunAndNote(design, impl, gateList string, opt RunOptions) (sel Select
 }
 
 // RunSelected runs the selected gates in canonical order (Gm, Gs, Gu, Gp, Gi,
-// Gn, Gc, G2, G3, Gd, Gl, Gx, Gy, Gr, Gk, Gb, Gw, Ge, Ga, Gj, Gv, G4, Gt, G5) with `machinery check`'s applicability
+// Gn, Gc, G2, G3, Gd, Gl, Gx, Gr, Gk, Gb, Gw, Ge, Ga, Gj, Gv, G4, Gt, G5) with `machinery check`'s applicability
 // rules: opt-in gates run only when their source exists (or when explicitly
 // requested), G4 and Gt only with an impl dir, and G5 only when explicitly
 // requested or when the design is decomposed. opt carries the run-time inputs
@@ -561,13 +544,6 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 	}
 	if sel.Run["gx"] {
 		out = append(out, CheckTraceability(design))
-	}
-	if sel.Run["gy"] {
-		if RulesActive(design) {
-			out = append(out, CheckRulesImpl(design, impl, opt.Explain))
-		} else if sel.Explicit {
-			out = append(out, rulesNotActivated())
-		}
 	}
 	if sel.Run["gr"] && (sel.Explicit || HasDeclaredReads(design)) {
 		out = append(out, CheckDeclaredReads(design, impl, opt.GitDesign, opt.GitImpl))

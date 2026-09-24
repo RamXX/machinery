@@ -50,10 +50,7 @@ func alloyJarPath() (string, error) {
 	return filepath.Join(cache, "machinery", "alloy-dist-"+alloyVersion+".jar"), nil
 }
 
-// ensureAlloyJarContext fetches and checksum-verifies the pinned Alloy jar on
-// first use; ctx bounds the wait for another process fetching into the same
-// cache.
-func ensureAlloyJarContext(ctx context.Context) (string, error) {
+func ensureAlloyJar() (string, error) {
 	want, err := overrideSHA("ALLOY_TOOLS_JAR", "ALLOY_TOOLS_JAR_SHA256", alloySHA256)
 	if err != nil {
 		return "", err
@@ -62,7 +59,7 @@ func ensureAlloyJarContext(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fetchJarContext(ctx, path,
+	return fetchJar(path,
 		"https://github.com/AlloyTools/org.alloytools.alloy/releases/download/"+alloyVersion+"/org.alloytools.alloy.dist.jar",
 		"org.alloytools.alloy.dist.jar "+alloyVersion, want)
 }
@@ -337,7 +334,7 @@ func runAlloy(alsPath string, commands []alloy.Command) (result []AlloyVerdict, 
 }
 
 func runAlloyScoped(ctx context.Context, alsPath string, commands []alloy.Command) (result []AlloyVerdict, notes []string, retErr error) {
-	jar, err := ensureAlloyJarContext(ctx)
+	jar, err := ensureAlloyJar()
 	if err != nil {
 		return nil, nil, err
 	}

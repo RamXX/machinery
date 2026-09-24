@@ -11,8 +11,7 @@
 #   this script                 the fast tier, then the heavy tier below
 #
 # Heavy tier: the race sweep, the required native integration lane, the
-# registered implementation modules, TLC formal verification, the Datalog
-# rules parity lane, C4 compilation,
+# registered implementation modules, TLC formal verification, C4 compilation,
 # and external checker reproduction. Any failure exits non-zero.
 #
 # Run directly any time with:   make preflight   (or  scripts/preflight.sh)
@@ -41,7 +40,7 @@ scripts/preflight-fast.sh || fail "cheap gate tier failed"
 say "native assurance runtime presence (node, python3, elixir, mix, tsc)"
 for tool in node python3 elixir mix tsc; do
   command -v "$tool" >/dev/null 2>&1 ||
-    fail "required native assurance runtime '$tool' is missing (the lane pins Node 26.9.0 + TypeScript 7.0.2, CPython 3.14.7, Elixir/Mix 1.20.4 with OTP 29 / ERTS 17.1)"
+    fail "required native assurance runtime '$tool' is missing (the lane pins Node 26.8.1 + TypeScript 7.0.2, CPython 3.14.7, Elixir/Mix 1.20.4 with OTP 29 / ERTS 17.0.6)"
 done
 
 # 3. race tests (ci: test job) ---------------------------------------------
@@ -71,12 +70,6 @@ done
 # 5. engine-backed formal suite (formal.yml) -------------------------------
 say "formal verification (regeneration + TLC)"
 make verify-formal || fail "formal verification failed"
-
-# 5b. Datalog parity (ci: datalog-parity job) ------------------------------
-# Every shipped consistency rule file over every bundled example, under native
-# Soufflé and the in-process evaluator, in the pinned image the CI job uses.
-say "Datalog rules parity (Soufflé vs internal/datalog, pinned image)"
-make dagger-job JOB=datalog-parity || fail "Datalog rules parity failed"
 
 # 6. C4 engine compilation (ci: engine-verification job) -------------------
 say "C4 compilation (Structurizr CLI)"
@@ -129,7 +122,6 @@ esac
 "$run_safe" -timeout 2m -stdout-limit 4096 -stderr-limit 4096 -- \
   "$docker_bin" run --rm --pull=never --platform "$checker_platform" --network=none --read-only \
   "$checker_image" python3 --version || fail "pinned external-checker image cannot run offline on $checker_platform"
-scripts/pii-flow-image.sh "$docker_bin" || fail "could not provision the pinned pii-flow checker image"
 if [ -z "${DOCKER_HOST:-}" ]; then
   DOCKER_HOST=$("$run_safe" -timeout 30s -stdout-limit 4096 -stderr-limit 4096 -- \
     "$docker_bin" context inspect --format '{{(index .Endpoints "docker").Host}}') ||

@@ -94,7 +94,6 @@ func collectClauseDecls(g *Gate, design string) []clauseSet {
 	var out []clauseSet
 	seen := map[[2]string]bool{}
 	siblings := siblingOracleGuards(design)
-	contractOnly := contractOnlyMatrices(design)
 	paths, _ := strictSortedGlob(g, filepath.Join(design, "machines"), "*.matrix.md", "clause matrix")
 	for _, path := range paths {
 		body, err := readDesignFile(design, path)
@@ -155,21 +154,9 @@ func collectClauseDecls(g *Gate, design string) []clauseSet {
 				strings.Contains(m[2], ",") && len(strings.Split(m[2], ",")) != len(d.retired) {
 				g.Errs = append(g.Errs, loc+": malformed clause list contains an empty member")
 			}
-			switch {
-			case owner == "":
+			if owner == "" {
 				g.Errs = append(g.Errs, loc+": empty matrix owner; name the matrix after its machine")
-			case contractOnly[owner]:
-				// A contract-only record (its placement row waives the
-				// machine): the clause set is the record's contract and
-				// governs no transition, so it binds no oracle row and owes
-				// no suffixed transition id. Its obligation is the
-				// assurance inventory's guard-clause key, one per active
-				// clause (owner = the matrix, id = guard:clause). A sibling
-				// oracle governing the guard is still the ownership defect.
-				if other := siblings(owner, name); other != "" {
-					g.Errs = append(g.Errs, loc+": contract-only matrix declares clauses for a guard "+other+"'s oracle governs; another machine cannot supply it")
-				}
-			default:
+			} else {
 				if _, err := readDesignFile(design, filepath.Join(design, "machines", owner+".machine.json")); err != nil {
 					g.Errs = append(g.Errs, loc+": missing or unreadable owning machine: "+err.Error())
 				}

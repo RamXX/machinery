@@ -1494,7 +1494,7 @@ func provisionFormal(work string) (retErr error) {
 		}
 	}()
 	ctx := processcontrol.WithScope(baseCtx, scope)
-	java, err := runtimeclosure.OpenJavaContext(ctx)
+	java, err := runtimeclosure.OpenJava()
 	if err != nil {
 		return err
 	}

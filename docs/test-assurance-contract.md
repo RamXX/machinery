@@ -271,7 +271,7 @@ The helper protocol is accident-resistant, not a cryptographic channel against t
 
 ## 6. Native adapter profiles and supported surface
 
-The release must contain all four adapters below plus real end-to-end baseline/control/challenge/GREEN tests for each. Initial EXACT compatibility entries are Go 1.27.1, Node 26.9.0 with TypeScript compiler 7.0.2, CPython 3.14.7, and Elixir/ExUnit/Mix 1.20.4 with Erlang/OTP 29.1.1 (ERTS 17.1). Availability of a runtime is not adapter verification. Platform-specific closure hashes are provisioned and checked by implementation/runtime stories. Adding another tested exact version is a compatibility-catalog change, never `>=` optimistic parsing.
+The release must contain all four adapters below plus real end-to-end baseline/control/challenge/GREEN tests for each. Initial EXACT compatibility entries are Go 1.27.1, Node 26.8.1 with TypeScript compiler 7.0.2, CPython 3.14.7, and Elixir/ExUnit/Mix 1.20.4 with Erlang/OTP 29.0.6 (ERTS 17.0.6). Availability of a runtime is not adapter verification. Platform-specific closure hashes are provisioned and checked by implementation/runtime stories. Adding another tested exact version is a compatibility-catalog change, never `>=` optimistic parsing.
 
 ### `go-testing/v1`
 

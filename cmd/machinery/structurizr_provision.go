@@ -28,23 +28,7 @@ var structurizrHTTPDo = http.DefaultClient.Do
 
 var closeStructurizrZip = func(reader *zip.ReadCloser) error { return reader.Close() }
 
-// structurizrProvisionLockName is the provisioning lock inside the
-// Structurizr cache base. It lives beside the tree it guards rather than in a
-// lock namespace, so every process sharing the cache (separate package test
-// binaries included) contends on the same file.
-const structurizrProvisionLockName = ".structurizr-provision.lock"
-
-func provisionStructurizr() (string, error) {
-	return provisionStructurizrContext(context.Background())
-}
-
-// provisionStructurizrContext returns the pinned launcher, provisioning it on
-// first use. Exactly one caller per cache provisions while holding the cache's
-// provisioning lock; every other caller waits (until ctx ends or the filelock
-// acquisition limit elapses) and then validates the published tree against its
-// receipt like any warm-cache caller. A holder that dies releases the lock with
-// its process, and the next holder recovers the stage it left.
-func provisionStructurizrContext(ctx context.Context) (path string, retErr error) {
+func provisionStructurizr() (path string, retErr error) {
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
@@ -53,9 +37,9 @@ func provisionStructurizrContext(ctx context.Context) (path string, retErr error
 	if err := os.MkdirAll(base, 0o700); err != nil {
 		return "", err
 	}
-	lock, err := filelock.AcquireFileWaitContext(ctx, base, structurizrProvisionLockName)
+	lock, err := filelock.AcquireWait(base)
 	if err != nil {
-		return "", fmt.Errorf("wait for Structurizr provisioning lock: %w", err)
+		return "", err
 	}
 	defer func() { retErr = errors.Join(retErr, lock.Release()) }()
 	if err := cachestage.Recover(base, ".structurizr-stage-"); err != nil {
@@ -148,11 +132,7 @@ func validateStructurizrCache(root string) error {
 	return nil
 }
 
-// downloadStructurizrArchive is the provisioner's download step; tests
-// substitute it to exercise provisioning without the network.
-var downloadStructurizrArchive = downloadPinnedStructurizrArchive
-
-func downloadPinnedStructurizrArchive(url, destination string) (retErr error) {
+func downloadStructurizrArchive(url, destination string) (retErr error) {
 	defer func() {
 		if retErr != nil {
 			removeErr := os.Remove(destination)

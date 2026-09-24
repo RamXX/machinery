@@ -94,18 +94,11 @@ type Java struct {
 }
 
 func OpenJava() (*Java, error) {
-	return OpenJavaContext(context.Background())
-}
-
-// OpenJavaContext is OpenJava with a context that bounds how long the caller
-// waits for another process that is provisioning the pinned runtime into the
-// same cache.
-func OpenJavaContext(ctx context.Context) (*Java, error) {
 	source := os.Getenv(JavaEnv)
 	explicit := source != ""
 	if source == "" {
 		var err error
-		source, err = provisionedJavaPathContext(ctx)
+		source, err = provisionedJavaPath()
 		if err != nil {
 			return nil, fmt.Errorf("provision pinned Java runtime: %w", err)
 		}
@@ -302,7 +295,7 @@ func validateJavaProperties(output string) (map[string]string, error) {
 		}
 	}
 	version := properties["java.version"]
-	if version != pinnedJavaVersion {
+	if version != "21.0.12.1" {
 		return nil, unsupportedJavaVersion(version)
 	}
 	parts := strings.FieldsFunc(version, func(r rune) bool { return r < '0' || r > '9' })
@@ -342,9 +335,9 @@ func allowedJavaPropertyKey(key string) bool {
 
 func canonicalJavaVersionLine(line string) bool {
 	const (
-		versionLine = `openjdk version "` + pinnedJavaVersion + `" ` + pinnedJavaReleaseDate + ` LTS`
-		runtimeLine = `OpenJDK Runtime Environment Temurin-` + PinnedJavaRuntimeVersion + ` (build ` + PinnedJavaProbeVersion + `)`
-		vmLine      = `OpenJDK 64-Bit Server VM Temurin-` + PinnedJavaRuntimeVersion + ` (build ` + PinnedJavaProbeVersion + `, mixed mode, sharing)`
+		versionLine = `openjdk version "21.0.12.1" 2026-08-18 LTS`
+		runtimeLine = `OpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)`
+		vmLine      = `OpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode, sharing)`
 	)
 	return line == versionLine || line == runtimeLine || line == vmLine
 }

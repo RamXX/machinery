@@ -66,7 +66,7 @@ assertion RED.
 The frozen argv is `mix test --seed <adapter seed> --max-cases <adapter
 max_cases> --warnings-as-errors <declared files...>` run with a fresh
 private `MIX_BUILD_PATH`, private `MIX_HOME`/`HOME`/`TMPDIR`, an offline
-closed environment and the pinned Elixir 1.20.4 / OTP 29.1.1 (ERTS 17.1)
+closed environment and the pinned Elixir 1.20.4 / OTP 29.0.6 (ERTS 17.0.6)
 runtime closure on `PATH`. Reconciliation rejects any effective-option
 drift the reporter reports (filters, formatter replacement, truncation,
 re-run or dry-run modes).

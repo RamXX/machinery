@@ -312,19 +312,13 @@ which):
 
 | name | kind | signature | contract (pre / post) | maps to | test type | fixture |
 |---|---|---|---|---|---|---|
-| `hasValidPaymentMethod` | guard | `(ctx, evt) -> bool` | true iff a non-expired method is on file. USES{PaymentMethod.expiresAt} | invariant `payment-method-valid` | unit | fake clock |
-| `chargePayment` | actor | `(input) -> Charge` | charges once; idempotent by `orderId`. WRITES{Payment.status} CARRIES{column:Payment.status} | C4 rel `order.service -> payments.api` | integration | contract-tested payments fake |
-| `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1`. WRITES{} | - | unit | none |
+| `hasValidPaymentMethod` | guard | `(ctx, evt) -> bool` | true iff a non-expired method is on file | invariant `payment-method-valid` | unit | fake clock |
+| `chargePayment` | actor | `(input) -> Charge` | charges once; idempotent by `orderId` | C4 rel `order.service -> payments.api` | integration | contract-tested payments fake |
+| `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1` | - | unit | none |
 
 G3 requires a row for every guard, action, and actor the machine fires; a missing row is DRIFT.
 Side-effect and idempotency contracts (the "charges once" class) are integration or property tests
 against the real dependency or a contract-tested fake; they are never derivable from transition tests.
-
-The contract cell may carry the declaration groups the skill lists: `WRITES{...}` for the stored
-facts the unit writes (`WRITES{}` when it writes none), `USES{...}` for the facts it reads or names,
-and `CARRIES{kind:target, ...}` for what carries an effect. Gx-trace parses them and fails a
-malformed group or an unknown upper-case `NAME{`; a backticked fact the row does not declare is a
-Gl-ledger warning.
 
 ## Helper keys, and importing into Stately or @xstate/graph
 

@@ -189,7 +189,7 @@ type elixirPrepared struct {
 }
 
 // Prepare implements tdd.Adapter: it validates the closed request, opens and
-// validates the pinned Elixir / OTP (ERTS) runtime
+// validates the pinned Elixir 1.20.4 / OTP 29.0.6 (ERTS 17.0.6) runtime
 // closure under the live scope, materializes and re-verifies the captured
 // source bundle plus every embedded pinned asset into a fresh private Mix
 // harness, validates each registered assertion as a typed helper call at

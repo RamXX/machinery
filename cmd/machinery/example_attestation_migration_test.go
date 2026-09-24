@@ -54,11 +54,11 @@ const (
 	reReviewPrefix = "Re-reviewed 2026-09-06 over the corrected BUILD"
 	// crmBumpDate/crmBumpPrefix pin the two go-crm rows covering BUILD.md.
 	// They moved off reviewDate when the dependabot bump of
-	// golang.org/x/crypto (0.55.0 to 0.56.0, then 0.56.0 to 0.57.0) staled the
-	// pin text BUILD.md quotes from the authoritative impl/go.mod, forcing a
-	// re-review of the corrected document and of the bumped implementation root.
-	crmBumpDate        = "2026-09-23"
-	crmBumpPrefix      = "Re-reviewed 2026-09-23 over the corrected BUILD"
+	// golang.org/x/crypto (0.55.0 to 0.56.0) staled the pin text BUILD.md
+	// quotes from the authoritative impl/go.mod, forcing a re-review of the
+	// corrected document and of the bumped implementation root.
+	crmBumpDate        = "2026-09-09"
+	crmBumpPrefix      = "Re-reviewed 2026-09-09 over the corrected BUILD"
 	portfolioRenewal   = "Renews the 2026-09-02 Codex deterministic design review"
 	nextGateAttestor   = "Codex lane/next-gates"
 	nextGateDate       = "2026-09-22"

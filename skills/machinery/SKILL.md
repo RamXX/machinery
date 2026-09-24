@@ -1,7 +1,7 @@
 ---
 name: machinery
 metadata:
-  version: "0.10.0"
+  version: "0.9.0"
 description: >
   Design software as a build-ready blueprint for greenfield, brownfield,
   rebuild, or hybrid work. Use for domain modeling, C4 architecture, state
@@ -116,22 +116,22 @@ not the event-payload `READS{...}` grammar above. `Gr-reads` warns in a design-o
 commit. The exact closed grammar is in `docs/declared-reads.md`.
 
 When a matrix event row restates a complete payload, use exactly one
-`payload {field, ...}` or `payload is exactly {field, ...}` group. It binds to
-that row's one event, and Gy-rules requires exact set equality with the
+`payload {field, ...}` or `payload is exactly {field, ...}` group. Gx-trace
+binds it to that row's one event and requires exact set equality with the
 Architecture Contract payload cell. Payload prose without a group defines
 nothing.
 
-Every action whose Modelith actor is `System`, and every action a matrix row
-declares in `PRODUCES{}`, needs an authorization admission: one row of a marked
-hand-written inventory (`AUTHORIZATION.md` carrying the
-`<!-- machinery:authorization-inventory -->` marker), covered by g2
-attestations. The row's subject is the `Entity.action` id and its admission is
-one backticked capability declared in `workspace.dsl`, or
-`(no authorization: <reason>)`. A `System` action whose matrix unit declares
-`WRITES{}` is read-only and owes no row. Gy-rules reports a missing, orphan, or
-unresolvable admission; Gx-trace reports a malformed row. A design with its own
-authorization notation generates these rows from its own reader (see the
-migration note below).
+Every action whose Modelith actor is `System`, and every producer named in an
+exact producer column of a matrix cascade or consumer table, needs an
+authorization admission. A marked hand-written inventory (`AUTHORIZATION.md`
+or `ARCHITECTURE.md`) gives exact subject rows and is covered by g2 attestations.
+Its admission exactly names a declared C4 element, matrix producer, or
+residual-table preset; a row may instead use
+`(no authorization: <reason>)`. A matrix may carry the H2 form instead:
+`MACHINE-WRITTEN{action, ...}` in a resource's machine-written actions cell,
+and `MACHINE-WRITTEN-BY{action: producer, ...}` in the residual verb table's
+resource cell. The latter is producer-narrowed. A residual seat-side verb grant
+governs a non-System actor. A matrix with these marks needs no marker document.
 
 Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
@@ -152,105 +152,27 @@ machines may reuse one guard name, and a declaration whose oracle rows only a
 sibling machine could supply is an error naming that sibling. A declared guard
 no oracle governs, such as one on a creation edge, owes nothing.
 
-A fact a unit reads or names is declared in `USES{}` (and a stored fact it
-writes in `WRITES{}`); a backticked token in prose is quotation, never a fact.
-Each member resolves to a Modelith attribute (`Entity.attr`) or enum member, a
-machine context key, an event payload field, or, on the same row, a `VALUES`
-member or a `derived: fact_name (<reason>)` waiver for a unit-local computed
-fact. The reason is mandatory and the waiver does not declare the fact for any
-other row.
+Backticked facts in named-unit contract, clause, and payload columns use the
+snake-case grammar plus Modelith attribute naming styles, including `Entity.attr` and single-word facts
+used with an explicit fact verb. They resolve to a Modelith attribute, enum
+member, action, machine context key, event name or payload field, failure-catalog
+identifier, a Class C content knob, a versioned vertical field, a model relation,
+an architecture join key, or a `VALUES` member on the same row. A unit-local computed fact uses
+`derived: fact_name (<reason>)` on the same row; the reason is mandatory and
+the waiver does not declare the fact for any other row. Quoted reason classes,
+classifications, producer names, and negated or rejected fields remain prose.
 
-A closed vocabulary is one `VALUES{a, b, c}` group on a named-unit row.
-Different units sharing a vocabulary name it with `VALUES reason_class{a, b, c}`.
-A group binds to a Modelith enum by exact name and must then spell exactly the
-enum's members: `VALUES OrderState{...}` binds enum `OrderState`, and an
-unnamed `VALUES{...}` binds only when the unit name equals the enum name
-exactly. There is no case folding and no fuzzy matching: `VALUES{...}` on unit
-`orderState` binds nothing, and Gl-ledger warns on exactly that case, telling
-you to write `VALUES OrderState{...}`. Prose that calls a vocabulary closed
-declares nothing.
-
-Five more groups state what a unit touches. Gx-trace parses them and fails a
-malformed one; Gy-rules (below) decides on them. Members use the dotted
-identifier grammar of payload fields; a group opens and closes in one table
-cell; a row carries at most one group of each name.
-
-- `WRITES{Order.status, OutboxMessage.status}`: the stored facts the unit
-  writes. `WRITES{}` states a read-only unit.
-- `USES{Order.totalCents, LineItem.quantity}`: the facts the unit reads or
-  names. An empty `USES{}` is an error; omit the group instead.
-- `PRODUCES{Order.markPaid}`: on the matrix row that names a cascade or
-  consumer arm, the Modelith actions that arm performs. Each member is one
-  `Entity.action` the model declares, and each owes an authorization
-  admission whatever its Modelith actor. An empty `PRODUCES{}` is an error.
-- `CARRIES{column:Order.status, outbox:OutboxMessage}`: what carries an
-  action's or actor's effect. Kinds are `column`, `outbox`, `sink`, `signal`,
-  and `action`.
-- `SUPERSEDES{type:LegacyDeal}`: on an Architecture Contract row, never a
-  matrix row, the stable type id this row replaces. Only `type:` exists.
-- `RESERVED{type:ReadbackReceipt}`: on an Architecture Contract row, never a
-  matrix row, a type this row reserves as not yet defined. Only `type:`
-  exists. Once any artifact owns the type (a `SUPERSEDES` row naming it, or a
-  `migration.yaml` disposition), the reservation is stale and must be removed.
-
-An upper-case word directly followed by `{` in a matrix table cell that names
-none of `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`,
-`PRODUCES`, `CARRIES`, `SUPERSEDES`, or `RESERVED` is an error, so a misspelled or private group never
-passes as prose. Gl-ledger warns on a backticked snake_case or `Entity.attr`
-token in a contract, clause, or payload cell that sits outside every group and
-that the row does not declare: declare it in `USES{}` or `WRITES{}`, or drop the
-backticks.
-
-Gy-rules (`--gate gy`, active on a design with `machines/` or an
-`AUTHORIZATION.md`) evaluates the shipped Datalog rules under
-`rules/consistency/` over the design's projected facts. Every `finding_*`
-result is an ERROR: an uncovered System or produced action (`authz_missing`),
-a stale or unresolvable admission (`authz_orphan`,
-`authz_unknown_capability`), a `PRODUCES{}` member the model does not declare
-(`produces_unknown_action`), a `USES{}`/`WRITES{}` member no declaration
-resolves (`fact_unresolved`), a `VALUES` group disagreeing with the
-same-named enum (`values_disagree`), a `payload {}` twin out of step with its
-contract row (`payload_twin`), an actor with no `CARRIES{}` or a writing
-action with none (`effect_uncarried`), `CARRIES{}` on a unit that is neither
-an action nor an actor (`carrier_misplaced`), supersession cycles,
-dangling replacements and duplicate owners, a `RESERVED` type some artifact
-owns (`stale_reservation`), a `slices.yaml` `row:` citation of a superseded
-type (`superseded_in_packet`), a matrix with neither a machine nor a
-`(no machine: <reason>)` placement waiver (`orphan_matrix`), a waiver on a
-component that has a machine (`waived_machine_present`), and, under `--impl`
-only, a BUILD.md oracle binding row that disagrees with the suite
-(`milestone_binding_stale`, `milestone_binding_phantom`). `machinery check <design> --gate gy --explain`
-prints under each finding its derivation: the rule file and rule number, then
-the facts it matched with their `path:line` sources.
+A named-unit row that calls a vocabulary closed, an enum, or a reason class
+uses exactly one `VALUES{a, b, c}` group. Different units sharing a vocabulary
+can name it with `VALUES reason_class{a, b, c}`. Gx-trace compares it as a set with a
+same-named Modelith enum after case and separator normalization. Without such
+an enum, the row is the vocabulary's one declaration; prose cannot define a
+second list. A cited vocabulary owned by another model entity and a matching
+enum typed on the owning entity need no duplicate unit-local declaration.
 
 Run `machinery oracle`, `machinery check <design> --gate g3`, and
 `machinery verify-formal <design>`. Read the verification reference for all
 four semantics patterns, including `control-flow-only`.
-
-#### Migrating from the 0.9.0 prose inference
-
-machinery 0.9.0 inferred facts, writes, read-only units and producers from the
-wording of matrix cells. That inference is gone; a design states each of them.
-Gx-trace warns, for one release, on a design that declares no `WRITES{}`,
-`USES{}` or `PRODUCES{}` anywhere and quotes a fact-shaped token in prose.
-
-- A fact the prose backticked: declare it in `USES{}` on the row, or drop the
-  backticks if it was only a quotation.
-- A unit the prose called read-only ("writes nothing"): declare `WRITES{}`.
-  A unit that writes: `WRITES{Entity.attr, ...}`.
-- A producer the 0.9.0 check read from a cascade or consumer table's producer
-  column: `PRODUCES{Entity.action}` on that row, plus its `AUTHORIZATION.md`
-  row.
-- Every actor, and every action with a non-empty `WRITES{}`: `CARRIES{}` naming
-  the column, outbox event, sink, signal, or other machine's unit that carries
-  its effect.
-- A `VALUES{...}` group whose unit name matches its enum only up to case: name
-  it, `VALUES Enum{...}`.
-- A design with its own authorization notation (resource action lists, producer
-  marks, residual verb tables): machinery no longer reads it. Generate the
-  `AUTHORIZATION.md` rows from the reader the design's own tooling already has,
-  and declare the file and that reader in a root `reads:` row so Gr-reads binds
-  the pair.
 
 ### Build handoff
 

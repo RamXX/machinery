@@ -146,7 +146,7 @@ const fixtureMatrix = "# Widget machine - contract and oracle\n\n" +
 	"## (a) Named-unit contract table\n\n" +
 	"| name | kind | signature | pre / post | maps to |\n" +
 	"|---|---|---|---|---|\n" +
-	"| `saveWidget` | actor | `(input) -> row \\| err` | atomic persist CARRIES{column:Widget.status} | `db` |\n" +
+	"| `saveWidget` | actor | `(input) -> row \\| err` | atomic persist | `db` |\n" +
 	"| `guardCanPublish` | guard | `(ctx,evt) -> bool` | actor may publish | inv `widget-owned` |\n" +
 	"| `setPending` | action | `(ctx) -> ctx` | stash pending | - |\n" +
 	"| `recordDenied` | action | `(ctx) -> ctx` | rejection reason | surfaces `widget-owned` |\n" +

@@ -9,7 +9,7 @@ States trace to enum `TaskStatus`. Events trace to `Task` actions. `Done`/`Cance
 
 | name | kind | signature | pre / post | maps to |
 |---|---|---|---|---|
-| `saveTask` | actor | `(input{taskId,status,ownerId,newAssigneeId,actor}) -> TaskRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: node `status`(+`owner` on reassign) atomically, or unchanged on err CARRIES{column:Task.status} | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (Cypher SaveTask) |
+| `saveTask` | actor | `(input{taskId,status,ownerId,newAssigneeId,actor}) -> TaskRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: node `status`(+`owner` on reassign) atomically, or unchanged on err | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (Cypher SaveTask) |
 | `guardCanStart` | guard | `(ctx,evt) -> bool` | true iff actor may write the task (owner/manager/admin in scope) | inv `rbac-write-scope` |
 | `guardCanComplete` | guard | `(ctx,evt) -> bool` | true iff actor may write. The machine admits this guard only from non-terminal states; Done and Cancelled are structurally final. `CLAUSES{actor-may-write}` | inv `task-terminal`, `rbac-write-scope` |
 | `guardCanCancel` | guard | `(ctx,evt) -> bool` | true iff actor may write. The machine admits this guard only from non-terminal states; Done and Cancelled are structurally final. `CLAUSES{actor-may-write}` | inv `task-terminal`, `rbac-write-scope` |

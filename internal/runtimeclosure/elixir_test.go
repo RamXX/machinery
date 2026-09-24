@@ -2,8 +2,8 @@
 
 package runtimeclosure
 
-// RED contract for MAC-8yai: the pinned Elixir / OTP (ERTS) runtime
-// closure. Every subject needs the real GREEN handle; the
+// RED contract for MAC-8yai: the pinned Elixir 1.20.4 / OTP 29.0.6 (ERTS
+// 17.0.6) runtime closure. Every subject needs the real GREEN handle; the
 // RED stub fails each with ErrElixirClosureNotImplemented instead of
 // silently passing. No subject launches an unowned subprocess.
 

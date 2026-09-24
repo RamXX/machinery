@@ -69,19 +69,19 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
-        hash: sha256:06b48f49bcbe32bf78c252089ccf15c6fb15b216ee32e5ace3fe9834e1406a05
+        hash: sha256:56f3b39cb7bfd4fb715c95e84bc77101d9acfd0f2c03abba3b1f039e587087a8
       - path: machines/RecommendationRun.machine.json
         hash: sha256:c647744e421ce753d907f49e5d13036a4d7af5de752e027d8a9d5781f6796c2e
       - path: machines/RecommendationRun.matrix.md
-        hash: sha256:b038fe9c8010692b8254f88e1cd837d32b91eed15efb16572277db6caf62fa1e
+        hash: sha256:e0e460859f638513025c13a3f74058fd8974304eb3b2bbfceee2dc28f32e450a
       - path: machines/ReferenceDataCommand.machine.json
         hash: sha256:1ba05f0a2fc6e69ed14b40faaa9baaf3524a71d83ada6daf2cbc7d8e8dde5617
       - path: machines/ReferenceDataCommand.matrix.md
-        hash: sha256:d02ad19aef73fedc4d945ae97d0aade8fb387e5e87c9f366873fc9015e0d2354
+        hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.invariant-enforcement
     kind: plan
     attestor: Codex lane/next-gates
@@ -91,19 +91,19 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
-        hash: sha256:06b48f49bcbe32bf78c252089ccf15c6fb15b216ee32e5ace3fe9834e1406a05
+        hash: sha256:56f3b39cb7bfd4fb715c95e84bc77101d9acfd0f2c03abba3b1f039e587087a8
       - path: machines/RecommendationRun.machine.json
         hash: sha256:c647744e421ce753d907f49e5d13036a4d7af5de752e027d8a9d5781f6796c2e
       - path: machines/RecommendationRun.matrix.md
-        hash: sha256:b038fe9c8010692b8254f88e1cd837d32b91eed15efb16572277db6caf62fa1e
+        hash: sha256:e0e460859f638513025c13a3f74058fd8974304eb3b2bbfceee2dc28f32e450a
       - path: machines/ReferenceDataCommand.machine.json
         hash: sha256:1ba05f0a2fc6e69ed14b40faaa9baaf3524a71d83ada6daf2cbc7d8e8dde5617
       - path: machines/ReferenceDataCommand.matrix.md
-        hash: sha256:d02ad19aef73fedc4d945ae97d0aade8fb387e5e87c9f366873fc9015e0d2354
+        hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.residual-transitions
     kind: plan
     attestor: Codex lane/next-gates
@@ -113,19 +113,19 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
-        hash: sha256:06b48f49bcbe32bf78c252089ccf15c6fb15b216ee32e5ace3fe9834e1406a05
+        hash: sha256:56f3b39cb7bfd4fb715c95e84bc77101d9acfd0f2c03abba3b1f039e587087a8
       - path: machines/RecommendationRun.machine.json
         hash: sha256:c647744e421ce753d907f49e5d13036a4d7af5de752e027d8a9d5781f6796c2e
       - path: machines/RecommendationRun.matrix.md
-        hash: sha256:b038fe9c8010692b8254f88e1cd837d32b91eed15efb16572277db6caf62fa1e
+        hash: sha256:e0e460859f638513025c13a3f74058fd8974304eb3b2bbfceee2dc28f32e450a
       - path: machines/ReferenceDataCommand.machine.json
         hash: sha256:1ba05f0a2fc6e69ed14b40faaa9baaf3524a71d83ada6daf2cbc7d8e8dde5617
       - path: machines/ReferenceDataCommand.matrix.md
-        hash: sha256:d02ad19aef73fedc4d945ae97d0aade8fb387e5e87c9f366873fc9015e0d2354
+        hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: g3.event-redelivery
     kind: plan
     attestor: Codex lane/next-gates
@@ -135,19 +135,19 @@ attestations:
       - path: machines/MarketDataFeed.machine.json
         hash: sha256:394a07e8610f838de53ecf21f1ce34c5a5748626c1733d6b3581568ee67b6c72
       - path: machines/MarketDataFeed.matrix.md
-        hash: sha256:49db12cd092cd00ab4af8612d8af5807d708562036e6c6c2a7641af1d799770c
+        hash: sha256:3b3b4abfe5d89999996dc083c3496765cfd3b98ff67bbeb7c05df43a27affae4
       - path: machines/Portfolio.machine.json
         hash: sha256:047835c3bdc8448ac829534270a9fb6ed7fcb7ca982290f07ae011cf3979c9c2
       - path: machines/Portfolio.matrix.md
-        hash: sha256:06b48f49bcbe32bf78c252089ccf15c6fb15b216ee32e5ace3fe9834e1406a05
+        hash: sha256:56f3b39cb7bfd4fb715c95e84bc77101d9acfd0f2c03abba3b1f039e587087a8
       - path: machines/RecommendationRun.machine.json
         hash: sha256:c647744e421ce753d907f49e5d13036a4d7af5de752e027d8a9d5781f6796c2e
       - path: machines/RecommendationRun.matrix.md
-        hash: sha256:b038fe9c8010692b8254f88e1cd837d32b91eed15efb16572277db6caf62fa1e
+        hash: sha256:e0e460859f638513025c13a3f74058fd8974304eb3b2bbfceee2dc28f32e450a
       - path: machines/ReferenceDataCommand.machine.json
         hash: sha256:1ba05f0a2fc6e69ed14b40faaa9baaf3524a71d83ada6daf2cbc7d8e8dde5617
       - path: machines/ReferenceDataCommand.matrix.md
-        hash: sha256:d02ad19aef73fedc4d945ae97d0aade8fb387e5e87c9f366873fc9015e0d2354
+        hash: sha256:3dbb4b0c85f9a208834e9fb2b298547334537afa03241bee7bb1370121e5d24a
   - claim: gt.conformance-test-shape
     kind: plan
     attestor: coordinator

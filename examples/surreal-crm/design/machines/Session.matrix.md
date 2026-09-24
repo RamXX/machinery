@@ -9,11 +9,11 @@ Session is not a Modelith entity; it is the operational credential (glossary + A
 
 | name | kind | signature | pre / post | maps to |
 |---|---|---|---|---|
-| `verifyCredentials` | actor | `(input{username,password}) -> User \| err{ErrBadCredentials,ErrDisabled,ErrLocked,ErrUnavailable}` | pre: username present. post: returns the User iff the argon2id hash matches; never returns User on bad credentials CARRIES{sink:repo} | C4 `crm.session -> crm.repo` ("Loads the user and verifies the password hash") |
-| `writeSessionFile` | actor | `(input{userId,expiresAt}) -> ok \| err` | post: HMAC-signed token written to `~/.crm/session` CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile` |
-| `readSessionFile` | actor | `() -> {userId,expiresAt} \| err{ErrNoSession,ErrExpired,ErrUnreadable}` | post: parsed token or typed error CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile` |
-| `loadUser` | actor | `(input{userId}) -> User \| err{ErrNotFound,ErrLocked,ErrUnavailable}` | post: returns the User with its current status CARRIES{sink:repo} | C4 `crm.session -> crm.repo` |
-| `clearSessionFile` | actor | `() -> ok \| err` | post: token removed/truncated (best-effort) CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile` |
+| `verifyCredentials` | actor | `(input{username,password}) -> User \| err{ErrBadCredentials,ErrDisabled,ErrLocked,ErrUnavailable}` | pre: username present. post: returns the User iff the argon2id hash matches; never returns User on bad credentials | C4 `crm.session -> crm.repo` ("Loads the user and verifies the password hash") |
+| `writeSessionFile` | actor | `(input{userId,expiresAt}) -> ok \| err` | post: HMAC-signed token written to `~/.crm/session` | C4 `crm.session -> crm.sessionfile` |
+| `readSessionFile` | actor | `() -> {userId,expiresAt} \| err{ErrNoSession,ErrExpired,ErrUnreadable}` | post: parsed token or typed error | C4 `crm.session -> crm.sessionfile` |
+| `loadUser` | actor | `(input{userId}) -> User \| err{ErrNotFound,ErrLocked,ErrUnavailable}` | post: returns the User with its current status | C4 `crm.session -> crm.repo` |
+| `clearSessionFile` | actor | `() -> ok \| err` | post: token removed/truncated (best-effort) | C4 `crm.session -> crm.sessionfile` |
 | `guardUserDisabled` | guard | `(ctx,evt) -> bool` | true iff the verified user's status == Disabled (deny path) | inv `disabled-cannot-auth` |
 | `guardSessionUserActive` | guard | `(ctx,evt) -> bool` | true iff the loaded user's status == Active | inv `session-active-user` |
 | `guardSessionExpired` | guard | `(ctx,evt) -> bool` | true iff token `expiresAt <= now` | Session expiry (validity window for `session-active-user`) |

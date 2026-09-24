@@ -11,7 +11,7 @@ import (
 // includeOrder is the canonical order of projection layers. The manifest may
 // list them in any order; the projection always emits this order so the bytes
 // (and the hash) are stable.
-var includeOrder = []string{"model", "invariants", "actions", "relationships", "scenarios", "machines", "matrices", "events", "c4", "authorization", "oracles", "milestones", "supersession"}
+var includeOrder = []string{"model", "invariants", "actions", "relationships", "scenarios", "machines", "c4", "oracles"}
 
 var knownLayers = func() map[string]bool {
 	m := make(map[string]bool, len(includeOrder))
@@ -21,10 +21,9 @@ var knownLayers = func() map[string]bool {
 	return m
 }()
 
-// No projection carries these layers yet. Requesting one fails loudly rather
-// than silently omitting it, so a checker never runs believing it received a
-// layer.
-var unsupportedLayers = map[string]bool{"scenarios": true}
+// v1 does not yet project these layers. Requesting one fails loudly rather than
+// silently omitting it, so a checker never runs believing it received a layer.
+var unsupportedLayers = map[string]bool{"actions": true, "scenarios": true, "machines": true, "c4": true, "oracles": true}
 
 // Projection is the canonical design slice. Field order is fixed and every slice
 // is sorted by stable_id, so encodeJSON is byte-reproducible. MachineryVersion
@@ -37,7 +36,6 @@ type Projection struct {
 	ManifestHash     string         `json:"manifest_hash"`
 	Include          []string       `json:"include"`
 	Model            *ProjModel     `json:"model,omitempty"`
-	Layers           *ProjLayers    `json:"layers,omitempty"`
 	Generated        map[string]any `json:"generated,omitempty"`
 }
 
@@ -84,32 +82,9 @@ type ProjRelationship struct {
 
 func entityID(name string) string { return "entity:" + name }
 
-// Generate builds the projection the manifest asks for from the model alone.
-// It serves every manifest whose include names only v1 layers; a manifest
-// that includes a v2 layer needs the design's facts (GenerateWithFacts).
+// Generate builds the projection the manifest asks for from the model. It fails
+// on any include layer v1 does not support rather than omitting it.
 func Generate(m *Model, man *Manifest, designID, machineryVersion string) (*Projection, error) {
-	return GenerateWithFacts(m, nil, man, designID, machineryVersion)
-}
-
-// NeedsDesignFacts reports whether a manifest includes any layer beyond the
-// v1 set, and so needs the design's facts to be projected.
-func NeedsDesignFacts(man *Manifest) bool {
-	for _, layer := range man.Projection.Include {
-		if !v1Layers[layer] {
-			return true
-		}
-	}
-	return false
-}
-
-// GenerateWithFacts builds the projection the manifest asks for. A manifest
-// that names only v1 layers gets the 1.0 projection, byte for byte what
-// machinery produced before projection v2; facts may be nil for it. A
-// manifest that names any other layer gets the 2.0 projection: the v1 model
-// block when a v1 layer is included, plus the relational layers read from
-// facts. A layer the design does not have, or one no projection carries yet,
-// fails loudly rather than being omitted.
-func GenerateWithFacts(m *Model, facts *DesignFacts, man *Manifest, designID, machineryVersion string) (*Projection, error) {
 	need := setOf(man.Projection.Include)
 	if len(need) == 0 {
 		return nil, fmt.Errorf("projection include must name at least one layer")
@@ -126,18 +101,7 @@ func GenerateWithFacts(m *Model, facts *DesignFacts, man *Manifest, designID, ma
 	}
 	for _, layer := range includeOrder {
 		if need[layer] && unsupportedLayers[layer] {
-			return nil, fmt.Errorf("projection include layer %q is not yet supported", layer)
-		}
-	}
-	v2 := NeedsDesignFacts(man)
-	if v2 {
-		if facts == nil {
-			return nil, fmt.Errorf("projection include names a v2 layer, which needs the design's facts; no fact reader was supplied")
-		}
-		for _, layer := range includeOrder {
-			if need[layer] && !facts.HasLayer(layer) {
-				return nil, fmt.Errorf("projection include layer %q is absent from this design (its source artifacts do not exist)", layer)
-			}
+			return nil, fmt.Errorf("projection include layer %q is not yet supported (v1 supports model, invariants, relationships)", layer)
 		}
 	}
 
@@ -145,12 +109,8 @@ func GenerateWithFacts(m *Model, facts *DesignFacts, man *Manifest, designID, ma
 	if err != nil {
 		return nil, err
 	}
-	schema := SchemaVersion
-	if v2 {
-		schema = ProjectionSchemaV2
-	}
 	p := &Projection{
-		ProjectionSchema: schema,
+		ProjectionSchema: SchemaVersion,
 		MachineryVersion: machineryVersion,
 		DesignID:         designID,
 		CheckerID:        man.Checker.ID,
@@ -216,12 +176,6 @@ func GenerateWithFacts(m *Model, facts *DesignFacts, man *Manifest, designID, ma
 			sort.Slice(pm.Relationships, func(i, j int) bool { return pm.Relationships[i].StableID < pm.Relationships[j].StableID })
 		}
 		p.Model = pm
-	}
-	if v2 {
-		p.Layers = newProjLayers()
-		for _, layer := range p.Include {
-			p.Layers.add(layer, facts)
-		}
 	}
 	if err := p.validate(); err != nil {
 		return nil, fmt.Errorf("generated projection violates its schema: %w", err)
@@ -316,8 +270,8 @@ func ParseProjection(b []byte) (*Projection, error) {
 }
 
 func (p *Projection) validate() error {
-	if p.ProjectionSchema != SchemaVersion && p.ProjectionSchema != ProjectionSchemaV2 {
-		return fmt.Errorf("projection_schema must be %q or %q, got %q", SchemaVersion, ProjectionSchemaV2, p.ProjectionSchema)
+	if p.ProjectionSchema != SchemaVersion {
+		return fmt.Errorf("projection_schema must be %q, got %q", SchemaVersion, p.ProjectionSchema)
 	}
 	if strings.TrimSpace(p.MachineryVersion) == "" {
 		return fmt.Errorf("machinery_version must be non-empty")
@@ -352,35 +306,6 @@ func (p *Projection) validate() error {
 		if canonical[i] != p.Include[i] {
 			return fmt.Errorf("include is not in canonical layer order")
 		}
-	}
-	hasV1, hasV2 := false, false
-	for layer := range need {
-		if v1Layers[layer] {
-			hasV1 = true
-		} else {
-			hasV2 = true
-		}
-	}
-	switch {
-	case p.ProjectionSchema == SchemaVersion && hasV2:
-		return fmt.Errorf("projection_schema %q carries only model, invariants and relationships; a v2 layer needs %q", SchemaVersion, ProjectionSchemaV2)
-	case p.ProjectionSchema == ProjectionSchemaV2 && !hasV2:
-		return fmt.Errorf("projection_schema %q is used only when a v2 layer is included; a v1-only include is projected as %q", ProjectionSchemaV2, SchemaVersion)
-	case p.ProjectionSchema == SchemaVersion && p.Layers != nil:
-		return fmt.Errorf("layers requires projection_schema %q", ProjectionSchemaV2)
-	case p.ProjectionSchema == ProjectionSchemaV2 && p.Layers == nil:
-		return fmt.Errorf("projection_schema %q requires layers", ProjectionSchemaV2)
-	}
-	if p.Layers != nil {
-		if err := p.Layers.validate(p.Include); err != nil {
-			return err
-		}
-	}
-	if !hasV1 {
-		if p.Model != nil {
-			return fmt.Errorf("model must be absent when no v1 layer (model, invariants, relationships) is included")
-		}
-		return nil
 	}
 	if p.Model == nil {
 		return fmt.Errorf("model is required for the supported projection layers")

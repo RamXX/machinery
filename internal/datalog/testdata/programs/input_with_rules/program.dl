@@ -1,9 +1,0 @@
-// An .input relation that also has rules (facts are seeded, rules add to
-// them), and an .output on an .input relation.
-.decl reach(a:symbol, b:symbol)
-.input reach
-.output reach
-.decl hop(a:symbol, b:symbol)
-.input hop
-.output hop
-reach(A, C) :- reach(A, B), hop(B, C).

@@ -197,7 +197,7 @@ func tsWritePinned(path string, body []byte) error {
 }
 
 // Prepare implements tdd.Adapter: it validates the closed request, opens and
-// validates the pinned Node / TypeScript runtime closure under
+// validates the pinned Node 26.8.1 / TypeScript 7.0.2 runtime closure under
 // the live scope, materializes and re-verifies the captured source bundle
 // plus every embedded pinned asset, validates each registered assertion as a
 // typed helper call at its exact frozen line, compiles the suite fresh with

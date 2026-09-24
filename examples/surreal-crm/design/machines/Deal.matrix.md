@@ -9,7 +9,7 @@ States trace to enum `DealStage`. Events trace to `Deal` actions. Operational st
 
 | name | kind | signature | pre / post | maps to |
 |---|---|---|---|---|
-| `saveDeal` | actor | `(input{dealId,stage,amountCents,closeDate,ownerId,actor}) -> DealRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: row `stage` = pendingStage atomically, or store unchanged on err CARRIES{column:Deal.stage} | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (SurrealQL SaveDeal) |
+| `saveDeal` | actor | `(input{dealId,stage,amountCents,closeDate,ownerId,actor}) -> DealRow \| err{ErrConstraint,ErrConflict,ErrDiskFull,ErrTimeout,ErrLocked}` | pre: guard passed, tx open. post: row `stage` = pendingStage atomically, or store unchanged on err | C4 `crm.domain -> crm.repo` then `crm.repo -> store` (SurrealQL SaveDeal) |
 | `guardCanAdvance` | guard | `(ctx,evt) -> bool` | true iff actor may write AND amountCents>=0. The machine offers this guard only from Lead, Qualified, and Proposal, whose next forward stage is structurally defined; Negotiation rejects advance without evaluating the guard. `CLAUSES{actor-may-write, amount-nonnegative}` | inv `deal-stage-forward`, `rbac-write-scope`, `deal-amount-nonneg` |
 | `guardCanWin` | guard | `(ctx,evt) -> bool` | true iff evt supplies a closeDate AND actor may write AND amountCents>=0. `CLAUSES{close-date-present, actor-may-write, amount-nonnegative}` | inv `deal-won-has-closedate`, `rbac-write-scope`, `deal-amount-nonneg` |
 | `guardCanLose` | guard | `(ctx,evt) -> bool` | true iff actor may write AND amountCents>=0. `CLAUSES{actor-may-write, amount-nonnegative}` | inv `rbac-write-scope`, `deal-amount-nonneg` |

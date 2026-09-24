@@ -1,1 +1,0 @@
-program.dl:8:32: relations are not stratifiable: cycle through aggregation d -> n -> d (n depends on d through aggregation)
