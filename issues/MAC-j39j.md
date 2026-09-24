@@ -7,8 +7,8 @@ type: bug
 labels: [consistency-layer, projection, gy, h2, blocks-h2]
 created_at: 2026-09-23T23:56:54Z
 created_by: ramirosalas
-updated_at: 2026-09-24T01:28:40Z
-content_hash: "sha256:f44a7bd0c126e0f0136061364bcfc3e8bfd44a41a9558506cd8e79b8840dcb6a"
+updated_at: 2026-09-24T05:13:12Z
+content_hash: "sha256:1f26e36a7eff438754012daa05740610ca2e53ab8401116a9eab78107bf063cb"
 ---
 
 ## Description
@@ -22,6 +22,7 @@ v0.10.0 on H2 design (branch design/machinery-0.10.0 at 0f2736ed): Gy fails proj
 
 ## Notes
 Fixed on release/0.10.1 (event edges, payload binding, per-row degradation; wiring of private groups into the projection 1fe6e948). On the H2 scratch tree: 0 duplicate-id errors, 53 events, 116 edges.
+Released in v0.10.1 (4bb85b78).
 
 ## History
 
