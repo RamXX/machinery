@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:8c876fcba90ef5afa7dfb7abc3625191654526069fef6964761535d0baf71a0e"
+content_hash: "sha256:22531e90bb072a05dfce91e6e993f3da6688c39c9e569e0c8cede3e1f7441ad3"
 blocked_by: [MAC-pe9v]
-blocks: [MAC-rau8, MAC-vx24, MAC-ou97]
+blocks: [MAC-rau8, MAC-vx24]
 was_blocked_by: [MAC-lnu6, MAC-p9z1]
 ---
 
@@ -98,10 +98,11 @@ Triage 2026-09-24: suite.go changed 9 times since 09-07; refresh interface text.
 - 2026-09-06T09:10:27Z dep_added: blocks MAC-ou97
 - 2026-09-06T23:26:04Z dep_removed: was_blocked_by MAC-lnu6
 - 2026-09-07T10:08:35Z dep_removed: was_blocked_by MAC-p9z1
+- 2026-09-24T21:33:55Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-rau8]], [[MAC-vx24]], [[MAC-ou97]]
+- Blocks: [[MAC-rau8]], [[MAC-vx24]]
 - Blocked by: [[MAC-pe9v]]
 - Was blocked by: [[MAC-lnu6]], [[MAC-p9z1]]
 
