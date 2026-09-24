@@ -7,8 +7,8 @@ type: bug
 labels: [consistency-layer, declarations, gx, gy, docs, h2, blocks-h2]
 created_at: 2026-09-23T23:56:54Z
 created_by: ramirosalas
-updated_at: 2026-09-23T23:56:54Z
-content_hash: "sha256:fba588195c2cfde217f026ab627c1b3c1e9345b9145e760b31adc08e63d217d3"
+updated_at: 2026-09-24T01:28:40Z
+content_hash: "sha256:747a6814a0faa8f9ecb470b5e8bc62a60f15d36140e98ef8fd028fc7c11b4c54"
 ---
 
 ## Description
@@ -21,7 +21,7 @@ v0.10.0 on H2: Gx reports 27 errors (MACHINE-WRITTEN 17, MACHINE-WRITTEN-BY 9, G
 
 
 ## Notes
-
+Fixed on release/0.10.1: private_groups: in the contract fence; projection honors it. H2 scratch tree with the declaration: Gx 27 -> 0.
 
 ## History
 
