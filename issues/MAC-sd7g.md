@@ -2,13 +2,13 @@
 id: MAC-sd7g
 title: "Run required checks against the exact replay state"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:32Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:3df86e33ae24e666359ff4fc6f4b314589d02d8337ff1c6e3e188d75175dac1f"
 blocked_by: [MAC-pe9v]
 blocks: [MAC-sqpt, MAC-vx24, MAC-ou97]
