@@ -1,14 +1,16 @@
 ---
 id: MAC-i5j8
 title: "Gl undeclared-fact warning fires on action names, qualified unit names, enum members and file names"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [consistency-layer, gl, warnings, h2]
 created_at: 2026-09-23T23:56:54Z
 created_by: ramirosalas
-updated_at: 2026-09-24T05:13:12Z
-content_hash: "sha256:b6645a67e7c9554d00e635d347b65da535e66130edbdd22d9e8c777459d5a664"
+updated_at: 2026-09-24T21:33:43Z
+content_hash: "sha256:efceb1a336f9fb64a6e610d00b2702893702299764b880521b7760f4cc3fb2eb"
+closed_at: 2026-09-24T21:33:43Z
+close_reason: "Released in 0.10.1 (428 -> 290 on H2; remaining unresolved tokens baselinable via baseline --gate gl). Triage 2026-09-24."
 ---
 
 ## Description
@@ -25,7 +27,7 @@ Fixed on release/0.10.1: tokens resolved against actions, units, enum values, co
 Released in v0.10.1 (4bb85b78).
 
 ## History
-
+- 2026-09-24T21:33:43Z status: open -> closed
 
 ## Links
 
