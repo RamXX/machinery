@@ -1,14 +1,16 @@
 ---
 id: MAC-6rp0
 title: "processscope: two remaining unsynchronized job-state reads in dispatch and handleRun"
-status: open
+status: closed
 priority: 2
 type: bug
 labels: [processscope, race]
 created_at: 2026-09-08T08:52:37Z
 created_by: ramirosalas
-updated_at: 2026-09-08T08:52:37Z
-content_hash: "sha256:2b1596865575640399150537c86940f2ed9572700844d8301e9dce337df51c36"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:9ca8e380581251adc448157087805f2d513799bb1c62ff016706b97556959d52"
+closed_at: 2026-09-24T21:31:55Z
+close_reason: "Fixed by f9390816 (j.retired read under b.mu, broker.go:442; early-failure paths via settleUnlaunched). Triage 2026-09-24."
 ---
 
 ## Description
@@ -33,7 +35,7 @@ Synchronize both reads (or restructure so the state is captured under the lock),
 
 
 ## History
-
+- 2026-09-24T21:31:55Z status: open -> closed
 
 ## Links
 
