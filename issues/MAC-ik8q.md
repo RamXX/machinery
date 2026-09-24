@@ -8,7 +8,8 @@ labels: [experiments, evidence, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:433527a79149cd8612b01d210711b9c9f58cf4465636508e82d781a0630e3e59"
+content_hash: "sha256:391c7365afd4bf98cdc78a15abc7fc134b6312676a4a603e31ea37bce449a000"
+blocked_by: [MAC-zti7]
 ---
 
 ## Description
@@ -34,9 +35,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:57Z dep_added: blocked_by MAC-zti7
 
 ## Links
-
+- Blocked by: [[MAC-zti7]]
 
 ## Comments
