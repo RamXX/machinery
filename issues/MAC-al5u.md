@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:2ddcdf0abd2a9edc98e087898a135314bdd46ca6b541ebec8aac25266b9ab8e4"
+updated_at: 2026-09-24T21:33:45Z
+content_hash: "sha256:efe6109b5cdcbec5e95091542b806d82e41a6ba3545e6119b0094265d465491e"
 blocked_by: [MAC-5ft8]
 blocks: [MAC-1u2v, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-bz1y]
@@ -92,7 +92,7 @@ status: new
 
 
 ## Notes
-
+Triage 2026-09-24: NEEDS-REWRITE. Retarget ci.yml wiring to .dagger/main.go (a9dd4b53) and the tiered preflight (0ee03664).
 
 ## History
 - 2026-09-06T09:10:12Z dep_added: blocked_by MAC-5ft8
