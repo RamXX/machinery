@@ -17,6 +17,17 @@ warned on every backticked action, enum value and file name as if it were an und
 baseline, so an existing design adopts the consistency layer by recording its current findings
 and burning them down instead of fixing everything in one stop-the-world migration.
 
+**Consumer-corpus diff (release safety, CONTRIBUTING).** `consumer-diff` was run with the v0.9.0
+release binary against this candidate over the largest consumer design available to the
+maintainer (a read-only clone of its pin branch with `private_groups:` declared and a Gy/Gl
+baseline recorded): 0 unexplained new findings; new findings 0 blocking, 0 warnings, 505 notes (236
+baselined Gy-rules, 268 baselined Gl-ledger lines, 1 migration note); 1 resolved blocking finding
+(the 0.9.0 contract-schema rejection of `private_groups:`); the allow file held one entry for
+version-stamp drift, citing the regeneration commands below, and it went unused because both runs
+keyed the stamp lines identically. The same consumer's conductor ran the candidate independently on
+a fresh clone and reported matching counts. The remaining blocking findings on that tree are its own
+stale attestations after the `private_groups:` edit, which the pin commit re-attests.
+
 ### Added
 
 - **Consistency-layer adoption baseline.** `machinery baseline <design> --gate gy,gl` records a
