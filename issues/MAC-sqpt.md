@@ -2,13 +2,13 @@
 id: MAC-sqpt
 title: "Reject assurance that fails retained-state replay"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:32Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:eb5c7b4106f18bd24e260685b35d20475260a0a3dd9b1c7658bd33f05674af38"
 blocked_by: [MAC-sd7g]
 blocks: [MAC-rau8, MAC-vx24, MAC-ou97]
