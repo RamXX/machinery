@@ -1,18 +1,19 @@
 ---
 id: MAC-vx24
 title: "Enforce replayable negative test assurance"
-status: open
+status: closed
 priority: 1
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:35:06Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:05:48Z
-content_hash: "sha256:bbc07ea2a4e22ef423efc4e904bf066e832b8bce1ea161e55eccb77c113f399e"
+updated_at: 2026-09-24T21:33:43Z
+content_hash: "sha256:2d38b0387d2eff91d06ec6447742248c90cb2ffb7a4046b45d079f185f5938cb"
 blocked_by: [MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
-blocks: [MAC-gcrr, MAC-ou97]
 was_blocked_by: [MAC-olrx, MAC-p7jd, MAC-l7m0, MAC-p9wm, MAC-sh60, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-hpqp, MAC-2n83, MAC-bz1y, MAC-p9z1, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-62s6]
+closed_at: 2026-09-24T21:33:43Z
+close_reason: "Superseded: after MAC-l7m0 its scope was decomposed into pe9v/sd7g/sqpt/wbxq/rau8/u4oo; guidance remnant moved to MAC-u4oo. Triage 2026-09-24."
 ---
 
 ## Description
@@ -172,10 +173,12 @@ No heavy preflight until final gate; no GitHub mutation; no active installation 
 - 2026-09-07T21:01:12Z dep_removed: was_blocked_by MAC-imtz
 - 2026-09-07T21:01:13Z dep_removed: was_blocked_by MAC-8yai
 - 2026-09-07T21:43:47Z dep_removed: was_blocked_by MAC-62s6
+- 2026-09-24T21:33:43Z status: open -> closed
+- 2026-09-24T21:33:43Z dep_removed: no_longer_blocks MAC-gcrr
+- 2026-09-24T21:33:43Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-gcrr]], [[MAC-ou97]]
 - Blocked by: [[MAC-pe9v]], [[MAC-sd7g]], [[MAC-sqpt]], [[MAC-wbxq]], [[MAC-rau8]], [[MAC-u4oo]], [[MAC-5ft8]], [[MAC-al5u]], [[MAC-1u2v]]
 - Was blocked by: [[MAC-olrx]], [[MAC-p7jd]], [[MAC-l7m0]], [[MAC-p9wm]], [[MAC-sh60]], [[MAC-lnu6]], [[MAC-wi5z]], [[MAC-qlw2]], [[MAC-cn7q]], [[MAC-6h0s]], [[MAC-hpqp]], [[MAC-2n83]], [[MAC-bz1y]], [[MAC-p9z1]], [[MAC-wi2u]], [[MAC-avfp]], [[MAC-imtz]], [[MAC-8yai]], [[MAC-62s6]]
 
