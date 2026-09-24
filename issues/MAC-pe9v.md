@@ -2,13 +2,13 @@
 id: MAC-pe9v
 title: "Keep final acceptance Git queries in the verification scope"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:40Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:ee386ed207303b978b62871edfcdb3202bf844aa1e11989ed746f4f6eb6079c8"
 blocks: [MAC-sd7g, MAC-wbxq, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-cn7q, MAC-bz1y]
