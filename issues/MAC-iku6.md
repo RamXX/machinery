@@ -7,8 +7,8 @@ type: bug
 labels: [ci, formal, reliability]
 created_at: 2026-09-10T17:32:53Z
 created_by: ramirosalas
-updated_at: 2026-09-10T17:32:53Z
-content_hash: "sha256:68f2c7a20c1b153b28a6c27f5692c8b386aee0cb73a838f411d7febbac5dbd46"
+updated_at: 2026-09-24T21:31:56Z
+content_hash: "sha256:becaca3490f051ae1ba1b65236525b2ad2e2d67db3c2f73eb1fc3fddf74a4020"
 ---
 
 ## Description
@@ -21,7 +21,7 @@ Observed 2026-09-10 on release commit 39e2c9ff, formal run 34503459934 attempt 1
 
 
 ## Notes
-
+Triage 2026-09-24: valid. Single attempt in internal/formal/formal.go fetchJarContext (~427, Do at ~494). Dagger CLI fetch retries since 92592a86; jar fetch does not. Independent of zafm/y8lj.
 
 ## History
 
