@@ -167,9 +167,9 @@ func TestPreCutoverInferenceWarning(t *testing.T) {
 	g := CheckTraceability(valuesDesign(t, "| `markPaid` | action | records `Order.state` and `order_total` | `order-paid-final` |\n"+
 		"| `settle` | action | reads `order_total` | `order-paid-final` |\n"))
 	got := deprecationWarnings(g)
-	if len(got) != 1 || !strings.HasPrefix(got[0], "Order.matrix.md:3: row 'markPaid': `Order.state` is quoted in prose") ||
+	if len(got) != 1 || !strings.HasPrefix(got[0], "the design declares no WRITES{}, USES{} or PRODUCES{} anywhere, and 2 matrix row(s) in 1 file(s) quote fact-shaped tokens in prose (first: Order.matrix.md:3 row 'markPaid', `Order.state`)") ||
 		!strings.Contains(got[0], MigrationNote) || !strings.Contains(got[0], "removed in the release after next") {
-		t.Fatalf("one warning at the first prose token, naming the note: %v", got)
+		t.Fatalf("one design-level warning counting the rows and naming the first, and the note: %v", got)
 	}
 	if len(g.Errs) != 0 && hasErr(g, "0.9.0") {
 		t.Fatalf("the deprecation is a warning, never an error: %v", g.Errs)
@@ -188,6 +188,29 @@ func TestPreCutoverInferenceWarning(t *testing.T) {
 	plain := CheckTraceability(shapeDesign(t, head+"| `markPaid` | action | records the payment | `order-paid-final` |\n", nil))
 	if got := deprecationWarnings(plain); len(got) != 0 {
 		t.Fatalf("no fact-shaped prose token, no warning: %v", got)
+	}
+}
+
+// A design that has recorded a Gy/Gl baseline is adopting the layer on
+// purpose; the deprecation becomes a note there, so a strict check can go
+// green on the pin commit and the declarations follow in the burn-down.
+func TestPreCutoverInferenceIsANoteUnderABaseline(t *testing.T) {
+	design := valuesDesign(t, "| `markPaid` | action | records `Order.state` | `order-paid-final` |\n")
+	if err := os.WriteFile(filepath.Join(design, RatchetFile), []byte(`{"date":"2026-09-24","rule_findings":[]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	g := CheckTraceability(design)
+	if got := deprecationWarnings(g); len(got) != 0 {
+		t.Fatalf("under a recorded baseline the deprecation must not warn: %v", got)
+	}
+	var notes []string
+	for _, n := range g.Notes {
+		if strings.Contains(n, "0.9.0 inferred") {
+			notes = append(notes, n)
+		}
+	}
+	if len(notes) != 1 || !strings.Contains(notes[0], "baseline recorded") {
+		t.Fatalf("one note saying the baseline carries the migration: %v", g.Notes)
 	}
 }
 

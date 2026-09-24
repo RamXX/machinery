@@ -980,13 +980,17 @@ var proseFactToken = regexp.MustCompile(`^(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)+|[A-Z]
 
 // checkPreCutoverInference is the one-release deprecation warning for a
 // design that relied on the 0.9.0 inference and never migrated: it declares
-// no WRITES{}, USES{} or PRODUCES{} anywhere, and some matrix row that carries
-// no declaration group quotes a snake_case or Entity.member token in prose.
-// Such a design used to have facts, writes and producers inferred from that
-// prose; now nothing is inferred, so the warning names the migration note.
-// One warning per design, at the first such row. A design with any of the
-// three declarations has migrated and never sees it. The warning is removed
-// in the release after next.
+// no WRITES{}, USES{} or PRODUCES{} anywhere, and matrix rows that carry no
+// declaration group quote snake_case or Entity.member tokens in prose. Such a
+// design used to have facts, writes and producers inferred from that prose;
+// now nothing is inferred, so the warning names the migration note. It is
+// one design-level line counting the rows and files and naming the first,
+// because the condition is a property of the whole design, not of a row. A
+// design with any of the three declarations has migrated and never sees it.
+// A design whose ratchet records a Gy or Gl baseline is adopting the layer on
+// purpose, so the line is a note there: the strict check on the pin commit
+// goes green, and the declarations follow in the burn-down. The line is
+// removed in the release after next.
 func checkPreCutoverInference(g *Gate, design string, decls []Declaration) {
 	for _, d := range decls {
 		if d.Group == GroupWrites || d.Group == GroupUses || d.Group == GroupProduces {
@@ -994,11 +998,13 @@ func checkPreCutoverInference(g *Gate, design string, decls []Declaration) {
 		}
 	}
 	names := designNameTokens(design)
+	rows, files, first := 0, 0, ""
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
 		body, err := readDesignFile(design, path)
 		if err != nil {
 			continue // the shape check reports an unreadable matrix
 		}
+		fileRows := 0
 		for _, r := range walkTableRows(normalizeNewlines(body)) {
 			nameCol := -1
 			if ni, _, _, ok := namedUnitCols(r.header); ok {
@@ -1013,21 +1019,41 @@ func checkPreCutoverInference(g *Gate, design string, decls []Declaration) {
 			if declared {
 				continue
 			}
-			row := rowIdentity(r)
+			hit := ""
 			for ci, cell := range r.cells {
-				if ci == nameCol {
+				if ci == nameCol || hit != "" {
 					continue
 				}
 				for _, m := range factBacktickSpan.FindAllStringSubmatch(cell, -1) {
 					tok := strings.TrimSpace(m[1])
-					if !proseFactToken.MatchString(tok) || names[tok] {
-						continue
+					if proseFactToken.MatchString(tok) && !names[tok] {
+						hit = tok
+						break
 					}
-					g.Warns = append(g.Warns, filepath.Base(path)+":"+strconv.Itoa(r.line)+": row "+ir.Repr(row)+": `"+tok+
-						"` is quoted in prose, and the design declares no WRITES{}, USES{} or PRODUCES{} anywhere; machinery 0.9.0 inferred facts, writes and producers from such prose and no longer does, so declare them (see "+MigrationNote+"). This deprecation warning is removed in the release after next")
-					return
 				}
 			}
+			if hit == "" {
+				continue
+			}
+			fileRows++
+			if first == "" {
+				first = filepath.Base(path) + ":" + strconv.Itoa(r.line) + " row " + ir.Repr(rowIdentity(r)) + ", `" + hit + "`"
+			}
+		}
+		if fileRows > 0 {
+			files++
+			rows += fileRows
 		}
 	}
+	if rows == 0 {
+		return
+	}
+	line := "the design declares no WRITES{}, USES{} or PRODUCES{} anywhere, and " + strconv.Itoa(rows) + " matrix row(s) in " +
+		strconv.Itoa(files) + " file(s) quote fact-shaped tokens in prose (first: " + first + "); machinery 0.9.0 inferred facts, writes " +
+		"and producers from such prose and no longer does, so declare them; see " + MigrationNote + "; this line is removed in the release after next"
+	if r, err := LoadRatchet(design); err == nil && r != nil && (r.Rules != nil || r.Undeclared != nil) {
+		g.Notes = append(g.Notes, line+" (baseline recorded: the burn-down carries this migration, so it does not block)")
+		return
+	}
+	g.Warns = append(g.Warns, line)
 }
