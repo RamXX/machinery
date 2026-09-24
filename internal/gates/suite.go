@@ -44,6 +44,10 @@ type RunOptions struct {
 	// Explain prints, under every Gy-rules finding, the derivation that
 	// produced it (machinery check --explain).
 	Explain bool
+	// Verbose prints every Gl-ledger undeclared-fact line instead of one
+	// summary line for a matrix past the per-file threshold
+	// (machinery check --verbose).
+	Verbose bool
 	// cargoWorkspaceManifest is an immutable exact-file snapshot of a Cargo
 	// workspace root above --impl. It is populated only by Snapshot.RunSelected.
 	cargoWorkspaceManifest string
@@ -557,7 +561,7 @@ func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) [
 		out = append(out, CheckIDCitations(design))
 	}
 	if sel.Run["gl"] {
-		out = append(out, CheckLedger(design))
+		out = append(out, CheckLedgerWith(design, LedgerOptions{Verbose: opt.Verbose}))
 	}
 	if sel.Run["gx"] {
 		out = append(out, CheckTraceability(design))

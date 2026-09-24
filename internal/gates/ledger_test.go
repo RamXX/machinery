@@ -397,8 +397,21 @@ func undeclaredFactDesign(t *testing.T, matrix string) string {
 	}
 	mustWrite(t, filepath.Join(design, "machines", "Order.machine.json"), wiringMachine)
 	mustWrite(t, filepath.Join(design, "machines", "Order.matrix.md"), matrix)
+	mustWrite(t, filepath.Join(design, "domain.modelith.yaml"), undeclaredFactModel)
 	return design
 }
+
+// undeclaredFactModel declares the attributes the undeclared-fact tests
+// quote, so the attribute wording is what they pin.
+const undeclaredFactModel = `kind: DomainModel
+version: v1
+entities:
+  Order:
+    attributes:
+      - {name: total, type: integer}
+      - {name: line_item_count, type: integer}
+      - {name: payment_ref, type: string}
+`
 
 func undeclaredFactWarns(g *Gate) []string {
 	var out []string

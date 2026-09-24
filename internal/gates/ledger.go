@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/RamXX/machinery/internal/ir"
 )
@@ -60,15 +61,27 @@ func LedgerActive(design string) bool {
 	return false
 }
 
-// CheckLedger implements Gl-ledger.
+// LedgerOptions carries Gl-ledger's run-time choices.
+type LedgerOptions struct {
+	// Verbose prints every undeclared-fact line even for a matrix past the
+	// per-file summary threshold (machinery check --verbose).
+	Verbose bool
+}
+
+// CheckLedger implements Gl-ledger with the default options.
 func CheckLedger(design string) *Gate {
+	return CheckLedgerWith(design, LedgerOptions{})
+}
+
+// CheckLedgerWith implements Gl-ledger.
+func CheckLedgerWith(design string, opt LedgerOptions) *Gate {
 	g := NewGate("Gl-ledger  session ledgers + house style")
 	g.startOrder()
 	checkSelfReviewLines(g, design)
 	checkDecisionEntries(g, design)
 	checkHouseStyle(g, design)
 	checkDuplicateTables(g, design)
-	checkUndeclaredFactReferences(g, design)
+	checkUndeclaredFactReferences(g, design, opt.Verbose)
 	checkValuesEnumCase(g, design)
 	return g
 }
@@ -575,12 +588,271 @@ func rowDeclaredTokens(cells []string) map[string]bool {
 	return out
 }
 
-func checkUndeclaredFactReferences(g *Gate, design string) {
+// UndeclaredSummaryThreshold is the per-file warning count above which Gl
+// prints one summary line for a matrix instead of one line per token (unless
+// --verbose). A migrated matrix quotes a handful of undeclared tokens at most;
+// a file past twenty has not been migrated at all, and a line per token there
+// buries every other finding in the run. Twenty keeps a partly migrated file's
+// lines individually visible, which is when each one is actionable.
+const UndeclaredSummaryThreshold = 20
+
+// Token classes a backticked fact-shaped token resolves to. The attribute
+// class keeps the undeclared-fact warning; every class with a label below is
+// a name, not a stored fact, and never warns; tokenUnresolved names nothing
+// the design declares.
+const (
+	tokenUnresolved = ""
+	tokenAttribute  = "attribute"
+	tokenAction     = "action"
+	tokenUnit       = "unit"
+	tokenEnumValue  = "enum value"
+	tokenContextKey = "context key"
+	tokenEvent      = "event"
+	tokenInvariant  = "invariant"
+	tokenFile       = "file"
+)
+
+// tokenClassCounts is the checked-line label of each class that never warns.
+var tokenClassCounts = map[string]string{
+	tokenAction: "backticked actions", tokenUnit: "backticked named units", tokenEnumValue: "backticked enum values",
+	tokenContextKey: "backticked context keys", tokenEvent: "backticked events", tokenInvariant: "backticked invariant ids",
+	tokenFile: "backticked file names",
+}
+
+// knownFileExtensions are the extensions a backticked `Name.ext` token is
+// read as a file name by, whether or not the file exists: `ARCHITECTURE.md`
+// has the Entity.attr shape, and no design means it as an attribute.
+var knownFileExtensions = stringSet("md", "json", "yaml", "yml", "dsl", "dl", "facts", "txt", "csv", "tsv",
+	"tla", "cfg", "als", "toml", "sql", "sh", "go", "ex", "exs", "ts", "js", "py", "java", "rs", "html", "xml", "proto")
+
+// factVocabulary is what a design declares that a backticked token can name:
+// model attributes (Entity.attr and bare), and the names that are not stored
+// facts (actions, named units, enum values, context keys, events, invariant
+// ids, and the files under the design).
+type factVocabulary struct {
+	attrs map[string]bool
+	names map[string]string // token -> class, first class wins
+	files map[string]bool   // base names of the files under the design
+}
+
+func (v factVocabulary) add(class string, tokens ...string) {
+	for _, t := range tokens {
+		if _, ok := v.names[t]; t != "" && !ok {
+			v.names[t] = class
+		}
+	}
+}
+
+// classify resolves one token. An attribute wins over every other class, so
+// an ambiguous name keeps the warning that asks for a declaration.
+func (v factVocabulary) classify(tok string) string {
+	if v.attrs[tok] {
+		return tokenAttribute
+	}
+	if class, ok := v.names[tok]; ok {
+		return class
+	}
+	if dot := strings.LastIndexByte(tok, '.'); v.files[tok] || (dot > 0 && knownFileExtensions[tok[dot+1:]]) {
+		return tokenFile
+	}
+	return tokenUnresolved
+}
+
+// snakeCase renders an identifier in snake_case: CardDeclined is
+// card_declined, HTTPError is http_error, IN_SCOPE is in_scope. Enum values
+// are quoted in prose in this form.
+func snakeCase(s string) string {
+	rs := []rune(s)
+	var b strings.Builder
+	for i, r := range rs {
+		switch {
+		case r == '-' || r == ' ':
+			b.WriteByte('_')
+		case unicode.IsUpper(r):
+			if i > 0 && (unicode.IsLower(rs[i-1]) || unicode.IsDigit(rs[i-1]) ||
+				(unicode.IsUpper(rs[i-1]) && i+1 < len(rs) && unicode.IsLower(rs[i+1]))) {
+				b.WriteByte('_')
+			}
+			b.WriteRune(unicode.ToLower(r))
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// itemNames returns the name (or key) of every item of a model list: a
+// mapping item's key field, or a bare string item.
+func itemNames(v *ir.Value, key string) []string {
+	var out []string
+	for _, item := range objSlice(v) {
+		if item == nil {
+			continue
+		}
+		if item.Kind == ir.KindString {
+			out = append(out, item.AsString())
+		} else if o := item.AsObject(); o != nil {
+			out = append(out, o.GetString(key))
+		}
+	}
+	return out
+}
+
+// designFactVocabulary reads the vocabulary from the model, the machines, the
+// matrices, the event contract and the design tree. Every source is optional
+// and read leniently: the gates that own each artifact report it broken.
+func designFactVocabulary(design string) factVocabulary {
+	v := factVocabulary{attrs: map[string]bool{}, names: map[string]string{}, files: map[string]bool{}}
+	if dm := loadModelith(design, NewGate("fact vocabulary")); dm != nil && dm.AsObject() != nil {
+		root := dm.AsObject()
+		if enums := root.GetObject("enums"); enums != nil {
+			for _, enum := range enums.Keys() {
+				eo := enums.GetObject(enum)
+				if eo == nil {
+					continue
+				}
+				for _, value := range itemNames(eo.Get2("values"), "name") {
+					v.add(tokenEnumValue, value, snakeCase(value), enum+"."+value, enum+"."+snakeCase(value))
+				}
+			}
+		}
+		if entities := root.GetObject("entities"); entities != nil {
+			for _, entity := range entities.Keys() {
+				eo := entities.GetObject(entity)
+				if eo == nil {
+					continue
+				}
+				for _, attr := range itemNames(eo.Get2("attributes"), "name") {
+					if attr != "" {
+						v.attrs[attr], v.attrs[entity+"."+attr] = true, true
+					}
+				}
+				for _, action := range itemNames(eo.Get2("actions"), "name") {
+					if action != "" {
+						v.add(tokenAction, action, entity+"."+action)
+					}
+				}
+				v.add(tokenInvariant, itemNames(eo.Get2("invariants"), "id")...)
+			}
+		}
+		v.add(tokenInvariant, itemNames(root.Get2("invariants"), "id")...)
+	}
+	mdir := filepath.Join(design, "machines")
+	qualifiers := map[string][]string{} // matrix stem -> the names that qualify its units
+	for _, path := range sortedGlob(mdir, "*.machine.json") {
+		stem := strings.TrimSuffix(filepath.Base(path), ".machine.json")
+		qualifiers[stem] = []string{stem}
+		m, err := loadDesignMachine(design, path)
+		if err != nil || m.AsObject() == nil {
+			continue
+		}
+		if id := strings.TrimSpace(m.AsObject().GetString("id")); id != "" && id != stem {
+			qualifiers[stem] = append(qualifiers[stem], id)
+		}
+		if ctx := m.AsObject().GetObject("context"); ctx != nil {
+			for _, key := range ctx.Keys() {
+				v.add(tokenContextKey, key)
+				for _, q := range qualifiers[stem] {
+					v.add(tokenContextKey, q+"."+key)
+				}
+			}
+		}
+	}
+	for _, path := range sortedGlob(mdir, "*.matrix.md") {
+		stem := strings.TrimSuffix(filepath.Base(path), ".matrix.md")
+		qs := qualifiers[stem]
+		if len(qs) == 0 {
+			qs = []string{stem}
+		}
+		body, ok := readTextOK(design, path)
+		if !ok {
+			continue
+		}
+		for _, r := range walkTableRows(normalizeNewlines([]byte(body))) {
+			ni, _, _, named := namedUnitCols(r.header)
+			if !named {
+				continue
+			}
+			for _, unit := range unitNames(cellAt(r.cells, ni)) {
+				v.add(tokenUnit, unit)
+				for _, q := range qs {
+					v.add(tokenUnit, q+"."+unit)
+				}
+			}
+		}
+	}
+	for _, r := range eventContractRows(readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))) {
+		v.add(tokenEvent, eventNamesOf(r.Cell("event"))...)
+	}
+	_ = walkTreeBounded(design, func(path string, fi os.FileInfo, err error) error {
+		if err == nil && !fi.IsDir() {
+			v.files[fi.Name()] = true
+		}
+		return nil
+	})
+	return v
+}
+
+// tokenFinding is one backticked token Gl reports: a model attribute outside
+// USES{}/WRITES{}, or a token naming nothing.
+type tokenFinding struct {
+	line       int
+	row, tok   string
+	unresolved bool
+}
+
+func (f tokenFinding) text(rel string) string {
+	where := rel + ":" + strconv.Itoa(f.line) + ": row " + ir.Repr(f.row) + ": "
+	if f.unresolved {
+		return where + "`" + f.tok + "` is not a declared fact, action, unit or value; drop the backticks or declare it"
+	}
+	return where + "undeclared fact reference `" + f.tok + "`; declare it in USES{} or WRITES{} or drop the backticks"
+}
+
+// nameCount renders "1 names" or "n name".
+func nameCount(n int) string {
+	if n == 1 {
+		return "1 names"
+	}
+	return strconv.Itoa(n) + " name"
+}
+
+// emitTokenFindings adds one file's findings: one line each, or, above the
+// threshold and without verbose, one summary line with the class split and
+// the first three tokens. The checked-line counts stay exact either way.
+func emitTokenFindings(g *Gate, rel string, findings []tokenFinding, verbose bool) {
+	attrs, unresolved := 0, 0
+	for _, f := range findings {
+		if f.unresolved {
+			unresolved++
+		} else {
+			attrs++
+		}
+	}
+	g.Count("undeclared fact references", attrs)
+	g.Count("unresolved backticked tokens", unresolved)
+	if verbose || len(findings) <= UndeclaredSummaryThreshold {
+		for _, f := range findings {
+			g.Warns = append(g.Warns, f.text(rel))
+		}
+		return
+	}
+	var first []string
+	for _, f := range findings[:3] {
+		first = append(first, "`"+f.tok+"`")
+	}
+	g.Warns = append(g.Warns, rel+": "+strconv.Itoa(len(findings))+" backticked tokens outside every declaration group ("+
+		nameCount(attrs)+" a model attribute, to declare in USES{} or WRITES{}; "+nameCount(unresolved)+
+		" no declared fact, action, unit or value), first "+strings.Join(first, ", ")+"; machinery check --verbose lists each")
+}
+
+func checkUndeclaredFactReferences(g *Gate, design string, verbose bool) {
 	paths := sortedGlob(filepath.Join(design, "machines"), "*.matrix.md")
 	if len(paths) == 0 {
 		return
 	}
 	names := designNameTokens(design)
+	vocab := designFactVocabulary(design)
 	for _, path := range paths {
 		body, ok := readTextOK(design, path)
 		if !ok {
@@ -591,6 +863,7 @@ func checkUndeclaredFactReferences(g *Gate, design string) {
 			rel = path
 		}
 		rel = filepath.ToSlash(rel)
+		var findings []tokenFinding
 		for _, r := range walkTableRows(normalizeNewlines([]byte(body))) {
 			cols := factReferenceCells(r.header)
 			if len(cols) == 0 {
@@ -620,10 +893,16 @@ func checkUndeclaredFactReferences(g *Gate, design string) {
 						continue
 					}
 					seen[tok] = true
-					g.Warns = append(g.Warns, rel+":"+strconv.Itoa(r.line)+": row "+ir.Repr(row)+": undeclared fact reference `"+tok+"`; declare it in USES{} or WRITES{} or drop the backticks")
+					switch class := vocab.classify(tok); class {
+					case tokenAttribute, tokenUnresolved:
+						findings = append(findings, tokenFinding{line: r.line, row: row, tok: tok, unresolved: class == tokenUnresolved})
+					default:
+						g.Count(tokenClassCounts[class])
+					}
 				}
 			}
 		}
+		emitTokenFindings(g, rel, findings, verbose)
 	}
 }
 
