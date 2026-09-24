@@ -1323,7 +1323,8 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	// commit under review does not exist yet, so Ga states that non-check
 	// rather than guessing. CI passes --commit and stays the outer wall.
 	run := snapshot.RunSelected(implDir, sel, gates.RunOptions{})
-	armed := fileExists(filepath.Join(sourceDesignDir, "ratchet.json"))
+	// a ratchet recording only Gy/Gl debt carries no G4 snapshot and arms nothing
+	armed := gates.RatchetArmsImports(sourceDesignDir)
 	left, waveStale, waveActive := waveSentinel(sourceDesignDir)
 	if observer, ok := w.(interface {
 		beforeAttestationFinalization(*gates.Snapshot, []*gates.Gate)
@@ -1393,10 +1394,14 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		msg := fmt.Sprintf("machinery: %d gate ERROR finding(s) remain (no DRIFT); normal mid-phase. "+
 			"'machinery check %s' lists them.", blocking, design)
 		if g4Blocking > 0 && !armed {
+			why := "does not exist"
+			if fileExists(filepath.Join(sourceDesignDir, "ratchet.json")) {
+				why = "records no G4 edges (only consistency-layer debt)"
+			}
 			msg = fmt.Sprintf("machinery: %d gate ERROR finding(s) remain, %d of them import findings. "+
-				"Import blocking is disarmed: %s/ratchet.json does not exist. Complete Stage 1 with "+
+				"Import blocking is disarmed: %s/ratchet.json %s. Complete Stage 1 with "+
 				"'machinery baseline %s --impl <dir>' (paste the printed rules, commit the ratchet) to arm enforcement.",
-				blocking, g4Blocking, design, design)
+				blocking, g4Blocking, design, why, design)
 		}
 		if cfg.plainDialog() {
 			msg = fmt.Sprintf("machinery: %d design-check item(s) are still open; normal while the design is in progress. The assistant can list and explain them.", blocking)
@@ -1831,7 +1836,7 @@ func sessionStart(w io.Writer, root string, cfg Config, warn string) error {
 	}
 	if cfg.Impl != "" {
 		state := "no ratchet.json baseline yet, so import findings warn only; run 'machinery baseline' to arm blocking"
-		if fileExists(filepath.Join(designDir, "ratchet.json")) {
+		if gates.RatchetArmsImports(designDir) {
 			state = "baseline recorded, violations block at turn end"
 		}
 		fmt.Fprintf(&b, "- Import-boundary gate G4 watches source edits under %s (%s).\n", cfg.Impl, state)

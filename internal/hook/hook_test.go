@@ -1751,6 +1751,71 @@ func TestStopImportFindingsDisarmedThenArmed(t *testing.T) {
 	}
 }
 
+// A ratchet that records only consistency-layer debt (Gy/Gl sections, no
+// edges) carries no G4 snapshot, so it must not arm import blocking.
+func TestStopConsistencyOnlyRatchetDoesNotArmImports(t *testing.T) {
+	root := writeG4Fixture(t)
+	sid := "s-gy-ratchet"
+	t.Cleanup(func() { clearState(root, sid) })
+	writeFile(t, filepath.Join(root, "design", "ratchet.json"), `{"date":"2026-07","rule_findings":[]}`)
+	appendState(root, sid, "impl")
+	out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+	var got stopOut
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+	}
+	if got.Decision == "block" || !strings.Contains(got.SystemMessage, "disarmed") {
+		t.Fatalf("a Gy/Gl-only ratchet must leave import blocking disarmed: %+v", got)
+	}
+}
+
+// writeConsistencyDebtRoot builds a managed root whose only findings are
+// Gy-rules and Gl-ledger consistency debt: an unresolved USES{} member and a backticked token
+// outside every group.
+func writeConsistencyDebtRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigName), `{"gates":"gy,gl","strict":true}`)
+	writeFile(t, filepath.Join(root, "design", "domain.modelith.yaml"), "kind: DomainModel\nversion: v1\nentities:\n  Order:\n    attributes:\n      - {name: status, type: string}\n")
+	writeFile(t, filepath.Join(root, "design", "machines", "Order.machine.json"),
+		`{"id": "order", "initial": "Open", "states": {"Open": {"on": {"close": {"target": "Closed", "guard": "canClose"}}}, "Closed": {"type": "final"}}}`+"\n")
+	writeFile(t, filepath.Join(root, "design", "machines", "Order.matrix.md"), "| name | kind | event | pre / post |\n|---|---|---|---|\n"+
+		"| `canClose` | guard | - | reads `ghost_token`. USES{Order.stat} |\n")
+	return root
+}
+
+// The stop hook classifies exactly as check does: in strict mode a design
+// whose Gy/Gl findings are all baselined in ratchet.json does not block, and
+// the same design without the baseline does.
+func TestStopDoesNotBlockOnBaselinedConsistencyFindings(t *testing.T) {
+	root := writeConsistencyDebtRoot(t)
+	sid := "s-baselined"
+	t.Cleanup(func() { clearState(root, sid) })
+	stop := func() stopOut {
+		t.Helper()
+		appendState(root, sid, "design")
+		var got stopOut
+		out := runEvent(t, root, Input{SessionID: sid, HookEventName: "Stop"})
+		if out == "" {
+			return got // a green stop is silent
+		}
+		if err := json.Unmarshal([]byte(out), &got); err != nil {
+			t.Fatalf("stop output is not JSON: %v (%q)", err, out)
+		}
+		return got
+	}
+	if got := stop(); got.Decision != "block" || !strings.Contains(got.Reason, "fact_unresolved") {
+		t.Fatalf("strict mode must block on the unbaselined Gy finding: %+v", got)
+	}
+	clearState(root, sid)
+	writeFile(t, filepath.Join(root, "design", "ratchet.json"), `{"date":"2026-07",`+
+		`"rule_findings":[{"relation":"finding_fact_unresolved","tuple":["Order.canClose","Order.stat"]}],`+
+		`"undeclared_facts":[{"file":"machines/Order.matrix.md","unit":"canClose","token":"ghost_token","count":1}]}`)
+	if got := stop(); got.Decision == "block" {
+		t.Fatalf("baselined findings must never block a stop: %+v", got)
+	}
+}
+
 // A staged gates list naming the impl-facing gates (gt, g4) with no impl
 // configured must not fail the stop, but the drop has to stay visible: a
 // silently skipped gate is a configured-but-never-run gate.
