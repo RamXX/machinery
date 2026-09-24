@@ -8,6 +8,7 @@ package gates
 // design still projects for Gy-rules; `machinery project` stays strict.
 
 import (
+	"sort"
 	"strings"
 	"testing"
 )
@@ -254,6 +255,36 @@ func TestRulesReportParallelUnnamedRelationships(t *testing.T) {
 	}
 	if !containsSub(g.Errs, "fact_unresolved (fact 'Link.knd')") || containsSub(g.Errs, "projection partial") {
 		t.Fatalf("the rules run on complete facts, with no partial note: %v", g.Errs)
+	}
+}
+
+// payload.dl binds each declaration to the edges its unit's component takes
+// part in (through action_owner), and a unit with no owning component to
+// every edge of the event.
+func TestPayloadRuleBindsEachUnitToItsComponentsEdges(t *testing.T) {
+	g := CheckRules(writeFactsDesign(t, t.TempDir(), eventFanOut), false)
+	var payload []string
+	for _, e := range g.Errs {
+		if strings.Contains(e, ": payload_") {
+			payload = append(payload, e[strings.Index(e, "row "):])
+		}
+	}
+	want := []string{
+		"row 'Audit.logIssued': payload_no_edge (event 'quote.issued', component 'archive')",
+		"row 'Audit.logRetired': payload_unknown_event (event 'quote.retired')",
+		"row 'Draft.echoVoided': payload_twin (event 'quote.voided', field 'Quote.id', edge 'quote.voided|intake->ledger')",
+		"row 'Draft.echoVoided': payload_twin (event 'quote.voided', field 'Quote.id', edge 'quote.voided|pricing->ledger')",
+		"row 'Lead.emitIssued': payload_twin (event 'quote.issued', field 'Quote.channel', edge 'quote.issued|intake->billing')",
+		"row 'Lead.emitIssued': payload_twin (event 'quote.issued', field 'Quote.channel', edge 'quote.issued|intake->ledger')",
+		"row 'Lead.emitIssued': payload_twin (event 'quote.issued', field 'Quote.total', edge 'quote.issued|intake->billing')",
+		"row 'Lead.emitIssued': payload_twin (event 'quote.issued', field 'Quote.total', edge 'quote.issued|intake->ledger')",
+	}
+	sort.Strings(payload)
+	if strings.Join(payload, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("payload findings:\n got %s\nwant %s", strings.Join(payload, "\n"), strings.Join(want, "\n"))
+	}
+	if containsSub(g.Errs, "projection error") {
+		t.Fatalf("the fan-out design projects whole: %v", g.Errs)
 	}
 }
 

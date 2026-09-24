@@ -1,21 +1,79 @@
-// Event-payload twins (proposal section 4, rule D; NEXT.md entry 30).
+// Event-payload twins (proposal section 4, rule D; NEXT.md entry 30), bound to
+// event edges (MAC-j39j).
 //
 // A matrix payload {...} declaration restates the payload of the event its
-// row names, so its field set must equal the Architecture Contract event
-// row's closed payload set, in both directions: a declared field the contract
-// lacks, and a contract field the declaration omits, are each one finding.
-// An event whose contract row states no closed field set has no
-// event_payload_field rows, so every declared field is reported.
+// row names, as the declaring unit's component sees it. The event-contract
+// table is one row per producer-consumer edge (event_edge), and the edges of
+// one event may carry different payloads, so the declaration is compared with
+// every edge whose producer or consumer is the unit's component, each in both
+// directions: a declared field the edge lacks, and an edge field the
+// declaration omits, are each one finding naming the edge. An edge whose row
+// states no closed field set has no event_edge_payload_field rows, so every
+// declared field is reported against it.
+//
+// The unit's component is the owner (action_owner, the action-ownership
+// table) of an action of the entity whose matrix declares the unit: a unit
+// row's machine column names that entity (the matrix stem, when its machine
+// exists), and a declaration on a row that names no unit has the matrix
+// itself as its subject. A unit with no owning component (the design has no
+// ownership table, the matrix has no machine, or nobody owns the entity's
+// actions) is compared with every edge of the event, which for an event of
+// one contract row is that row.
+//
+// finding_payload_no_edge: the unit has a component and the event has
+// contract rows, but no edge names the component; the declaration binds to
+// nothing it takes part in.
+//
+// finding_payload_unknown_event: the event has no contract row at all.
 
+.decl unit(id:symbol, machine:symbol, name:symbol, kind:symbol)
+.input unit
+.decl matrix(id:symbol)
+.input matrix
+.decl action(id:symbol, entity:symbol, name:symbol, actor:symbol)
+.input action
+.decl action_owner(action:symbol, component:symbol)
+.input action_owner
+.decl event(id:symbol)
+.input event
+.decl event_edge(edge:symbol, event:symbol, producer:symbol, consumer:symbol)
+.input event_edge
+.decl event_edge_payload_field(edge:symbol, field:symbol)
+.input event_edge_payload_field
 .decl unit_payload(unit:symbol, event:symbol, field:symbol)
 .input unit_payload
-.decl event_payload_field(id:symbol, field:symbol)
-.input event_payload_field
 
 .decl unit_event(unit:symbol, event:symbol)
 unit_event(U, E) :- unit_payload(U, E, _).
 
-.decl finding_payload_twin(unit:symbol, event:symbol, field:symbol)
+.decl declaring_entity(unit:symbol, entity:symbol)
+declaring_entity(U, M) :- unit(U, M, _, _), M != "".
+declaring_entity(M, M) :- matrix(M).
+
+.decl unit_component(unit:symbol, component:symbol)
+unit_component(U, C) :- declaring_entity(U, M), action(A, M, _, _), action_owner(A, C).
+
+.decl placed(unit:symbol)
+placed(U) :- unit_component(U, _).
+
+// The edges a declaration is held to.
+.decl unit_edge(unit:symbol, event:symbol, edge:symbol)
+unit_edge(U, E, X) :- unit_event(U, E), unit_component(U, C), event_edge(X, E, C, _).
+unit_edge(U, E, X) :- unit_event(U, E), unit_component(U, C), event_edge(X, E, _, C).
+unit_edge(U, E, X) :- unit_event(U, E), !placed(U), event_edge(X, E, _, _).
+
+.decl bound(unit:symbol, event:symbol)
+bound(U, E) :- unit_edge(U, E, _).
+
+.decl finding_payload_twin(unit:symbol, event:symbol, field:symbol, edge:symbol)
 .output finding_payload_twin
-finding_payload_twin(U, E, F) :- unit_payload(U, E, F), !event_payload_field(E, F).
-finding_payload_twin(U, E, F) :- unit_event(U, E), event_payload_field(E, F), !unit_payload(U, E, F).
+finding_payload_twin(U, E, F, X) :- unit_payload(U, E, F), unit_edge(U, E, X), !event_edge_payload_field(X, F).
+finding_payload_twin(U, E, F, X) :- unit_edge(U, E, X), event_edge_payload_field(X, F), !unit_payload(U, E, F).
+
+.decl finding_payload_no_edge(unit:symbol, event:symbol, component:symbol)
+.output finding_payload_no_edge
+finding_payload_no_edge(U, E, C) :- unit_event(U, E), event(E), unit_component(U, C), !bound(U, E).
+
+.decl finding_payload_unknown_event(unit:symbol, event:symbol)
+.output finding_payload_unknown_event
+finding_payload_unknown_event(U, E) :- unit_event(U, E), !event(E).

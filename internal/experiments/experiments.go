@@ -166,7 +166,7 @@ var MachineryCheckExperiments = []Experiment{
 	{Name: "rules-values-conflict", Tool: "check", Mutation: "two units spell the enum-less group reason as {late, lost} and {late, early}",
 		ExpectSubstr: "row 'Widget.commit': values_conflict (group 'reason', member 'lost')", ExpectExit: true},
 	{Name: "rules-payload-twin", Tool: "check", Mutation: "a matrix payload {} omits one field of the contract's event payload",
-		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status')", ExpectExit: true},
+		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status', edge 'widget.published|app->storelib')", ExpectExit: true},
 	{Name: "rules-supersession-cycle", Tool: "check", Mutation: "SUPERSEDES rows close A > B > C > A",
 		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: true},
 	{Name: "rules-effect-uncarried", Tool: "check", Mutation: "an action declares WRITES{Widget.status} and no CARRIES{}",
@@ -208,6 +208,23 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: ": milestone_binding_stale", ExpectExit: true},
 	{Name: "rules-milestone-binding-phantom", Tool: "check", Mutation: "BUILD.md says a Widget oracle id is bound at internal/app/app_test.go, which binds only another id (--impl)",
 		ExpectSubstr: "milestone_binding_phantom (path 'internal/app/app_test.go')", ExpectExit: true},
+	// 2026-09-23, MAC-j39j: the event-contract table is one row per
+	// producer-consumer edge. A fan-out event is defined once and each row is
+	// an edge with its own payload; a matrix payload {} binds to the edges its
+	// unit's component takes part in, and a row the projection cannot read
+	// degrades Gy-rules to that row instead of failing the whole gate.
+	{Name: "rules-payload-edge-disagrees", Tool: "check", Mutation: "the intake component's emitting unit declares the payload of the pricing edges, not its own",
+		ExpectSubstr: "row 'Lead.emitPriced': payload_twin (event 'widget.priced', field 'Widget.channel', edge 'widget.priced|intake->ledger')", ExpectExit: true},
+	{Name: "rules-payload-no-edge", Tool: "check", Mutation: "a unit owned by the archive component declares a payload for an event no edge of which names archive",
+		ExpectSubstr: "row 'Audit.logPriced': payload_no_edge (event 'widget.priced', component 'archive')", ExpectExit: true},
+	{Name: "rules-payload-unknown-event", Tool: "check", Mutation: "a unit declares a payload for an event with no contract row",
+		ExpectSubstr: "row 'Audit.logPriced': payload_unknown_event (event 'widget.retired')", ExpectExit: true},
+	{Name: "event-edge-contradiction", Tool: "check", Mutation: "one edge is stated on two contract rows with different payloads",
+		ExpectSubstr: "event edge 'widget.priced|app->storelib' is stated again with another payload", ExpectExit: true},
+	{Name: "relationship-parallel-unnamed", Tool: "check", Mutation: "two relationships from Widget to Lead with one cardinality and no role or name",
+		ExpectSubstr: "relationship 'Widget->Lead:n:1' is declared again with no distinguishing role or name", ExpectExit: true},
+	{Name: "rules-partial-projection", Tool: "check", Mutation: "a malformed declaration group on one matrix row beside a real finding on another",
+		ExpectSubstr: "[projection partial: 1 projection error(s) omitted facts", ExpectExit: true},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.

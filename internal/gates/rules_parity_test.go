@@ -69,6 +69,9 @@ func TestRulesParity(t *testing.T) {
 	// parity also covers populated outputs of every rule body. Its
 	// implementation supplies the --impl relations (bound_at, test_file).
 	targets = append(targets, target{"synthetic/every-rule-fires", writeFactsDesign(t, t.TempDir(), everyRuleFires), writeFactsDesign(t, t.TempDir(), everyRuleFiresImpl)})
+	// A fan-out event (MAC-j39j): every rule runs over one event on several
+	// contract rows, so edges and per-edge payloads reach both engines.
+	targets = append(targets, target{"synthetic/event-fan-out", writeFactsDesign(t, t.TempDir(), eventFanOut), ""})
 	nonEmpty := map[string]bool{}
 	for _, tg := range targets {
 		rel := tg.name
@@ -190,6 +193,57 @@ entities:
 	"migration.yaml":             "contract_version: 1\nmode: rebuild\ndispositions:\n  - legacy: TypeD\n    target: Order\n    strategy: replace\n    rationale: r\n",
 	"AUTHORIZATION.md": "<!-- machinery:authorization-inventory -->\n\n| authorization subject | admission |\n|---|---|\n" +
 		"| Order.pay | `nowhere` |\n| Order.view | `nowhere` |\n",
+}
+
+// eventFanOut is one event on four contract rows (two producers by two
+// consumers, the payload differing by producer) plus a verbatim restatement,
+// a second event from two producers named in one cell, and the payload
+// declarations every edge-bound outcome needs: a unit matching its own edges
+// and not the other producer's (silent), one disagreeing with its own edges,
+// one whose component is on no edge, one naming an event with no row, and
+// one with no owning component (held to every edge).
+var eventFanOut = map[string]string{
+	"domain.modelith.yaml": `kind: DomainModel
+version: v1
+entities:
+  Quote:
+    attributes:
+      - {name: total, type: integer}
+    actions:
+      - {name: issue}
+  Lead:
+    attributes:
+      - {name: channel, type: string}
+    actions:
+      - {name: capture}
+  Audit:
+    attributes:
+      - {name: note, type: string}
+    actions:
+      - {name: record}
+`,
+	"ARCHITECTURE.md": "# Architecture\n\n" +
+		"| event | producer | consumer | payload | delivery |\n|---|---|---|---|---|\n" +
+		"| `quote.issued` | `pricing` | `billing` | `Quote.id`, `Quote.total` | at-least-once |\n" +
+		"| `quote.issued` | `pricing` | `ledger` | `Quote.id`, `Quote.total` | at-least-once |\n" +
+		"| `quote.issued` | `intake` | `billing` | `Quote.id`, `Quote.channel` | at-least-once |\n" +
+		"| `quote.issued` | `intake` | `ledger` | `Quote.id`, `Quote.channel` | at-least-once |\n" +
+		"| `quote.issued` | `pricing` | `ledger` | `Quote.id`, `Quote.total` | at-least-once |\n" +
+		"| `quote.voided` | `pricing` + `intake` | `ledger` | the quote id | at-least-once |\n\n" +
+		"| action | owning component |\n|---|---|\n" +
+		"| `Quote.issue` | `pricing` |\n| `Lead.capture` | `intake` |\n| `Audit.record` | `archive` |\n",
+	"machines/Quote.machine.json": `{"id":"quote","initial":"Open","states":{"Open":{"type":"final"}}}`,
+	"machines/Lead.machine.json":  `{"id":"lead","initial":"Open","states":{"Open":{"type":"final"}}}`,
+	"machines/Audit.machine.json": `{"id":"audit","initial":"Open","states":{"Open":{"type":"final"}}}`,
+	"machines/Quote.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+		"| `announce` | action | `quote.issued` | payload {Quote.id, Quote.total} |\n",
+	"machines/Lead.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+		"| `emitIssued` | action | `quote.issued` | payload {Quote.id, Quote.total} |\n",
+	"machines/Audit.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+		"| `logIssued` | action | `quote.issued` | payload {Quote.id} |\n" +
+		"| `logRetired` | action | `quote.retired` | payload {Quote.id} |\n",
+	"machines/Draft.matrix.md": "| name | kind | event | pre / post |\n|---|---|---|---|\n" +
+		"| `echoVoided` | action | `quote.voided` | payload {Quote.id} |\n",
 }
 
 // everyRuleFiresImpl is everyRuleFires' implementation: its one test file
