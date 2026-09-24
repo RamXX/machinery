@@ -8,7 +8,8 @@ labels: [check, performance, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:9653960fda9f153c0911f4ad4b05b238846bf1c42efa502d530f01d390c725f2"
+content_hash: "sha256:1bbdd6cff90902359505664cb30ac84ea4d903ef2fc7dffdaee3b00ae54e0f11"
+related: [MAC-6mzy]
 ---
 
 ## Description
@@ -40,6 +41,6 @@ Acceptance criteria:
 
 
 ## Links
-
+- Related: [[MAC-6mzy]]
 
 ## Comments

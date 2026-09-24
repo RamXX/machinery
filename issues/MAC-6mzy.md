@@ -8,7 +8,8 @@ labels: [gv, attest, h2, needs-owner-decision, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:49Z
-content_hash: "sha256:ab22cef71938c2858f80eec2d72361f3d64c5d80577e412caf76ca8e1ccc4a05"
+content_hash: "sha256:a82cad47c46994677452744598a365a2a2d4c60720cb701122876603463aa174"
+related: [MAC-38er]
 ---
 
 ## Description
@@ -49,6 +50,6 @@ Acceptance criteria:
 
 
 ## Links
-
+- Related: [[MAC-38er]]
 
 ## Comments
