@@ -2,13 +2,13 @@
 id: MAC-3lqk
 title: "Pin the Claude Code marketplace to release tags so a push to main is not a plugin release"
 status: open
-priority: 2
+priority: 1
 type: task
 labels: [release-process, claude-code]
 created_at: 2026-09-09T18:28:12Z
 created_by: ramirosalas
-updated_at: 2026-09-09T18:28:12Z
-content_hash: "sha256:9e4f77aecff6d62b1e5874d914838a9705c758f2d360ddbdb5efb03f61b30792"
+updated_at: 2026-09-24T21:33:45Z
+content_hash: "sha256:1aa3d7ec02d7b56fd2f405bcaa65f3a6b54493116a0a554bc885a101424b3339"
 ---
 
 ## Description
@@ -25,7 +25,7 @@ Make the marketplace serve the tagged release (a ref or a release branch that on
 
 
 ## Notes
-
+Triage 2026-09-24: raised. marketplace.json source is ./; the 0.10.0 withdraw/revert on main (9c042684, aaac8403) showed the exposure is real.
 
 ## History
 
