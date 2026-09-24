@@ -1,14 +1,16 @@
 ---
 id: MAC-aldv
 title: "recovery-docker lane tests leave root-owned residue on Linux hosts (fixture ran as root)"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [ci, integration-lane, linux]
 created_at: 2026-09-08T19:03:40Z
 created_by: ramirosalas
-updated_at: 2026-09-08T19:03:40Z
-content_hash: "sha256:871fa54008e0e2c6b3a630c3f43b64dede02db0815eed232f88e154fff165405"
+updated_at: 2026-09-24T21:31:54Z
+content_hash: "sha256:34728ce689b7dd21aa41f72b70836a6719ec3d5d7b93a05623590e9a13b487ff"
+closed_at: 2026-09-24T21:31:54Z
+close_reason: "Fixed by c306a192 (fixture runs --user uid:gid); integration-required lane green at 4bb85b78. Triage 2026-09-24."
 ---
 
 ## Description
@@ -31,7 +33,7 @@ The fixture runs as the host uid:gid (c306a19). Verified locally; hosted verific
 
 
 ## History
-
+- 2026-09-24T21:31:54Z status: open -> closed
 
 ## Links
 
