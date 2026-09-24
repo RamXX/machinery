@@ -2,13 +2,13 @@
 id: MAC-ou97
 title: "E2e: Consumers receive trustworthy standalone assurance"
 status: open
-priority: 1
+priority: 2
 type: task
 labels: [capstone]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
-updated_at: 2026-09-06T12:05:48Z
+updated_at: 2026-09-24T21:33:45Z
 content_hash: "sha256:745f37fd91720846e4a7ef76809108a3ba80d0474f00a66ed48203eab6dbf8f0"
 blocked_by: [MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 was_blocked_by: [MAC-olrx, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-uzxr, MAC-l7m0, MAC-p9wm, MAC-yig6, MAC-lhu5, MAC-sh60, MAC-hgz1, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-hpqp, MAC-2n83, MAC-yhg5, MAC-hlae, MAC-hwdb, MAC-hy71, MAC-gcrr, MAC-bz1y, MAC-p9z1, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-62s6, MAC-vx24]
