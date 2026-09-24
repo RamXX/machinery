@@ -409,7 +409,7 @@ func ObserveRuleDebt(design, impl string) ([]RuleDebt, error) {
 		return nil, fmt.Errorf("cannot project the design's facts for the consistency rules: %w", err)
 	}
 	if len(rep.problems) > 0 {
-		return nil, fmt.Errorf("Gy-rules has %d projection error(s); a row the rules cannot read is a broken design, not debt, and is never baselined; fix them and rerun:\n  %s",
+		return nil, fmt.Errorf("the design has %d Gy-rules projection error(s); a row the rules cannot read is a broken design, not debt, and is never baselined; fix them and rerun:\n  %s",
 			len(rep.problems), strings.Join(prefixed(projectionErrorPrefix, rep.problems), "\n  "))
 	}
 	if impl != "" {
