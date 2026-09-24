@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:7b068b5b2ddbc2df547aa79d5a5a25dd6736a82b014534ea3130b712ff2c78c5"
+content_hash: "sha256:b30798407e317d81ef68986bc1267afdea7bcd146aa175ec10209dcaa69938bf"
 blocked_by: [MAC-u4oo]
-blocks: [MAC-al5u, MAC-vx24, MAC-ou97]
+blocks: [MAC-al5u, MAC-vx24]
 ---
 
 ## Description
@@ -102,10 +102,11 @@ Triage 2026-09-24: NEEDS-REWRITE. go-crm changed since 09-06 (slices, Gy/Gl, acc
 - 2026-09-06T09:10:12Z dep_added: blocks MAC-al5u
 - 2026-09-06T09:10:29Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:30Z dep_added: blocks MAC-ou97
+- 2026-09-24T21:33:55Z dep_removed: no_longer_blocks MAC-ou97
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-al5u]], [[MAC-vx24]], [[MAC-ou97]]
+- Blocks: [[MAC-al5u]], [[MAC-vx24]]
 - Blocked by: [[MAC-u4oo]]
 
 ## Comments
