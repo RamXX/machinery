@@ -8,7 +8,8 @@ labels: [packet, gw, h2]
 created_at: 2026-09-10T19:13:54Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:46Z
-content_hash: "sha256:3f55b7e014128ebf0a5366e5aa954d700a669f5c0426410eb9be71c026330e1f"
+content_hash: "sha256:b1728713b657973eaaf70553eec122057eadd5203016fe90ddfe2eec3ef73bd4"
+related: [MAC-94n5]
 ---
 
 ## Description
@@ -27,6 +28,6 @@ Triage 2026-09-24: valid. packet.go:1432 rejects duplicate first-cell keys; H2 A
 
 
 ## Links
-
+- Related: [[MAC-94n5]]
 
 ## Comments

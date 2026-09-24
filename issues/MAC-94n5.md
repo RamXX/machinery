@@ -8,8 +8,9 @@ labels: [consistency-layer, packets, supersession, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:8a432eaea20f9a386c97dfad3974336fa85a74cd355e28014fe3a835fa3b1135"
+content_hash: "sha256:7c158209022acf59ec973a3def888070453c37780e371bc0e7d419aa0c44958b"
 blocks: [MAC-f15w]
+related: [MAC-036o]
 ---
 
 ## Description
@@ -44,5 +45,6 @@ Acceptance criteria:
 
 ## Links
 - Blocks: [[MAC-f15w]]
+- Related: [[MAC-036o]]
 
 ## Comments
