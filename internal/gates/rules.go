@@ -53,9 +53,8 @@ var ruleSubjectSources = map[string][]string{
 	"action":  {"action"},
 	"subject": {"admission", "no_authorization", "action"},
 	"type":    {"type_owner", "supersedes", "reserved"},
-	// a matrix stem, and a component named by a placement row
-	"matrix":    {"matrix"},
-	"component": {"no_machine_waiver"},
+	// a matrix stem
+	"matrix": {"matrix"},
 	// a slices.yaml slice id
 	"slice": {"packet_cites", "slice_claim"},
 	// an oracle stable id, located at its BUILD.md binding row

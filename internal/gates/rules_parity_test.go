@@ -183,7 +183,6 @@ entities:
 		"| TypeA | SUPERSEDES{type:TypeB} |\n| TypeB | SUPERSEDES{type:TypeC} |\n| TypeC | SUPERSEDES{type:TypeA} |\n" +
 		"| TypeD | SUPERSEDES{type:Ghost} |\n| DraftContract | RESERVED{type:TypeA} |\n\n" +
 		"| component | placement | persistence |\n|---|---|---|\n" +
-		"| `Order` (no machine: a stale waiver) | in-process | row |\n" +
 		"| `Receipt` (no machine: an append-only record) | in-process | row |\n",
 	"machines/Order.oracle.md":   "| test id | stable id | guard |\n|---|---|---|\n| T-ORD-01 | ORD-aaaaaa | - |\n| T-ORD-02 | ORD-bbbbbb | - |\n",
 	"BUILD.md":                   "# BUILD\n\n## 9.1 Oracle bindings\n\n| oracle | bound at |\n|---|---|\n| ORD-aaaaaa | unbound |\n| T-ORD-02 | `order_test.go` |\n",

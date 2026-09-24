@@ -229,8 +229,7 @@ an action nor an actor (`carrier_misplaced`), supersession cycles,
 dangling replacements and duplicate owners, a `RESERVED` type some artifact
 owns (`stale_reservation`), a `slices.yaml` `row:` citation of a superseded
 type (`superseded_in_packet`), a matrix with neither a machine nor a
-`(no machine: <reason>)` placement waiver (`orphan_matrix`), a waiver on a
-component that has a machine (`waived_machine_present`), and, under `--impl`
+`(no machine: <reason>)` placement waiver (`orphan_matrix`), and, under `--impl`
 only, a BUILD.md oracle binding row that disagrees with the suite
 (`milestone_binding_stale`, `milestone_binding_phantom`). `machinery check <design> --gate gy --explain`
 prints under each finding its derivation: the rule file and rule number, then

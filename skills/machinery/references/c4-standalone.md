@@ -512,8 +512,9 @@ and invariant `maps to` cells. The placement row's `(no machine: <reason>)` waiv
 what declares that matrix contract-only, and it is the only declaration: G3 accepts the matrix
 without a machine, Gd accepts its `CLAUSES{}` without an owning machine or oracle, and Gy-rules reads
 the same waiver as `no_machine_waiver`. Without the waiver (or with an empty reason) the matrix is a
-stale orphan: G3 reports it and Gy-rules reports `orphan_matrix`. A waiver on a component that does
-have a machine is `waived_machine_present`. A contract-only record never gets a fake machine or an
+stale orphan: G3 reports it and Gy-rules reports `orphan_matrix`. A waiver beside a small machine
+of the same name (an envelope machine for a record-only entity) is accepted and declares nothing
+contract-only. A contract-only record never gets a fake machine or an
 empty oracle. Its `CLAUSES{}` govern no transition, so they owe no suffixed transition id; their
 coverage obligation is the assurance inventory's `guard-clause` key, one per active clause (owner
 the matrix name, id `guard:clause`), which a locked suite binds like any other obligation. Every

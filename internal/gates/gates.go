@@ -2428,9 +2428,9 @@ func NoMachineWaivers(archText string) []NoMachineWaiver {
 // contractOnlyMatrices names the matrices a design declares contract-only:
 // a machines/<X>.matrix.md with no machines/<X>.machine.json whose component
 // X carries a '(no machine: <reason>)' placement waiver with a reason. A
-// waiver on a component that has a machine declares nothing here (Gy-rules
-// reports it as waived_machine_present), and a matrix with neither is a
-// stale orphan, which G3 and Gy-rules both report.
+// waiver on a component that has a machine declares nothing here (an
+// envelope machine for a record-only entity is an accepted convention), and
+// a matrix with neither is a stale orphan, which G3 and Gy-rules both report.
 func contractOnlyMatrices(design string) map[string]bool {
 	out := map[string]bool{}
 	arch := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))

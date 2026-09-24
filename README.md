@@ -464,8 +464,7 @@ You can read that trace without knowing Datalog. The action is declared at line 
   nobody owns, a `RESERVED` type some artifact already owns, and an executor packet that cites the
   row of a superseded type.
 - `records.dl`: a matrix with neither a machine nor a `(no machine: <reason>)` placement waiver
-  (`orphan_matrix`), and a waiver on a component that has a machine. This is how an append-only,
-  contract-only record is declared.
+  (`orphan_matrix`). This is how an append-only, contract-only record is declared.
 - `bindings.dl`: under `--impl` only, a BUILD.md oracle binding table that says an oracle id is
   unbound while a test binds it (`milestone_binding_stale`), or names a test file that binds
   nothing for it (`milestone_binding_phantom`).

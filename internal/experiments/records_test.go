@@ -18,8 +18,7 @@ import (
 
 func init() {
 	RegisterRunner("records_test.go",
-		"record-orphan-matrix", "record-orphan-matrix-rule", "record-waiver-empty-reason",
-		"record-waived-machine-present")
+		"record-orphan-matrix", "record-orphan-matrix-rule", "record-waiver-empty-reason")
 }
 
 const recordModel = `  ErasureRecord:
@@ -131,17 +130,20 @@ func TestContractOnlyWaiverWithEmptyReason(t *testing.T) {
 	requireRuleFinding(t, "record-orphan-matrix-rule", design)
 }
 
-// A waiver on a component that has a machine is a finding; the fixture's own
-// Widget row, unwaived, is the near-neighbour.
-func TestWaivedMachinePresent(t *testing.T) {
+// A '(no machine: ...)' placement beside a small machine of the same name is
+// an accepted convention (an envelope machine for a record-only entity), which
+// 0.9.0 accepted: Gy-rules raises nothing on it. The waiver still declares
+// nothing there (the matrix has its machine), so G3 counts no contract-only
+// matrix for it.
+func TestWaiverBesideMachineIsAccepted(t *testing.T) {
 	design, _ := fixture(t)
-	editFile(t, filepath.Join(design, "ARCHITECTURE.md"), "| `Widget` | in-process |", "| `Widget` (no machine: stale) | in-process |")
-	requireRuleFinding(t, "record-waived-machine-present", design)
-
-	near, _ := fixture(t)
-	contractOnlyRecord(t, near, recordPlacementWaived)
-	refuteRuleFinding(t, near, "waived_machine_present")
-	refuteRuleFinding(t, near, "orphan_matrix")
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"), "| `Widget` | in-process |", "| `Widget` (no machine: envelope for a record-only entity) | in-process |")
+	if got := rulesFindings(t, design); len(got) != 0 {
+		t.Fatalf("Gy-rules must accept a waiver beside a machine: %v", got)
+	}
+	if n := gates.CheckMachines(design).Counts["contract-only matrices (no machine: waived)"]; n != 0 {
+		t.Fatalf("a waiver beside a machine declares no contract-only matrix, got %d", n)
+	}
 }
 
 // A contract-only clause set governs no transition, so it binds no oracle row

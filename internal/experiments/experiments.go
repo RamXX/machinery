@@ -192,8 +192,6 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "row 'ErasureRecord': orphan_matrix", ExpectExit: true},
 	{Name: "record-waiver-empty-reason", Tool: "check", Mutation: "the placement waiver reads '(no machine: )', naming no reason",
 		ExpectSubstr: "placement row component `ErasureRecord` has no machine and no '(no machine: <reason>)' waiver", ExpectExit: true},
-	{Name: "record-waived-machine-present", Tool: "check", Mutation: "the Widget placement row waives the machine Widget has",
-		ExpectSubstr: "row 'Widget': waived_machine_present", ExpectExit: true},
 	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 15): a reservation
 	// of a type an artifact now owns is stale, and a packet citing the row of
 	// a superseded type carries a replaced definition as its contract.

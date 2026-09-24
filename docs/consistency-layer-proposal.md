@@ -496,9 +496,12 @@ catalog of rule files, findings and the declarations each reads is `rules/README
   `NoMachineWaivers` (internal/gates/gates.go) is its one reader; Gx's placement check, the
   projection, G3 and Gd all go through it. The projection adds `matrix(id)` (every
   `machines/*.matrix.md`, machine or not) and `no_machine_waiver(component)` (a waiver with a
-  reason; an empty reason is no waiver, Gx reports the row, and nothing is projected). Rules:
-  `finding_orphan_matrix(matrix)` for a matrix with neither a machine nor a waiver, and
-  `finding_waived_machine_present(component)` for a waiver beside a machine. Two gate paths change,
+  reason; an empty reason is no waiver, Gx reports the row, and nothing is projected). Rule:
+  `finding_orphan_matrix(matrix)` for a matrix with neither a machine nor a waiver. A waiver
+  beside a machine of the same name is no finding: an envelope machine for a record-only entity
+  next to its `(no machine: ...)` placement is an accepted convention that 0.9.0 accepted (a
+  `finding_waived_machine_present` rule of the withdrawn 0.10.0 assumed the two
+  exclusive and is removed). Two gate paths change,
   both by consulting that reader, never a second parser: G3 (`CheckMachines`) no longer reports a
   waived matrix as an orphan and counts it (`contract-only matrices (no machine: waived)`); Gd,
   through `collectClauseDecls` (shared with Gt and the assurance inventory), no longer demands an
@@ -542,9 +545,9 @@ catalog of rule files, findings and the declarations each reads is `rules/README
   relations empty. No bundled example has an implementation with a binding table (fulfillment has
   no implementation directory), so a synthetic fixture covers it; go-crm's golden check, which runs
   with `--impl`, now projects its `bound_at` rows and stays clean.
-- **Subject kinds.** The gate's subject vocabulary grows by `matrix`, `component`, `slice` and
-  `oracle`, each resolved through the relations that carry it (`matrix`; `no_machine_waiver`;
-  `packet_cites`, `slice_claim`; the binding rows, then `oracle_row`), and `type` also resolves
+- **Subject kinds.** The gate's subject vocabulary grows by `matrix`, `slice` and `oracle`, each
+  resolved through the relations that carry it (`matrix`; `packet_cites`, `slice_claim`; the
+  binding rows, then `oracle_row`), and `type` also resolves
   through `reserved`.
 - **Evidence.** `TestRulesParity` covers 8 rule files over 9 designs (72 runs), the synthetic
   design now with an implementation so every output, the binding twins included, is compared

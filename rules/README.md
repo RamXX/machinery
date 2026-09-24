@@ -18,7 +18,7 @@ pinned Soufflé.
 | `carriers.dl` | `effect_uncarried`, `carrier_misplaced` | `CARRIES{}` and `WRITES{}` on matrix rows, the unit kind column |
 | `facts.dl` | `fact_unresolved` | `USES{}` and `WRITES{}` members against Modelith attributes and enum members, machine context keys, event payload fields, and the row's own `derived:` and `VALUES` declarations |
 | `payload.dl` | `payload_twin`, `payload_no_edge`, `payload_unknown_event` | `payload {}` on matrix event rows against the closed payload set of each event-contract edge whose producer or consumer is the unit's component (the ARCHITECTURE.md action-ownership table's owner of an action of the matrix's entity; every edge of the event when the unit has no owner) |
-| `records.dl` | `orphan_matrix`, `waived_machine_present` | `machines/*.matrix.md` and `*.machine.json` stems, the `(no machine: <reason>)` waiver on ARCHITECTURE.md persistence-and-placement rows |
+| `records.dl` | `orphan_matrix` | `machines/*.matrix.md` and `*.machine.json` stems, the `(no machine: <reason>)` waiver on ARCHITECTURE.md persistence-and-placement rows |
 | `supersession.dl` | `duplicate_owner`, `supersession_cycle`, `dangling_replacement`, `stale_reservation`, `superseded_in_packet` | `SUPERSEDES{type:...}` and `RESERVED{type:...}` on Architecture Contract rows, `migration.yaml` dispositions, `slices.yaml` `row:` citations |
 | `values.dl` | `values_disagree`, `values_conflict` | `VALUES{}` and `VALUES name{}` on matrix rows, Modelith enums |
 

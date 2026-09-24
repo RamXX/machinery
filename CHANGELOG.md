@@ -60,6 +60,16 @@ under their version heading when a release is cut.
   one summary line with the split and the first three tokens; `machinery check --verbose` prints
   every line, and the counts on the `checked:` line are exact either way.
 
+### Removed
+
+- **`waived_machine_present` (`records.dl`).** 0.10.0 reported a `(no machine: <reason>)`
+  placement waiver on a component that also has a machine. That placement next to a small machine
+  of the same name is an accepted convention (an envelope machine for a record-only entity) which
+  0.9.0 accepted; the rule assumed the two are exclusive and would fail valid designs. The waiver
+  still declares nothing contract-only when the machine exists, `orphan_matrix` (a matrix with
+  neither a machine nor a waiver) stays, and so does contract-only record support. The `component`
+  subject kind, which only that rule used, is gone from the Gy-rules subject vocabulary.
+
 ## [0.10.0] - 2026-09-23
 
 ### Added
