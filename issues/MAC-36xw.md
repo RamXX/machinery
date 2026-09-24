@@ -7,8 +7,8 @@ type: bug
 labels: [flaky-under-load, macos, ci, cmd-machinery, structurizr]
 created_at: 2026-09-23T22:35:13Z
 created_by: ramirosalas
-updated_at: 2026-09-23T22:35:13Z
-content_hash: "sha256:84c826f9d06518f3846d2c7654615f623eaf41a5d674967f7a8aea98aac71f71"
+updated_at: 2026-09-24T05:13:12Z
+content_hash: "sha256:821e0def39ab7d01ae4229eb97e7182a61af8ceed5d4e8ca35966feeb40e21e9"
 ---
 
 ## Description
@@ -21,7 +21,7 @@ Observed 2026-09-23 on ci run 35924889820 (commit 8ab48a15), job native-tests (m
 
 
 ## Notes
-
+Second occurrence 2026-09-24 on ci run 35955372364 (the cancellation variant, same shape). 4bb85b78 replaces the helpers' bare select {} with a sleep loop (a process whose goroutines are all blocked with no timer pending is a runtime deadlock and dies, releasing the flock; the helper binary runs with no -test.timeout so no timer exists) and makes every waiter assertion print the helper's liveness, exit status and output. ci on 4bb85b78 passed first try. Keep open until the instrumentation has seen one more hosted macOS run under load; close if the sleep loop explanation holds.
 
 ## History
 
