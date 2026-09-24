@@ -8,7 +8,8 @@ labels: [gt, assurance, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:94f0f105badaf8fd411dacb4bc3ed413435e999f815ba8154b15e37045a6dbff"
+content_hash: "sha256:a86226d859170739158cde96db5ffa2399c94d35b911d2741be141fba17e4dcd"
+blocks: [MAC-9azz]
 ---
 
 ## Description
@@ -40,9 +41,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:56Z dep_added: blocks MAC-9azz
 
 ## Links
-
+- Blocks: [[MAC-9azz]]
 
 ## Comments
