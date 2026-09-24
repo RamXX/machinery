@@ -1,14 +1,16 @@
 ---
 id: MAC-bsdq
 title: "Closed group vocabulary rejects a design's own private groups although the 0.10.0 migration note says the design keeps its notation"
-status: open
+status: closed
 priority: 0
 type: bug
 labels: [consistency-layer, declarations, gx, gy, docs, h2, blocks-h2]
 created_at: 2026-09-23T23:56:54Z
 created_by: ramirosalas
-updated_at: 2026-09-24T05:13:12Z
-content_hash: "sha256:1507631f175d9e53016059ac94cf215e822af96b7a99e80b24ce6e9281ac1013"
+updated_at: 2026-09-24T21:33:43Z
+content_hash: "sha256:d48534c6f14bb6b547e04909a24deb18dc8a4e3582e936776689c0bf646a827e"
+closed_at: 2026-09-24T21:33:43Z
+close_reason: "Released in 0.10.1 (private_groups:). Triage 2026-09-24."
 ---
 
 ## Description
@@ -25,7 +27,7 @@ Fixed on release/0.10.1: private_groups: in the contract fence; projection honor
 Released in v0.10.1 (4bb85b78).
 
 ## History
-
+- 2026-09-24T21:33:43Z status: open -> closed
 
 ## Links
 
