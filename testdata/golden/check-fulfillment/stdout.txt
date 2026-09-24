@@ -31,7 +31,7 @@
   checked: 12 entities, 6 lifecycle machines traced, 6 lifecycle entities with machines, 6 lifecycle semantics annotations, 5 control-flow-only semantics, 3 placement rows with machines, 4 placement rows waived, 1 entities placement-waived, 11 entities placed, 5 mitigation rows with residual handlers, 17 declaration groups parsed, 21 authorization rows read, 4 event-contract reactions waived, 5 event-contract emissions traced, 4 event-contract reactions traced, 3 event-contract emissions waived, 13 event-contract consumer reads declared, 22 declared read fields carried, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 25 invariants enforced, 24 invariants unit-backed (guard/action/actor), 1 invariants integrity-checked (relational model)
   ok
 == Gy-rules  consistency rules over projected facts ==
-  checked: 8 rule files evaluated, 1269 facts
+  checked: 8 rule files evaluated, 1386 facts
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 18 skeleton citations
