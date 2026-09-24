@@ -8,7 +8,8 @@ labels: [docs, isolation]
 created_at: 2026-09-24T21:27:28Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:27:28Z
-content_hash: "sha256:c50f7d386bb145e0ce5bd30f5dc73366555a22d822f1fe22f8f2a7dd06bfd442"
+content_hash: "sha256:0ed3de7d61956d174e5e0bf17d28419ad67356c86b749a163dc131fc41184b29"
+related: [MAC-2f7g]
 ---
 
 ## Description
@@ -35,6 +36,6 @@ Acceptance criteria: the three bullets appear in README's residual list and the 
 
 
 ## Links
-
+- Related: [[MAC-2f7g]]
 
 ## Comments
