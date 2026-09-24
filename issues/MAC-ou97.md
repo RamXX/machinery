@@ -9,7 +9,7 @@ parent: MAC-ui8a
 created_at: 2026-09-05T19:36:14Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:745f37fd91720846e4a7ef76809108a3ba80d0474f00a66ed48203eab6dbf8f0"
+content_hash: "sha256:591d387ab61ec2451bd9b02f9a32057a5d878ba4b4d3d5f38a8a85ce3bfe310d"
 blocked_by: [MAC-pe9v, MAC-sd7g, MAC-sqpt, MAC-wbxq, MAC-rau8, MAC-u4oo, MAC-5ft8, MAC-al5u, MAC-1u2v]
 was_blocked_by: [MAC-olrx, MAC-p8ce, MAC-a89e, MAC-2u36, MAC-p7jd, MAC-uzxr, MAC-l7m0, MAC-p9wm, MAC-yig6, MAC-lhu5, MAC-sh60, MAC-hgz1, MAC-lnu6, MAC-wi5z, MAC-qlw2, MAC-cn7q, MAC-6h0s, MAC-hpqp, MAC-2n83, MAC-yhg5, MAC-hlae, MAC-hwdb, MAC-hy71, MAC-gcrr, MAC-bz1y, MAC-p9z1, MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai, MAC-62s6, MAC-vx24]
 ---
@@ -124,6 +124,7 @@ CONSUMES:
   endpoint: go run ./scripts/integration-lane --lane required (Makefile test-integration invokes same entrypoint).
 Additional acceptance criteria: fragment matches actual test sources both directions; all registered cases actually start/terminate with expected positive/negative outcomes; no cached/skipped/empty/partial/fabricated-summary success; real provisioned positive and missing-runtime/fresh-cache failure diagnostics; no owned container/process leaks. Required local preflight and hosted CI execute the same union. Do not edit shared root inventory; own only this fragment. RED source, fixture, fragment and runner configuration are frozen together after review. Any exact test names introduced in RED must remain registered through GREEN.
 No heavy preflight until final gate; no GitHub mutation; no active installation replacement. This note supersedes any earlier command implying service-backed tests execute in unprovisioned ordinary package suites.
+Triage 2026-09-24: NEEDS-REWRITE. Heavy preflight and Linux proof now run through Dagger. BlockedBy reduced to immediate predecessors.
 
 ## History
 - 2026-09-05T19:36:14Z dep_added: blocked_by MAC-hlae
