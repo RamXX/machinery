@@ -8,7 +8,8 @@ labels: [install, flaky-under-load, preflight]
 created_at: 2026-09-08T22:25:52Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:31:55Z
-content_hash: "sha256:6901e8fbb0cae0056aed675a1dafe8286b12e34f5181770dc9d6f5527ed9a2c7"
+content_hash: "sha256:42259df5ca345a412cb06992861cedb4062038301e9507b84a35f2cfeea97669"
+related: [MAC-qo6n]
 ---
 
 ## Description
@@ -40,6 +41,6 @@ Triage 2026-09-24: valid. Watchdog unchanged at internal/install/bootstrap_recei
 
 
 ## Links
-
+- Related: [[MAC-qo6n]]
 
 ## Comments
