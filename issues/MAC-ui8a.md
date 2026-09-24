@@ -2,11 +2,11 @@
 id: MAC-ui8a
 title: "Deterministic assurance hardening"
 status: open
-priority: 0
+priority: 2
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-06T16:51:41Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:5b4473951430887d6c2dc695fdc8fe044bd2d29dc56a7c5f36a4c2814408fd92"
 ---
 
