@@ -7,8 +7,8 @@ type: feature
 labels: [packet, gw, h2]
 created_at: 2026-09-10T19:13:54Z
 created_by: ramirosalas
-updated_at: 2026-09-10T19:13:54Z
-content_hash: "sha256:a18a5e8f457bad8d92ad38242c48d822f8d4e3ba50079f9db09d1f351e210229"
+updated_at: 2026-09-24T21:33:46Z
+content_hash: "sha256:3f55b7e014128ebf0a5366e5aa954d700a669f5c0426410eb9be71c026330e1f"
 ---
 
 ## Description
@@ -21,7 +21,7 @@ H2's ARCHITECTURE.md section 3 mitigation table carries two rows whose first bac
 
 
 ## Notes
-
+Triage 2026-09-24: valid. packet.go:1432 rejects duplicate first-cell keys; H2 ARCHITECTURE.md:616-617 still has two pg rows.
 
 ## History
 
