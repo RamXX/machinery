@@ -135,8 +135,8 @@ keeps the v1 stable-id discipline, so evidence binds to identity rather than to 
 | `actions` | `action(id, entity, name, actor)`, `action_writes(id, attr)` | `action:Entity.name` |
 | `machines` | `machine`, `state`, `transition(id, from, event, to)`, `guard_on`, `action_on`, `invoke`, `context_key(machine, key)` | `machine:M`, `state:M.s`, `tr:M.n` |
 | `matrices` | `unit(id, machine, name, kind)`, `unit_writes`, `unit_uses`, `unit_derived(id, fact, reason)`, `unit_values(id, group, member)`, `unit_clauses`, `unit_reads`, `unit_carries(id, kind, target)`, `unit_payload(id, event, field)` | `unit:M.name` |
-| `events` | `event(id, source)`, `event_participant`, `event_payload_field(id, field)`, `event_consumer(id, c4)` | `event:name` |
-| `c4` | `c4_element(id, kind, parent)`, `c4_relationship`, `boundary`, `allowed_edge`, `reads_row` | `c4:id` |
+| `events` | `event(id)`, `event_edge(edge, event, producer, consumer)`, `event_edge_payload_field(edge, field)`, `event_producer`, `event_consumer`, `event_participant`, `event_payload_field(id, field)` | `event:name`, `edge:<event>\|<producer>-><consumer>` |
+| `c4` | `c4_element(id, kind, parent)`, `c4_relationship`, `boundary`, `allowed_edge`, `reads_row`, `action_owner(action, component)` | `c4:id` |
 | `authorization` | `admission(subject, capability)`, `no_authorization(subject, reason)` | `action:Entity.name` |
 | `oracles` | `oracle_row(id, machine, transition)` | `orc:id` |
 | `milestones` | `milestone`, `dod_id(m, orc)`, `slice_claim(slice, orc)`, `bound_at(orc, path)` (with `--impl`) | `ms:id`, `slice:id` |
@@ -171,7 +171,7 @@ Stage 2 landed every layer of the table; `scenarios` stays reserved. The contrac
   v1 include vocabulary.
 - **No prose columns.** `unit_derived(unit, fact)` and `no_authorization(subject)` drop
   the reason column the rules sketch in section 4 gives them, because the reason is
-  prose. `event(id, producer)` names the producer; `event_participant` is producers and
+  prose. `event_participant` is producers and
   consumers together; `unit_clauses` carries `active` or `retired`; `boundary` carries a
   `role` (`boundary` or `external`); `supersedes(new, old)` takes the new type from the
   declaring row's subject and `type_owner(type, owner)` names the declaring artifact.
@@ -183,6 +183,34 @@ Stage 2 landed every layer of the table; `scenarios` stays reserved. The contrac
 - **Presence.** A layer is present only when its sources exist; a present layer claims all
   of its relations, empty ones included. Two definitions of one stable id from different
   places fail, naming both.
+- **Events and edges (0.10.1, MAC-j39j).** 0.10.0 projected `event(id, producer)` as a
+  defining relation, one row per event-contract table row. The table is one row per
+  producer-consumer edge by design (per-consumer `READS`), so every fan-out event failed the
+  projection as a duplicate stable id and Gy-rules evaluated nothing on such a design. The
+  events layer is now: `event(id)`, defined once at the first row naming the event;
+  `event_edge(edge, event, producer, consumer)`, defining, one per pair of the row's producer
+  and consumer cells (their cross product, an empty cell standing for one empty participant),
+  with the content-derived id `<event>|<producer>-><consumer>` (stable id `edge:...`), never a
+  line number; `event_edge_payload_field(edge, field)`, the row's closed payload set on each of
+  its edges; and the non-defining sets `event_producer(id, producer)`,
+  `event_consumer(id, consumer)`, `event_participant(id, participant)` and
+  `event_payload_field(id, field)`. `event_payload_field` is the union over the event's edges:
+  `facts.dl` asks only whether a name is a payload field of the event on some edge, and an
+  intersection would make a field one edge carries an unresolved fact. Two rows stating one
+  edge with one payload collapse (the first row is the source); with two payloads (a prose cell
+  counts as no closed set) they are a projection problem naming both rows, and the second row
+  is omitted.
+- **Action ownership.** `action_owner(action, component)` (c4 layer) projects the
+  ARCHITECTURE.md action-ownership table G2 already holds: each `Entity.action` with the
+  backticked component owning it; an `(unowned: <reason>)` row projects nothing. It is the one
+  stated mapping from the model to a C4 component, and `payload.dl` reads it.
+- **Parallel relationships.** A relationship's id is `From->To:card`, with `:role` (or `:name`)
+  when Modelith gives one, unchanged for every existing design. Two relationships between one
+  entity pair with one cardinality and neither a role nor a name share that id: they project as
+  one tuple (a relation is a set) and Gy-rules reports a model finding naming both and asking
+  for a role. Before 0.10.1 they failed the whole projection. The 1.0 projection's `model`
+  block, which a checker manifest names, still refuses the collision, since its evidence binds
+  per relationship id.
 - **Omitted.** `action_writes` (Modelith has no structured post-condition). `bound_at` was
   omitted until Stage 5, which added it with `test_file`, filled only by `machinery check --impl`.
 - **Facts form.** `machinery project <design> --facts <dir>` writes every present layer's
@@ -302,9 +330,31 @@ and runs unchanged under Soufflé.
 - **Activation.** A design with a `machines/` directory or an `AUTHORIZATION.md`. An explicit
   `--gate gy` on any other design prints the gate with `note   not activated: the design has no
   machines/ and no AUTHORIZATION.md, ...`; the default suite skips it silently.
-- **Facts.** Built in process by the Stage 2 reader (`LoadDesignFacts`); nothing is written. Every
-  catalog relation is supplied, so a relation of a layer the design lacks is an empty input, never
-  a missing-input error. A design that cannot be projected is an ERROR of the gate.
+- **Facts.** Built in process by the Stage 2 reader; nothing is written. Every catalog relation is
+  supplied, so a relation of a layer the design lacks is an empty input, never a missing-input
+  error.
+- **Per-row degradation (0.10.1).** Until 0.10.1 a design that could not be projected whole was
+  one ERROR and no rule ran, so one malformed row hid every finding in the design. The reader
+  now degrades per source row: the tuples one table row states (a matrix row with its units, an
+  event-contract row with its edges, a contract row's declarations, a milestone with its DoD
+  citations, a binding row) are recorded together or not at all (`DesignFacts.AddAll`), and a
+  problem in the row (a malformed declaration group, an edge stated with two payloads, a
+  duplicate stable id) omits the whole row. A machine file and the other YAML and DSL sources
+  are read element by element, and a source that cannot be read at all omits what it would
+  have stated. Each problem is an ERROR, `projection error, the row's facts are omitted and the
+  rules ran on the rest: <path>:<line>: ...`, and the rules run over everything else. The gate
+  stays red while any problem exists (fail-closed). `machinery project` and the checker
+  projections (`LoadDesignFacts`) stay strict: their output is never partial.
+- **Soundness boundary of a partial projection.** A rule sees only what was projected. A finding
+  derived from a partial fact set can be a consequence of an omitted row rather than a defect of
+  its own: a unit whose row was omitted is missing from every join, so its absence can make a
+  negated literal hold (an admission orphaned because its action's row is gone, a payload bound
+  to no edge because the edge's row is gone), and a finding that needs the omitted row cannot
+  fire at all. So while projection errors exist every Gy finding is printed with
+  `[projection partial: N projection error(s) omitted facts, so this finding may follow from an
+  omitted row]`, and the gate adds a note saying so. A finding without that mark was derived
+  from the whole design. The mark claims nothing about which findings are consequences; fixing
+  the projection errors and re-running is the only way to tell.
 - **Load-time contract**, checked once per process and by `TestShippedRulesLoad` at test time, so a
   broken rule file fails this repository's tests rather than a user's check: every file parses;
   every `.input` is a catalog relation of the same arity; every `.output` is named
@@ -342,6 +392,20 @@ What the rules read and decide, where the text above left it open:
   same unit (both are row-local declarations). `WRITES{Order.status}` joins `attr` directly,
   because fact columns carry stable ids without their kind prefix; the fixture
   `rules-fact-unresolved` pins it.
+- **payload.dl (edges since 0.10.1).** A `payload {}` declaration is compared with the edges
+  whose producer or consumer is the unit's component, each in both directions
+  (`payload_twin(unit, event, field, edge)`), not with the union of the event's rows, which on a
+  fan-out event is no row's payload. The unit's component is the `action_owner` of an action of
+  the entity whose matrix declares the unit (the unit's `machine` column, or the matrix itself
+  for a declaration on a row naming no unit); no other projected fact maps the model to a C4
+  component, so `action_owner` was added for this. A unit with a component on no edge of the
+  event is `payload_no_edge`; a declaration for an event with no contract row is
+  `payload_unknown_event`; a unit with no owning component (no ownership table, a matrix with no
+  machine, an entity whose actions nobody owns) is held to every edge of the event, which for a
+  one-row event is the 0.10.0 behavior. The fixtures under `internal/experiments/eventedges_test.go`
+  pin each case, and the fan-out design joins the parity set (80 runs: 8 files by 10 designs).
+- **Parallel unnamed relationships** are a Gy-rules ERROR naming both relationships and asking
+  for a role or name. They omit nothing, so they add no partial mark to the other findings.
 - **values.dl.** Group and enum names are compared exactly, and an enum no attribute uses is not
   projected, so it binds no group.
 - **carriers.dl.** Entry 20 ships in two tiers. `warn_effect_uncarried`: an action or actor unit

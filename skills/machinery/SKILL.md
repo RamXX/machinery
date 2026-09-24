@@ -221,8 +221,9 @@ a stale or unresolvable admission (`authz_orphan`,
 `authz_unknown_capability`), a `PRODUCES{}` member the model does not declare
 (`produces_unknown_action`), a `USES{}`/`WRITES{}` member no declaration
 resolves (`fact_unresolved`), a `VALUES` group disagreeing with the
-same-named enum (`values_disagree`), a `payload {}` twin out of step with its
-contract row (`payload_twin`), an actor with no `CARRIES{}` or a writing
+same-named enum (`values_disagree`), a `payload {}` twin out of step with a
+contract edge its unit's component produces or consumes (`payload_twin`,
+`payload_no_edge`, `payload_unknown_event`), an actor with no `CARRIES{}` or a writing
 action with none (`effect_uncarried`), `CARRIES{}` on a unit that is neither
 an action nor an actor (`carrier_misplaced`), supersession cycles,
 dangling replacements and duplicate owners, a `RESERVED` type some artifact

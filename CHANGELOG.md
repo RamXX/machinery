@@ -8,6 +8,30 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- **A fan-out event no longer fails the projection, and Gy-rules no longer evaluates nothing.**
+  The event-contract table is one row per producer-consumer edge, but 0.10.0 projected
+  `event(id, producer)` as a defining row per table row, so an event on several rows was a
+  duplicate stable id and Gy-rules stopped at the projection. The events layer of projection 2.0
+  is now `event(id)` (defined once), `event_edge(edge, event, producer, consumer)` with the
+  content-derived id `<event>|<producer>-><consumer>` (one per producer-consumer pair of a row),
+  `event_edge_payload_field(edge, field)`, and the non-defining sets `event_producer`,
+  `event_consumer`, `event_participant` and `event_payload_field` (the union over the edges). One
+  edge stated with two payloads is a projection problem naming both rows. External rule files
+  that declared `event` with two columns must drop the second and read `event_producer`.
+- **`payload {}` binds to the unit's own edges.** `payload.dl` compares a declaration with each
+  edge whose producer or consumer is the unit's component (from the action-ownership table,
+  projected as the new `action_owner(action, component)`), and names the edge in `payload_twin`.
+  New findings: `payload_no_edge` (the component is on no edge of the event) and
+  `payload_unknown_event` (the event has no contract row). A unit with no owning component is
+  held to every edge, which for a one-row event is the 0.10.0 behavior.
+- **Gy-rules degrades per row.** A row the projection cannot read (a malformed or unknown
+  declaration group, an edge with two payloads) is one ERROR naming the row, the row's facts are
+  omitted, and the rules run on everything else; the gate stays red, and every finding printed
+  beside such an ERROR carries `[projection partial: ...]`. `machinery project` stays strict.
+- **Parallel unnamed relationships are a model finding.** Two relationships between one entity
+  pair with one cardinality and no role or name no longer fail the projection: they project as
+  one tuple and Gy-rules reports them, naming both and asking for a `role:`.
+
 - **A design's own group notation is declared instead of failing Gx-trace.** Under 0.10.0 every
   upper-case `NAME{...}` in a matrix table cell outside the public vocabulary was an
   unknown-group error, so a design whose own tooling reads group marks in its matrices (a mark

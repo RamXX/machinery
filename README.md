@@ -453,8 +453,11 @@ You can read that trace without knowing Datalog. The action is declared at line 
   context key, payload field, or same-row `derived:` or `VALUES` declaration (`fact_unresolved`).
 - `values.dl`: a `VALUES` group that disagrees with its enum (`values_disagree`), and two units
   spelling one shared vocabulary differently (`values_conflict`).
-- `payload.dl`: a `payload {}` twin that is not equal to its contract row (`payload_twin`). This is
-  the four-fields-against-three scene.
+- `payload.dl`: a `payload {}` twin that is not equal to the payload of an event-contract edge its
+  unit's component produces or consumes (`payload_twin`, naming the edge), a unit whose component
+  is on no edge of the event (`payload_no_edge`), and a payload for an event with no contract row
+  (`payload_unknown_event`). This is the four-fields-against-three scene. The component comes from
+  the ARCHITECTURE.md action-ownership table; a unit with no owner is held to every edge.
 - `carriers.dl`: an actor, or an action with a non-empty `WRITES{}`, that names no `CARRIES{}`
   (`effect_uncarried`), and a `CARRIES{}` on a unit that is neither (`carrier_misplaced`).
 - `supersession.dl`: two owners of one type, supersession cycles, a replacement whose old type
@@ -469,9 +472,12 @@ You can read that trace without knowing Datalog. The action is declared at line 
 
 What a green Gy-rules proves is stated in its release notes: over declared facts only, every
 `System` and produced action has one admission naming a declared capability, every declared fact
-resolves, every enum-bound `VALUES` group equals its enum, every `payload {}` twin equals its
-contract row, every effect names a carrier, and type supersession is acyclic with owned
-replacements. It says nothing about facts a design only mentions in prose.
+resolves, every enum-bound `VALUES` group equals its enum, every `payload {}` twin equals each
+contract edge its unit's component takes part in, every effect names a carrier, and type
+supersession is acyclic with owned replacements. It says nothing about facts a design only
+mentions in prose. A design Gy-rules cannot project whole is red: each row it cannot read is an
+ERROR, the rules run on the rest, and every finding printed beside such an ERROR is marked
+`[projection partial: ...]`, because it may follow from the omitted row.
 
 A design written for 0.9.0 migrates by declaring what the prose used to imply; the skill's
 "Migrating from the 0.9.0 prose inference" section walks through each case. For one release,

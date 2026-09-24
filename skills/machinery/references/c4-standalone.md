@@ -621,11 +621,16 @@ unarmed design carries no obligation at all.
 
 A matrix event row may restate the exact payload it implements with one group in any cell:
 `payload {Order.id, Order.paidAt}` or `payload is exactly {Order.id, Order.paidAt}`. This is a
-declaration, not prose. It binds to the row's one event, and Gy-rules compares the field set with
-the payload cell of the Architecture Contract row for that event (`payload_twin`, one finding per
-field present on one side only; an event whose contract cell states no closed set reports every
-declared field). Field order does not matter. Empty or duplicate members, malformed or repeated
-groups, and a row naming zero or several events are Gx-trace errors.
+declaration, not prose. It binds to the row's one event. The event-contract table is one row per
+producer-consumer edge, and edges of one event may carry different payloads, so Gy-rules compares
+the field set with the payload cell of every edge whose producer or consumer is the unit's
+component (`payload_twin`, one finding per field present on one side only, naming the edge; an
+edge whose cell states no closed set reports every declared field). The unit's component is the
+owner, in the action-ownership table, of an action of the matrix's entity; a unit with no owner is
+compared with every edge of the event. A unit whose component is on no edge of the event is
+`payload_no_edge`, and a payload for an event with no contract row is `payload_unknown_event`.
+Field order does not matter. Empty or duplicate members, malformed or repeated groups, and a row
+naming zero or several events are Gx-trace errors.
 
 The architecture payload cell supplies its closed set through backticked field names, or through a
 comma-separated list in which every member is an identifier. Use domain names such as `Order.id`,
