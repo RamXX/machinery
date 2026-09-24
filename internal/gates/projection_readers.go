@@ -47,8 +47,11 @@ import (
 // source would have stated.
 type factBuilder struct {
 	design string
-	facts  *checker.DesignFacts
-	errs   []string
+	// private holds the design's own group names from the contract's
+	// private_groups: list. They are skipped exactly as Gx-trace skips them.
+	private map[string]bool
+	facts   *checker.DesignFacts
+	errs    []string
 	// modelFindings are statements about the model the facts cannot carry
 	// and that omit nothing: parallel relationships between one entity pair
 	// that share an id because neither is named.
@@ -658,6 +661,11 @@ func (b *factBuilder) matrices() {
 		return
 	}
 	b.mark("matrices")
+	private, perr := PrivateGroups(b.design)
+	if perr != nil {
+		b.fail("%s", perr.Error())
+	}
+	b.private = private
 	for _, rel := range paths {
 		text, ok := b.read(rel)
 		if !ok {
@@ -669,7 +677,7 @@ func (b *factBuilder) matrices() {
 		if b.exists("machines/" + matrix + ".machine.json") {
 			machine = matrix
 		}
-		decls, derrs := ParseMatrixDeclarations(rel, []byte(text))
+		decls, derrs := ParseMatrixDeclarationsWith(rel, []byte(text), b.private)
 		byLine := map[int][]Declaration{}
 		for _, d := range decls {
 			byLine[d.Line] = append(byLine[d.Line], d)
@@ -752,7 +760,8 @@ func (b *factBuilder) matrixRowFacts(mr matrixRow) {
 		}
 	}
 	declared := map[string]bool{}
-	for _, cell := range r.cells {
+	for _, raw := range r.cells {
+		cell := MaskPrivateGroups(raw, b.private)
 		if clauseDecl.MatchString(cell) {
 			declared[GroupClauses] = true
 		}
