@@ -44,6 +44,14 @@ and burning them down instead of fixing everything in one stop-the-world migrati
 
 ### Fixed
 
+- **The pre-cutover deprecation is one design-level line, and a note under a recorded baseline.**
+  0.10.0 reported "the design declares no WRITES{}, USES{} or PRODUCES{}" on one arbitrary matrix
+  row, which read as a row defect; Gx-trace now prints one line per design counting the rows and
+  files that quote fact-shaped tokens in prose and naming the first. A design whose `ratchet.json`
+  records a Gy-rules or Gl-ledger baseline is adopting the layer on purpose, so the line is a note
+  there and `--warnings-as-errors` passes on the pin commit; the declarations follow in the
+  burn-down. Both points came from the first consumer run of the 0.10.1 candidate.
+
 - **A fan-out event no longer fails the projection, and Gy-rules no longer evaluates nothing.**
   The event-contract table is one row per producer-consumer edge, but 0.10.0 projected
   `event(id, producer)` as a defining row per table row, so an event on several rows was a
