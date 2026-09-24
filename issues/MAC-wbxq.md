@@ -2,13 +2,13 @@
 id: MAC-wbxq
 title: "Expose current assurance freshness without claiming replay"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:33Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:72f75c979bf1dd0855b448c636a4239bba266302ae9213c6089c5215935859a9"
 blocked_by: [MAC-pe9v]
 blocks: [MAC-rau8, MAC-vx24, MAC-ou97]
