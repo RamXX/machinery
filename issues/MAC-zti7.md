@@ -8,8 +8,9 @@ labels: [readiness, evidence, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:dce78cc5a766c0ec679d9e53bfa28883e94c096c0eaf33cbb8cab83432921428"
+content_hash: "sha256:bb162923fdc7338d3321c0ec41b3e632af75f58efe21dacc94ee2020dda65b8a"
 blocks: [MAC-kyh6, MAC-ik8q, MAC-q1kf, MAC-b27n]
+related: [MAC-wbxq]
 ---
 
 ## Description
@@ -44,5 +45,6 @@ Acceptance criteria:
 
 ## Links
 - Blocks: [[MAC-kyh6]], [[MAC-ik8q]], [[MAC-q1kf]], [[MAC-b27n]]
+- Related: [[MAC-wbxq]]
 
 ## Comments

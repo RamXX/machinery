@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:22531e90bb072a05dfce91e6e993f3da6688c39c9e569e0c8cede3e1f7441ad3"
+content_hash: "sha256:a5754cf6efe874940504224db076c7e7171ecd0794e71c7897c550594cbd0c38"
 blocked_by: [MAC-pe9v]
 blocks: [MAC-rau8, MAC-vx24]
 was_blocked_by: [MAC-lnu6, MAC-p9z1]
+related: [MAC-zti7]
 ---
 
 ## Description
@@ -105,6 +106,7 @@ Triage 2026-09-24: suite.go changed 9 times since 09-07; refresh interface text.
 - Blocks: [[MAC-rau8]], [[MAC-vx24]]
 - Blocked by: [[MAC-pe9v]]
 - Was blocked by: [[MAC-lnu6]], [[MAC-p9z1]]
+- Related: [[MAC-zti7]]
 
 ## Comments
 
