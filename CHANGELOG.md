@@ -6,6 +6,36 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A design's own group notation is declared instead of failing Gx-trace.** Under 0.10.0 every
+  upper-case `NAME{...}` in a matrix table cell outside the public vocabulary was an
+  unknown-group error, so a design whose own tooling reads group marks in its matrices (a mark
+  such as `OWNED-BY{...}`) could not keep them, although the 0.10.0 notes said such a design kept
+  its notation. The Architecture Contract v2 fence now accepts `private_groups: [OWNED-BY, ...]`:
+  a non-empty list of upper-case group names in the scanner's own grammar (letters, digits,
+  hyphen, underscore), each listed once and none a public group; declaring `WRITES` or `RETIRED`
+  private is a G2 error, and an invalid entry is never honored. A declared private group is
+  skipped by the declaration parser and the projection: it is not an error, it is not projected,
+  its members declare nothing and satisfy no obligation, and Gx-trace counts the skipped spans on
+  its `checked:` line. An undeclared unknown name is still an error, so `WRITE{...}` beside a
+  declared `OWNED-BY{...}` still fails, and the message now lists every known group (`RETIRED`
+  was missing) and names the `private_groups:` escape. The list lives in the contract, not in
+  `.machinery.json`: `machinery check` never reads `.machinery.json` (only the hooks do), and the
+  declaration changes what the design means, so it is reviewed with the design.
+- **Gl-ledger resolves a backticked token before calling it an undeclared fact.** The 0.10.0
+  warning fired on every backticked snake_case or `Entity.attr` token outside a group, including
+  action names, machine-qualified units, enum values and file names (`ARCHITECTURE.md` has the
+  `Entity.attr` shape). A token is now resolved against the model's attributes, actions and
+  invariant ids, the enum values (and their snake_case form), the named units of every matrix
+  (bare and qualified by machine), the machines' context keys, the event contract's event names,
+  and file names (a known extension, or a file under the design). A model attribute keeps the
+  warning ("declare it in USES{} or WRITES{}"); a token naming nothing gets a softer one ("is not
+  a declared fact, action, unit or value; drop the backticks or declare it"); every other class
+  is silent and counted on the `checked:` line. A matrix with more than 20 such warnings prints
+  one summary line with the split and the first three tokens; `machinery check --verbose` prints
+  every line, and the counts on the `checked:` line are exact either way.
+
 ## [0.10.0] - 2026-09-23
 
 ### Added
@@ -19,8 +49,8 @@ under their version heading when a release is cut.
 - **Closed group-name vocabulary.** An upper-case `NAME{` in a matrix table cell that is not
   `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES` or
   `SUPERSEDES` is a
-  Gx-trace error naming the row. A design carrying a private group now fails until it maps that
-  notation to the public grammar.
+  Gx-trace error naming the row. In 0.10.0 that included a design's own group names, with no way
+  to keep them; 0.10.1 adds the `private_groups:` contract declaration (see Unreleased, Fixed).
 - **Undeclared fact references warn in Gl-ledger.** A backticked snake_case or `Entity.attr`
   token in a matrix contract, clause, or payload cell, outside every group and not declared by its
   own row, is a warning: declare it in `USES{}` or `WRITES{}`, or drop the backticks.
@@ -162,7 +192,13 @@ did not declare. Nothing is inferred from prose any more; declare instead:
   case included.
 
 A design that carries its own authorization notation (resource action lists, producer marks,
-residual verb tables) keeps it for its own tooling, but machinery no longer reads it: generate
+residual verb tables) can keep it for its own tooling; machinery reads none of it, and what
+happens depends on its shape. Notation in any shape but a group (prose, its own tables,
+lower-case marks) is ignored and never fails. Notation in the group shape, an upper-case
+`NAME{...}` in a matrix table cell, fails Gx-trace (and Gy-rules' projection) under 0.10.0 as an
+unknown declaration group, so the design either rewrites it out of that shape or, from 0.10.1,
+lists each name in the Architecture Contract's `private_groups:`, after which machinery skips
+it. Either way, generate
 the marked `AUTHORIZATION.md` rows (`Entity.action` subject, backticked capability or
 `(no authorization: <reason>)`) from the consumer's own reader, and declare the generated file
 and that reader in a `reads:` row so Gr-reads binds the pair. The migration note in the machinery

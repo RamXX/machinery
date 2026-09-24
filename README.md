@@ -365,11 +365,17 @@ group name followed by a braced, comma-separated list, placed in one table cell.
   `(no authorization: <reason>)`.
 
 Two rules close the grammar. An upper-case `NAME{` in a matrix cell that is not one of `CLAUSES`,
-`READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES`, `SUPERSEDES`, or `RESERVED`
-is an error, so a misspelled or private group never passes as prose. And a backticked snake_case or
-`Entity.attr` token in a contract, clause, or payload cell that no group on its row declares is a
-Gl-ledger warning: declare it or drop the backticks. **Prose never declares.** A sentence may quote
-a fact; it cannot create one.
+`RETIRED`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES`, `SUPERSEDES`,
+or `RESERVED` is an error, so a misspelled group never passes as prose. A design whose own tooling
+reads group marks of its own keeps them by listing each name once in the Architecture Contract,
+`private_groups: [OWNED-BY]`; machinery then skips those groups (no error, no fact, no obligation
+met), while any unlisted name still fails, and listing a public name is a G2 error. And a
+backticked snake_case or `Entity.attr` token in a contract, clause, or payload cell that no group
+on its row declares is resolved first: an action, named unit, enum value, context key, event,
+invariant id, or file name is silent; a model attribute is a Gl-ledger warning (declare it in
+`USES{}` or `WRITES{}`); a token that names nothing gets a softer warning (drop the backticks or
+declare it). A matrix with more than 20 such warnings prints one summary line; `--verbose` lists
+each. **Prose never declares.** A sentence may quote a fact; it cannot create one.
 
 ### 2. Facts are projected once
 
@@ -1063,6 +1069,8 @@ machinery preflight                   # enforce the pinned release prerequisites
 machinery check <your-design>         # run the deterministic gate suite
 machinery check <design> --gate gy --explain
                                       # the rules gate, with each finding's derivation
+machinery check <design> --gate gl --verbose
+                                      # every undeclared-fact line, no per-file summary
 machinery check <design> --impl <dir> \
   --complete --warnings-as-errors     # require a final, closed, zero-warning handoff
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet

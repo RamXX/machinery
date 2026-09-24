@@ -477,10 +477,15 @@ capacity, and observability beyond what the Phase 2 NFR record captures.
   carries at most one group per name. Gx-trace fails an empty (where not
   allowed), duplicate, malformed, unterminated, or repeated group, and any
   upper-case `NAME{` in a matrix cell outside the closed vocabulary (`CLAUSES`,
-  `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES`,
-  `SUPERSEDES`, `RESERVED`).
-  A backticked fact in a contract, clause, or payload cell that no group on
-  its row declares is a Gl-ledger warning, never a finding that resolves it.
+  `RETIRED`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`,
+  `CARRIES`, `SUPERSEDES`, `RESERVED`) that the Architecture Contract does not
+  list in `private_groups:` (the design's own notation, skipped: no error, no
+  fact, no obligation met; a public name there is a G2 error).
+  A backticked token in a contract, clause, or payload cell that no group on
+  its row declares is a Gl-ledger warning, never a finding that resolves it,
+  when it names a model attribute (declare it in `USES{}` or `WRITES{}`) or
+  nothing at all (drop the backticks or declare it); an action, named unit,
+  enum value, context key, event, invariant id, or file name never warns.
 - Every Modelith action whose actor is `System`, and every action a matrix row declares in
   `PRODUCES{}`, has one row in the marked, g2-attested hand-written authorization inventory
   (`AUTHORIZATION.md`): subject `Entity.action`, admission one backticked capability declared in

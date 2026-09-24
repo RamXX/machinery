@@ -225,6 +225,12 @@ Field semantics:
   code). Staged brownfield adoption leans on this too: start with broad ignore globs over the
   unmodeled remainder and ratchet them down as slices come under the gates (see
   `docs/brownfield-team-guide.md` in the machinery repo).
+- **private_groups** (optional): the design's own declaration-group names, read by its own
+  tooling, that machinery must skip in matrix cells: `private_groups: [OWNED-BY, AUDIT-TRAIL]`.
+  Each entry is an upper-case group name (letters, digits, hyphen, underscore; no braces), listed
+  once; a public group name (`WRITES`, `RETIRED`, ...) is a G2 error. A listed group is not an
+  error, not projected, and satisfies no obligation; an unlisted unknown name stays a Gx-trace
+  error, so a misspelled public group is still caught.
 - **dependency_rules**: `allow`, `deny`, and `baseline` edges, `src -> dest`. `*` globs are legal
   in `allow` and `deny` only: `baseline:` is an enumerated-edges ratchet, and a wildcard baseline
   rule (which would amnesty the whole edge space) is a G2 ERROR; run `machinery baseline` to

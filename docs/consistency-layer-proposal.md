@@ -90,6 +90,39 @@ those marks at compile time (that is why Gr-reads exists), so it owns a reader f
 a twenty-line script in H2 emits the public AUTHORIZATION.md rows from that reader, and
 Gr-reads binds the two files. Machinery ships the public grammar and one migration note.
 
+#### Private groups and the undeclared-fact warning, as implemented (0.10.1)
+
+0.10.0 closed the vocabulary with no escape, so a design whose own compile-time reader needs
+group marks in its matrices could not keep them, which contradicted the migration note. 0.10.1
+settles it with an explicit declaration rather than a looser rule:
+
+- **Where.** `private_groups: [NAME, ...]` in the Architecture Contract v2 fence, validated by G2
+  with the other root keys (unknown keys still fail). Not `.machinery.json`: `machinery check`
+  never reads that file (only the hooks do), so a declaration there would make the CLI and the
+  hooks disagree, and the list changes what the design's matrices mean, so it belongs in the
+  reviewed design.
+- **Grammar.** A non-empty list; each entry matches the scanner's group-name grammar
+  (`[A-Z][A-Z0-9_-]*[A-Z0-9]`, no braces), is listed once, and is not a public group (`RETIRED`
+  included). An invalid entry is a G2 error and is never honored.
+- **Meaning.** A declared private group is skipped whole by `ParseMatrixDeclarationsWith` (no
+  error, no declaration) and masked by `MaskPrivateGroups` before any reader applies its own
+  pattern (`VALUES`, `payload`, `derived:`), so nothing inside it declares a fact or satisfies an
+  obligation. Gx counts the skipped spans (`private declaration groups skipped`). An undeclared
+  unknown name stays an error, and its message lists every known group and names the escape.
+  `PrivateGroups(design)` is the one reader; the projection consults it the same way.
+- **Gl resolution.** Before the undeclared-fact warning, a token is resolved against model
+  attributes, actions (bare and `Entity.action`), invariant ids, enum values (and their
+  snake_case form), every matrix's named units (bare and qualified by the matrix or machine
+  name), machine context keys (bare and qualified), the event contract's event names, and file
+  names (a known extension, or a file under the design). An attribute wins over every other class,
+  so an ambiguous name keeps the warning that asks for a declaration. Attributes keep the 0.10.0
+  wording; a token naming nothing gets a softer one; every other class is silent and counted on
+  the `checked:` line.
+- **Summary.** A matrix with more than 20 warnings (`UndeclaredSummaryThreshold`) prints one line
+  with the attribute/unresolved split and the first three tokens, unless `--verbose`. A migrated
+  matrix quotes a handful at most; past twenty the file has not been migrated, and one line per
+  token buries every other finding. The `checked:` counts stay exact.
+
 ### 3.2 Facts (projection v2)
 
 `machinery project` grows from three layers to the set the rules need. Every element

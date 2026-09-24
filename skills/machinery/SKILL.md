@@ -194,12 +194,24 @@ cell; a row carries at most one group of each name.
   `migration.yaml` disposition), the reservation is stale and must be removed.
 
 An upper-case word directly followed by `{` in a matrix table cell that names
-none of `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`,
-`PRODUCES`, `CARRIES`, `SUPERSEDES`, or `RESERVED` is an error, so a misspelled or private group never
-passes as prose. Gl-ledger warns on a backticked snake_case or `Entity.attr`
-token in a contract, clause, or payload cell that sits outside every group and
-that the row does not declare: declare it in `USES{}` or `WRITES{}`, or drop the
-backticks.
+none of `CLAUSES`, `RETIRED`, `READS`, `VALUES`, `ORACLESET`, `WRITES`,
+`USES`, `PRODUCES`, `CARRIES`, `SUPERSEDES`, or `RESERVED` is an error, so a
+misspelled group never passes as prose. A group the design's own tooling reads
+(its own notation, say `OWNED-BY{...}`) is declared once in the Architecture
+Contract fence, `private_groups: [OWNED-BY]`: upper-case names, each listed
+once, never a public group name. Machinery then skips it: it is no error, no
+fact, and satisfies no obligation, while an undeclared unknown name, such as a
+`WRITE{...}` typo, still fails.
+
+Gl-ledger resolves each backticked snake_case or `Entity.attr` token in a
+contract, clause, or payload cell that sits outside every group and that the
+row does not declare. An action, a named unit (bare or `Machine.unit`), an enum
+value (or its snake_case form), a context key, an event, an invariant id, or a
+file name is a name, not a stored fact, and never warns. A model attribute
+warns: declare it in `USES{}` or `WRITES{}`, or drop the backticks. A token
+that names nothing warns more softly: drop the backticks or declare it. A
+matrix with more than 20 such warnings prints one summary line;
+`machinery check --verbose` lists each.
 
 Gy-rules (`--gate gy`, active on a design with `machines/` or an
 `AUTHORIZATION.md`) evaluates the shipped Datalog rules under
@@ -247,10 +259,13 @@ Gx-trace warns, for one release, on a design that declares no `WRITES{}`,
 - A `VALUES{...}` group whose unit name matches its enum only up to case: name
   it, `VALUES Enum{...}`.
 - A design with its own authorization notation (resource action lists, producer
-  marks, residual verb tables): machinery no longer reads it. Generate the
-  `AUTHORIZATION.md` rows from the reader the design's own tooling already has,
-  and declare the file and that reader in a root `reads:` row so Gr-reads binds
-  the pair.
+  marks, residual verb tables): machinery reads none of it, and the design may
+  keep it. Notation in prose or in its own tables is ignored. Notation in the
+  group shape (an upper-case `NAME{...}` in a matrix cell) is an unknown-group
+  error until each name is listed in the contract's `private_groups:`; then it
+  is skipped. Generate the `AUTHORIZATION.md` rows from the reader the design's
+  own tooling already has, and declare the file and that reader in a root
+  `reads:` row so Gr-reads binds the pair.
 
 ### Build handoff
 
