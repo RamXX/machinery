@@ -31,7 +31,7 @@ ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast dagger-ci dagger-job ci-linux hooks lint-install runtime-pins help
+.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast dagger-ci dagger-job ci-linux hooks lint-install runtime-pins consumer-diff help
 
 build: ## Build the machinery binary from source into .bin/machinery (needs Go)
 	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
@@ -118,6 +118,13 @@ lint-install: ## Install the pinned static-analysis tools so local matches CI ex
 
 runtime-pins: ## Report pinned vs host vs latest upstream runtimes; exits non-zero when a pin is behind
 	@go run ./scripts/runtime-pins
+
+# Built rather than `go run` so the tool's exit code (0 explained, 1
+# unexplained new findings, 2 usage or execution error) reaches the caller.
+consumer-diff: ## Diff two machinery binaries over a consumer design: OLD=<bin> NEW=<bin> DESIGN=<dir> [IMPL= ALLOW= COMMIT= GATES=]
+	@test -n "$(OLD)" && test -n "$(NEW)" && test -n "$(DESIGN)" || { echo "usage: make consumer-diff OLD=<bin> NEW=<bin> DESIGN=<dir> [IMPL=<dir>] [ALLOW=<file>] [COMMIT=<sha>] [GATES=<list>]"; exit 2; }
+	@mkdir -p .bin && go build -o .bin/consumer-diff ./scripts/consumer-diff
+	@.bin/consumer-diff -old "$(OLD)" -new "$(NEW)" -design "$(DESIGN)" $(if $(IMPL),-impl "$(IMPL)") $(if $(ALLOW),-allow "$(ALLOW)") $(if $(COMMIT),-commit "$(COMMIT)") $(if $(GATES),-gates "$(GATES)")
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
