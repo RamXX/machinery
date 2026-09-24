@@ -7,8 +7,8 @@ type: bug
 labels: [install, flaky-under-load, preflight]
 created_at: 2026-09-08T22:25:52Z
 created_by: ramirosalas
-updated_at: 2026-09-08T22:25:52Z
-content_hash: "sha256:58dfc0e8214d60250a93547d4430292681645101cfa402291eb1800fb175434e"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:6901e8fbb0cae0056aed675a1dafe8286b12e34f5181770dc9d6f5527ed9a2c7"
 ---
 
 ## Description
@@ -34,7 +34,7 @@ Replace the panic watchdog with the Update's own deadline (or a t.Fatal after th
 
 
 ## Notes
-
+Triage 2026-09-24: valid. Watchdog unchanged at internal/install/bootstrap_receipt_test.go:972 (time.AfterFunc 90s panic). Do the t.Fatal/deadline fix first (independent, cheap); the quiet-lane move depends on MAC-qo6n.
 
 ## History
 
