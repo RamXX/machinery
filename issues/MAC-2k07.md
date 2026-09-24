@@ -2,13 +2,13 @@
 id: MAC-2k07
 title: "tree-inventory snapshot counts nested worktrees; preflight render check fails in any checkout with worktrees"
 status: open
-priority: 1
+priority: 3
 type: bug
 labels: [preflight, tooling]
 created_at: 2026-09-08T07:58:27Z
 created_by: ramirosalas
-updated_at: 2026-09-08T07:58:27Z
-content_hash: "sha256:57d78bf0c59651bb8fc32d333d22282daff132f357865ff75c5fbdbe6079d94f"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:6b27dde8304502852c5bc82a63b35ebfffdb4d2544e9b41d5906d8b196db9192"
 ---
 
 ## Description
@@ -49,7 +49,7 @@ Removed the landed worktrees and moved the two live ones to ~/workspace/machiner
 
 
 ## Notes
-
+Triage 2026-09-24: partial. b9242e8a prunes .claude (scripts/modelith-render.sh:117), 330df9c5 same for Dagger source. Residual: walk is filesystem-based, not git ls-files, so other worktrees/ignored trees still count toward 128 MiB; misleading message at scripts/preflight-fast.sh:156. Rewrite scope: snapshot from tracked files and surface the tree-inventory error. Fold into MAC-qo6n pre-push tier work.
 
 ## History
 
