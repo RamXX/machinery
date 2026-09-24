@@ -1136,36 +1136,65 @@ func (b *factBuilder) contract(rel, text string) {
 func (b *factBuilder) supersession(rel, text string) {
 	b.mark("supersession")
 	decls, errs := ParseContractDeclarations(rel, []byte(text))
-	for _, e := range errs {
-		b.fail("%s", e.String())
-	}
 	rows := map[int]tableRow{}
 	for _, r := range walkTableRows(text) {
 		rows[r.line] = r
 	}
+	// one row transaction per declaring line: a malformed group omits
+	// every declaration of its row
+	byLine := map[int][]Declaration{}
+	errsByLine := map[int][]DeclarationError{}
 	for _, d := range decls {
-		subject := d.Row
-		if d.Column != "contract" {
-			if names := ir.CellNames(cellAt(rows[d.Line].cells, 0)); len(names) > 0 {
-				subject = names[0]
+		byLine[d.Line] = append(byLine[d.Line], d)
+	}
+	for _, e := range errs {
+		errsByLine[e.Line] = append(errsByLine[e.Line], e)
+	}
+	lines := make([]int, 0, len(byLine)+len(errsByLine))
+	for line := range byLine {
+		lines = append(lines, line)
+	}
+	for line := range errsByLine {
+		if _, ok := byLine[line]; !ok {
+			lines = append(lines, line)
+		}
+	}
+	sort.Ints(lines)
+	for _, line := range lines {
+		b.row(func() {
+			for _, e := range errsByLine[line] {
+				b.fail("%s", e.String())
 			}
-		}
-		if !unitNameShape.MatchString(subject) {
-			b.fail("%s:%d: %s row subject %q is not an identifier", rel, d.Line, d.Group, subject)
-			continue
-		}
-		if d.Group == GroupReserved {
-			// a reservation claims the type is not defined yet; the
-			// reserving row owns nothing
-			for _, p := range d.Pairs {
-				b.add(rel, d.Line, "reserved", "type:"+p.Target, p.Target, subject)
+			for _, d := range byLine[line] {
+				b.supersessionDecl(rel, d, rows[d.Line])
 			}
-			continue
+		})
+	}
+}
+
+// supersessionDecl projects one SUPERSEDES or RESERVED declaration.
+func (b *factBuilder) supersessionDecl(rel string, d Declaration, r tableRow) {
+	subject := d.Row
+	if d.Column != "contract" {
+		if names := ir.CellNames(cellAt(r.cells, 0)); len(names) > 0 {
+			subject = names[0]
 		}
-		b.add(rel, d.Line, "type_owner", "type:"+subject, subject, checker.PortableSourcePath(rel))
+	}
+	if !unitNameShape.MatchString(subject) {
+		b.fail("%s:%d: %s row subject %q is not an identifier", rel, d.Line, d.Group, subject)
+		return
+	}
+	if d.Group == GroupReserved {
+		// a reservation claims the type is not defined yet; the reserving
+		// row owns nothing
 		for _, p := range d.Pairs {
-			b.add(rel, d.Line, "supersedes", "type:"+subject, subject, p.Target)
+			b.add(rel, d.Line, "reserved", "type:"+p.Target, p.Target, subject)
 		}
+		return
+	}
+	b.add(rel, d.Line, "type_owner", "type:"+subject, subject, checker.PortableSourcePath(rel))
+	for _, p := range d.Pairs {
+		b.add(rel, d.Line, "supersedes", "type:"+subject, subject, p.Target)
 	}
 }
 
@@ -1393,10 +1422,12 @@ func (b *factBuilder) planMilestones(rel string) {
 	for i, m := range ms {
 		line := bodyLine + strings.Count(body[:offsets[i][0]], "\n")
 		id := "M" + m.numRaw
-		b.add(rel, line, "milestone", "ms:"+id, id, m.status)
-		for _, orc := range b.citedOracleIDs(m.dodText()) {
-			b.add(rel, line, "dod_id", "ms:"+id, id, orc)
-		}
+		b.row(func() {
+			b.add(rel, line, "milestone", "ms:"+id, id, m.status)
+			for _, orc := range b.citedOracleIDs(m.dodText()) {
+				b.add(rel, line, "dod_id", "ms:"+id, id, orc)
+			}
+		})
 	}
 }
 
@@ -1460,9 +1491,11 @@ func (b *factBuilder) milestoneBindings(rel string) {
 			b.fail("%s: bound-at cell for %s must be the literal unbound or test file paths relative to the implementation root, got %q", where, oracle, cell)
 			continue
 		}
-		for _, p := range paths {
-			b.add(rel, r.line, "milestone_says_bound", "orc:"+oracle, oracle, p)
-		}
+		b.row(func() {
+			for _, p := range paths {
+				b.add(rel, r.line, "milestone_says_bound", "orc:"+oracle, oracle, p)
+			}
+		})
 	}
 }
 

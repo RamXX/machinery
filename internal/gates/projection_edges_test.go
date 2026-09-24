@@ -189,6 +189,25 @@ func TestFactsActionOwnershipProjectsActionOwner(t *testing.T) {
 	}
 }
 
+// A malformed contract group omits every declaration of its row, a
+// well-formed sibling group included; the other rows still project.
+func TestFactsMalformedContractRowOmitsOnlyThatRow(t *testing.T) {
+	design := writeFactsDesign(t, t.TempDir(), map[string]string{"ARCHITECTURE.md": "# Architecture\n\n" +
+		"| type | replaces |\n|---|---|\n" +
+		"| TypeX | SUPERSEDES{type:OldX} |\n" +
+		"| TypeY | SUPERSEDES{OldY} RESERVED{type:TypeZ} |\n"})
+	rep, err := projectDesignFacts(design)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.problems) != 1 || !strings.Contains(rep.problems[0], "ARCHITECTURE.md:6") {
+		t.Fatalf("one problem naming the row, got %v", rep.problems)
+	}
+	if got := strings.Join(factRows(rep.facts, "supersedes"), " ") + "/" + strings.Join(factRows(rep.facts, "reserved"), " "); got != "TypeX|OldX/" {
+		t.Fatalf("only the well-formed row projects: %s", got)
+	}
+}
+
 // Gy-rules degrades per row: a projection error is an ERROR naming the row,
 // the rules still run on everything else, the gate stays red, and every
 // finding printed beside a projection error says the projection was partial.
