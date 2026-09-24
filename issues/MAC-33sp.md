@@ -1,14 +1,16 @@
 ---
 id: MAC-33sp
 title: "Directory ABA witness blind on Linux 6.8 in containers: readRootDirectory accepts a create-delete ABA"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [security, linux, dirscan, gates]
 created_at: 2026-09-08T16:46:10Z
 created_by: ramirosalas
-updated_at: 2026-09-09T16:55:43Z
-content_hash: "sha256:2d8ba236a2446a7b16de46d5b7dd7f9e74cd2c781a0a70a81d6ddef6aca81ff6"
+updated_at: 2026-09-24T21:32:05Z
+content_hash: "sha256:d89be6c690c74f131625942ce0e4259c36a4d3754e60f8c7ad6e103a24a5226d"
+closed_at: 2026-09-24T21:32:05Z
+close_reason: "Core fix shipped in 0.8.0 (a56bbe32, 1f62e9ab). Residuals filed as MAC-n35t. Triage 2026-09-24."
 ---
 
 ## Description
@@ -37,7 +39,7 @@ Determine which witness component is blind here (directory ctime granularity on 
 
 
 ## History
-
+- 2026-09-24T21:32:05Z status: open -> closed
 
 ## Links
 
