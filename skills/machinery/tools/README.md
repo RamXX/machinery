@@ -105,7 +105,10 @@ One line per subcommand:
   contract's `dependency_rules` after review), suggests `ignore:` globs, and writes
   `design/ratchet.json`, the snapshot G4 ratchets baselined edges against. `--date` overrides the
   snapshot and rule-comment stamp (default: today, YYYY-MM-DD; older YYYY-MM snapshots stay
-  readable and age from the first of that month).
+  readable and age from the first of that month). `--gate gy,gl` records the Gy-rules findings
+  and Gl-ledger undeclared-fact warnings instead (with `g4` as well, both); a recorded finding
+  then reports as a `baselined:` note, and a rerun only shrinks that part of the ratchet unless
+  `--grow` is given. It refuses while Gy-rules has projection errors.
 - `machinery scale <design>` measures a design's size (stateful components, bounded contexts,
   synthesis input) and recommends sharding or recursive decomposition.
 - `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into

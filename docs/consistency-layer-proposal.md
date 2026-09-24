@@ -553,6 +553,18 @@ catalog of rule files, findings and the declarations each reads is `rules/README
   design now with an implementation so every output, the binding twins included, is compared
   populated under both engines.
 
+#### Adoption baseline, as implemented (0.10.1)
+
+An existing design adopts the layer the way it adopts G4: `machinery baseline <design> --gate
+gy,gl` records today's Gy-rules findings (`rule_findings`, keyed by output relation and tuple) and
+Gl-ledger undeclared-fact warnings (`undeclared_facts`, keyed by file, unit and token, with a
+count) in `design/ratchet.json`, beside the unchanged `edges` section, which a ratchet recording
+only this debt omits (G4 then sees no snapshot and the stop hook stays disarmed). A recorded
+finding is a `baselined:` NOTE counted on the gate's `checked:` line; an unrecorded one reports as
+before; a recorded one no longer observed is a resolved NOTE. The first run records everything,
+later runs intersect with the recorded set unless `--grow`, projection errors refuse the
+recording, and `--complete` refuses while baselined debt remains (`internal/gates/consistency_baseline.go`).
+
 ## 4. The rules, written out
 
 These replace the four 0.9.0 checks and cover the open gaps. Each is short enough to

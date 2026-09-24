@@ -6,6 +6,31 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Consistency-layer adoption baseline.** `machinery baseline <design> --gate gy,gl` records a
+  design's current Gy-rules findings and Gl-ledger undeclared-fact warnings in
+  `design/ratchet.json`, the file that already holds G4's baselined edges, so an existing design
+  can adopt the layer and burn its debt down instead of fixing everything in one change. Two
+  optional sections join `edges`: `rule_findings` (`{relation, tuple}`: the rule's output
+  relation and the finding's subject ids) and `undeclared_facts` (`{file, unit, token, count}`);
+  neither carries a line number. A recorded finding prints as `note   baselined: <finding>` and is
+  counted on the gate's `checked:` line (`N baselined`); it never blocks or warns, so strict and
+  `--warnings-as-errors` runs pass, and the stop hook classifies the same way. A finding the
+  ratchet does not record reports exactly as before. A recorded entry no longer observed is a
+  note (`... resolved; run machinery baseline to shrink the ratchet`), never an error. The first
+  `gy` (or `gl`) run records every current finding; later runs keep only the recorded entries
+  still observed, so that part of the ratchet only shrinks, unless `--grow` accepts new debt.
+  `--impl` is required only with `g4` (the default, unchanged); for `gy` it adds the
+  implementation's oracle bindings as `check --impl` does. The baseline refuses to record while
+  Gy-rules has projection errors, which are a broken design, not debt. `machinery check
+  --complete` refuses while any baselined Gy/Gl finding remains and prints the count per gate.
+- **Compatibility.** A ratchet with only an `edges` section loads, renders and drives G4 byte for
+  byte as before, and a plain `machinery baseline <design> --impl <dir>` prints and writes what
+  it did (it now keeps any recorded `rule_findings` and `undeclared_facts`). A ratchet recording
+  only Gy/Gl debt omits `edges`: G4 treats it as no snapshot, and it does not arm import blocking
+  at turn end.
+
 ### Fixed
 
 - **A fan-out event no longer fails the projection, and Gy-rules no longer evaluates nothing.**

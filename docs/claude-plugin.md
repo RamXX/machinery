@@ -135,9 +135,10 @@ machinery-managed. All fields optional:
   for ordinary coding sessions, the "no drift" case: an undeclared cross-boundary import, or a new
   offender file on a baselined edge, blocks the turn that wrote it instead of waiting for CI.
   Requires the contract's boundaries to declare `code:` globs, and blocking arms only once
-  `machinery baseline <design> --impl <dir>` has written `<design>/ratchet.json` (run it with zero
-  findings on a greenfield repo; the empty snapshot is the arming marker). Until then import
-  findings warn. Unset, G4 and Gt never run from hooks.
+  `machinery baseline <design> --impl <dir>` has written `<design>/ratchet.json` with its `edges`
+  section (run it with zero findings on a greenfield repo; the empty snapshot is the arming
+  marker; a ratchet that records only Gy/Gl debt arms nothing). Until then import findings warn.
+  Gy-rules and Gl-ledger findings the ratchet records are notes and never block a stop. Unset, G4 and Gt never run from hooks.
 - `strict`: block the end of any turn on ANY blocking finding, not only DRIFT and G4. Right for a
   repo whose design is complete; wrong mid-interrogation.
 - `hooks`: set `false` to keep the repo marked as machinery-managed while opting out of hook

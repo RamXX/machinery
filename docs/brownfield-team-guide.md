@@ -218,6 +218,50 @@ greenfield protocol: design change first, gates green, oracle diff as the affect
 list, then implementation. BUILD.md's zero-context claim applies to the new work you carve
 out of the modeled slice.
 
+### Adopting the consistency layer: baseline, then burn down (gates gy and gl)
+
+A design written before the consistency layer usually arrives red on Gy-rules (declared facts
+that disagree: an unresolved `USES{}` member, an orphan matrix, a `System` action with no
+admission) and loud on Gl-ledger (backticked fact-shaped tokens outside every declaration group).
+None of that is new breakage; it is debt the prose used to hide. The ratchet that holds G4's
+boundary debt holds this too, in the same `design/ratchet.json`:
+
+```sh
+machinery check design --gate gy,gl --impl .                     # see the debt
+machinery baseline design --gate gy,gl --impl . --date 2026-09-23  # record it; commit design/ratchet.json
+machinery check design --impl . --warnings-as-errors             # green: the debt reports as notes
+```
+
+- **What is recorded.** Gy-rules findings under `rule_findings`, keyed by the rule's output
+  relation and the finding's subject ids; Gl-ledger undeclared-fact warnings (both the model
+  attribute and the unresolved-token class) under `undeclared_facts`, keyed by matrix file, row
+  (unit) name and token, with a count because one key can repeat. No line number takes part, so
+  unrelated edits never disturb the ratchet. Pass the same `--impl` you check with: under it
+  Gy-rules also reads the implementation's oracle bindings. `--gate g4,gy,gl --impl .` records
+  the boundary edges in the same run; a `--gate gy,gl` run leaves the `edges` section and the
+  snapshot date untouched, and a plain `machinery baseline design --impl .` (G4 only) keeps the
+  recorded Gy/Gl sections.
+- **How it reports.** A recorded finding prints as `note   baselined: <the finding>` and the
+  gate's `checked:` line counts `N baselined`; it neither blocks nor warns, so strict and
+  `--warnings-as-errors` runs pass. A finding the ratchet does not record reports exactly as it
+  would without one: a new debt item blocks the build. A recorded entry that no longer occurs is a
+  note (`... resolved; run machinery baseline to shrink the ratchet`), never an error, so burning
+  down debt never breaks a build. The stop hook classifies the same way.
+- **It only shrinks.** The first `--gate gy` (or `gl`) run records every current finding. Every
+  later run keeps only the recorded entries still observed (a count takes the smaller of the two),
+  prints what it dropped, and leaves new findings out of the ratchet and blocking. `--grow`
+  records the current set as it is: a deliberate debt acceptance, reviewed in the PR like any
+  `ratchet.json` change. This differs from the G4 rerun, which re-snapshots the observed edges.
+- **What it refuses.** Gy-rules projection errors (a row the rules cannot read) are a broken
+  design, not debt: the baseline refuses to record while any exists and lists them. Fix them
+  first.
+- **Final handoff.** `machinery check --complete` refuses while any Gy/Gl finding is still
+  baselined and prints the count per gate, the way it refuses an open milestone. The recorded
+  debt is a migration aid, not a place to finish in.
+
+The burn-down loop is the G4 one: fix findings in ordinary PRs, watch the resolved notes, and
+rerun `machinery baseline design --gate gy,gl --impl .` to shrink the ratchet in the same PR.
+
 ### Stage 5 (rare): sharding and recursion
 
 Run `machinery scale design` before reaching for either. Shard at roughly ten stateful
@@ -461,7 +505,7 @@ folding it into a substrate boundary manufactures allow-graph cycles.
 ## 9. What "sustainable" looks like (the exit criteria)
 
 You are done adopting when, for each design: the `baseline:` list is empty and
-`ratchet.json` records no edges; `ignore:`
+`ratchet.json` records no edges, no `rule_findings` and no `undeclared_facts`; `ignore:`
 covers test scaffolding only; every lifecycle enum has a machine and Gx is in the CI gate
 list; the characterization suite is fully adjudicated and locked; CI runs the full check
 on every PR plus formal verification at least nightly; and a new hire cannot merge a

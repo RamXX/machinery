@@ -483,6 +483,15 @@ A design written for 0.9.0 migrates by declaring what the prose used to imply; t
 Gx-trace warns on a design that declares no `WRITES{}`, `USES{}`, or `PRODUCES{}` anywhere and quotes
 a fact-shaped token in prose.
 
+A design with too much of that debt to fix in one change adopts with a baseline:
+`machinery baseline <design> --gate gy,gl --impl .` records today's Gy-rules findings and
+Gl-ledger undeclared-fact warnings in `design/ratchet.json`, beside G4's baselined edges. From then
+on each recorded one prints as a `baselined:` note counted on the `checked:` line and never blocks,
+a new one blocks as before, and a fixed one prints a resolved note until the next baseline run
+shrinks the ratchet, which never grows without `--grow`. The baseline refuses to record while
+Gy-rules has projection errors, and `--complete` refuses while baselined debt remains. The
+[brownfield team guide](docs/brownfield-team-guide.md) has the loop.
+
 ### Bring your own checker
 
 Some invariants need domain knowledge machinery does not have: a sensitive-data-flow property, a
@@ -1079,6 +1088,8 @@ machinery check <design> --gate gl --verbose
 machinery check <design> --impl <dir> \
   --complete --warnings-as-errors     # require a final, closed, zero-warning handoff
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
+machinery baseline <design> --gate gy,gl --impl .
+                                      # record Gy-rules and Gl-ledger debt in the ratchet (shrink-only)
 machinery verify-formal <your-design> # regenerate + TLC/Alloy-check the proofs (needs Java)
 machinery verify-c4 <your-design>     # compile workspace.dsl under structurizr-cli (needs Java)
 machinery project <design>            # write the external-checker projections

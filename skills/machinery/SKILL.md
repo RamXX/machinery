@@ -246,6 +246,17 @@ wording of matrix cells. That inference is gone; a design states each of them.
 Gx-trace warns, for one release, on a design that declares no `WRITES{}`,
 `USES{}` or `PRODUCES{}` anywhere and quotes a fact-shaped token in prose.
 
+A design with more findings than one change should carry adopts with a
+baseline, then burns it down. Fix Gy-rules projection errors first (the
+baseline refuses them), then run
+`machinery baseline <design> --gate gy,gl --impl <dir> --date <YYYY-MM-DD>` and
+commit `design/ratchet.json`. Each recorded Gy-rules finding and Gl-ledger
+undeclared-fact warning then prints as a `baselined:` note and never blocks; a
+new one still does. Work through the cases below in ordinary changes; a fixed
+finding prints a resolved note, and rerunning the same command shrinks the
+ratchet (it never grows without `--grow`). `--complete` refuses while any
+baselined Gy/Gl finding remains.
+
 - A fact the prose backticked: declare it in `USES{}` on the row, or drop the
   backticks if it was only a quotation.
 - A unit the prose called read-only ("writes nothing"): declare `WRITES{}`.
