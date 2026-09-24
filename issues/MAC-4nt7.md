@@ -1,14 +1,16 @@
 ---
 id: MAC-4nt7
 title: "Decision: hierarchical isolation scoping (tenant > unit) deferred until an access-boundary need exists"
-status: open
+status: closed
 priority: 4
 type: decision
 labels: [relational, isolation, deferred, from-next]
 created_at: 2026-09-24T21:32:35Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:35Z
-content_hash: "sha256:88622cd3297b30b09db781c1742aa3fba7e8d723390a4106b8262743cc10728c"
+updated_at: 2026-09-24T21:32:49Z
+content_hash: "sha256:17def3b15ddc1fd77a4112d0d356629bb0bc7cd32f9b49ee122ce65de0b326cc"
+closed_at: 2026-09-24T21:32:49Z
+close_reason: "Deferred by owner ('do not pull forward'). Reopen when a design needs an access boundary below the tenant."
 ---
 
 ## Description
@@ -30,7 +32,7 @@ Reopen trigger: a consumer design declares a second access boundary below the te
 
 
 ## History
-
+- 2026-09-24T21:32:49Z status: open -> closed
 
 ## Links
 
