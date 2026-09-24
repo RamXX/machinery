@@ -26,6 +26,11 @@ hardening release.
    release commit before anything publishes. Until that enforcement lands and is applied, notes
    must not describe it as active; its locally tested release policy is deliberately not claimed
    as remotely enforced.
+6. **Consumer corpora are diffed before any push or tag.** A change that touches gates,
+   projections, declarations, or the skill's grammar is run through `make consumer-diff` against
+   the last release binary over every consumer design the maintainer can read (read-only clones,
+   never committed), and the candidate's notes record the counts and the allow file (see
+   CONTRIBUTING.md, "Release safety: consumer corpora").
 
 ## The historic omission: v0.6.3
 
