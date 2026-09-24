@@ -6,6 +6,17 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-09-24
+
+**Why this release.** 0.10.0 was withdrawn the day it shipped because it blocked valid designs.
+An event on several rows of the event-contract table (a fan-out) projected as a duplicate stable
+id, so Gy-rules stopped at the projection and evaluated nothing; a design's own group notation in
+its matrices (`OWNED-BY{...}`) was an unknown-group error with no way to keep it; and Gl-ledger
+warned on every backticked action, enum value and file name as if it were an undeclared fact.
+0.10.1 fixes those, removes one over-strict rule (`waived_machine_present`), and adds the Gy/Gl
+baseline, so an existing design adopts the consistency layer by recording its current findings
+and burning them down instead of fixing everything in one stop-the-world migration.
+
 ### Added
 
 - **Consistency-layer adoption baseline.** `machinery baseline <design> --gate gy,gl` records a
@@ -95,7 +106,50 @@ under their version heading when a release is cut.
   neither a machine nor a waiver) stays, and so does contract-only record support. The `component`
   subject kind, which only that rule used, is gone from the Gy-rules subject vocabulary.
 
+### Compatibility and migration
+
+**From 0.10.0.** 0.10.0 is withdrawn; do not stay on it. Everything 0.10.0 accepted is accepted
+here, except that an external rule file declaring `event` with two columns must drop the second
+column and read `event_producer` (see Fixed). The declarations 0.10.0 introduced keep their
+meaning.
+
+**From 0.9.0: adopting the consistency layer.** A design green under 0.9.0 can arrive red on
+Gy-rules and loud on Gl-ledger; that is debt the prose inference used to hide, and the 0.10.0
+migration notes below say what to declare. Adopt in this order:
+
+1. Pin the release: `machinery update --version v0.10.1` (or `MACHINERY_VERSION=v0.10.1` for the
+   one-line installer), so every run of the adoption reads the same rules.
+2. If the design's matrices carry its own upper-case group notation (`OWNED-BY{...}` and the
+   like), list each name under `private_groups:` in the Architecture Contract v2 fence. Without
+   it those marks are Gx-trace errors, and Gy-rules projection errors, which the baseline refuses
+   to record.
+3. Record the current debt: `machinery baseline <design> --gate gy,gl` (add `--impl <dir>` when
+   you check with one, so Gy-rules also reads the oracle bindings), and commit
+   `design/ratchet.json`. Recorded findings print as `baselined:` notes and never block.
+4. Burn it down in ordinary changes: fix findings, watch the resolved notes, and rerun the same
+   `machinery baseline` command to shrink the ratchet. It never grows without `--grow`, and
+   `machinery check --complete` refuses while any Gy/Gl finding is still baselined.
+
+**Proof scope.** A green Gy-rules on a design with baselined findings establishes the 0.10.0
+scope for every finding the ratchet does not record, and nothing about the recorded ones;
+`--complete` is the run that establishes the full scope. Removing `waived_machine_present` means
+Gy-rules no longer asserts that a `(no machine: <reason>)` waiver and a machine are exclusive.
+Gl-ledger's undeclared-fact warning now fires only for a model attribute or a token that names
+nothing, so a quiet Gl-ledger no longer implies that no action, unit, enum value or file name is
+backticked outside a group.
+
+**Generated output.** The oracle, TLA+, Alloy, checker-projection, and packet generators now emit
+the `v0.10.1` machinery stamp. This restamps the committed example oracles and formal artifacts,
+the pii-flow checker projection, and the golden corpus, including its packet fixture. Run
+`machinery oracle <design>/machines`, `machinery verify-formal <design> --gen-only` (which also
+regenerates opted-in Alloy layers), and `machinery project <design>` for those example families;
+run `make golden-update` to recapture the corpus. The release-preparation regeneration changes
+only version stamps. Consumers should regenerate and commit their generated design artifacts on
+upgrade.
+
 ## [0.10.0] - 2026-09-23
+
+Withdrawn 2026-09-23; see 0.10.1.
 
 ### Added
 
@@ -109,7 +163,7 @@ under their version heading when a release is cut.
   `CLAUSES`, `READS`, `VALUES`, `ORACLESET`, `WRITES`, `USES`, `PRODUCES`, `CARRIES` or
   `SUPERSEDES` is a
   Gx-trace error naming the row. In 0.10.0 that included a design's own group names, with no way
-  to keep them; 0.10.1 adds the `private_groups:` contract declaration (see Unreleased, Fixed).
+  to keep them; 0.10.1 adds the `private_groups:` contract declaration (see 0.10.1, Fixed).
 - **Undeclared fact references warn in Gl-ledger.** A backticked snake_case or `Entity.attr`
   token in a matrix contract, clause, or payload cell, outside every group and not declared by its
   own row, is a warning: declare it in `USES{}` or `WRITES{}`, or drop the backticks.

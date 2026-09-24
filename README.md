@@ -336,8 +336,8 @@ same contract differently got a different verdict, and a `System` action whose d
 "writes nothing" was treated as read-only and owed no authorization row. Heuristics over prose are
 exactly the "trust the reader" problem this project exists to remove, so they were deleted
 (2,639 lines, with their tests) and replaced with the consistency layer, which rests on four ideas.
-The consistency layer ships in release 0.10.0; [CHANGELOG.md](CHANGELOG.md) records what it
-adds and the migration a 0.9.0 design needs.
+The consistency layer ships in release 0.10.1 (0.10.0, which first carried it, was withdrawn);
+[CHANGELOG.md](CHANGELOG.md) records what it adds and the migration a 0.9.0 design needs.
 
 ### 1. Declarations are grammar
 
@@ -1007,7 +1007,7 @@ versions and release checks. Neither command installs anything.
   fatal in images that must carry the complete toolchain. The script puts `machinery` on
   `~/.local/bin` and runs `machinery install` to place the skill and role docs into your agent homes
   (real files under `~/.agents`, symlinked into `~/.claude`; see [Agent homes](#agent-homes)).
-  Environment variables override it, for example `MACHINERY_VERSION=v0.10.0`,
+  Environment variables override it, for example `MACHINERY_VERSION=v0.10.1`,
   `INSTALL_DIR=/usr/local/bin`, `MACHINERY_HOMES="$HOME/Agent Home"`, or
   `MACHINERY_TARGETS="codex opencode"`. `MACHINERY_HOMES` takes one full path per line, preserving
   spaces; separate several homes with a literal newline.
@@ -1019,7 +1019,7 @@ versions and release checks. Neither command installs anything.
   machinery install                        # fetches the matching skill + role docs into your agent homes
   ```
 
-  **Windows:** v0.10.0 publishes a cross-compiled `machinery-windows-amd64` binary and
+  **Windows:** v0.10.1 publishes a cross-compiled `machinery-windows-amd64` binary and
   `machinery_<version>_windows_amd64.tar.gz` as release artifacts. The one-line installer and
   `machinery update` do not support Windows, so download the asset by hand. Native Windows runtime
   guarantees are not claimed: process custody, formal verification, and the assurance lanes are
@@ -1164,7 +1164,7 @@ matches the installed version.
 
 ```bash
 machinery update                         # latest release, all detected installations
-machinery update --version v0.10.0        # force an exact release
+machinery update --version v0.10.1       # force an exact release
 machinery update --target all            # restrict the harness refresh explicitly
 machinery update --skip-plugins          # leave host-managed plugin caches alone
 ```
