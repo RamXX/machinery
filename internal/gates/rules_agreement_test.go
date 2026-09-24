@@ -57,8 +57,8 @@ var agreementCases = []agreementCase{
 			"machines/Order.machine.json": agreementMachine,
 			"machines/Order.matrix.md":    "| name | kind | contract (pre / post) |\n|---|---|---|\n| `recompute` | action | reads `missing_fact` / records result |\n",
 		},
-		gl:  "undeclared fact reference `missing_fact`",
-		why: "a bare backticked token is prose: no fact to resolve, and Gl-ledger warns on it",
+		gl:  "`missing_fact` is not a declared fact, action, unit or value; drop the backticks or declare it",
+		why: "a bare backticked token is prose: no fact to resolve, and Gl-ledger warns on it (with the unresolved wording, since the model declares no such attribute)",
 	},
 	{
 		name: "fact declared and unresolved",
