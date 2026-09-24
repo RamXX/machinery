@@ -2,13 +2,13 @@
 id: MAC-al5u
 title: "Keep every complete example on the strict verification path"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:00Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:2ddcdf0abd2a9edc98e087898a135314bdd46ca6b541ebec8aac25266b9ab8e4"
 blocked_by: [MAC-5ft8]
 blocks: [MAC-1u2v, MAC-vx24, MAC-ou97]
