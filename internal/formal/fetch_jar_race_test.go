@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -325,7 +326,7 @@ func TestFetchJarWaiterHonorsCancellationWhileWinnerFetches(t *testing.T) {
 	}()
 	select {
 	case got := <-done:
-		t.Fatalf("waiter returned while the winner held the lock: path=%q err=%v", got.path, got.err)
+		t.Fatalf("waiter returned while the winner held the lock: path=%q err=%v; winner %s", got.path, got.err, jarHelperState(winner))
 	case <-time.After(200 * time.Millisecond):
 	}
 	cancel()
@@ -365,7 +366,7 @@ func TestFetchJarWaiterRecoversFromCrashedWinner(t *testing.T) {
 	}()
 	select {
 	case got := <-done:
-		t.Fatalf("waiter did not wait for the live winner: path=%q err=%v", got.path, got.err)
+		t.Fatalf("waiter did not wait for the live winner: path=%q err=%v; winner %s", got.path, got.err, jarHelperState(winner))
 	case <-time.After(500 * time.Millisecond):
 	}
 	if info, err := os.Stat(stage); err != nil || info.Size() != int64(len(jarFetchBody)/2) {
@@ -396,4 +397,25 @@ func TestFetchJarWaiterRecoversFromCrashedWinner(t *testing.T) {
 	if snapshot := jarFetchSnapshot(t, filepath.Dir(dest)); len(snapshot) != 1 {
 		t.Fatalf("fetch left residue beside the jar:\n%s", strings.Join(snapshot, "\n"))
 	}
+}
+
+// jarHelperState reports whether the crash helper is still alive, and if it is not,
+// how it exited and what it printed, so a waiter that gets through the lock
+// says whether the lock was released by a dead holder.
+func jarHelperState(cmd *exec.Cmd) string {
+	if cmd.Process == nil {
+		return "never started"
+	}
+	if err := cmd.Process.Signal(syscall.Signal(0)); err == nil {
+		return "alive (pid " + strconv.Itoa(cmd.Process.Pid) + ")"
+	}
+	state, err := cmd.Process.Wait()
+	if err != nil {
+		return "dead (wait: " + err.Error() + ")"
+	}
+	out := ""
+	if buf, ok := cmd.Stdout.(*bytes.Buffer); ok {
+		out = "; output:\n" + buf.String()
+	}
+	return "dead (" + state.String() + ")" + out
 }

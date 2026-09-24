@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -145,7 +146,12 @@ func TestJavaProvisionHelper(t *testing.T) {
 				return err
 			}
 			javaProvisionMark(t, sync, "holding-"+id)
-			select {}
+			// Sleep rather than select {}: a process whose only goroutines are
+			// blocked with no timer pending is a runtime deadlock and dies,
+			// which releases the lock this helper exists to hold.
+			for {
+				time.Sleep(time.Hour)
+			}
 		})
 		_, err := provisionedJavaPath()
 		t.Fatalf("crash helper returned instead of blocking: %v", err)
@@ -359,7 +365,7 @@ func TestProvisionJavaWaiterHonorsCancellationWhileWinnerProvisions(t *testing.T
 	}()
 	select {
 	case got := <-done:
-		t.Fatalf("waiter returned while the winner held the lock: path=%q err=%v", got.path, got.err)
+		t.Fatalf("waiter returned while the winner held the lock: path=%q err=%v; winner %s", got.path, got.err, javaHelperState(winner))
 	case <-time.After(200 * time.Millisecond):
 	}
 	cancel()
@@ -407,7 +413,7 @@ func TestProvisionJavaWaiterRecoversFromCrashedWinner(t *testing.T) {
 	}()
 	select {
 	case got := <-done:
-		t.Fatalf("waiter did not wait for the live winner: path=%q err=%v", got.path, got.err)
+		t.Fatalf("waiter did not wait for the live winner: path=%q err=%v; winner %s", got.path, got.err, javaHelperState(winner))
 	case <-time.After(500 * time.Millisecond):
 	}
 	if body, err := os.ReadFile(filepath.Join(stage, "runtime.archive")); err != nil || len(body) != len(archive)/2 {
@@ -435,4 +441,25 @@ func TestProvisionJavaWaiterRecoversFromCrashedWinner(t *testing.T) {
 	if left, _ := filepath.Glob(filepath.Join(base, ".java-stage-*")); len(left) != 0 {
 		t.Fatalf("provision left stage residue: %v", left)
 	}
+}
+
+// javaHelperState reports whether the crash helper is still alive, and if it is not,
+// how it exited and what it printed, so a waiter that gets through the lock
+// says whether the lock was released by a dead holder.
+func javaHelperState(cmd *exec.Cmd) string {
+	if cmd.Process == nil {
+		return "never started"
+	}
+	if err := cmd.Process.Signal(syscall.Signal(0)); err == nil {
+		return "alive (pid " + strconv.Itoa(cmd.Process.Pid) + ")"
+	}
+	state, err := cmd.Process.Wait()
+	if err != nil {
+		return "dead (wait: " + err.Error() + ")"
+	}
+	out := ""
+	if buf, ok := cmd.Stdout.(*bytes.Buffer); ok {
+		out = "; output:\n" + buf.String()
+	}
+	return "dead (" + state.String() + ")" + out
 }
