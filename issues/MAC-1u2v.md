@@ -2,13 +2,13 @@
 id: MAC-1u2v
 title: "Exercise fresh standalone assurance in all four languages"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [integration]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:16Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:34Z
+updated_at: 2026-09-24T21:33:45Z
 content_hash: "sha256:381a2a7d57c21e318d06ac0ad121482bde02e1fc03ef27cb69710ca701cb5077"
 blocked_by: [MAC-al5u, MAC-u4oo]
 blocks: [MAC-vx24, MAC-ou97]
