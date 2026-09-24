@@ -344,7 +344,7 @@ var (
 )
 
 var (
-	contractRootKeys     = stringSet("contract_version", "boundaries", "externals", "ignore", "reads", "dependency_rules", "_comment")
+	contractRootKeys     = stringSet("contract_version", "boundaries", "externals", "ignore", "reads", "private_groups", "dependency_rules", "_comment")
 	contractBoundaryKeys = stringSet("id", "kind", "element", "code", "exposes", "modules", "provides", "consumes", "_comment")
 	contractExternalKeys = stringSet("id", "element", "imports", "modules", "_comment")
 	contractReadKeys     = stringSet("artifact", "reader", "reviewed", "_comment")
@@ -442,6 +442,12 @@ func validateContractSchema(g *Gate, co *ir.Object) {
 		}
 	}
 	contractStringList(g, co, "ignore", "root", false)
+	if pv := co.Get2("private_groups"); pv != nil {
+		_, errs := parsePrivateGroups(pv)
+		for _, e := range errs {
+			g.Errs = append(g.Errs, "Architecture Contract: "+e)
+		}
+	}
 	if rv := co.Get2("reads"); rv != nil {
 		if rv.Kind != ir.KindArray || len(rv.AsArray()) == 0 {
 			g.Errs = append(g.Errs, "Architecture Contract: reads must be a non-empty list of mappings")
@@ -2035,9 +2041,12 @@ func CheckTraceability(design string) *Gate {
 	// SUPERSEDES), the closed group-name vocabulary, and the shape of the
 	// VALUES, payload, derived: and authorization-inventory declarations:
 	// parse-time findings only (declarations.go). What the declarations mean
-	// is Gy-rules' to decide over their projected facts.
-	checkPreCutoverInference(g, design, checkDeclarations(g, design, archText))
-	checkMatrixDeclarationShapes(g, design)
+	// is Gy-rules' to decide over their projected facts. A group the
+	// contract declares in private_groups: is the design's own notation and
+	// is skipped; G2 reports an invalid entry, which is never honored.
+	private, _ := contractPrivateGroups(archText)
+	checkPreCutoverInference(g, design, checkDeclarations(g, design, archText, private))
+	checkMatrixDeclarationShapes(g, design, private)
 	checkAuthorizationShape(g, design)
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)

@@ -55,6 +55,7 @@
 package gates
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -87,6 +88,128 @@ var knownDeclarationGroups = map[string]bool{
 // contractGroups are the groups that belong on Architecture Contract rows
 // and never in a matrix.
 var contractGroups = map[string]bool{GroupSupersedes: true, GroupReserved: true}
+
+// unknownGroupHint is the tail of the unknown-group error: every known group,
+// generated from the vocabulary so the list can never omit one, and the one
+// escape for a design's own notation.
+var unknownGroupHint = func() string {
+	var matrix, contract []string
+	for name := range knownDeclarationGroups {
+		if contractGroups[name] {
+			contract = append(contract, name)
+		} else {
+			matrix = append(matrix, name)
+		}
+	}
+	sort.Strings(matrix)
+	sort.Strings(contract)
+	return "known groups are " + strings.Join(matrix, ", ") + " (" + strings.Join(contract, " and ") +
+		" on Architecture Contract rows) and payload {...}; a group the design's own tooling reads is declared in the Architecture Contract's private_groups: list, and machinery then skips it"
+}()
+
+// privateGroupName is the group-name grammar, the scanner's own (see
+// groupOpening): upper case, digits, hyphen or underscore, two or more
+// characters, starting with a letter and ending with a letter or digit. A
+// name outside it could never open a group the scanner sees.
+var privateGroupName = regexp.MustCompile(`^[A-Z][A-Z0-9_-]*[A-Z0-9]$`)
+
+// parsePrivateGroups validates the Architecture Contract's private_groups:
+// value, the explicit declaration of a design's own group names. It returns
+// the valid entries and one message per invalid one; an invalid entry is never
+// honored. A public group name is an error (a design cannot switch off a
+// machinery group by calling it private), and so is a duplicate. The messages
+// carry no "Architecture Contract:" prefix; callers add it.
+func parsePrivateGroups(v *ir.Value) (map[string]bool, []string) {
+	out := map[string]bool{}
+	if v == nil || v.Kind != ir.KindArray || len(v.AsArray()) == 0 {
+		return out, []string{"private_groups must be a non-empty list of group names (upper case, as in OWNED-BY)"}
+	}
+	var errs []string
+	for i, item := range v.AsArray() {
+		where := "private_groups[" + strconv.Itoa(i) + "]"
+		if item == nil || item.Kind != ir.KindString {
+			errs = append(errs, where+" is not a string; list bare group names, as in OWNED-BY")
+			continue
+		}
+		name := item.AsString()
+		switch {
+		case !privateGroupName.MatchString(name):
+			errs = append(errs, where+" "+ir.Repr(name)+" is not a group name; a group name is upper case (letters, digits, hyphen or underscore, two or more characters), written without braces, as in OWNED-BY")
+		case knownDeclarationGroups[name]:
+			errs = append(errs, where+" "+ir.Repr(name)+" is a public machinery group; a design cannot declare it private")
+		case out[name]:
+			errs = append(errs, where+" "+ir.Repr(name)+" is listed twice")
+		default:
+			out[name] = true
+		}
+	}
+	return out, errs
+}
+
+// contractPrivateGroups reads private_groups: from an ARCHITECTURE.md text.
+// A missing contract, an unparsable one, or one without the key declares no
+// private group; G2 reports a broken contract.
+func contractPrivateGroups(archText string) (map[string]bool, []string) {
+	fence, ok := ir.ContractFence(normalizeNewlines([]byte(archText)))
+	if !ok {
+		return map[string]bool{}, nil
+	}
+	c, err := ir.LoadYAML([]byte(fence))
+	if err != nil || c.AsObject() == nil {
+		return map[string]bool{}, nil
+	}
+	v := c.AsObject().Get2("private_groups")
+	if v == nil {
+		return map[string]bool{}, nil
+	}
+	return parsePrivateGroups(v)
+}
+
+// PrivateGroups returns the private group names a design declares in its
+// Architecture Contract's private_groups: list. Every reader of matrix
+// declarations consults it: a declared private group is skipped (not an
+// error, not projected, and its members declare nothing). The error reports
+// every invalid entry; the map holds only the valid ones, so a caller that
+// fails on the error and one that proceeds see the same honored set.
+func PrivateGroups(design string) (map[string]bool, error) {
+	body, err := readDesignFile(design, filepath.Join(design, "ARCHITECTURE.md"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return map[string]bool{}, nil
+		}
+		return map[string]bool{}, err
+	}
+	private, errs := contractPrivateGroups(string(body))
+	if len(errs) > 0 {
+		return private, errors.New("Architecture Contract: " + strings.Join(errs, "; "))
+	}
+	return private, nil
+}
+
+// MaskPrivateGroups blanks every declared private group span of a cell (the
+// name through its closing brace, or through the end of the cell when it
+// never closes) with spaces, preserving byte offsets. A reader that scans a
+// cell with its own pattern (VALUES, payload, derived:) masks first, so text
+// inside a private group never declares a fact.
+func MaskPrivateGroups(cell string, private map[string]bool) string {
+	if len(private) == 0 {
+		return cell
+	}
+	masked := []byte(cell)
+	for _, span := range scanGroups(cell) {
+		if !private[span.name] || knownDeclarationGroups[span.name] {
+			continue
+		}
+		end := span.end
+		if end < 0 {
+			end = len(cell)
+		}
+		for i := span.start; i < end; i++ {
+			masked[i] = ' '
+		}
+	}
+	return string(masked)
+}
 
 // parsedHere reports whether a group is parsed by this file (the rest are
 // recognized only, and parsed by their own owners).
@@ -353,8 +476,24 @@ func normalizeNewlines(body []byte) string {
 // of every table row is scanned; fenced code is not. file is the path the
 // findings and declarations carry.
 func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []DeclarationError) {
+	return ParseMatrixDeclarationsWith(file, body, nil)
+}
+
+// ParseMatrixDeclarationsWith is ParseMatrixDeclarations for a design that
+// declares private groups (see PrivateGroups): a group whose name is in
+// private is skipped whole, never an error and never a declaration. A public
+// group name in private is ignored; it stays parsed.
+func ParseMatrixDeclarationsWith(file string, body []byte, private map[string]bool) ([]Declaration, []DeclarationError) {
+	decls, errs, _ := parseMatrixDeclarations(file, body, private)
+	return decls, errs
+}
+
+// parseMatrixDeclarations also returns how many private group spans it
+// skipped, so Gx can make the skipping visible.
+func parseMatrixDeclarations(file string, body []byte, private map[string]bool) ([]Declaration, []DeclarationError, int) {
 	var decls []Declaration
 	var errs []DeclarationError
+	skipped := 0
 	for _, r := range walkTableRows(normalizeNewlines(body)) {
 		row := rowIdentity(r)
 		fail := func(msg string) {
@@ -364,8 +503,11 @@ func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []Declara
 		for ci, cell := range r.cells {
 			for _, span := range scanGroups(cell) {
 				switch {
+				case !knownDeclarationGroups[span.name] && private[span.name]:
+					skipped++
+					continue // the design's own notation, read by its own tooling
 				case !knownDeclarationGroups[span.name]:
-					fail("unknown declaration group " + span.name + "{...}; known groups are CARRIES, CLAUSES, ORACLESET, PRODUCES, READS, USES, VALUES, WRITES (RESERVED and SUPERSEDES on Architecture Contract rows) and payload {...}")
+					fail("unknown declaration group " + span.name + "{...}; " + unknownGroupHint)
 					continue
 				case !parsedHere(span.name):
 					continue // CLAUSES, READS, VALUES, ORACLESET: owned by their own parsers
@@ -397,7 +539,7 @@ func ParseMatrixDeclarations(file string, body []byte) ([]Declaration, []Declara
 			}
 		}
 	}
-	return decls, errs
+	return decls, errs, skipped
 }
 
 // contractBoundaryID reads the `- id: X` opener of a contract YAML list item.
@@ -469,17 +611,18 @@ func ParseContractDeclarations(file string, body []byte) ([]Declaration, []Decla
 // ARCHITECTURE.md in Gx-trace, beside the VALUES findings, in the same
 // `file:line: message` shape. It returns the parsed declarations for callers
 // that want them; Gx itself only counts them.
-func checkDeclarations(g *Gate, design, archText string) []Declaration {
+func checkDeclarations(g *Gate, design, archText string, private map[string]bool) []Declaration {
 	var all []Declaration
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
 		body, err := readDesignFile(design, path)
 		if err != nil {
 			continue // the VALUES and payload readers already report an unreadable matrix
 		}
-		decls, errs := ParseMatrixDeclarations(filepath.Base(path), body)
+		decls, errs, skipped := parseMatrixDeclarations(filepath.Base(path), body, private)
 		for _, e := range errs {
 			g.Errs = append(g.Errs, e.String())
 		}
+		g.Count("private declaration groups skipped", skipped)
 		all = append(all, decls...)
 	}
 	if archText != "" {
@@ -636,7 +779,7 @@ func isMarkdownSeparator(cells []string) bool {
 // declaration on a row that does not name exactly one event. These are the
 // same conditions the projection refuses, surfaced here as Gx findings with
 // their row, so an author sees them without reading a projection error.
-func checkMatrixDeclarationShapes(g *Gate, design string) {
+func checkMatrixDeclarationShapes(g *Gate, design string, private map[string]bool) {
 	for _, path := range sortedGlob(filepath.Join(design, "machines"), "*.matrix.md") {
 		body, err := readDesignFile(design, path)
 		if err != nil {
@@ -646,7 +789,8 @@ func checkMatrixDeclarationShapes(g *Gate, design string) {
 		for _, r := range walkTableRows(normalizeNewlines(body)) {
 			where := filepath.Base(path) + ":" + strconv.Itoa(r.line) + ": "
 			values := 0
-			for _, cell := range r.cells {
+			for _, raw := range r.cells {
+				cell := MaskPrivateGroups(raw, private)
 				groups := valuesGroup.FindAllStringSubmatch(cell, -1)
 				if len(groups) == 0 && valuesOpening.MatchString(cell) {
 					g.Errs = append(g.Errs, where+"malformed VALUES declaration; write VALUES{a, b, c}")
