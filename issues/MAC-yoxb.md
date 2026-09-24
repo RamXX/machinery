@@ -7,8 +7,8 @@ type: bug
 labels: [formal, runtimeclosure, flaky-under-load, dagger, ci]
 created_at: 2026-09-23T08:39:54Z
 created_by: ramirosalas
-updated_at: 2026-09-23T17:20:11Z
-content_hash: "sha256:6418d37e83e438b11b0308b82f5d45718adab17d87d147b92c15579cf3842343"
+updated_at: 2026-09-24T05:13:12Z
+content_hash: "sha256:3a110856f290ad27d5291fe57d6950707e84046f84c38eba659429feb77d1cb6"
 ---
 
 ## Description
@@ -33,6 +33,7 @@ Latent siblings with the same scope-lock-on-shared-cache shape, not changed here
 - Structurizr: 5a4bcdac (download step made substitutable, no behavior change), f7fc1c3f (RED), 1b408f73 (fix; lock <cache>/machinery/structurizr/.structurizr-provision.lock; provisionStructurizrContext).
 - 50022497 CHANGELOG extended (no issue id); 42117d0e drops unused ensureAlloyJar and gofmts the Java race helper.
 Which test binaries share each cache in the Dagger test job (go test -race ./... as uid ci, one /home/ci/.cache): Java: internal/runtimeclosure (custody_integration_test, java_test) and internal/formal (custody/process tests) - two binaries, the observed race. Formal jars: only internal/formal (custody_integration_test clears TLA_TOOLS_JAR/ALLOY_TOOLS_JAR and fetches into the real cache); in-process fetches were already serialized. Structurizr: only cmd/machinery, whose TestMain sandboxes HOME/XDG_CACHE_HOME per process, so nothing shares it today. The integration lane provisions Java under its own HOME/XDG_CACHE_HOME.
+Released in v0.10.1 (4bb85b78): Java runtime, formal jars and Structurizr each lock beside the target.
 
 ## History
 
