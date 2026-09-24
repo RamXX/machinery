@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:72f75c979bf1dd0855b448c636a4239bba266302ae9213c6089c5215935859a9"
+updated_at: 2026-09-24T21:33:45Z
+content_hash: "sha256:8c876fcba90ef5afa7dfb7abc3625191654526069fef6964761535d0baf71a0e"
 blocked_by: [MAC-pe9v]
 blocks: [MAC-rau8, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-lnu6, MAC-p9z1]
@@ -87,7 +87,7 @@ status: new
 
 
 ## Notes
-
+Triage 2026-09-24: suite.go changed 9 times since 09-07; refresh interface text.
 
 ## History
 - 2026-09-06T09:10:08Z dep_added: blocked_by MAC-p9z1
