@@ -1,14 +1,16 @@
 ---
 id: MAC-1jhn
 title: "assuranceflow: a reader of ledger/heads sees a publisher's in-flight .publish-<nonce> entry and fails INVALID_SCHEMA"
-status: open
+status: closed
 priority: 2
 type: bug
 labels: [flaky-under-load, assuranceflow, tdd-store, concurrency]
 created_at: 2026-09-10T07:34:53Z
 created_by: ramirosalas
-updated_at: 2026-09-10T07:34:53Z
-content_hash: "sha256:b701470809e2a6e64ae206c656500d109e9c254dd1cdd95522361e1e5c0018c4"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:9b7b3b98bd0ca2078504206c4b4d531f87a3becb65cdc33c3a879c0d1e73a248"
+closed_at: 2026-09-24T21:31:55Z
+close_reason: "Fixed by e2db8e49 in 0.8.0 (reserved .publish-<nonce> predicate in internal/tdd/store.go, option 1 of the AC). Triage 2026-09-24."
 ---
 
 ## Description
@@ -111,7 +113,7 @@ isolated `-count=N`, because the window needs another writer publishing while a 
 
 
 ## History
-
+- 2026-09-24T21:31:55Z status: open -> closed
 
 ## Links
 
