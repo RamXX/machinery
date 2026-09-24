@@ -2,13 +2,13 @@
 id: MAC-rau8
 title: "Seal verification only after the complete native lifecycle"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:22:41Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:dd97b19e34759b01aad55f6069cfacb2d587aa0655533767ed497f8920f316b9"
 blocked_by: [MAC-sqpt, MAC-wbxq]
 blocks: [MAC-u4oo, MAC-vx24, MAC-ou97]
