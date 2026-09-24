@@ -1,14 +1,16 @@
 ---
 id: MAC-yoxb
 title: "formal: pinned Java provisioning races itself when several packages cold-start one cache in the Dagger test job"
-status: open
+status: closed
 priority: 2
 type: bug
 labels: [formal, runtimeclosure, flaky-under-load, dagger, ci]
 created_at: 2026-09-23T08:39:54Z
 created_by: ramirosalas
-updated_at: 2026-09-24T05:13:12Z
-content_hash: "sha256:3a110856f290ad27d5291fe57d6950707e84046f84c38eba659429feb77d1cb6"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:508cbecc1b8bd10514a0fe81d430ca1e29f1f8c6e523241f8c55f55fbcb106f9"
+closed_at: 2026-09-24T21:31:55Z
+close_reason: "Released in 0.10.1: 8254e299, 1ec9aaf1, d26de89c, 1b408f73. Triage 2026-09-24."
 ---
 
 ## Description
@@ -36,7 +38,7 @@ Which test binaries share each cache in the Dagger test job (go test -race ./...
 Released in v0.10.1 (4bb85b78): Java runtime, formal jars and Structurizr each lock beside the target.
 
 ## History
-
+- 2026-09-24T21:31:55Z status: open -> closed
 
 ## Links
 
