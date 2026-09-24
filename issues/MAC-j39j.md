@@ -1,14 +1,16 @@
 ---
 id: MAC-j39j
 title: "Gy: event projection treats fan-out rows of one event as duplicate stable ids, so Gy evaluates nothing on H2"
-status: open
+status: closed
 priority: 0
 type: bug
 labels: [consistency-layer, projection, gy, h2, blocks-h2]
 created_at: 2026-09-23T23:56:54Z
 created_by: ramirosalas
-updated_at: 2026-09-24T05:13:12Z
-content_hash: "sha256:1f26e36a7eff438754012daa05740610ca2e53ab8401116a9eab78107bf063cb"
+updated_at: 2026-09-24T21:33:43Z
+content_hash: "sha256:aeee624703a907e3ee3883532ffc5aed57315d4983380f955977c573dae0893a"
+closed_at: 2026-09-24T21:33:43Z
+close_reason: "Released in 0.10.1 (fan-out event edges). Triage 2026-09-24."
 ---
 
 ## Description
@@ -25,7 +27,7 @@ Fixed on release/0.10.1 (event edges, payload binding, per-row degradation; wiri
 Released in v0.10.1 (4bb85b78).
 
 ## History
-
+- 2026-09-24T21:33:43Z status: open -> closed
 
 ## Links
 
