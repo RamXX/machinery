@@ -2,13 +2,13 @@
 id: MAC-qo6n
 title: "Tier the gate: fast pre-push, heavy evidence in CI and make ci-linux, custody suites in the lane"
 status: open
-priority: 1
+priority: 3
 type: feature
 labels: [release-process, ci, preflight]
 created_at: 2026-09-08T16:36:40Z
 created_by: ramirosalas
-updated_at: 2026-09-09T17:10:39Z
-content_hash: "sha256:7dcb57447db02d91920e2f77ab9c75e4d17fa55aa5b34ad5c695ae5daae5a980"
+updated_at: 2026-09-24T21:33:45Z
+content_hash: "sha256:d7a581f361cd0498abd520eb4dff868f434ec9fefd7fe2d747203b3dd0abb550"
 ---
 
 ## Description
@@ -39,7 +39,7 @@ Six push attempts, each paying the full pre-push gate (about 50 minutes: 20 to 3
 
 
 ## Notes
-
+Triage 2026-09-24: PARTIAL. Items 1-3 and 5 shipped 0ee03664 (0.7.1); non-root sweep 220c2b29 (0.8.0); socket-sharing defect superseded by Dagger nested dockerd. Remaining scope: item 4 only, install/custody suites out of the Dagger Test go test -race sweep into their own lane (CHANGELOG:743).
 
 ## History
 
