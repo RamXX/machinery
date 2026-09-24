@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:16:33Z
-content_hash: "sha256:b01ec80138b1685e09a1bf1b9f865e9c5fe3a1396b17d474d4e56e1bea0b802b"
+updated_at: 2026-09-24T21:33:43Z
+content_hash: "sha256:b94690eb0bfa3dd7fa942167e9c0ee376e159292c3a64f6806759d93b12261d5"
 blocked_by: [MAC-rau8]
 blocks: [MAC-5ft8, MAC-1u2v, MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-2n83, MAC-62s6]
@@ -95,7 +95,7 @@ status: new
 
 
 ## Notes
-
+Triage 2026-09-24: absorbs the only unique remnant of closed MAC-vx24: update consumer guidance (agents/machinery-build-writer.md, SKILL.md, build-md-template) for replayable negative test assurance.
 
 ## History
 - 2026-09-06T09:10:10Z dep_added: blocked_by MAC-rau8
