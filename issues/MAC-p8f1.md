@@ -8,7 +8,8 @@ labels: [consistency-layer, authz, gy-rules, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:20e381bb5a325d30ad161a80a157f94bde3046bdbfae073873385e17982c5135"
+content_hash: "sha256:a95f8ea9253ffa59632a02070dc8eacb552b9a1ad42299afe86b02b674ecbe4f"
+blocks: [MAC-qa6n]
 ---
 
 ## Description
@@ -36,9 +37,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:57Z dep_added: blocks MAC-qa6n
 
 ## Links
-
+- Blocks: [[MAC-qa6n]]
 
 ## Comments

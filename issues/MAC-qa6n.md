@@ -8,7 +8,8 @@ labels: [relational, formal, h2-ask, unapproved-scope, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:9fd18cbc7868783ae57feeb01bd58bef2cffb2732404cf7989c8fbf416e69fc9"
+content_hash: "sha256:d879026d49b961939a7e749aca2c4302475fc6754fd6d43da88ab501c198f654"
+blocked_by: [MAC-p8f1]
 ---
 
 ## Description
@@ -34,9 +35,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:57Z dep_added: blocked_by MAC-p8f1
 
 ## Links
-
+- Blocked by: [[MAC-p8f1]]
 
 ## Comments
