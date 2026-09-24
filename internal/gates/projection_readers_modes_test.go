@@ -217,8 +217,14 @@ func TestFactsEventRowWithEmptyPayloadProjectsNoFields(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(factRows(facts, "event"), " "); got != "nudged|orders paid|orders prosed|orders" {
+	if got := strings.Join(factRows(facts, "event"), " "); got != "nudged paid prosed" {
 		t.Fatalf("every event row projects, empty payload or not: %s", got)
+	}
+	if got := strings.Join(factRows(facts, "event_producer"), " "); got != "nudged|orders paid|orders prosed|orders" {
+		t.Fatalf("producers: %s", got)
+	}
+	if got := strings.Join(factRows(facts, "event_edge_payload_field"), " "); got != "paid|orders->billing|Order.id paid|orders->billing|Order.total" {
+		t.Fatalf("an empty or prose payload cell yields no edge fields: %s", got)
 	}
 	if got := strings.Join(factRows(facts, "event_payload_field"), " "); got != "paid|Order.id paid|Order.total" {
 		t.Fatalf("an empty or prose payload cell yields no fields: %s", got)

@@ -82,7 +82,17 @@ var relationCatalog = []RelationSpec{
 	// group contributes no member row, only this marker.
 	{Name: "unit_declares", Layer: "matrices", Columns: []string{"unit", "group"}},
 
-	{Name: "event", Layer: "events", Columns: []string{"id", "producer"}, Defines: true},
+	// An event is defined once, by name, at the first event-contract row
+	// naming it. Every row is one or more edges: the cross product of its
+	// producer and consumer cells, each with a content-derived id
+	// <event>|<producer>-><consumer> (never a line number), so the same edge
+	// stated twice with one payload collapses, and with two payloads is a
+	// projection problem naming both rows. The payload belongs to the edge;
+	// event_payload_field is its union over the event's edges.
+	{Name: "event", Layer: "events", Columns: []string{"id"}, Defines: true},
+	{Name: "event_edge", Layer: "events", Columns: []string{"edge", "event", "producer", "consumer"}, Defines: true},
+	{Name: "event_edge_payload_field", Layer: "events", Columns: []string{"edge", "field"}},
+	{Name: "event_producer", Layer: "events", Columns: []string{"id", "producer"}},
 	{Name: "event_participant", Layer: "events", Columns: []string{"id", "participant"}},
 	{Name: "event_consumer", Layer: "events", Columns: []string{"id", "consumer"}},
 	{Name: "event_payload_field", Layer: "events", Columns: []string{"id", "field"}},
@@ -97,6 +107,11 @@ var relationCatalog = []RelationSpec{
 	// record. The reason is prose and is not projected; a waiver naming no
 	// reason is no waiver and projects nothing.
 	{Name: "no_machine_waiver", Layer: "c4", Columns: []string{"component"}},
+	// action_owner is the ARCHITECTURE.md action-ownership table (an action
+	// column and an owning-component column): each Entity.action with the
+	// backticked component that owns it. An '(unowned: <reason>)' row
+	// projects nothing.
+	{Name: "action_owner", Layer: "c4", Columns: []string{"action", "component"}},
 
 	{Name: "admission", Layer: "authorization", Columns: []string{"subject", "capability"}, Defines: true},
 	{Name: "no_authorization", Layer: "authorization", Columns: []string{"subject"}, Defines: true},
@@ -245,53 +260,109 @@ func (f *DesignFacts) Layers() []string {
 	return out
 }
 
+// Tuple is one row of a relation as a reader states it, before it is
+// recorded: the relation, the stable id of the element it describes, where it
+// was read, and the values in column order.
+type Tuple struct {
+	Relation string
+	StableID string
+	Source   Source
+	Values   []string
+}
+
 // Add records one tuple. The relation's layer is marked present. An identical
 // tuple is recorded once (the first source wins), because a relation is a set.
 // A defining relation rejects a stable_id already defined in the same layer
 // from a different source, naming both locations.
 func (f *DesignFacts) Add(relation, stableID string, src Source, values ...string) error {
-	spec, ok := relationByName[relation]
+	return f.AddAll([]Tuple{{Relation: relation, StableID: stableID, Source: src, Values: values}})
+}
+
+// AddAll records every tuple or none. Each is held to Add's rules, against the
+// recorded facts and against the earlier tuples of the same batch, and only a
+// batch with no problem is recorded. It is the row transaction of the
+// projection: a source row that cannot be projected leaves no partial facts.
+func (f *DesignFacts) AddAll(tuples []Tuple) error {
+	pending := map[string]Source{}
+	for _, t := range tuples {
+		spec, err := checkTuple(t)
+		if err != nil {
+			return err
+		}
+		if !spec.Defines {
+			continue
+		}
+		key := spec.Layer + "\x00" + t.StableID
+		prior, exists := f.defs[key]
+		if !exists {
+			prior, exists = pending[key]
+		}
+		if exists && prior != t.Source {
+			return fmt.Errorf("duplicate stable id %q: defined at %s and at %s", t.StableID, prior, t.Source)
+		}
+		if !exists {
+			pending[key] = t.Source
+		}
+	}
+	for _, t := range tuples {
+		spec := relationByName[t.Relation]
+		f.layers[spec.Layer] = true
+		if spec.Defines {
+			key := spec.Layer + "\x00" + t.StableID
+			if _, exists := f.defs[key]; !exists {
+				f.defs[key] = t.Source
+			}
+		}
+		key := tupleKey(t.Values)
+		if f.tuples[t.Relation] == nil {
+			f.tuples[t.Relation] = map[string]bool{}
+		}
+		if f.tuples[t.Relation][key] {
+			continue
+		}
+		f.tuples[t.Relation][key] = true
+		f.rows[t.Relation] = append(f.rows[t.Relation], Row{StableID: t.StableID, Source: t.Source, Values: append([]string(nil), t.Values...)})
+	}
+	return nil
+}
+
+// checkTuple holds one tuple to the catalog: a known relation, its arity, a
+// non-empty stable id, a valid source, and symbols a fact can hold.
+func checkTuple(t Tuple) (RelationSpec, error) {
+	spec, ok := relationByName[t.Relation]
 	if !ok {
-		return fmt.Errorf("unknown relation %q", relation)
+		return spec, fmt.Errorf("unknown relation %q", t.Relation)
 	}
-	if len(values) != len(spec.Columns) {
-		return fmt.Errorf("%s: relation %s has %d columns, got %d values", src, relation, len(spec.Columns), len(values))
+	if len(t.Values) != len(spec.Columns) {
+		return spec, fmt.Errorf("%s: relation %s has %d columns, got %d values", t.Source, t.Relation, len(spec.Columns), len(t.Values))
 	}
-	if strings.TrimSpace(stableID) == "" {
-		return fmt.Errorf("%s: relation %s row has an empty stable_id", src, relation)
+	if strings.TrimSpace(t.StableID) == "" {
+		return spec, fmt.Errorf("%s: relation %s row has an empty stable_id", t.Source, t.Relation)
 	}
-	if err := src.validate(); err != nil {
-		return fmt.Errorf("relation %s row %s: %w", relation, stableID, err)
+	if err := t.Source.validate(); err != nil {
+		return spec, fmt.Errorf("relation %s row %s: %w", t.Relation, t.StableID, err)
 	}
-	for i, v := range append([]string{stableID}, values...) {
+	for i, v := range append([]string{t.StableID}, t.Values...) {
 		if !validSymbol(v) {
 			column := "stable_id"
 			if i > 0 {
 				column = spec.Columns[i-1]
 			}
-			return fmt.Errorf("%s: relation %s column %s value %q contains a tab, carriage return or newline, which a fact symbol cannot hold", src, relation, column, v)
+			return spec, fmt.Errorf("%s: relation %s column %s value %q contains a tab, carriage return or newline, which a fact symbol cannot hold", t.Source, t.Relation, column, v)
 		}
 	}
-	f.layers[spec.Layer] = true
-	if spec.Defines {
-		key := spec.Layer + "\x00" + stableID
-		if prior, exists := f.defs[key]; exists && prior != src {
-			return fmt.Errorf("duplicate stable id %q: defined at %s and at %s", stableID, prior, src)
-		}
-		if _, exists := f.defs[key]; !exists {
-			f.defs[key] = src
-		}
+	return spec, nil
+}
+
+// Defined reports whether a defining relation's layer already defines the
+// stable id, from any source. It is false for a non-defining relation.
+func (f *DesignFacts) Defined(relation, stableID string) bool {
+	spec, ok := relationByName[relation]
+	if !ok || !spec.Defines {
+		return false
 	}
-	key := tupleKey(values)
-	if f.tuples[relation] == nil {
-		f.tuples[relation] = map[string]bool{}
-	}
-	if f.tuples[relation][key] {
-		return nil
-	}
-	f.tuples[relation][key] = true
-	f.rows[relation] = append(f.rows[relation], Row{StableID: stableID, Source: src, Values: append([]string(nil), values...)})
-	return nil
+	_, exists := f.defs[spec.Layer+"\x00"+stableID]
+	return exists
 }
 
 // Rows returns a relation's rows sorted column by column (bytewise), a copy.

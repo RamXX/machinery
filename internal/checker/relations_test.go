@@ -299,3 +299,78 @@ func TestV1OnlyManifestNeverSelectsV2(t *testing.T) {
 		t.Fatalf("a v1-only manifest must render the 1.0 bytes whether or not facts are supplied:\n%s", a)
 	}
 }
+
+// An event is defined once by name; each event-contract row is an edge, and
+// the edge, not the event, carries a payload. The per-event sets (producer,
+// consumer, participant, payload field) define nothing, so a fan-out event's
+// second row is never a duplicate definition.
+func TestEventRelationsDefineTheEventOnceAndEachEdge(t *testing.T) {
+	want := map[string]struct {
+		columns string
+		defines bool
+	}{
+		"event":                    {"id", true},
+		"event_edge":               {"edge,event,producer,consumer", true},
+		"event_edge_payload_field": {"edge,field", false},
+		"event_producer":           {"id,producer", false},
+		"event_consumer":           {"id,consumer", false},
+		"event_participant":        {"id,participant", false},
+		"event_payload_field":      {"id,field", false},
+		"action_owner":             {"action,component", false},
+	}
+	seen := map[string]bool{}
+	for _, spec := range RelationCatalog() {
+		w, ok := want[spec.Name]
+		if !ok {
+			continue
+		}
+		seen[spec.Name] = true
+		if got := strings.Join(spec.Columns, ","); got != w.columns || spec.Defines != w.defines {
+			t.Errorf("%s: columns %s defines %v, want %s defines %v", spec.Name, got, spec.Defines, w.columns, w.defines)
+		}
+	}
+	for name := range want {
+		if !seen[name] {
+			t.Errorf("relation %s is not in the catalog", name)
+		}
+	}
+}
+
+// AddAll is the row transaction of the projection: either every tuple of a
+// source row is recorded or none is, so a row that cannot be projected leaves
+// no partial facts behind.
+func TestDesignFactsAddAllRecordsEveryTupleOrNone(t *testing.T) {
+	f := NewDesignFacts()
+	if err := f.Add("state", "state:Order.Paid", src(9), "Order.Paid", "Order", "final"); err != nil {
+		t.Fatal(err)
+	}
+	row := Source{Path: "machines/Other.machine.json", Line: 2}
+	err := f.AddAll([]Tuple{
+		{Relation: "context_key", StableID: "machine:Other", Source: row, Values: []string{"Other", "k"}},
+		{Relation: "state", StableID: "state:Order.Paid", Source: row, Values: []string{"Order.Paid", "Other", "final"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "machines/Order.machine.json:9") {
+		t.Fatalf("a batch holding a duplicate definition must fail naming both sources, got %v", err)
+	}
+	if got := len(f.Rows("context_key")); got != 0 {
+		t.Fatalf("a failed batch must record nothing, got %d context_key rows", got)
+	}
+	if err := f.AddAll([]Tuple{{Relation: "entity", StableID: "entity:X", Source: row, Values: []string{"a\tb"}}}); err == nil {
+		t.Fatal("a batch holding an unholdable value must fail")
+	}
+	if f.HasLayer("model") {
+		t.Fatal("a failed batch must not mark its layer present")
+	}
+	if err := f.AddAll([]Tuple{
+		{Relation: "context_key", StableID: "machine:Other", Source: row, Values: []string{"Other", "k"}},
+		{Relation: "machine", StableID: "machine:Other", Source: row, Values: []string{"Other"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Rows("context_key")) != 1 || len(f.Rows("machine")) != 1 {
+		t.Fatal("a valid batch must record every tuple")
+	}
+	if !f.Defined("machine", "machine:Other") || f.Defined("machine", "machine:Nope") || f.Defined("context_key", "machine:Other") {
+		t.Fatal("Defined reports a stable id a defining relation of the same layer introduced, and nothing else")
+	}
+}

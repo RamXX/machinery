@@ -39,10 +39,26 @@ import (
 // factBuilder accumulates the facts of one design and every problem found
 // reading them. Problems are collected rather than returned at the first one,
 // so a single run names every unprojectable declaration.
+//
+// The unit of omission is the source row: the tuples one table row (or one
+// machine file, one milestone, one slice) states are recorded together, and a
+// problem anywhere in the row omits all of them (see row). A problem outside
+// any row (an unreadable file, a malformed YAML document) omits what that
+// source would have stated.
 type factBuilder struct {
 	design string
 	facts  *checker.DesignFacts
 	errs   []string
+	// modelFindings are statements about the model the facts cannot carry
+	// and that omit nothing: parallel relationships between one entity pair
+	// that share an id because neither is named.
+	modelFindings []string
+	// pending is the open source row, nil outside one.
+	pending *pendingRow
+	// edges is every event edge recorded so far, with the payload its first
+	// row stated, so a restated edge collapses and a contradicting one is a
+	// problem naming both rows.
+	edges map[string]edgeStatement
 	// oracleRows is the committed oracle corpus, shared by the oracles and
 	// milestones layers.
 	oracleRows []projectedOracleRow
@@ -53,16 +69,39 @@ type projectedOracleRow struct {
 	line                           int
 }
 
-// LoadDesignFacts reads every fact layer the design has. It fails when the
-// design cannot be projected: an unreadable or malformed source, a malformed
-// declaration group, a duplicate stable id (both sources named), or a value a
-// fact symbol cannot hold.
-func LoadDesignFacts(design string) (*checker.DesignFacts, error) {
+// pendingRow is one source row's tuples, held until the row ends.
+type pendingRow struct {
+	tuples []checker.Tuple
+	failed bool
+	commit []func()
+}
+
+// edgeStatement is the first row stating an event edge and its payload: the
+// sorted closed field set, or nil when the cell states none.
+type edgeStatement struct {
+	source  checker.Source
+	payload []string
+}
+
+// factsReport is a design's facts as far as they could be projected: the
+// facts, every problem that omitted some of them (each names its source), and
+// the model findings, which omit nothing.
+type factsReport struct {
+	facts         *checker.DesignFacts
+	problems      []string
+	modelFindings []string
+}
+
+// projectDesignFacts reads every fact layer the design has, degrading per
+// row: a row that cannot be projected is reported and its facts are omitted,
+// and everything else is still read. It fails only when the design path
+// cannot be resolved.
+func projectDesignFacts(design string) (*factsReport, error) {
 	abs, err := filepath.Abs(design)
 	if err != nil {
 		return nil, err
 	}
-	b := &factBuilder{design: abs, facts: checker.NewDesignFacts()}
+	b := &factBuilder{design: abs, facts: checker.NewDesignFacts(), edges: map[string]edgeStatement{}}
 	b.model()
 	b.oracles()
 	b.machines()
@@ -72,14 +111,33 @@ func LoadDesignFacts(design string) (*checker.DesignFacts, error) {
 	b.workspace()
 	b.authorization()
 	b.milestones()
-	if len(b.errs) > 0 {
-		return nil, errors.New(strings.Join(b.errs, "; "))
-	}
-	return b.facts, nil
+	return &factsReport{facts: b.facts, problems: b.errs, modelFindings: b.modelFindings}, nil
 }
 
+// LoadDesignFacts reads every fact layer the design has. It fails when the
+// design cannot be projected whole: an unreadable or malformed source, a
+// malformed declaration group, an event edge stated with two payloads, a
+// duplicate stable id (both sources named), or a value a fact symbol cannot
+// hold. `machinery project` and the checker projections use it, so their
+// output is never partial; Gy-rules uses projectDesignFacts and degrades per
+// row instead.
+func LoadDesignFacts(design string) (*checker.DesignFacts, error) {
+	rep, err := projectDesignFacts(design)
+	if err != nil {
+		return nil, err
+	}
+	if len(rep.problems) > 0 {
+		return nil, errors.New(strings.Join(rep.problems, "; "))
+	}
+	return rep.facts, nil
+}
+
+// fail records a problem. Inside a row it also omits the row.
 func (b *factBuilder) fail(format string, args ...any) {
 	b.errs = append(b.errs, fmt.Sprintf(format, args...))
+	if b.pending != nil {
+		b.pending.failed = true
+	}
 }
 
 func (b *factBuilder) mark(layer string) {
@@ -88,12 +146,51 @@ func (b *factBuilder) mark(layer string) {
 	}
 }
 
-// add records one tuple located at rel:line.
+// add records one tuple located at rel:line: at once outside a row, and with
+// the rest of the row inside one.
 func (b *factBuilder) add(rel string, line int, relation, stableID string, values ...string) {
 	src := checker.Source{Path: checker.PortableSourcePath(rel), Line: line}
+	if b.pending != nil {
+		b.pending.tuples = append(b.pending.tuples, checker.Tuple{Relation: relation, StableID: stableID, Source: src, Values: values})
+		return
+	}
 	if err := b.facts.Add(relation, stableID, src, values...); err != nil {
 		b.fail("%s", err.Error())
 	}
+}
+
+// row reads one source row: every tuple fn adds is recorded together when fn
+// reports no problem and the facts accept all of them, and none is recorded
+// otherwise; the functions fn registers with onCommit run only when the row
+// is recorded. A row opened inside a row joins it.
+func (b *factBuilder) row(fn func()) {
+	if b.pending != nil {
+		fn()
+		return
+	}
+	b.pending = &pendingRow{}
+	fn()
+	p := b.pending
+	b.pending = nil
+	if p.failed {
+		return
+	}
+	if err := b.facts.AddAll(p.tuples); err != nil {
+		b.fail("%s", err.Error())
+		return
+	}
+	for _, f := range p.commit {
+		f()
+	}
+}
+
+// onCommit runs fn once the open row is recorded, or at once outside a row.
+func (b *factBuilder) onCommit(fn func()) {
+	if b.pending != nil {
+		b.pending.commit = append(b.pending.commit, fn)
+		return
+	}
+	fn()
 }
 
 // exists reports whether a design-relative regular file is present.
@@ -231,6 +328,7 @@ func (b *factBuilder) model() {
 		b.fail("%s: declares no entities", rel)
 		return
 	}
+	relationshipAt := map[string]int{}
 	for i := 0; i+1 < len(entities.Content); i += 2 {
 		name, line, body := entities.Content[i].Value, entities.Content[i].Line, entities.Content[i+1]
 		if !need(line, "entity name", name) {
@@ -269,6 +367,15 @@ func (b *factBuilder) model() {
 			if role != "" {
 				id += ":" + role
 			}
+			if first, seen := relationshipAt[id]; seen {
+				// Parallel relationships the model leaves unnamed: the same
+				// tuple, so the relation holds one, and the model is asked
+				// to tell them apart. Nothing is omitted.
+				b.modelFindings = append(b.modelFindings, fmt.Sprintf("%s:%d: relationship %s is declared again with no distinguishing role or name (first at %s:%d); the facts hold one relationship for both, so give each a role: (or name:) to tell them apart",
+					rel, rv.Line, ir.Repr(id), rel, first))
+				continue
+			}
+			relationshipAt[id] = rv.Line
 			b.add(rel, rv.Line, "relationship", "rel:"+id, id, name, to, card)
 		}
 		for _, av := range yamlItems(yamlMap(body, "actions")) {
@@ -563,36 +670,61 @@ func (b *factBuilder) matrices() {
 			machine = matrix
 		}
 		decls, derrs := ParseMatrixDeclarations(rel, []byte(text))
-		for _, e := range derrs {
-			b.fail("%s", e.String())
-		}
 		byLine := map[int][]Declaration{}
 		for _, d := range decls {
 			byLine[d.Line] = append(byLine[d.Line], d)
 		}
+		errsByLine := map[int][]DeclarationError{}
+		for _, e := range derrs {
+			errsByLine[e.Line] = append(errsByLine[e.Line], e)
+		}
 		for _, r := range walkTableRows(text) {
-			mr := matrixRow{rel: rel, matrix: matrix, row: r, decls: byLine[r.line]}
-			if ni, ki, _, ok := namedUnitCols(r.header); ok {
-				kind := strings.ToLower(ir.CleanCell(cellAt(r.cells, ki)))
-				for _, name := range unitNames(cellAt(r.cells, ni)) {
-					if !unitNameShape.MatchString(name) {
-						b.fail("%s:%d: unit name %q is not an identifier", rel, r.line, name)
-						continue
-					}
-					id := matrix + "." + name
-					b.add(rel, r.line, "unit", "unit:"+id, id, machine, name, kind)
-					mr.subjects = append(mr.subjects, id)
-					mr.unitNames = append(mr.unitNames, name)
-					mr.stableIDs = append(mr.stableIDs, "unit:"+id)
+			b.row(func() {
+				// a malformed group omits its whole row, the unit included
+				for _, e := range errsByLine[r.line] {
+					b.fail("%s", e.String())
 				}
-			} else {
-				mr.subjects = []string{matrix}
-				mr.unitNames = []string{""}
-				mr.stableIDs = []string{"matrix:" + matrix}
+				delete(errsByLine, r.line)
+				b.matrixRow(matrixRow{rel: rel, matrix: matrix, row: r, decls: byLine[r.line]}, machine)
+			})
+		}
+		// a declaration error on no table row the walk saw still fails
+		lines := make([]int, 0, len(errsByLine))
+		for line := range errsByLine {
+			lines = append(lines, line)
+		}
+		sort.Ints(lines)
+		for _, line := range lines {
+			for _, e := range errsByLine[line] {
+				b.fail("%s", e.String())
 			}
-			b.matrixRowFacts(mr)
 		}
 	}
+}
+
+// matrixRow projects one matrix table row: the units a named-unit row
+// declares, then the declaration groups on it (matrixRowFacts).
+func (b *factBuilder) matrixRow(mr matrixRow, machine string) {
+	r := mr.row
+	if ni, ki, _, ok := namedUnitCols(r.header); ok {
+		kind := strings.ToLower(ir.CleanCell(cellAt(r.cells, ki)))
+		for _, name := range unitNames(cellAt(r.cells, ni)) {
+			if !unitNameShape.MatchString(name) {
+				b.fail("%s:%d: unit name %q is not an identifier", mr.rel, r.line, name)
+				continue
+			}
+			id := mr.matrix + "." + name
+			b.add(mr.rel, r.line, "unit", "unit:"+id, id, machine, name, kind)
+			mr.subjects = append(mr.subjects, id)
+			mr.unitNames = append(mr.unitNames, name)
+			mr.stableIDs = append(mr.stableIDs, "unit:"+id)
+		}
+	} else {
+		mr.subjects = []string{mr.matrix}
+		mr.unitNames = []string{""}
+		mr.stableIDs = []string{"matrix:" + mr.matrix}
+	}
+	b.matrixRowFacts(mr)
 }
 
 // matrixRowFacts projects the declaration groups on one matrix row into the
@@ -817,7 +949,45 @@ func (b *factBuilder) architecture() {
 	b.events(rel, text)
 	b.contract(rel, text)
 	b.placementWaivers(rel, text)
+	b.actionOwners(rel, text)
 	b.supersession(rel, text)
+}
+
+// actionOwners projects the action-ownership table (ownershipTables, the
+// table G2's ownership check holds): action_owner(action, component) for
+// every Entity.action of a row and every backticked component its owner cell
+// names outside a parenthetical. An '(unowned: <reason>)' row owns nothing.
+// As everywhere in the projection, the table is projected as stated; whether
+// an owner resolves and ownership is singular is G2's question.
+func (b *factBuilder) actionOwners(rel, text string) {
+	for _, r := range walkTableRows(text) {
+		ai := colContaining(r.header, "action")
+		oi := colContaining(r.header, "owning component")
+		if oi < 0 {
+			oi = colContaining(r.header, "owner")
+		}
+		if ai < 0 || oi < 0 || ai == oi {
+			continue
+		}
+		b.mark("c4")
+		owner := cellAt(r.cells, oi)
+		if unownedWaiverRe.MatchString(owner) {
+			continue
+		}
+		var acts []string
+		for _, seg := range strings.Split(strings.ReplaceAll(cellAt(r.cells, ai), "`", " "), ",") {
+			if seg = strings.TrimSpace(seg); ownershipActRe.MatchString(seg) {
+				acts = append(acts, seg)
+			}
+		}
+		b.row(func() {
+			for _, m := range mitTokRe.FindAllStringSubmatch(parenAnnotationRe.ReplaceAllString(owner, " "), -1) {
+				for _, act := range acts {
+					b.add(rel, r.line, "action_owner", "action:"+act, act, m[1])
+				}
+			}
+		})
+	}
 }
 
 // placementWaivers projects each '(no machine: <reason>)' placement waiver
@@ -833,6 +1003,14 @@ func (b *factBuilder) placementWaivers(rel, text string) {
 	}
 }
 
+// events projects the event-contract tables. The table is one row per
+// producer-consumer edge, so one event may span many rows: the event is
+// defined once, at the first row naming it, and each row states the edges of
+// its producer and consumer cells (their cross product; an empty cell is one
+// empty participant, so the row's payload is still stated), each with the
+// row's payload. An edge restated with the same payload collapses; restated
+// with another payload it is a problem naming both rows, and the second row
+// is omitted.
 func (b *factBuilder) events(rel, text string) {
 	for _, r := range walkTableRows(text) {
 		hl := strings.ToLower(strings.Join(r.header, " "))
@@ -850,24 +1028,61 @@ func (b *factBuilder) events(rel, text string) {
 		if why != "" {
 			fields = nil // a payload cell stating no closed field set is prose, not facts
 		}
-		for _, ev := range eventNamesOf(cellAt(r.cells, ei)) {
-			sid := "event:" + ev
-			if len(producers) == 0 {
-				b.add(rel, r.line, "event", sid, ev, "")
-			}
-			for _, p := range producers {
-				b.add(rel, r.line, "event", sid, ev, p)
-				b.add(rel, r.line, "event_participant", sid, ev, p)
-			}
-			for _, c := range consumers {
-				b.add(rel, r.line, "event_consumer", sid, ev, c)
-				b.add(rel, r.line, "event_participant", sid, ev, c)
-			}
-			for _, f := range fields {
-				b.add(rel, r.line, "event_payload_field", sid, ev, f)
+		b.row(func() { b.eventRow(rel, r.line, eventNamesOf(cellAt(r.cells, ei)), producers, consumers, fields) })
+	}
+}
+
+// eventRow projects one event-contract row inside its row transaction.
+func (b *factBuilder) eventRow(rel string, line int, events, producers, consumers, fields []string) {
+	src := checker.Source{Path: checker.PortableSourcePath(rel), Line: line}
+	edgeProducers, edgeConsumers := producers, consumers
+	if len(edgeProducers) == 0 {
+		edgeProducers = []string{""}
+	}
+	if len(edgeConsumers) == 0 {
+		edgeConsumers = []string{""}
+	}
+	for _, ev := range events {
+		sid := "event:" + ev
+		if !b.facts.Defined("event", sid) {
+			b.add(rel, line, "event", sid, ev)
+		}
+		for _, p := range producers {
+			b.add(rel, line, "event_producer", sid, ev, p)
+			b.add(rel, line, "event_participant", sid, ev, p)
+		}
+		for _, c := range consumers {
+			b.add(rel, line, "event_consumer", sid, ev, c)
+			b.add(rel, line, "event_participant", sid, ev, c)
+		}
+		for _, p := range edgeProducers {
+			for _, c := range edgeConsumers {
+				edge := ev + "|" + p + "->" + c
+				if prior, seen := b.edges[edge]; seen {
+					if strings.Join(prior.payload, ",") != strings.Join(fields, ",") {
+						b.fail("%s: event edge %s is stated again with another payload (%s here, %s at %s); one edge has one payload, so make the rows agree",
+							src, ir.Repr(edge), payloadText(fields), payloadText(prior.payload), prior.source)
+					}
+					continue // restated with the same payload: the same edge
+				}
+				esid := "edge:" + edge
+				b.add(rel, line, "event_edge", esid, edge, ev, p, c)
+				for _, f := range fields {
+					b.add(rel, line, "event_edge_payload_field", esid, edge, f)
+					b.add(rel, line, "event_payload_field", sid, ev, f)
+				}
+				b.onCommit(func() { b.edges[edge] = edgeStatement{source: src, payload: fields} })
 			}
 		}
 	}
+}
+
+// payloadText renders an edge payload for a message.
+func payloadText(fields []string) string {
+	if len(fields) == 0 {
+		return "no closed field set"
+	}
+	return "{" + strings.Join(fields, ", ") + "}"
 }
 
 // contract projects the Architecture Contract fence: boundaries and

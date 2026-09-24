@@ -368,26 +368,52 @@ func CheckRulesImpl(design, impl string, explain bool) *Gate {
 		g.Errs = append(g.Errs, "the shipped consistency rules do not load: "+err.Error())
 		return g
 	}
-	facts, err := LoadDesignFacts(design)
+	rep, err := projectDesignFacts(design)
 	if err != nil {
 		g.Errs = append(g.Errs, "cannot project the design's facts for the consistency rules: "+err.Error())
 		return g
 	}
+	// Per-row degradation: each problem is an ERROR naming its row, whose
+	// facts are omitted, and the rules run on everything else. The gate
+	// stays red while any problem exists, and every finding printed beside
+	// one is marked, because it may follow from an omitted row.
+	for _, p := range rep.problems {
+		g.Errs = append(g.Errs, projectionErrorPrefix+p)
+	}
+	g.Errs = append(g.Errs, rep.modelFindings...)
+	facts := rep.facts
 	if impl != "" {
 		for _, p := range AddImplBindings(facts, design, impl) {
 			g.Errs = append(g.Errs, "cannot read the implementation's oracle bindings for the consistency rules: "+p)
 		}
 	}
-	checkRulesOver(g, set, facts, explain)
+	checkRulesOver(g, set, facts, explain, len(rep.problems))
 	return g
 }
 
-func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain bool) {
+// projectionErrorPrefix opens the ERROR of a row Gy-rules could not project.
+const projectionErrorPrefix = "projection error, the row's facts are omitted and the rules ran on the rest: "
+
+// partialProjectionNote is appended to every finding printed while n
+// projection errors omitted facts: a rule sees only what was projected, so a
+// finding can be a consequence of an omitted row (a unit whose row was
+// omitted is missing from every join), not a defect of its own.
+func partialProjectionNote(n int) string {
+	return fmt.Sprintf(" [projection partial: %d projection error(s) omitted facts, so this finding may follow from an omitted row]", n)
+}
+
+func checkRulesOver(g *Gate, set *ruleSet, facts *checker.DesignFacts, explain bool, omitted int) {
 	findings, errs := evaluateRules(set, facts)
 	g.Errs = append(g.Errs, errs...)
 	sources := indexFactSources(facts)
+	if omitted > 0 {
+		g.Notes = append(g.Notes, fmt.Sprintf("projection partial: %d projection error(s) omitted facts; the rules ran on the rest and every finding is marked", omitted))
+	}
 	for _, f := range findings {
 		msg := sources.message(f)
+		if omitted > 0 {
+			msg += partialProjectionNote(omitted)
+		}
 		if f.output.warn {
 			g.Warns = append(g.Warns, msg)
 		} else {

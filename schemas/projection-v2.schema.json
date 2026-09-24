@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/RamXX/machinery/schemas/projection-v2.schema.json",
   "title": "Machinery design projection 2.0 (machinery -> checker)",
-  "description": "The 2.0 projection contract, emitted when a checker manifest includes any layer beyond model, invariants and relationships; a v1-only manifest keeps the 1.0 contract of projection.schema.json byte for byte. 2.0 is a superset of 1.0: the model object keeps its 1.0 shape and is present exactly when a v1 layer is included, and layers carries every included layer as relations, one array of rows per relation, present even when empty. Every row carries the stable_id of the element it describes and the design-relative source (forward slashes, 1-based line) it was read from. Every other value is an identifier or an enumerated value, never free prose, and holds no tab, carriage return or newline, so the same rows render as the fact files of machinery project --facts. Rows of a defining relation (entity, attr, enum_member, invariant, action, relationship, machine, state, transition, matrix, unit, event, c4_element, boundary, admission, no_authorization, oracle_row, milestone) that share a stable_id share one source. generated and machinery_version are excluded from the evidence input hash; all other fields bind the verdict.",
+  "description": "The 2.0 projection contract, emitted when a checker manifest includes any layer beyond model, invariants and relationships; a v1-only manifest keeps the 1.0 contract of projection.schema.json byte for byte. 2.0 is a superset of 1.0: the model object keeps its 1.0 shape and is present exactly when a v1 layer is included, and layers carries every included layer as relations, one array of rows per relation, present even when empty. Every row carries the stable_id of the element it describes and the design-relative source (forward slashes, 1-based line) it was read from. Every other value is an identifier or an enumerated value, never free prose, and holds no tab, carriage return or newline, so the same rows render as the fact files of machinery project --facts. Rows of a defining relation (entity, attr, enum_member, invariant, action, relationship, machine, state, transition, matrix, unit, event, event_edge, c4_element, boundary, admission, no_authorization, oracle_row, milestone) that share a stable_id share one source. generated and machinery_version are excluded from the evidence input hash; all other fields bind the verdict.",
   "type": "object",
   "required": [
     "projection_schema",
@@ -914,6 +914,9 @@
           "type": "object",
           "required": [
             "event",
+            "event_edge",
+            "event_edge_payload_field",
+            "event_producer",
             "event_participant",
             "event_consumer",
             "event_payload_field"
@@ -921,6 +924,91 @@
           "additionalProperties": false,
           "properties": {
             "event": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "id"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "event_edge": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "edge",
+                  "event",
+                  "producer",
+                  "consumer"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "edge": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "event": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "producer": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "consumer": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "event_edge_payload_field": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "edge",
+                  "field"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "edge": {
+                    "$ref": "#/$defs/symbol"
+                  },
+                  "field": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "event_producer": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -1038,7 +1126,8 @@
             "boundary",
             "allowed_edge",
             "reads_row",
-            "no_machine_waiver"
+            "no_machine_waiver",
+            "action_owner"
           ],
           "additionalProperties": false,
           "properties": {
@@ -1201,6 +1290,33 @@
                   },
                   "source": {
                     "$ref": "#/$defs/source"
+                  },
+                  "component": {
+                    "$ref": "#/$defs/symbol"
+                  }
+                }
+              }
+            },
+            "action_owner": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "stable_id",
+                  "source",
+                  "action",
+                  "component"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "stable_id": {
+                    "$ref": "#/$defs/stableId"
+                  },
+                  "source": {
+                    "$ref": "#/$defs/source"
+                  },
+                  "action": {
+                    "$ref": "#/$defs/symbol"
                   },
                   "component": {
                     "$ref": "#/$defs/symbol"
