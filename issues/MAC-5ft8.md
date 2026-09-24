@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:86d60c6279716347f7c022a7353108aceedcd8ef90cec0c0e16749f13b66fa16"
+updated_at: 2026-09-24T21:33:45Z
+content_hash: "sha256:7b068b5b2ddbc2df547aa79d5a5a25dd6736a82b014534ea3130b712ff2c78c5"
 blocked_by: [MAC-u4oo]
 blocks: [MAC-al5u, MAC-vx24, MAC-ou97]
 ---
@@ -95,7 +95,7 @@ status: new
 
 
 ## Notes
-
+Triage 2026-09-24: NEEDS-REWRITE. go-crm changed since 09-06 (slices, Gy/Gl, acceptance); obligation inventory is stale.
 
 ## History
 - 2026-09-06T09:10:12Z dep_added: blocked_by MAC-u4oo
