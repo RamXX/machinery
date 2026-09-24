@@ -138,6 +138,18 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "unknown declaration group OWNED-BY{...}", ExpectExit: true},
 	{Name: "undeclared-fact-reference", Tool: "check", Mutation: "a contract cell quotes `Widget.status` outside any group",
 		ExpectSubstr: "undeclared fact reference `Widget.status`", ExpectExit: false},
+	// 2026-09-24, 0.10.1: a design's own group notation is declared in the
+	// contract's private_groups: list and skipped. The declaration cannot
+	// switch off a public group, and a misspelled public group beside a
+	// declared private one is still an unknown group. A backticked token that
+	// names nothing the design declares is a softer Gl warning than one naming
+	// a model attribute; actions, units, enum values and files never warn.
+	{Name: "private-group-names-public-group", Tool: "check", Mutation: "private_groups: [WRITES] in the Architecture Contract",
+		ExpectSubstr: "private_groups[0] 'WRITES' is a public machinery group", ExpectExit: true},
+	{Name: "misspelled-group-beside-private", Tool: "check", Mutation: "private_groups: [OWNED-BY] and a WRITE{} group in a contract cell",
+		ExpectSubstr: "unknown declaration group WRITE{...}", ExpectExit: true},
+	{Name: "unresolved-backticked-token", Tool: "check", Mutation: "a contract cell quotes `retry_budget`, which names nothing the design declares",
+		ExpectSubstr: "`retry_budget` is not a declared fact, action, unit or value", ExpectExit: false},
 	// 2026-09-22, consistency layer Stage 3: the shipped Datalog rules of
 	// Gy-rules. Since Stage 4 every finding_ relation is an ERROR, so each
 	// of these exits nonzero.

@@ -16,7 +16,8 @@ import (
 
 func init() {
 	RegisterRunner("declarations_test.go",
-		"malformed-writes-declaration", "unknown-declaration-group", "undeclared-fact-reference")
+		"malformed-writes-declaration", "unknown-declaration-group", "undeclared-fact-reference",
+		"private-group-names-public-group", "misspelled-group-beside-private", "unresolved-backticked-token")
 }
 
 func experimentNamed(t *testing.T, name string) Experiment {
@@ -84,6 +85,70 @@ func TestUndeclaredFactReferenceIsWarning(t *testing.T) {
 	for _, w := range gates.CheckLedger(near).Warns {
 		if strings.Contains(w, "undeclared fact reference") {
 			t.Fatalf("a fact the row declares is not undeclared: %s", w)
+		}
+	}
+}
+
+// declarePrivateGroups adds a private_groups: list to the fixture's contract.
+func declarePrivateGroups(t *testing.T, design, list string) {
+	t.Helper()
+	editFile(t, filepath.Join(design, "ARCHITECTURE.md"), "contract_version: 2\n", "contract_version: 2\nprivate_groups: "+list+"\n")
+}
+
+func TestPrivateGroupNamingPublicGroupIsError(t *testing.T) {
+	e := experimentNamed(t, "private-group-names-public-group")
+	design, _ := fixture(t)
+	declarePrivateGroups(t, design, "[WRITES]")
+	if g := gates.CheckC4(design); !containsAny(g.Errs, e.ExpectSubstr) {
+		t.Fatalf("%s escaped G2: %v", e.Name, g.Errs)
+	}
+
+	near, _ := fixture(t)
+	declarePrivateGroups(t, near, "[OWNED-BY]")
+	mutateSaveWidgetContract(t, near, "atomic persist. OWNED-BY{Widget.status} CARRIES{column:Widget.status}")
+	if g := gates.CheckC4(near); containsAny(g.Errs, "private_groups") {
+		t.Fatalf("a valid private_groups list must pass G2: %v", g.Errs)
+	}
+	g := gates.CheckTraceability(near)
+	if len(g.Errs) != 0 || g.Counts["private declaration groups skipped"] != 1 {
+		t.Fatalf("a declared private group must be skipped, visibly: errs=%v counts=%v", g.Errs, g.Counts)
+	}
+}
+
+func TestMisspelledGroupBesidePrivateIsError(t *testing.T) {
+	e := experimentNamed(t, "misspelled-group-beside-private")
+	design, _ := fixture(t)
+	declarePrivateGroups(t, design, "[OWNED-BY]")
+	mutateSaveWidgetContract(t, design, "atomic persist. OWNED-BY{Widget.status} WRITE{Widget.status}")
+	if g := gates.CheckTraceability(design); !containsAny(g.Errs, e.ExpectSubstr) {
+		t.Fatalf("%s escaped Gx: %v", e.Name, g.Errs)
+	}
+
+	near, _ := fixture(t)
+	declarePrivateGroups(t, near, "[OWNED-BY]")
+	mutateSaveWidgetContract(t, near, "atomic persist. OWNED-BY{Widget.status} WRITES{Widget.status} CARRIES{column:Widget.status}")
+	if g := gates.CheckTraceability(near); len(g.Errs) != 0 {
+		t.Fatalf("a declared private group beside a public one must parse clean: %v", g.Errs)
+	}
+}
+
+func TestUnresolvedBacktickedTokenIsSofterWarning(t *testing.T) {
+	e := experimentNamed(t, "unresolved-backticked-token")
+	design, _ := fixture(t)
+	mutateSaveWidgetContract(t, design, "atomic persist within `retry_budget`")
+	g := gates.CheckLedger(design)
+	if !containsAny(g.Warns, e.ExpectSubstr) {
+		t.Fatalf("%s escaped Gl: %v", e.Name, g.Warns)
+	}
+	if containsAny(g.Warns, "undeclared fact reference `retry_budget`") {
+		t.Fatalf("a token naming no model attribute must not get the attribute wording: %v", g.Warns)
+	}
+
+	for _, quoted := range []string{"`Widget.publish`", "`Widget.saveWidget`", "`ARCHITECTURE.md`"} {
+		near, _ := fixture(t)
+		mutateSaveWidgetContract(t, near, "atomic persist, see "+quoted)
+		if w := gates.CheckLedger(near).Warns; len(w) != 0 {
+			t.Fatalf("%s names an action, a unit or a file and must not warn: %v", quoted, w)
 		}
 	}
 }
