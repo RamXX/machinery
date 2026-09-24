@@ -2,13 +2,13 @@
 id: MAC-5ft8
 title: "Migrate Go CRM to prospective strict assurance"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-06T09:48:03Z
+updated_at: 2026-09-24T21:33:44Z
 content_hash: "sha256:86d60c6279716347f7c022a7353108aceedcd8ef90cec0c0e16749f13b66fa16"
 blocked_by: [MAC-u4oo]
 blocks: [MAC-al5u, MAC-vx24, MAC-ou97]
