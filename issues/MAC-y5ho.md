@@ -2,13 +2,13 @@
 id: MAC-y5ho
 title: "assuranceflow: writer.lock mkdir returns EINVAL under host load in TestRegisterConflictingWriters"
 status: open
-priority: 2
+priority: 3
 type: bug
 labels: [flaky-under-load, assuranceflow]
 created_at: 2026-09-08T08:21:09Z
 created_by: ramirosalas
-updated_at: 2026-09-10T07:35:14Z
-content_hash: "sha256:2716b499ea79ecaa6d6089a35a65805b0f1c253d1a4a39b23ea67b2750608047"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:f6de2cdd335c78db038463b083972cda3189f25dcdd5736b4ae7e406e2a9108b"
 ---
 
 ## Description
@@ -36,7 +36,7 @@ Reproduce under load (run the package with -count=20 while another race sweep ru
 
 
 ## Notes
-
+Triage 2026-09-24: still valid, unexplained. EINVAL maps to CUSTODY_ERROR at internal/tdd/registration_store.go:568-570; 65183fc1 predates the sighting so did not fix it. One darwin-local sighting since 09-08. Re-measure on the quiet lane MAC-qo6n defines.
 
 ## History
 
