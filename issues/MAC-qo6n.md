@@ -8,8 +8,8 @@ labels: [release-process, ci, preflight]
 created_at: 2026-09-08T16:36:40Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:2e4900ee3004065b49c0a83084ab9d37b6fd1edeae5ee8187842676d599b7a5a"
-related: [MAC-2k07, MAC-awrq]
+content_hash: "sha256:5875234513c0d1fda224311e3daafabb90b17735dea25bc45efd3b41d7ddcb5c"
+related: [MAC-2k07, MAC-awrq, MAC-y5ho]
 ---
 
 ## Description
@@ -46,7 +46,7 @@ Triage 2026-09-24: PARTIAL. Items 1-3 and 5 shipped 0ee03664 (0.7.1); non-root s
 
 
 ## Links
-- Related: [[MAC-2k07]], [[MAC-awrq]]
+- Related: [[MAC-2k07]], [[MAC-awrq]], [[MAC-y5ho]]
 
 ## Comments
 

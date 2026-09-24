@@ -8,7 +8,8 @@ labels: [flaky-under-load, assuranceflow]
 created_at: 2026-09-08T08:21:09Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:31:55Z
-content_hash: "sha256:f6de2cdd335c78db038463b083972cda3189f25dcdd5736b4ae7e406e2a9108b"
+content_hash: "sha256:389054b6942a8b9cb7237745b3ebf0619d8fd89e9951a85c0ced38d47687cdca"
+related: [MAC-qo6n]
 ---
 
 ## Description
@@ -42,7 +43,7 @@ Triage 2026-09-24: still valid, unexplained. EINVAL maps to CUSTODY_ERROR at int
 
 
 ## Links
-
+- Related: [[MAC-qo6n]]
 
 ## Comments
 
