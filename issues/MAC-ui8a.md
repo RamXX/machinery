@@ -6,8 +6,8 @@ priority: 2
 type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:5b4473951430887d6c2dc695fdc8fe044bd2d29dc56a7c5f36a4c2814408fd92"
+updated_at: 2026-09-24T21:33:45Z
+content_hash: "sha256:7fbd37018b1ebb4353d284c34364c743113ad7ecb238c80fc1f458303d81ecaa"
 ---
 
 ## Description
@@ -84,6 +84,7 @@ Self-review: all 17 children clean within their approved or explicitly blocked s
 Validation after repair: pvg lint --backlog --epic MAC-ui8a --json => []; pvg rtm check --epic MAC-ui8a => passed, 0 tagged requirements, 18 records; pvg nd dep cycles => none. Full preflight not run.
 LOCAL PROGRESS CHECKPOINT 2026-09-05: MAC-olrx accepted and merged locally to epic/MAC-ui8a=f24b2df3cb1e1521f97b406a7516f72bb7bc7890; merged-epic targeted ownership replay PASS10.274s. Main remains497419ab4512fcff765cd5feb27aed4c67b5608d. MAC-hpqp REDv1=612f65f3b4502a3267828507faaf0e395c8dd558 was independently rejected with four test-contract gaps; authorized RED rework active in retained worktree via /root/red_hpqp. MAC-2u36 RED=99956740ae5559262790a9473b5597c1775928f2 final targeted replay active via /root/red_2u36. MAC-p8ce RED approved0d52f43b393d961160aeea0db43b13a3fa5c284a remains queued, no GREEN yet. No full preflight completed/run intentionally; no GH mutations or installation updates. Installed binary SHA2565205883aaa4276d7eb6edb25b6ad43ac39a04bcb9a8b5ee55498127b04950849 confirmed unchanged again. Local remote.origin.pushurl=/dev/null remains intentional guard (original unset). Do not use pushing sync/merge/setup commands; manual accepted-gated local merges only. Do not run destructive recovery while current agents are healthy. Architecture/native-adapter choices still await previously relayed user answers.
 VERIFICATION HANDOFF: Full scripts/preflight.sh remains deferred to final epic gate. GREEN deliveries should nevertheless run proportionate targeted compiler/tests, affected-package golangci-lint/actionlint where applicable, and exact frozen-input verification now; pvg proof-shape/quality scans do not replace Go lint or behavioral execution. No claim of complete preflight from these checks. Runtime REDv2 e55238223961fec922896c361d8af6cafc454a8e independently approved (96 new leaves39pass57intendedfail0skip,20 existing controls); installer ordinary missing-file diagnostic uncovered real premature full-receipt inventory and is being grouped into MAC-2u36 before further RED edits.
+Triage 2026-09-24: 42 of 53 children closed. Remaining 10 are the replay/CLI half; none of their files exist yet. P0 -> P2: nothing broken for consumers (0.8.0 through 0.10.1 shipped without it); raise if consumer executable assurance is wanted before MAC-cup9. Child bodies embed 09-06 session state (no-push, pushurl guard, preflight-final-only, ci.yml ownership); CI now lives in .dagger/main.go. Refresh each body before dispatch.
 
 ## ANCHOR REVIEW (backlog_review, round 2 of 3)
 REVIEW_RESULT: APPROVED
