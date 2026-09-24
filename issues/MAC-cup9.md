@@ -7,8 +7,8 @@ type: epic
 labels: [self-design, dogfood, table-oracle, after-va30]
 created_at: 2026-09-24T02:38:02Z
 created_by: ramirosalas
-updated_at: 2026-09-24T02:38:02Z
-content_hash: "sha256:02fbb649859571e9d5d0c8c7b7af508329d74b28e36b6cbaf4b898d53c44bf14"
+updated_at: 2026-09-24T02:38:21Z
+content_hash: "sha256:d79d9e7309489994c5496d91313c5b9183d8528d8beb87091d3aa8eeec8bbb19"
 ---
 
 ## Description
@@ -37,7 +37,7 @@ Stories, in order:
 
 
 ## Notes
-
+Ordering: starts after MAC-va30 (owner ruling 2026-09-23). Story 1 filed as a child; stories 2 to 10 are enumerated in the epic body and get filed when story 1 lands.
 
 ## History
 
