@@ -9,9 +9,9 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:efe6109b5cdcbec5e95091542b806d82e41a6ba3545e6119b0094265d465491e"
+content_hash: "sha256:963556de8896b25645cc9f27d67e381d5bde4dc6db0f4b07271c1bcf61587ee5"
 blocked_by: [MAC-5ft8]
-blocks: [MAC-1u2v, MAC-vx24, MAC-ou97]
+blocks: [MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-bz1y]
 ---
 
@@ -101,10 +101,11 @@ Triage 2026-09-24: NEEDS-REWRITE. Retarget ci.yml wiring to .dagger/main.go (a9d
 - 2026-09-06T09:10:30Z dep_added: blocks MAC-vx24
 - 2026-09-06T09:10:31Z dep_added: blocks MAC-ou97
 - 2026-09-07T10:08:34Z dep_removed: was_blocked_by MAC-bz1y
+- 2026-09-24T21:33:54Z dep_removed: no_longer_blocks MAC-1u2v
 
 ## Links
 - Parent: [[MAC-ui8a]]
-- Blocks: [[MAC-1u2v]], [[MAC-vx24]], [[MAC-ou97]]
+- Blocks: [[MAC-vx24]], [[MAC-ou97]]
 - Blocked by: [[MAC-5ft8]]
 - Was blocked by: [[MAC-bz1y]]
 
