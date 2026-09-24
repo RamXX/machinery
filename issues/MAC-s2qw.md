@@ -8,7 +8,8 @@ labels: [hook, governance, doctor, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:49Z
-content_hash: "sha256:a50d6159277b84161a13c8b4f40dd50159259638728d1915dd8c30ffeabbc8fd"
+content_hash: "sha256:44780adfe837eac2cdc1aa2d3caafd9c0f9eb585feb5114719af57aeb44dfed6"
+related: [MAC-bmlh]
 ---
 
 ## Description
@@ -56,6 +57,6 @@ Acceptance criteria:
 
 
 ## Links
-
+- Related: [[MAC-bmlh]]
 
 ## Comments

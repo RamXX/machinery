@@ -8,7 +8,8 @@ labels: [hook, governance, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:49Z
-content_hash: "sha256:968f55a69b2300145ad7a3f7b59a4c22cf859254b98ffb3ad7dcbba816b53e80"
+content_hash: "sha256:85b5adf32e1af85bb72df5cbe2a3243a029c1a61f1195cc33d6c758d8adbee45"
+related: [MAC-s2qw]
 ---
 
 ## Description
@@ -43,6 +44,6 @@ Acceptance criteria:
 
 
 ## Links
-
+- Related: [[MAC-s2qw]]
 
 ## Comments
