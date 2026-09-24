@@ -8,7 +8,8 @@ labels: [attest, ux, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:b41c8513682a0695cde4bdf2795812d7f77c7df101e07801eb848df2d7e965ea"
+content_hash: "sha256:37161c8b763d4590eb2e94c97ad8e4d9f1f780957bd7b2ea8f2a3ace40522090"
+related: [MAC-zlbk]
 ---
 
 ## Description
@@ -39,6 +40,6 @@ Acceptance criteria:
 
 
 ## Links
-
+- Related: [[MAC-zlbk]]
 
 ## Comments

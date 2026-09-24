@@ -8,8 +8,8 @@ labels: [attest, gv, ux, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:1ab6b50fa47794b199302cab4aec1ecd5f249b868216c3861e35b2f801ec458a"
-related: [MAC-6mzy]
+content_hash: "sha256:3599f5412d6307a346e9355226c6e930609dd1a14f831dce273fc7306732f5d6"
+related: [MAC-6mzy, MAC-mkh1]
 ---
 
 ## Description
@@ -43,6 +43,6 @@ Acceptance criteria:
 
 
 ## Links
-- Related: [[MAC-6mzy]]
+- Related: [[MAC-6mzy]], [[MAC-mkh1]]
 
 ## Comments
