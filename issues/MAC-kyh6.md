@@ -8,8 +8,9 @@ labels: [review-protocol, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:688efbbeed3b4858d0b914a27ec331713f1b525b12693c0db6b963f633e93f7d"
+content_hash: "sha256:b3c9623fea2c83c142e3ec16d00b0c7e20bf68b35818b17e258c8d35da903ad5"
 blocked_by: [MAC-zti7]
+blocks: [MAC-f15w]
 ---
 
 ## Description
@@ -36,8 +37,10 @@ Acceptance criteria:
 
 ## History
 - 2026-09-24T21:33:57Z dep_added: blocked_by MAC-zti7
+- 2026-09-24T21:33:58Z dep_added: blocks MAC-f15w
 
 ## Links
+- Blocks: [[MAC-f15w]]
 - Blocked by: [[MAC-zti7]]
 
 ## Comments
