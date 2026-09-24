@@ -8,7 +8,8 @@ labels: [formal, g3, lint, liveness]
 created_at: 2026-09-24T21:27:28Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:27:28Z
-content_hash: "sha256:84b57c222d5190ec7b02af4fd3fc6f3fc79a281a18c3e2a53511403522c2419c"
+content_hash: "sha256:d845dbfb64f8aa668932f339bc82d7142f8284e5c5301e5275d0234eff5c3df9"
+blocks: [MAC-2f7g]
 ---
 
 ## Description
@@ -34,9 +35,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:56Z dep_added: blocks MAC-2f7g
 
 ## Links
-
+- Blocks: [[MAC-2f7g]]
 
 ## Comments

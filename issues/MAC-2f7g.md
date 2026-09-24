@@ -8,7 +8,8 @@ labels: [formal, gc, invariants]
 created_at: 2026-09-24T21:27:28Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:27:28Z
-content_hash: "sha256:16a0689dd5194ad637bfc053563fef08e82d69dbbba16e5935f2f69438ea271f"
+content_hash: "sha256:ec6e0a2d56292bb96f2df3d53118223bab4f1d1e98511f764a79e1748e39c933"
+blocked_by: [MAC-534p]
 ---
 
 ## Description
@@ -43,9 +44,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:56Z dep_added: blocked_by MAC-534p
 
 ## Links
-
+- Blocked by: [[MAC-534p]]
 
 ## Comments
