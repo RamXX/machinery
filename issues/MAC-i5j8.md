@@ -7,8 +7,8 @@ type: bug
 labels: [consistency-layer, gl, warnings, h2]
 created_at: 2026-09-23T23:56:54Z
 created_by: ramirosalas
-updated_at: 2026-09-24T01:28:40Z
-content_hash: "sha256:cf9d24d81937f6408f8bbba5b46cebfb92fc96cf5cb21d2f666621b331a0cbd8"
+updated_at: 2026-09-24T05:13:12Z
+content_hash: "sha256:b6645a67e7c9554d00e635d347b65da535e66130edbdd22d9e8c777459d5a664"
 ---
 
 ## Description
@@ -22,6 +22,7 @@ v0.10.0 on H2: 428 Gl warnings over 66 matrices. Classified against H2's own voc
 
 ## Notes
 Fixed on release/0.10.1: tokens resolved against actions, units, enum values, context keys, events, invariants, file names; H2 scratch tree 428 -> 290 (209 real attributes, 81 unresolved).
+Released in v0.10.1 (4bb85b78).
 
 ## History
 
