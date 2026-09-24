@@ -1,14 +1,16 @@
 ---
 id: MAC-idn3
 title: "contributor lane: go/python runtime identity probes time out under host load with a bare TIMEOUT"
-status: open
+status: closed
 priority: 2
 type: bug
 labels: [flaky-under-load, integration-lane, custody]
 created_at: 2026-09-08T12:15:30Z
 created_by: ramirosalas
-updated_at: 2026-09-08T13:27:22Z
-content_hash: "sha256:d02bc14420eafd77ea70859f249d51191349f82dabe2ccba26501f6379be53b7"
+updated_at: 2026-09-24T21:31:55Z
+content_hash: "sha256:77c30e7f8640dfc96bae549ab0370ebd389659b5ec536cb74acf5101268d8528"
+closed_at: 2026-09-24T21:31:55Z
+close_reason: "Root cause was MAC-ipa1, fixed by 2db00b90 (demux dropped fast job result -> bare TIMEOUT). Diagnostic-wording residual not worth tracking. Triage 2026-09-24."
 ---
 
 ## Description
@@ -37,7 +39,7 @@ Decide the probe budget from measured cost with a stated margin (and log the mea
 
 
 ## History
-
+- 2026-09-24T21:31:55Z status: open -> closed
 
 ## Links
 
