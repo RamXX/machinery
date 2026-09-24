@@ -1207,12 +1207,18 @@ func TestVerifyCheckersPiiFlowEngineGolden(t *testing.T) {
 		}
 		t.Setenv("DOCKER_HOST", endpoint)
 	}
-	const image = "python@sha256:c6ead215bfd31f1e433d968853b7a769989117115b728874824e6c0a27cb96fc"
 	root := repoRootDir(t)
-	digest, err := checker.OCIImageDigest(image)
+	// The pinned CPython-plus-Souffle image the example registry names; the
+	// ambient-dependency probe below runs its python3 too.
+	piiFlowRegistry, err := checker.LoadRegistry(filepath.Join(root, "examples", "pii-flow", "checkers.local.example.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	piiFlowEntry, ok := piiFlowRegistry.Resolve("pii-flow")
+	if !ok {
+		t.Fatal("pii-flow registry entry is missing")
+	}
+	image, digest := piiFlowEntry.Runtime.Image, piiFlowEntry.Runtime.Digest
 	if inspectErr := verifyLocalOCIImage([]string{docker}, image, digest, testRuntimePlatform, checkerOCIControlPlaneTimeout, root); inspectErr != nil {
 		t.Fatalf("required OCI golden image is not locally provisioned: %v", inspectErr)
 	}

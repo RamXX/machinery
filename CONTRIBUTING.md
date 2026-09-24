@@ -37,7 +37,9 @@ make preflight-fast   # the same tier, on demand
 
 **Heavy tier, authoritative in hosted CI.** The race sweep, the required native
 integration lane, formal verification with TLC, C4 compilation, the external
-checker reproduction, and the native macOS suite run in
+checker reproduction, the Soufflé parity lane for the shipped Datalog rules
+(`datalog-parity`, reproducible with `make dagger-job JOB=datalog-parity`), and
+the native macOS suite run in
 `.github/workflows/ci.yml` and `formal.yml` on the pushed commit. Nothing local
 is authoritative for them. Run the full mirror locally when you want it:
 
@@ -67,8 +69,8 @@ It runs the hosted `test` job (`go test -race -count=1 ./... -timeout=30m`) and
 the hosted `integration-required` job (`go run ./scripts/integration-lane --lane
 required`) inside a pinned 2-CPU `linux/amd64` container carrying the exact
 runtime identities `.github/actions/assurance-runtimes` installs: Go 1.27.1,
-Node 26.8.1 with TypeScript 7.0.2, CPython 3.14.7, and Elixir 1.20.4 on OTP
-29.0.6. The lane re-verifies each identity and fails closed, so a drifted image
+Node 26.9.0 with TypeScript 7.0.2, CPython 3.14.7, and Elixir 1.20.4 on OTP
+29.1.1. The lane re-verifies each identity and fails closed, so a drifted image
 stage is reported, never silently tolerated.
 
 That container reproduces the Linux kernel and filesystem semantics, the 2-CPU
@@ -101,6 +103,60 @@ The golangci-lint version is the single source of truth in `.golangci-version`,
 read by CI, `make lint-install`, and preflight. To bump it: edit that file, run
 `make lint-install`, then `make preflight-fast`. If it is clean locally, CI's
 lint job runs the identical binary.
+
+## Runtime pins
+
+machinery stays on the latest release of every native runtime it pins
+(Erlang/OTP and its erts, Elixir, Node, TypeScript, CPython, Temurin Java, Go)
+for security reasons. Dependabot covers Go modules and actions; the runtimes
+are covered by a drift report:
+
+```sh
+make runtime-pins   # pinned, host-installed and latest-upstream per runtime
+```
+
+It exits 1 when a pin is behind its latest upstream release. The upstream
+column prints `offline` only when no index can be reached at all; when one
+lookup fails while others answer, its cell names the failure (for example
+`lookup failed: HTTP 403`) and a warning is printed. `-strict` exits 2 on any
+unknown upstream version. The status column adds `host behind` (or `host
+ahead`) when the runtime on your PATH is not the pinned version, which is what
+makes the native suites fail locally; that exits 0 by default, and
+`go run ./scripts/runtime-pins -host-strict` exits 3 on it. Elixir is looked
+up through the GitHub releases API (set `GITHUB_TOKEN` to avoid the
+unauthenticated rate limit) with builds.hex.pm as the fallback.
+`.github/workflows/runtime-pins.yml` runs it with `-strict` every Monday and
+opens or updates the issue "runtime pins behind upstream" with the table.
+Bumping a pin is a normal weekly chore, not a release event.
+
+Each pin is defined once, in `internal/runtimeclosure` (`RequiredOTPVersion`,
+`RequiredErtsVersion`, `RequiredElixirVersion`, `RequiredNodeRelease`,
+`RequiredTypeScriptVersion`, `RequiredPythonVersion`, `RequiredGoVersion`, and
+`pinnedJavaVersion` with its build and banner date in `provision.go`). The
+integration lane derives its catalog from those constants. The other files
+that spell a version (the assurance-runtimes action, `scripts/ci-linux.dockerfile`,
+`testdata/integration-lanes/*.json` and the contracts, `.java-runtime-pin`,
+`go.mod`, README and docs) are held to them by `go test ./scripts/runtime-pins`
+and `go test ./internal/runtimeclosure`, which name every site that disagrees.
+For OTP, take the erts version from `otp_versions.table`; for Java, take the
+archive checksums from the Adoptium API. Then run the suites:
+
+```sh
+go test ./scripts/runtime-pins ./internal/runtimeclosure/...   # every pin site agrees
+go test -count=1 ./internal/runtimeclosure/... ./scripts/integration-lane/... ./internal/tdd/...
+make test && make check && make golden && make verify-formal
+```
+
+The native suites run against the runtimes on your PATH and fail closed on any
+other version, so upgrade the host first (for example `brew upgrade node`).
+
+Java tracks the latest patch of the Temurin 21 LTS line. Temurin 25 LTS was
+tried on 2026-09-22 (25.0.4.1+1): TLC results were identical, but every Alloy
+run failed because JDK 25 prints JEP 472 restricted-method warnings for
+kodkod's `System::load`, and the Alloy runner rejects any extra engine output
+("alloy exec emitted unexpected success diagnostics"). The probe also needs
+`stdin.encoding`, a property new in JDK 25, allowed. Moving to 25 is a
+separate change that has to handle both.
 
 ## Versioning
 

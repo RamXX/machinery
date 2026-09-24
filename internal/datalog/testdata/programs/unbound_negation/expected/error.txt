@@ -1,0 +1,1 @@
+program.dl:8:21: variable Y in a negated atom is not bound by a positive body atom

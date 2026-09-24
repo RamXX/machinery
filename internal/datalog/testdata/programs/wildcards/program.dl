@@ -1,0 +1,15 @@
+// Wildcards in positive atoms, in negated atoms and in aggregate bodies.
+.decl edge(a:symbol, b:symbol, label:symbol)
+.input edge
+.decl source(a:symbol)
+.output source
+source(A) :- edge(A, _, _).
+.decl sink(b:symbol)
+.output sink
+sink(B) :- edge(_, B, _), !edge(B, _, _).
+.decl labelled(a:symbol)
+.output labelled
+labelled(A) :- edge(A, _, "hot").
+.decl fanout(a:symbol, n:number)
+.output fanout
+fanout(A, N) :- source(A), N = count : { edge(A, _, _) }.

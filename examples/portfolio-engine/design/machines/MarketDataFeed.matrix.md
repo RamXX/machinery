@@ -11,7 +11,7 @@ instead of hanging.
 |---|---|---|---|---|---|---|
 | `atThreshold` | guard | `(ctx) -> bool` | true iff `failures + 1 >= threshold` (this failure trips the breaker) | invariant `feed-circuit-breaks` | unit | none |
 | `probeSucceeded` | guard | `(ctx, evt) -> bool` | true iff the half-open trial call returned data | recloses the circuit on recovery | unit | fake probe result |
-| `recordTrip` | action | `(ctx) -> ()` | logs `feed_circuit_open` and marks the breaker open; derived: feed_circuit_open (operator log signal, not stored) | operator signal for `feed-circuit-breaks` | unit | captured log |
+| `recordTrip` | action | `(ctx) -> ()` | logs `feed_circuit_open` and marks the breaker open; derived: feed_circuit_open (operator log signal, not stored). USES{feed_circuit_open} | operator signal for `feed-circuit-breaks` | unit | captured log |
 | `incFailures` | action | `(ctx) -> ctx` | `failures := failures + 1` | counts toward the trip threshold | unit | none |
 | `resetFailures` | action | `(ctx) -> ctx` | `failures := 0` on a success or a successful probe | clears the count on recovery | unit | none |
 

@@ -128,6 +128,74 @@ var MachineryCheckExperiments = []Experiment{
 		ExpectSubstr: "not in the exposes list of widget.store", ExpectExit: true},
 	{Name: "source-outside-contract", Tool: "check", Mutation: "rogue package",
 		ExpectSubstr: "maps to no contract boundary", ExpectExit: true},
+	// 2026-09-22, consistency layer Stage 1: the declaration grammar is closed.
+	// A malformed WRITES group and an unknown upper-case group name are
+	// Gx-trace errors; a backticked fact quoted outside every group is a
+	// Gl-ledger warning (the tier never fails a gate, so ExpectExit is false).
+	{Name: "malformed-writes-declaration", Tool: "check", Mutation: "a WRITES group repeats a member",
+		ExpectSubstr: "WRITES declaration has duplicate member 'Widget.status'", ExpectExit: true},
+	{Name: "unknown-declaration-group", Tool: "check", Mutation: "a private OWNED-BY{} group in a contract cell",
+		ExpectSubstr: "unknown declaration group OWNED-BY{...}", ExpectExit: true},
+	{Name: "undeclared-fact-reference", Tool: "check", Mutation: "a contract cell quotes `Widget.status` outside any group",
+		ExpectSubstr: "undeclared fact reference `Widget.status`", ExpectExit: false},
+	// 2026-09-22, consistency layer Stage 3: the shipped Datalog rules of
+	// Gy-rules. Since Stage 4 every finding_ relation is an ERROR, so each
+	// of these exits nonzero.
+	{Name: "rules-authz-missing", Tool: "check", Mutation: "Widget.publish becomes a System action with no authorization row",
+		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: true},
+	{Name: "rules-authz-orphan", Tool: "check", Mutation: "an authorization row admits Widget.publish, which is not a System action",
+		ExpectSubstr: "row 'Widget.publish': authz_orphan", ExpectExit: true},
+	{Name: "rules-authz-unknown-capability", Tool: "check", Mutation: "an admission names appX, a fabricated suffix of the c4 element app",
+		ExpectSubstr: "authz_unknown_capability (capability 'appX')", ExpectExit: true},
+	{Name: "rules-fact-unresolved", Tool: "check", Mutation: "USES{Widget.stat} names no declared fact",
+		ExpectSubstr: "row 'Widget.guardCanPublish': fact_unresolved (fact 'Widget.stat')", ExpectExit: true},
+	{Name: "rules-values-disagree", Tool: "check", Mutation: "VALUES WidgetStatus{} adds a member the enum lacks",
+		ExpectSubstr: "values_disagree (group 'WidgetStatus', member 'Archived')", ExpectExit: true},
+	{Name: "rules-values-conflict", Tool: "check", Mutation: "two units spell the enum-less group reason as {late, lost} and {late, early}",
+		ExpectSubstr: "row 'Widget.commit': values_conflict (group 'reason', member 'lost')", ExpectExit: true},
+	{Name: "rules-payload-twin", Tool: "check", Mutation: "a matrix payload {} omits one field of the contract's event payload",
+		ExpectSubstr: "payload_twin (event 'widget.published', field 'Widget.status')", ExpectExit: true},
+	{Name: "rules-supersession-cycle", Tool: "check", Mutation: "SUPERSEDES rows close A > B > C > A",
+		ExpectSubstr: "row 'WidgetA': supersession_cycle", ExpectExit: true},
+	{Name: "rules-effect-uncarried", Tool: "check", Mutation: "an action declares WRITES{Widget.status} and no CARRIES{}",
+		ExpectSubstr: "row 'Widget.commit': effect_uncarried", ExpectExit: true},
+	{Name: "rules-actor-uncarried", Tool: "check", Mutation: "the saveWidget actor loses its CARRIES{} group",
+		ExpectSubstr: "row 'Widget.saveWidget': effect_uncarried", ExpectExit: true},
+	{Name: "rules-carrier-misplaced", Tool: "check", Mutation: "a guard row declares CARRIES{signal:published}",
+		ExpectSubstr: "row 'Widget.guardCanPublish': carrier_misplaced (kind 'guard')", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 4: PRODUCES{} declares the action a
+	// cascade or consumer arm performs, so a produced action owes an admission
+	// whatever its Modelith actor, and a produced name the model lacks is its
+	// own finding.
+	{Name: "rules-produces-owes-admission", Tool: "check", Mutation: "a matrix row declares PRODUCES{Widget.publish} (a non-System action) and no authorization row admits it",
+		ExpectSubstr: "row 'Widget.publish': authz_missing", ExpectExit: true},
+	{Name: "rules-produces-unknown-action", Tool: "check", Mutation: "PRODUCES{Widget.unpublish} names an action the model does not declare",
+		ExpectSubstr: "row 'Widget.commit': produces_unknown_action (action 'Widget.unpublish')", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 13): a matrix with
+	// no machine is a contract-only record only when its placement row waives
+	// the machine with a reason; G3 and Gy-rules read the same waiver.
+	{Name: "record-orphan-matrix", Tool: "check", Mutation: "a matrix with no machine whose placement row carries no '(no machine: <reason>)' waiver",
+		ExpectSubstr: "ErasureRecord.matrix.md: orphan matrix has no corresponding ErasureRecord.machine.json", ExpectExit: true},
+	{Name: "record-orphan-matrix-rule", Tool: "check", Mutation: "the same unwaived matrix, under Gy-rules",
+		ExpectSubstr: "row 'ErasureRecord': orphan_matrix", ExpectExit: true},
+	{Name: "record-waiver-empty-reason", Tool: "check", Mutation: "the placement waiver reads '(no machine: )', naming no reason",
+		ExpectSubstr: "placement row component `ErasureRecord` has no machine and no '(no machine: <reason>)' waiver", ExpectExit: true},
+	{Name: "record-waived-machine-present", Tool: "check", Mutation: "the Widget placement row waives the machine Widget has",
+		ExpectSubstr: "row 'Widget': waived_machine_present", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 15): a reservation
+	// of a type an artifact now owns is stale, and a packet citing the row of
+	// a superseded type carries a replaced definition as its contract.
+	{Name: "rules-stale-reservation", Tool: "check", Mutation: "a contract row reserves WidgetReceipt with RESERVED{} while another row owns it",
+		ExpectSubstr: "row 'WidgetReceipt': stale_reservation", ExpectExit: true},
+	{Name: "rules-superseded-in-packet", Tool: "check", Mutation: "slices.yaml cites the table row of WidgetV1, which WidgetV2 supersedes",
+		ExpectSubstr: "slices.yaml:6: row 'M1-S1': superseded_in_packet (type 'WidgetV1')", ExpectExit: true},
+	// 2026-09-23, consistency layer Stage 5 (NEXT.md entry 37 residual): the
+	// BUILD.md oracle binding table against the oracle ids the locked suite
+	// binds under --impl.
+	{Name: "rules-milestone-binding-stale", Tool: "check", Mutation: "BUILD.md says a Widget oracle id is unbound while internal/app/app_test.go binds it (--impl)",
+		ExpectSubstr: ": milestone_binding_stale", ExpectExit: true},
+	{Name: "rules-milestone-binding-phantom", Tool: "check", Mutation: "BUILD.md says a Widget oracle id is bound at internal/app/app_test.go, which binds only another id (--impl)",
+		ExpectSubstr: "milestone_binding_phantom (path 'internal/app/app_test.go')", ExpectExit: true},
 }
 
 // RefineExperiments are the data-refinement reconciliation failures.

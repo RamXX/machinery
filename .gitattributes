@@ -2,3 +2,7 @@
 # oracle freshness diffs all assume LF. Pin it so an autocrlf checkout cannot
 # spuriously fail G5 or the golden corpus.
 * text=auto eol=lf
+
+# Datalog fixtures carry symbol values with leading or trailing spaces on
+# purpose (the symbols parity program). Exempt them from the whitespace check.
+internal/datalog/testdata/** -whitespace

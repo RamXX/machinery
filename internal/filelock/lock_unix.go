@@ -80,7 +80,13 @@ func acquireWithMode(ctx context.Context, scope string, nonBlocking, shared bool
 	if err != nil {
 		return nil, err
 	}
-	l := &Lock{root: location.root, identity: location.name}
+	return acquireAt(ctx, scope, location, nonBlocking, shared, hooks)
+}
+
+// acquireAt takes the lock on an opened location and owns location.root from
+// here on: every failure path closes it.
+func acquireAt(ctx context.Context, scope string, location *lockLocation, nonBlocking, shared bool, hooks acquireHooks) (*Lock, error) {
+	l := &Lock{root: location.root, identity: location.identity}
 	if err := reserveExclusiveLock(ctx, scope, l.identity, nonBlocking); err != nil {
 		return nil, errors.Join(err, location.root.Close())
 	}

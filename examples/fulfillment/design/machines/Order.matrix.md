@@ -9,8 +9,8 @@ document is the named-unit contract table and the failure catalog.
 
 | name | kind | signature | pre / post | maps to | test | fixture |
 |---|---|---|---|---|---|---|
-| `persistOrder` | actor | `(orderId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row AND the outbox event in one transaction, or neither (the transactional outbox) | C4 `orderRepo -> orderDb`; inv `exactly-once-effect` | integration | real Postgres (docker compose) |
-| `guardCanConfirm` | guard | `(ctx,evt) -> bool` | true iff the order has line items and `totalCents` matches their sum. `CLAUSES{line-items-present, total-matches-item-sum}` | inv `order-total-matches-items` | unit + property | pure; property over generated line-item lists |
+| `persistOrder` | actor | `(orderId, status) -> row \| err{ErrUnavailable,ErrConflict}` | writes the status row AND the outbox event in one transaction, or neither (the transactional outbox). WRITES{Order.status, OutboxMessage.messageType, OutboxMessage.status} CARRIES{column:Order.status, outbox:OutboxMessage} | C4 `orderRepo -> orderDb`; inv `exactly-once-effect` | integration | real Postgres (docker compose) |
+| `guardCanConfirm` | guard | `(ctx,evt) -> bool` | true iff the order has line items and `totalCents` matches their sum. `CLAUSES{line-items-present, total-matches-item-sum}` USES{Order.totalCents, LineItem.quantity, LineItem.unitPriceCents} | inv `order-total-matches-items` | unit + property | pure; property over generated line-item lists |
 | `guardCanCancel` | guard | `(ctx,evt) -> bool` | true iff the caller owns the order | inv `order-owned-by-customer` | unit | pure |
 | `pendingIsConfirmed` / `pendingIsReserved` / `pendingIsPaid` / `pendingIsShipped` / `pendingIsDelivered` / `pendingIsCancelled` / `pendingIsFailed` | guard | `(ctx) -> bool` | true iff `ctx.pendingStatus` equals that status | - (persist success routing) | unit | pure |
 | `priorIsPending` / `priorIsConfirmed` / `priorIsReserved` / `priorIsPaid` / `priorIsShipped` | guard | `(ctx) -> bool` | true iff `ctx.priorStatus` equals that status | - (rollback routing) | unit | pure |
@@ -18,7 +18,7 @@ document is the named-unit contract table and the failure catalog.
 | `retriesExhausted` | guard | `(ctx) -> bool` | true iff `ctx.retries >= 3` | C4 3 bound | unit | pure |
 | `setPendingConfirmed` / `setPendingReserved` / `setPendingPaid` / `setPendingShipped` / `setPendingDelivered` / `setPendingCancelled` / `setPendingFailed` | action | `(ctx,evt) -> ctx` | `priorStatus := status; pendingStatus := <that status>`; enforces the forward order | inv `order-forward` | unit | pure |
 | `resetRetries` | action | `(ctx) -> ctx` | `retries := 0` before every independent Order persistence operation, so an earlier command cannot consume a later command's retry budget | C4 3 per-operation DB retry bound | unit | pure |
-| `commitStatus` | action | `(ctx) -> ctx` | `status := pendingStatus` (mirrors the committed row) | - | unit | pure |
+| `commitStatus` | action | `(ctx) -> ctx` | `status := pendingStatus` (mirrors the committed row). WRITES{} | - | unit | pure |
 | `incrementRetries` | action | `(ctx) -> ctx` | `retries := retries + 1` | - | unit | pure |
 | `recordConfirmDenied` / `recordCancelDenied` | action | `(ctx,evt) -> ctx` | set the rejection reason naming the violated invariant | surfaces `order-total-matches-items`, `order-owned-by-customer` | unit | pure |
 | `recordError` / `recordConflict` / `recordTimeout` / `recordUnknownError` / `recordRetriesExhausted` / `recordRoutingError` | action | `(ctx,evt) -> ctx` | `lastError := classified error` | maps repo errors | unit | pure |

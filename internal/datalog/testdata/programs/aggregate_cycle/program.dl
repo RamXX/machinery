@@ -1,0 +1,8 @@
+// n counts over a relation that depends on n: not stratifiable.
+.decl b(x:symbol)
+.input b
+.decl n(x:symbol, c:number)
+.output n
+.decl d(x:symbol)
+d(X) :- n(X, _).
+n(X, C) :- b(X), C = count : { d(X) }.

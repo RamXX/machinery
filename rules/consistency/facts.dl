@@ -1,0 +1,47 @@
+// Named-unit fact resolution (proposal section 4, rule B; NEXT.md entry 35).
+//
+// Every fact a unit names in USES{} or WRITES{} resolves to a declaration: a
+// Modelith attribute (Entity.attr, joining attr ids directly because fact
+// columns carry stable ids without their kind prefix), an enum member id
+// (Entity.attr.Value), a machine context key, an event payload field, or,
+// on the same unit, a derived: waiver or a VALUES member. derived: and
+// VALUES are row-local declarations: a waiver on one unit never resolves a
+// fact another unit names.
+//
+// An empty WRITES{} contributes no member and so owes nothing here; the
+// unit_declares marker matters to authz.dl and carriers.dl, not to this rule.
+
+.decl attr(id:symbol, entity:symbol, datatype:symbol)
+.input attr
+.decl enum_member(id:symbol, enum:symbol, value:symbol)
+.input enum_member
+.decl context_key(machine:symbol, key:symbol)
+.input context_key
+.decl event_payload_field(id:symbol, field:symbol)
+.input event_payload_field
+.decl unit_derived(unit:symbol, fact:symbol)
+.input unit_derived
+.decl unit_values(unit:symbol, group:symbol, member:symbol)
+.input unit_values
+.decl unit_uses(unit:symbol, fact:symbol)
+.input unit_uses
+.decl unit_writes(unit:symbol, fact:symbol)
+.input unit_writes
+
+.decl declared_fact(fact:symbol)
+declared_fact(F) :- attr(F, _, _).
+declared_fact(F) :- enum_member(F, _, _).
+declared_fact(F) :- context_key(_, F).
+declared_fact(F) :- event_payload_field(_, F).
+
+.decl unit_local_fact(unit:symbol, fact:symbol)
+unit_local_fact(U, F) :- unit_derived(U, F).
+unit_local_fact(U, F) :- unit_values(U, _, F).
+
+.decl named_fact(unit:symbol, fact:symbol)
+named_fact(U, F) :- unit_uses(U, F).
+named_fact(U, F) :- unit_writes(U, F).
+
+.decl finding_fact_unresolved(unit:symbol, fact:symbol)
+.output finding_fact_unresolved
+finding_fact_unresolved(U, F) :- named_fact(U, F), !declared_fact(F), !unit_local_fact(U, F).

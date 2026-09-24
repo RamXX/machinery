@@ -3,11 +3,13 @@ hooks/machinery-hook.sh
 install.sh
 scripts/c4-inventory.sh
 scripts/ci-linux.sh
+scripts/datalog-parity.sh
 scripts/example-gates.sh
 scripts/example-inventory.sh
 scripts/git-safe.sh
 scripts/modelith-inventory.sh
 scripts/modelith-render.sh
+scripts/pii-flow-image.sh
 scripts/preflight-fast.sh
 scripts/preflight.sh
 scripts/shellcheck-inventory.sh

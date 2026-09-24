@@ -1,0 +1,21 @@
+// Event-payload twins (proposal section 4, rule D; NEXT.md entry 30).
+//
+// A matrix payload {...} declaration restates the payload of the event its
+// row names, so its field set must equal the Architecture Contract event
+// row's closed payload set, in both directions: a declared field the contract
+// lacks, and a contract field the declaration omits, are each one finding.
+// An event whose contract row states no closed field set has no
+// event_payload_field rows, so every declared field is reported.
+
+.decl unit_payload(unit:symbol, event:symbol, field:symbol)
+.input unit_payload
+.decl event_payload_field(id:symbol, field:symbol)
+.input event_payload_field
+
+.decl unit_event(unit:symbol, event:symbol)
+unit_event(U, E) :- unit_payload(U, E, _).
+
+.decl finding_payload_twin(unit:symbol, event:symbol, field:symbol)
+.output finding_payload_twin
+finding_payload_twin(U, E, F) :- unit_payload(U, E, F), !event_payload_field(E, F).
+finding_payload_twin(U, E, F) :- unit_event(U, E), event_payload_field(E, F), !unit_payload(U, E, F).

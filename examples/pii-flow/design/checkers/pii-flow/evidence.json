@@ -2,16 +2,23 @@
   "evidence_schema": "1.0",
   "checker": {
     "id": "pii-flow",
-    "version": "pii-flow-fixed-point-1"
+    "version": "pii-flow-souffle-1"
   },
   "input_hash": "sha256:06da2492ce48807bc9f38eaae97a48f81cce47e7f92eb7fbc4367901462fc992",
-  "runtime_closure": "sha256:afd225b867fec907e1a80cd31984d54310eb5798d2363c0829d41538c3036129",
+  "runtime_closure": "sha256:bdde2cabffd09544dde5591cf1b26b137bbca8764af4166aa6fd180f2ad04b19",
   "verdict": "pass",
   "coverage": [
     {
       "element": "inv:priv-no-unredacted-export",
-      "verdict": "pass"
+      "verdict": "pass",
+      "detail": "souffle derived no leak tuple: no sensitive attribute reaches a sink unredacted"
     }
   ],
-  "findings": []
+  "findings": [],
+  "attestation": {
+    "engine": "souffle",
+    "engine_version": "2.5",
+    "rules_sha256": "sha256:367aa619827d673ed4d81c8cf93801e6429ccb193806226642d1179c36e34992"
+  },
+  "trace_ref": "generated/souffle-outputs.json"
 }

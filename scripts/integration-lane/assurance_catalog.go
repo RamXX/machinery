@@ -40,17 +40,20 @@ const assuranceProbeKind = "runtime-probe"
 const assuranceConformanceKind = "native-conformance"
 const machineryModulePath = "github.com/RamXX/machinery"
 
-// The exact first-release native catalog of docs/test-assurance-contract.md
-// section 6. Git is a gate runtime, not a fifth adapter.
+// The exact native catalog of docs/test-assurance-contract.md section 6.
+// Every runtime version is owned by the internal/runtimeclosure pin that
+// opens the closure, so the lane and the closures cannot disagree; the
+// frozen testdata/integration-lanes/assurance-runtime-pins.json is checked
+// against these. Git is a gate runtime, not a fifth adapter.
 const (
-	assuranceGoVersion         = "1.27.1"
-	assuranceNodeVersion       = "26.8.1"
-	assuranceTypeScriptVersion = "7.0.2"
-	assurancePythonVersion     = "3.14.7"
-	assuranceElixirVersion     = "1.20.4"
-	assuranceOTPVersion        = "29"
-	assuranceErtsVersion       = "17.0.6"
-	assuranceMixVersion        = "1.20.4"
+	assuranceGoVersion         = runtimeclosure.RequiredGoVersion
+	assuranceNodeVersion       = runtimeclosure.RequiredNodeRelease
+	assuranceTypeScriptVersion = runtimeclosure.RequiredTypeScriptVersion
+	assurancePythonVersion     = runtimeclosure.RequiredPythonVersion
+	assuranceElixirVersion     = runtimeclosure.RequiredElixirVersion
+	assuranceOTPVersion        = runtimeclosure.RequiredOTPMajor
+	assuranceErtsVersion       = runtimeclosure.RequiredErtsVersion
+	assuranceMixVersion        = runtimeclosure.RequiredElixirVersion
 	assuranceGitVersion        = "2.55.0"
 )
 
@@ -1200,7 +1203,7 @@ func conformanceCallLine(testBytes []byte, id string) (int64, error) {
 // executeTypeScriptConformanceSuite executes the frozen node-test-typescript
 // /v1 conformance fixture through the REAL production assurance chain: the
 // frozen bytes are captured into a private content-addressed store bundle,
-// the pinned Node 26.8.1 / TypeScript 7.0.2 runtime closure is opened and
+// the pinned Node / TypeScript runtime closure is opened and
 // validated under the lane's custody scope, the closed adapter prepares the
 // suite (verified materialization, embedded byte-pinned helper transport and
 // reporter, typed assertion call-site validation, separate pinned-compiler
@@ -1682,7 +1685,7 @@ func conformanceDeclLine(testBytes []byte, name string) int64 {
 // executeElixirConformanceSuite executes the frozen elixir-exunit/v1
 // conformance fixture through the REAL production assurance chain: the
 // frozen bytes are captured into a private content-addressed store bundle,
-// the pinned Elixir 1.20.4 / OTP 29.0.6 (ERTS 17.0.6) runtime closure is
+// the pinned Elixir / OTP (ERTS) runtime closure is
 // opened and validated under the lane's custody scope, the closed adapter
 // prepares the suite (verified materialization into the embedded harness,
 // byte-pinned transport, typed assertion call-site validation) and runs

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/RamXX/machinery/internal/runtimeclosure"
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
@@ -898,6 +899,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 		"dagger call example-impls",
 		"dagger call modelith-render",
 		"dagger call design-engines",
+		"dagger call datalog-parity",
 		"dagger call integration-evidence",
 	)
 	ci := ciOwnerBody(t)
@@ -953,7 +955,7 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 	)
 	javaPin := mustRepositoryFile(t, filepath.Join(root, ".java-runtime-pin"))
 	requireAll("Java runtime pin", javaPin,
-		"JAVA_RUNTIME_VERSION=21.0.12.1+1",
+		"JAVA_RUNTIME_VERSION="+runtimeclosure.PinnedJavaRuntimeVersion,
 		"JAVA_RUNTIME_DARWIN_ARM64_SHA256=3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998",
 		"JAVA_RUNTIME_LINUX_AMD64_SHA256=ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
 	)
@@ -1120,14 +1122,14 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 	// The container carries the same runtime identities the hosted jobs
 	// install; the lane re-verifies each one and fails closed.
 	requireAll("containerized Linux runtime pins", dockerfile,
-		"golang:1.27.1",
-		"node:26.8.1",
-		"python:3.14.7",
-		"1.20.4-erlang-29.0.6",
-		"typescript@7.0.2",
+		"golang:"+runtimeclosure.RequiredGoVersion,
+		"node:"+runtimeclosure.RequiredNodeRelease,
+		"python:"+runtimeclosure.RequiredPythonVersion,
+		runtimeclosure.RequiredElixirVersion+"-erlang-"+runtimeclosure.RequiredOTPVersion,
+		"typescript@"+runtimeclosure.RequiredTypeScriptVersion,
 	)
 	assurance := mustRepositoryFile(t, filepath.Join(root, ".github", "actions", "assurance-runtimes", "action.yml"))
-	for _, version := range []string{"1.27.1", "26.8.1", "3.14.7", "1.20.4", "29.0.6", "typescript@7.0.2"} {
+	for _, version := range []string{runtimeclosure.RequiredGoVersion, runtimeclosure.RequiredNodeRelease, runtimeclosure.RequiredPythonVersion, runtimeclosure.RequiredElixirVersion, runtimeclosure.RequiredOTPVersion, "typescript@" + runtimeclosure.RequiredTypeScriptVersion} {
 		if !strings.Contains(assurance, version) {
 			t.Errorf("containerized runtime pin %q has drifted from the hosted assurance-runtimes owner", version)
 		}

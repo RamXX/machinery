@@ -106,6 +106,12 @@ func acquireWithMode(ctx context.Context, scope string, nonBlocking, shared bool
 	if err != nil {
 		return nil, err
 	}
+	return acquireAt(ctx, scope, location, nonBlocking, shared, hooks)
+}
+
+// acquireAt takes the lock on an opened location and owns location.root from
+// here on: every failure path closes it.
+func acquireAt(ctx context.Context, scope string, location *lockLocation, nonBlocking, shared bool, hooks acquireHooks) (*Lock, error) {
 	f, err := location.openFile()
 	if err != nil {
 		return nil, errors.Join(err, location.root.Close())

@@ -199,6 +199,19 @@ func TestLaneCustodyActivationIsAuthenticatedAndExclusive(t *testing.T) {
 			defer cancel()
 			cmd := exec.CommandContext(ctx, bin, tc.args...)
 			cmd.Env = append(os.Environ(), tc.env...)
+			// Pin descriptors 3 through 9 to /dev/null. The parent of this
+			// test may itself hold an inherited socket on a low descriptor
+			// (a hosted macOS runner does, on fd 9), and a socket there turns
+			// the forged claim into a present-but-unmarked channel, a
+			// different refusal from the one this case asserts.
+			for fd := 3; fd <= 9; fd++ {
+				devNull, openErr := os.Open(os.DevNull)
+				if openErr != nil {
+					t.Fatal(openErr)
+				}
+				defer devNull.Close()
+				cmd.ExtraFiles = append(cmd.ExtraFiles, devNull)
+			}
 			out, err := cmd.CombinedOutput()
 			if err == nil {
 				t.Fatalf("untrusted internal activation was accepted: %s", out)

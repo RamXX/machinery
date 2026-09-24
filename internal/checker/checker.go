@@ -4,8 +4,10 @@
 // against the model, and verifies that committed evidence binds to the current
 // design. It never runs an external engine; that is the verify-checkers phase.
 //
-// The two committed contracts are schemas/projection.schema.json (machinery ->
-// checker) and schemas/evidence.schema.json (checker -> machinery); this package
+// The committed contracts are schemas/projection.schema.json (machinery ->
+// checker, 1.0), schemas/projection-v2.schema.json (machinery -> checker, 2.0,
+// generated from the relation catalog in relations.go) and
+// schemas/evidence.schema.json (checker -> machinery); this package
 // is their Go realization. See docs/external-checkers.md for the builder guide.
 package checker
 

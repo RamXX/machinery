@@ -114,7 +114,7 @@ func TestElixirLookupResolvesClosedIdentity(t *testing.T) {
 }
 
 // exRealStreamLines is a frozen sample of REAL embedded-reporter output
-// (Elixir 1.20.4 / OTP 29.0.6 under the frozen harness argv): the effective
+// (the pinned Elixir / OTP under the frozen harness argv): the effective
 // suite_started options, module lifecycle, the describe-prefixed native
 // names, helper witnesses with the ok verdict, passed tests with the
 // empirically pinned null native state, the summary and the terminal

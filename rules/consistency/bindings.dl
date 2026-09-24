@@ -1,0 +1,32 @@
+// Milestone binding twin (proposal section 4, rule D; NEXT.md entry 37
+// residual).
+//
+// BUILD.md states, per oracle id, where the locked suite binds it: a table
+// with an oracle column and a bound-at column, whose cell is test file paths
+// relative to the implementation root or the literal unbound
+// (milestone_says_bound, milestone_says_unbound). The implementation states
+// the same fact a second time: bound_at(oracle, path) is a committed oracle
+// row a test file binds under Gt's credit rules, and test_file(path) is every
+// test file Gt scanned. Both come from --impl; without it they are empty and
+// neither rule fires, because a missing implementation is not a disagreement.
+
+.decl milestone_says_bound(oracle:symbol, path:symbol)
+.input milestone_says_bound
+.decl milestone_says_unbound(oracle:symbol)
+.input milestone_says_unbound
+.decl bound_at(oracle:symbol, path:symbol)
+.input bound_at
+.decl test_file(path:symbol)
+.input test_file
+
+// The table says unbound, and a test file binds the oracle.
+.decl finding_milestone_binding_stale(oracle:symbol)
+.output finding_milestone_binding_stale
+finding_milestone_binding_stale(O) :- milestone_says_unbound(O), bound_at(O, _).
+
+// The table names a path that binds nothing for the oracle (the file does
+// not exist, or does not bind that row). Guarded by test_file(_), so it
+// holds only when the implementation was read.
+.decl finding_milestone_binding_phantom(oracle:symbol, path:symbol)
+.output finding_milestone_binding_phantom
+finding_milestone_binding_phantom(O, P) :- milestone_says_bound(O, P), test_file(_), !bound_at(O, P).

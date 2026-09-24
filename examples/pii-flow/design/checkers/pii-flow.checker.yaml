@@ -1,7 +1,7 @@
 checker:
   id: pii-flow
   description: "Sensitive-data flow: no sensitive attribute reaches an export sink without redaction."
-  runtime_closure: sha256:afd225b867fec907e1a80cd31984d54310eb5798d2363c0829d41538c3036129
+  runtime_closure: sha256:bdde2cabffd09544dde5591cf1b26b137bbca8764af4166aa6fd180f2ad04b19
 projection:
   include: [model, invariants, relationships]
   requires: [gx]

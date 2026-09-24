@@ -1146,6 +1146,29 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 // checker layer. Omitting gk once let checker DRIFT (a stale committed
 // projection after a mid-session model edit) pass the turn end green while
 // the CLI reported it and exited 1.
+// Gy-rules activates in the stop hook with the CLI's rule: a design with
+// machines/ or an AUTHORIZATION.md gets gy, and one with neither does not.
+func TestSelectGatesArmsConsistencyRules(t *testing.T) {
+	bare := t.TempDir()
+	writeFile(t, filepath.Join(bare, "domain.modelith.yaml"), "entities: {}\n")
+	if sel, _ := selectGates(bare, Config{}); sel.Run["gy"] {
+		t.Fatalf("gy must not run before machines/ or AUTHORIZATION.md exists: %v", sel.Run)
+	}
+	machines := t.TempDir()
+	writeFile(t, filepath.Join(machines, "domain.modelith.yaml"), "entities: {}\n")
+	writeFile(t, filepath.Join(machines, "machines", "Order.machine.json"), "{}\n")
+	if sel, _ := selectGates(machines, Config{}); !sel.Run["gy"] {
+		t.Fatalf("a design with machines must select gy: %v", sel.Run)
+	}
+	inventory := t.TempDir()
+	writeFile(t, filepath.Join(inventory, "domain.modelith.yaml"), "entities: {}\n")
+	writeFile(t, filepath.Join(inventory, "AUTHORIZATION.md"), "<!-- machinery:authorization-inventory -->\n")
+	sel, _ := selectGates(inventory, Config{})
+	if !sel.Run["gy"] || sel.Run["gx"] {
+		t.Fatalf("a machine-less design with AUTHORIZATION.md selects gy (and not gx): %v", sel.Run)
+	}
+}
+
 func TestSelectGatesArmsCarrierIdciteCheckers(t *testing.T) {
 	dir := t.TempDir()
 	sel, _ := selectGates(dir, Config{})

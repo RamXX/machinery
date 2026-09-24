@@ -12,6 +12,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/RamXX/machinery/internal/runtimeclosure"
 	"os"
 	"path/filepath"
 	"strings"
@@ -226,10 +227,10 @@ func TestAssuranceRequiredLaneCarriesClosedCatalog(t *testing.T) {
 		t.Fatalf("platforms are not the closed native pair: %+v", pins)
 	}
 	want := map[string][5]string{
-		"go-testing/v1":           {"go", "1.27.1", "", "", ""},
-		"node-test-typescript/v1": {"node", "26.8.1", "7.0.2", "", ""},
-		"python-unittest/v1":      {"python", "3.14.7", "", "", ""},
-		"elixir-exunit/v1":        {"elixir", "1.20.4", "", "17.0.6", "1.20.4"},
+		"go-testing/v1":           {"go", runtimeclosure.RequiredGoVersion, "", "", ""},
+		"node-test-typescript/v1": {"node", runtimeclosure.RequiredNodeRelease, runtimeclosure.RequiredTypeScriptVersion, "", ""},
+		"python-unittest/v1":      {"python", runtimeclosure.RequiredPythonVersion, "", "", ""},
+		"elixir-exunit/v1":        {"elixir", runtimeclosure.RequiredElixirVersion, "", runtimeclosure.RequiredErtsVersion, runtimeclosure.RequiredElixirVersion},
 	}
 	if len(pins.Adapters) != len(want) {
 		t.Fatalf("adapter pin set is not the closed four-language union: %+v", pins.Adapters)
@@ -364,18 +365,18 @@ func TestAssuranceCatalogExecutesFourLanguageProbesNatively(t *testing.T) {
 		identities[runtime.ID] = runtime.Identity
 	}
 	for id, want := range map[string]string{
-		"go":     "go1.27.1",
-		"node":   "v26.8.1",
-		"tsc":    "Version 7.0.2",
-		"python": "Python 3.14.7",
-		"elixir": "Elixir 1.20.4",
-		"mix":    "Mix 1.20.4",
+		"go":     "go" + runtimeclosure.RequiredGoVersion,
+		"node":   runtimeclosure.RequiredNodeVersion,
+		"tsc":    "Version " + runtimeclosure.RequiredTypeScriptVersion,
+		"python": "Python " + runtimeclosure.RequiredPythonVersion,
+		"elixir": "Elixir " + runtimeclosure.RequiredElixirVersion,
+		"mix":    "Mix " + runtimeclosure.RequiredElixirVersion,
 	} {
 		if !strings.Contains(identities[id], want) {
 			t.Fatalf("runtime %s identity does not match the exact pin (%q vs %q)", id, identities[id], want)
 		}
 	}
-	if !strings.Contains(identities["elixir"], "erts-17.0.6") {
+	if !strings.Contains(identities["elixir"], "erts-"+runtimeclosure.RequiredErtsVersion) {
 		t.Fatalf("elixir identity does not bind the pinned ERTS closure: %q", identities["elixir"])
 	}
 }

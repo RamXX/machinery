@@ -19,6 +19,8 @@ type lockLocation struct {
 	dir  string
 	name string
 	info os.FileInfo
+	// identity keys the process-scoped reservation on record-lock platforms.
+	identity string
 }
 
 type acquireHooks struct {
@@ -47,6 +49,44 @@ func openLockLocation(scope string) (*lockLocation, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, err
 	}
+	location, err := openPrivateLockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := ScopeIdentity(scope)
+	if err != nil {
+		return nil, errors.Join(err, location.root.Close())
+	}
+	sum := sha256.Sum256([]byte(identity))
+	location.name = fmt.Sprintf("%x.lock", sum[:])
+	location.identity = location.name
+	return location, nil
+}
+
+// openLockLocationInDir places the lock file name directly inside dir, an
+// existing caller-owned private directory. Every process that resolves dir
+// shares this lock, independent of where its own scope-lock namespace lives,
+// so a resource shared through dir is guarded by a lock that travels with it.
+func openLockLocationInDir(dir, name string) (*lockLocation, error) {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) || filepath.Base(name) != name {
+		return nil, fmt.Errorf("lock file name %q must be one path segment", name)
+	}
+	location, err := openPrivateLockDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := ScopeIdentity(filepath.Join(dir, name))
+	if err != nil {
+		return nil, errors.Join(err, location.root.Close())
+	}
+	location.name = name
+	location.identity = identity
+	return location, nil
+}
+
+// openPrivateLockDir opens dir as a rooted private real directory and proves
+// the root and the pathname name the same directory.
+func openPrivateLockDir(dir string) (*lockLocation, error) {
 	info, err := os.Lstat(dir)
 	if err != nil {
 		return nil, err
@@ -65,12 +105,7 @@ func openLockLocation(scope string) (*lockLocation, error) {
 	if err := ValidatePrivateDir(dir, inside); err != nil {
 		return nil, errors.Join(err, root.Close())
 	}
-	identity, err := ScopeIdentity(scope)
-	if err != nil {
-		return nil, errors.Join(err, root.Close())
-	}
-	sum := sha256.Sum256([]byte(identity))
-	return &lockLocation{root: root, dir: dir, name: fmt.Sprintf("%x.lock", sum[:]), info: inside}, nil
+	return &lockLocation{root: root, dir: dir, info: inside}, nil
 }
 
 func lockCacheBase() (string, error) {

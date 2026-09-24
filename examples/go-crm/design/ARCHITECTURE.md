@@ -213,7 +213,7 @@ aggregate is loaded, acted on, and saved inside the one write transaction the Co
 
 | component | machine placement | persistence | concurrency serialization |
 |---|---|---|---|
-| `Deal` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `stage` attribute | read-modify-write in one write Tx; cross-process by the store's single-writer lock |
+| `Deal` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `stage` attribute; replaces the prototype's deal record (`migration.yaml`, strategy replace) SUPERSEDES{type:LegacyDeal} | read-modify-write in one write Tx; cross-process by the store's single-writer lock |
 | `Task` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
 | `User` aggregate | ephemeral in-process; load-act-save in the Tx | graph node `status` attribute | as above |
 | `Session` | in-process during a command; token on disk | `~/.crm/session` (user id + expiry, HMAC-signed) | last write wins; single local user |

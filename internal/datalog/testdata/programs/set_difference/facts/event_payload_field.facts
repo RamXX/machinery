@@ -1,0 +1,4 @@
+order.confirmed	orderId
+order.confirmed	total
+order.confirmed	customerId
+order.cancelled	orderId

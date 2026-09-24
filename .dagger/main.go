@@ -49,9 +49,12 @@ func New(
 	// .bin holds a host-built binary every job rebuilds for itself, and
 	// .vault/issues is tracker state. The rest of .vault stays, because
 	// tracked files under it are part of the worktree the formal gate proves
-	// clean, and excluding them would report them as deletions.
+	// clean, and excluding them would report them as deletions. .claude holds
+	// agent-session state (worktrees, the sidecar file) that is never tracked
+	// and can hold whole extra checkouts, which would breach the
+	// tree-inventory snapshot bound.
 	// +defaultPath="/"
-	// +ignore=[".bin", ".dagger/internal", ".vault/issues"]
+	// +ignore=[".bin", ".dagger/internal", ".vault/issues", ".claude"]
 	source *dagger.Directory,
 	// Target platform, for example linux/amd64 to mirror the hosted runners
 	// exactly. Defaults to the host architecture.
@@ -167,16 +170,35 @@ func (m *Machinery) dockerd() *dagger.Service {
 
 // withDocker binds the daemon a job needs to pull and run pinned images, and
 // puts the job's temp directory on the one path both sides can resolve.
-func (m *Machinery) withDocker(c *dagger.Container, job string) *dagger.Container {
-	return c.
+//
+// user is the account the job runs as ("" keeps root). The job directory is
+// created as root and handed to uid 1000, because the cache volume persists
+// across runs and its parent directory may already belong to root from an
+// earlier job or daemon; an unprivileged mkdir there fails with EACCES and
+// the job dies before its first test.
+func (m *Machinery) withDocker(c *dagger.Container, job, user string) *dagger.Container {
+	tmp := sharedTmpPath + "/tmp/" + job
+	work := sharedTmpPath + "/work/" + job
+	c = c.
 		WithServiceBinding("docker", m.dockerd()).
 		WithEnvVariable("DOCKER_HOST", "tcp://docker:2375").
 		// uid 1000 so an unprivileged job can write here; root is not
 		// blocked by a 1000-owned directory.
 		WithMountedCache(sharedTmpPath, m.sharedTmp(),
 			dagger.ContainerWithMountedCacheOpts{Owner: "1000:1000"}).
-		WithExec([]string{"mkdir", "-p", sharedTmpPath + "/tmp/" + job}).
-		WithEnvVariable("TMPDIR", sharedTmpPath+"/tmp/"+job)
+		WithUser("root").
+		// Both per-job directories (TMPDIR, and the worktree copy shInShared
+		// makes) are reset here as root, so a leftover owned by another uid
+		// from an earlier run cannot block the job's own rm -rf or mkdir.
+		WithExec([]string{"bash", "-euo", "pipefail", "-c",
+			"rm -rf " + tmp + " " + work +
+				" && mkdir -p " + tmp + " " + work +
+				" && chown 1000:1000 " + sharedTmpPath + "/tmp " + sharedTmpPath + "/work " + tmp + " " + work}).
+		WithEnvVariable("TMPDIR", tmp)
+	if user != "" {
+		c = c.WithUser(user)
+	}
+	return c
 }
 
 // shInShared runs a script from a copy of the worktree on the shared path.
@@ -326,7 +348,7 @@ echo "go.mod and go.sum tidy"`)
 
 // Test is the full race sweep over every package: the hosted ci test job.
 func (m *Machinery) Test(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "test"), "test",
+	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "test", ciUser), "test",
 		`go test -race -count=1 ./... -timeout=`+goTestTimeout)
 }
 
@@ -427,7 +449,7 @@ make modelith-render-check`)
 // compilation and the reference external checker, including the real pinned
 // OCI checker runtime.
 func (m *Machinery) DesignEngines(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.Base(), "design-engines"), "design-engines", `
+	return m.shInShared(ctx, m.withDocker(m.Base(), "design-engines", ""), "design-engines", `
 make build
 test -s .java-runtime-pin
 test -s .structurizr-pin
@@ -461,7 +483,11 @@ esac
   docker run --rm --pull=never --platform "$platform" --network=none --read-only "$image" python3 --version
 echo "pinned external-checker OCI runtime provisioned"
 
-MACHINERY_REQUIRE_OCI_GOLDEN=1 go test -count=1 -run '^TestVerifyCheckersPiiFlowEngineGolden$' ./cmd/machinery
+# The pii-flow reference runs its rules under Souffle: rebuild that image
+# reproducibly and refuse any digest other than the registry's pin.
+scripts/pii-flow-image.sh
+
+MACHINERY_REQUIRE_OCI_GOLDEN=1 go test -count=1 -run '^(TestVerifyCheckersPiiFlowEngineGolden|TestPiiFlowSouffleVerdicts)$' ./cmd/machinery
 
 scripts/example-inventory.sh checkers | while IFS=$'\t' read -r design registry; do
   .bin/machinery verify-checkers "$design" --registry "$registry"
@@ -478,7 +504,7 @@ echo "every registered external checker re-ran"`)
 // exec would abort the pipeline and take the evidence with it, so the lane
 // runs without -e here and the verdict travels inside the directory.
 func (m *Machinery) IntegrationEvidence() *dagger.Directory {
-	return m.withDocker(m.Base(), "integration-required").
+	return m.withDocker(m.Base(), "integration-required", "").
 		WithEnvVariable("MACHINERY_INTEGRATION_REPORT_DIR", "/evidence").
 		WithExec([]string{"bash", "-c", `
 set +e
@@ -527,6 +553,31 @@ if [ -n "$status" ]; then
   exit 1
 fi
 echo "formal suite clean, no diff"`)
+}
+
+// soufflePlatform is the one platform the upstream Soufflé release is built
+// for; on an arm64 host the parity lane runs under emulation.
+const soufflePlatform = dagger.Platform("linux/amd64")
+
+// DatalogParity is the hosted datalog-parity job: the Soufflé parity tests of
+// internal/datalog and of the shipped Gy-rules rule files, run in the image
+// scripts/souffle.dockerfile builds from pinned inputs (base and Go images by
+// digest, the Soufflé release asset by sha256, dependencies from a fixed
+// Ubuntu snapshot). scripts/datalog-parity.sh fails when a test skipped its
+// Soufflé half.
+func (m *Machinery) DatalogParity(ctx context.Context) (string, error) {
+	c := m.Source.
+		DockerBuild(dagger.DirectoryDockerBuildOpts{
+			Dockerfile: "scripts/souffle.dockerfile",
+			Platform:   soufflePlatform,
+		}).
+		WithEnvVariable("GOCACHE", "/gocache").
+		WithEnvVariable("GOMODCACHE", "/gomodcache").
+		WithMountedCache("/gocache", dag.CacheVolume("machinery-gocache-souffle")).
+		WithMountedCache("/gomodcache", dag.CacheVolume("machinery-gomodcache")).
+		WithMountedDirectory("/src", m.Source).
+		WithWorkdir("/src")
+	return sh(ctx, c, "scripts/datalog-parity.sh")
 }
 
 // Govulncheck scans the toolchain and every registered example module.
@@ -595,7 +646,7 @@ echo "regeneration left the tree clean"`)
 // the canary for environment-driven divergence, such as a Go toolchain update
 // changing generated output.
 func (m *Machinery) GoldenNightly(ctx context.Context) (string, error) {
-	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "golden-nightly"), "golden-nightly", `
+	return m.shInShared(ctx, m.withDocker(m.baseAs(ciUser), "golden-nightly", ciUser), "golden-nightly", `
 go test -count=1 ./... -timeout=20m
 go test -count=1 -run TestGolden ./cmd/machinery`)
 }
@@ -625,6 +676,7 @@ func (m *Machinery) Ci(ctx context.Context) (string, error) {
 		{"docs", func(ctx context.Context) (string, error) { return m.Docs(ctx, "HEAD~1") }},
 		{"modelith-render", m.ModelithRender},
 		{"design-engines", m.DesignEngines},
+		{"datalog-parity", m.DatalogParity},
 		{"verify-formal", m.VerifyFormal},
 		{"govulncheck", m.Govulncheck},
 		{"gitleaks", m.Gitleaks},

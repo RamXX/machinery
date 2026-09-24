@@ -1,0 +1,11 @@
+// An input relation whose fact file is empty.
+.decl item(x:symbol)
+.input item
+.decl blocked(x:symbol)
+.input blocked
+.decl ready(x:symbol)
+.output ready
+ready(X) :- item(X), !blocked(X).
+.decl blocked_out(x:symbol)
+.output blocked_out
+blocked_out(X) :- blocked(X).

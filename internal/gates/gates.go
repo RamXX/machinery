@@ -42,6 +42,24 @@ type Gate struct {
 	// from the running binary. Absence of a stamp records nothing: pre-stamp
 	// artifacts are not skew.
 	stampVersions map[string]bool
+	// explain holds, per finding text, the indented derivation lines Emit
+	// prints under that finding (Gy-rules with --explain).
+	explain map[string][]string
+}
+
+// addExplain attaches derivation lines to a finding's text.
+func (g *Gate) addExplain(finding string, lines []string) {
+	if g.explain == nil {
+		g.explain = map[string][]string{}
+	}
+	g.explain[finding] = lines
+}
+
+// emitExplain prints a finding's derivation lines, aligned under its text.
+func (g *Gate) emitExplain(out io.Writer, finding string) {
+	for _, line := range g.explain[finding] {
+		fmt.Fprintf(out, "         %s\n", line)
+	}
 }
 
 // recordStamp notes the generator version stamped into a checked committed
@@ -167,18 +185,21 @@ func (g *Gate) CheckedExtra(segment string) {
 	g.checkedExtra = append(g.checkedExtra, segment)
 }
 
-// Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok).
-// Returns the number of blocking findings (errs + drift).
+// Emit prints the gate like Python (ERRS, DRIFT, warns, notes, checked:, ok),
+// each finding followed by its derivation lines when it carries any (Gy-rules
+// with --explain). Returns the number of blocking findings (errs + drift).
 func (g *Gate) Emit(out io.Writer) int {
 	fmt.Fprintf(out, "== %s ==\n", g.Title)
 	for _, e := range g.Errs {
 		fmt.Fprintf(out, "  ERROR  %s\n", e)
+		g.emitExplain(out, e)
 	}
 	for _, d := range g.Drift {
 		fmt.Fprintf(out, "  DRIFT  %s\n", d)
 	}
 	for _, w := range g.Warns {
 		fmt.Fprintf(out, "  warn   %s\n", w)
+		g.emitExplain(out, w)
 	}
 	for _, a := range g.Notes {
 		fmt.Fprintf(out, "  note   %s\n", a)
@@ -1505,7 +1526,10 @@ func CheckMachines(design string) *Gate {
 	}
 	// Reconcile in both directions. A generated-looking artifact with no
 	// source machine is stale inventory, not an additional verified machine;
-	// exact basename identity is the only deterministic association.
+	// exact basename identity is the only deterministic association. The one
+	// exception is a contract-only record's matrix, declared by its
+	// placement waiver (NoMachineWaivers); a waiver never excuses an oracle.
+	contractOnly := contractOnlyMatrices(design)
 	for _, spec := range []struct {
 		paths  []string
 		suffix string
@@ -1513,9 +1537,16 @@ func CheckMachines(design string) *Gate {
 	}{{oraclePaths, ".oracle.md", "oracle"}, {matrixPaths, ".matrix.md", "matrix"}} {
 		for _, path := range spec.paths {
 			stem := strings.TrimSuffix(filepath.Base(path), spec.suffix)
-			if !machineStems[stem] {
-				g.Errs = append(g.Errs, fmt.Sprintf("%s: orphan %s has no corresponding %s.machine.json; remove the stale artifact or restore its exact-basename machine", filepath.Base(path), spec.kind, stem))
+			if machineStems[stem] {
+				continue
 			}
+			if spec.kind == "matrix" && contractOnly[stem] {
+				// a contract-only record: its placement row waives the
+				// machine, and the matrix is the record's contract
+				g.Count("contract-only matrices (no machine: waived)")
+				continue
+			}
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: orphan %s has no corresponding %s.machine.json; remove the stale artifact or restore its exact-basename machine (a contract-only record's matrix is declared by '(no machine: <reason>)' on its placement row)", filepath.Base(path), spec.kind, stem))
 		}
 	}
 	if len(files) == 0 {
@@ -2000,15 +2031,17 @@ func CheckTraceability(design string) *Gate {
 	// runs only where a pack exists, so a design that carries one is left to
 	// G5 rather than reported twice for one defect (see eventwiring.go)
 	archText := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
-	checkAuthorizationInventory(g, design, dm)
-	checkFactResolution(g, design, archText, dm)
-	checkClosedVocabularies(g, design, dm)
+	// the declaration grammar family (WRITES, USES, PRODUCES, CARRIES,
+	// SUPERSEDES), the closed group-name vocabulary, and the shape of the
+	// VALUES, payload, derived: and authorization-inventory declarations:
+	// parse-time findings only (declarations.go). What the declarations mean
+	// is Gy-rules' to decide over their projected facts.
+	checkPreCutoverInference(g, design, checkDeclarations(g, design, archText))
+	checkMatrixDeclarationShapes(g, design)
+	checkAuthorizationShape(g, design)
 	if !pack.HasPack(design) {
 		checkEventWiring(g, design, archText)
 	}
-	// A matrix may opt into a closed restatement of one event payload. Once
-	// written, the twin must agree exactly with the Architecture Contract row.
-	checkPayloadTwins(g, design, archText)
 	// the consumer-READS completeness tier, armed by the design's own marker.
 	// It runs on a packed design too: G5 reconciles boundary-event DIRECTION
 	// from the generated events.md and has no notion of READS, so nothing
@@ -2322,16 +2355,93 @@ func placementSubjects(cell string) []string {
 // buried anywhere else in the row is prose, and an empty reason is an
 // unanswered design question, not a waiver (GATE-5).
 func placementWaived(row []string, placementCol int) bool {
+	reason, found := placementWaiverReason(row, placementCol)
+	return found && reason != ""
+}
+
+// placementWaiverReason is the one reader of the '(no machine: <reason>)'
+// waiver: it looks only in the component cell and the machine-placement
+// cell, and returns the first waiver's trimmed reason ("" when every waiver
+// token names none) and whether a waiver token is present at all.
+func placementWaiverReason(row []string, placementCol int) (string, bool) {
 	cells := []string{row[0]}
 	if placementCol > 0 && placementCol < len(row) {
 		cells = append(cells, row[placementCol])
 	}
+	found := false
 	for _, cell := range cells {
-		if m := noMachineWaiverRe.FindStringSubmatch(cell); len(m) > 1 && strings.TrimSpace(m[1]) != "" {
-			return true
+		for _, m := range noMachineWaiverRe.FindAllStringSubmatch(cell, -1) {
+			if reason := strings.TrimSpace(m[1]); reason != "" {
+				return reason, true
+			}
+			found = true
 		}
 	}
-	return false
+	return "", found
+}
+
+// NoMachineWaiver is one '(no machine: <reason>)' placement waiver: the
+// component the row places (its first backticked subject), the waiver's
+// reason ("" when it names none, which is no waiver) and the row's 1-based
+// line in ARCHITECTURE.md.
+type NoMachineWaiver struct {
+	Component string
+	Reason    string
+	Line      int
+}
+
+// NoMachineWaivers reads every persistence-and-placement table of an
+// ARCHITECTURE.md text, as Gx's placement check does, and returns each row
+// whose first component carries the waiver. A '(not placed: ...)' row places
+// nothing and so waives nothing. It is the single source of the
+// contract-only record declaration: the no_machine_waiver fact, G3's orphan
+// matrix report and Gd's clause ownership all read it, so they cannot
+// disagree about which matrix is waived.
+func NoMachineWaivers(archText string) []NoMachineWaiver {
+	var out []NoMachineWaiver
+	for _, r := range walkTableRows(archText) {
+		hl := strings.ToLower(strings.Join(r.header, " "))
+		if !strings.Contains(hl, "placement") || !strings.Contains(hl, "persistence") || len(r.cells) == 0 {
+			continue
+		}
+		named := placementSubjects(r.cells[0])
+		if len(named) == 0 || notPlacedWaiverRe.MatchString(r.cells[0]) {
+			continue
+		}
+		mp := ir.FindCol(r.header, "machine placement", "placement", "machine")
+		if reason, found := placementWaiverReason(r.cells, mp); found {
+			out = append(out, NoMachineWaiver{Component: named[0], Reason: reason, Line: r.line})
+		}
+	}
+	return out
+}
+
+// contractOnlyMatrices names the matrices a design declares contract-only:
+// a machines/<X>.matrix.md with no machines/<X>.machine.json whose component
+// X carries a '(no machine: <reason>)' placement waiver with a reason. A
+// waiver on a component that has a machine declares nothing here (Gy-rules
+// reports it as waived_machine_present), and a matrix with neither is a
+// stale orphan, which G3 and Gy-rules both report.
+func contractOnlyMatrices(design string) map[string]bool {
+	out := map[string]bool{}
+	arch := readDesignOrEmpty(design, filepath.Join(design, "ARCHITECTURE.md"))
+	if arch == "" {
+		return out
+	}
+	mdir := filepath.Join(design, "machines")
+	for _, w := range NoMachineWaivers(normalizeNewlines([]byte(arch))) {
+		if w.Reason == "" {
+			continue
+		}
+		if fi, err := os.Lstat(filepath.Join(mdir, w.Component+".matrix.md")); err != nil || !fi.Mode().IsRegular() {
+			continue
+		}
+		if _, err := os.Lstat(filepath.Join(mdir, w.Component+".machine.json")); err == nil {
+			continue
+		}
+		out[w.Component] = true
+	}
+	return out
 }
 
 func backtickTokens(s string) []string {

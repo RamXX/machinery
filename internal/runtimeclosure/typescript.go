@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -23,7 +24,7 @@ import (
 
 // The exact approved TypeScript closure of the first-release catalog
 // (docs/test-assurance-contract.md section 6): node-test-typescript/v1
-// executes only under Node 26.8.1 with the TypeScript compiler 7.0.2 on the
+// executes only under Node 26.9.0 with the TypeScript compiler 7.0.2 on the
 // pinned native platforms darwin/arm64 and linux/amd64. OpenTypeScript
 // binds the complete closure by exact bytes without launching anything: the
 // node executable, the TypeScript package tree (CLI shim, API surface,
@@ -37,14 +38,18 @@ const (
 	// TypeScriptProfile is the runtime profile identity of the
 	// node-test-typescript/v1 closure.
 	TypeScriptProfile = tddRuntimeProfile
-	// RequiredNodeVersion is the exact first-release Node runtime version.
-	RequiredNodeVersion = "v26.8.1"
+	// RequiredNodeRelease is the exact Node runtime release, the single
+	// owner of the Node pin.
+	RequiredNodeRelease = "26.9.0"
+	// RequiredNodeVersion is the exact Node runtime version as `node
+	// --version` prints it.
+	RequiredNodeVersion = "v" + RequiredNodeRelease
 	// RequiredTypeScriptVersion is the exact first-release TypeScript
 	// compiler version.
 	RequiredTypeScriptVersion = "7.0.2"
 	// TypeScriptIdentityVersion is the RuntimeRef version spelling of the
-	// two-part pinned closure identity.
-	TypeScriptIdentityVersion = "26.8.1/7.0.2"
+	// two-part pinned closure identity, derived from the two pins above.
+	TypeScriptIdentityVersion = RequiredNodeRelease + "/" + RequiredTypeScriptVersion
 
 	typeScriptClosureDomain     = "machinery.tdd.runtime.node-test-typescript/v1"
 	typeScriptProbeDeadlineMS   = int64(30000)
@@ -75,7 +80,7 @@ type TypeScriptRequest struct {
 	ExpectedClosure string
 }
 
-// TypeScript is the pinned Node 26.8.1 / TypeScript 7.0.2 runtime handle
+// TypeScript is the pinned Node 26.9.0 / TypeScript 7.0.2 runtime handle
 // implementing tdd.RuntimeHandle. nodeLibrary binds the node runtime's own
 // shared library (libnode) when the installation links one; it is part of
 // the closure exactly like the executables.
@@ -170,30 +175,35 @@ func OpenTypeScript(ctx context.Context, req TypeScriptRequest) (*TypeScript, er
 	if err != nil {
 		return nil, fmt.Errorf("UNSUPPORTED_VERSION: the pinned TypeScript %s compiler is absent from PATH: %w", RequiredTypeScriptVersion, err)
 	}
-	shimReal, err := filepath.EvalSymlinks(shimDiscovered)
+	platformPkg, err := typeScriptPlatformPackage()
 	if err != nil {
-		return nil, fmt.Errorf("UNSUPPORTED_VERSION: resolve tsc entry: %w", err)
+		return nil, errors.Join(err, nodeFile.Close())
 	}
-	if filepath.Base(filepath.Dir(shimReal)) != "bin" {
-		return nil, fmt.Errorf("UNSUPPORTED_VERSION: tsc entry %s does not live in its package bin directory; unsupported installation layout", shimDiscovered)
-	}
-	pkgRoot := filepath.Dir(filepath.Dir(shimReal))
-	pkgIdentity, err := readTypeScriptPackageIdentity(pkgRoot)
+	layout, err := resolveTypeScriptLayout(shimDiscovered, platformPkg)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, nodeFile.Close())
+	}
+	pkgIdentity, err := readTypeScriptPackageIdentity(layout.pkgRoot)
+	if err != nil {
+		return nil, errors.Join(err, nodeFile.Close())
 	}
 	if pkgIdentity.Name != typeScriptTypescriptPkgName || pkgIdentity.Version != RequiredTypeScriptVersion {
-		return nil, fmt.Errorf("UNSUPPORTED_VERSION: TypeScript package %q version %q is not the exact pinned compiler %s", pkgIdentity.Name, pkgIdentity.Version, RequiredTypeScriptVersion)
+		return nil, errors.Join(nodeFile.Close(), fmt.Errorf("UNSUPPORTED_VERSION: TypeScript package %q version %q is not the exact pinned compiler %s", pkgIdentity.Name, pkgIdentity.Version, RequiredTypeScriptVersion))
 	}
-	platformPkg, _ := typeScriptPlatformPackage()
-	compilerPath := filepath.Join(pkgRoot, "node_modules", "@typescript", platformPkg, "lib", "tsc")
+	if layout.kegVersion != "" && layout.kegVersion != pkgIdentity.Version {
+		return nil, errors.Join(nodeFile.Close(), fmt.Errorf("UNSUPPORTED_VERSION: package-manager keg version %q does not match the TypeScript package version %q it installs", layout.kegVersion, pkgIdentity.Version))
+	}
+	compilerPath := layout.compilerPath
 	platformIdentity, err := readTypeScriptPackageIdentity(filepath.Dir(filepath.Dir(compilerPath)))
 	if err != nil {
-		return nil, fmt.Errorf("UNSUPPORTED_VERSION: the pinned platform compiler package is absent or malformed: %w", err)
+		return nil, errors.Join(nodeFile.Close(), fmt.Errorf("UNSUPPORTED_VERSION: the pinned platform compiler package is absent or malformed: %w", err))
 	}
 	if platformIdentity.Name != "@typescript/"+platformPkg || platformIdentity.Version != RequiredTypeScriptVersion {
-		return nil, fmt.Errorf("UNSUPPORTED_VERSION: platform compiler package %q version %q is not the exact pinned %s", platformIdentity.Name, platformIdentity.Version, RequiredTypeScriptVersion)
+		return nil, errors.Join(nodeFile.Close(), fmt.Errorf("UNSUPPORTED_VERSION: platform compiler package %q version %q is not the exact pinned %s", platformIdentity.Name, platformIdentity.Version, RequiredTypeScriptVersion))
 	}
+	// pkgRoot below is the fingerprinted closure tree root (see
+	// typeScriptLayout.closureRoot).
+	pkgRoot := layout.closureRoot
 	compilerInfo, compilerFile, compilerBody, err := openTypeScriptBinary(compilerPath)
 	if err != nil {
 		return nil, err
@@ -618,4 +628,125 @@ func typeScriptDigestBytes(b []byte) string {
 func typeScriptClosureDigest(nodeDigest, nodeLibDigest, compilerDigest, treeDigest string) string {
 	sum := sha256.Sum256([]byte(typeScriptClosureDomain + "\x00" + nodeDigest + "\x00" + nodeLibDigest + "\x00" + compilerDigest + "\x00" + treeDigest))
 	return hex.EncodeToString(sum[:])
+}
+
+// typeScriptLayout is where a resolved tsc entry says the TypeScript closure
+// lives. pkgRoot is the typescript package (its package.json is the version
+// identity), compilerPath the platform native compiler, and closureRoot the
+// directory whose complete tree is fingerprinted: the typescript package
+// itself when the platform package is nested inside it (npm), or the
+// node_modules directory holding both packages side by side (a Homebrew
+// keg). kegVersion is the keg's package version with any Homebrew revision
+// suffix removed, empty for a plain npm layout.
+type typeScriptLayout struct {
+	pkgRoot      string
+	compilerPath string
+	closureRoot  string
+	kegVersion   string
+}
+
+// homebrewKegName matches a Homebrew keg directory name: the package version
+// plus an optional "_<revision>" suffix. A revision rebuilds the same
+// upstream version, so it is not part of the version identity.
+var homebrewKegName = regexp.MustCompile(`^([0-9]+\.[0-9]+\.[0-9]+)(_[0-9]+)?$`)
+
+const typeScriptEntryMaxHops = 40
+
+// typeScriptEntryChain follows the tsc entry's symlink chain one hop at a
+// time and returns every hop with its directory resolved, ending at the
+// real file. Each hop is kept because package managers link through their
+// own bin directories before reaching the package's file.
+func typeScriptEntryChain(entry string) ([]string, error) {
+	abs, err := filepath.Abs(entry)
+	if err != nil {
+		return nil, err
+	}
+	canonical := func(path string) (string, error) {
+		dir, err := filepath.EvalSymlinks(filepath.Dir(path))
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(dir, filepath.Base(path)), nil
+	}
+	current, err := canonical(abs)
+	if err != nil {
+		return nil, err
+	}
+	chain := []string{current}
+	for range typeScriptEntryMaxHops {
+		info, err := os.Lstat(current)
+		if err != nil {
+			return nil, err
+		}
+		if info.Mode()&os.ModeSymlink == 0 {
+			real, err := filepath.EvalSymlinks(abs)
+			if err != nil {
+				return nil, err
+			}
+			if real != current {
+				return nil, fmt.Errorf("tsc entry %s changed while resolving its symlink chain", entry)
+			}
+			return chain, nil
+		}
+		target, err := os.Readlink(current)
+		if err != nil {
+			return nil, err
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(current), target)
+		}
+		if current, err = canonical(target); err != nil {
+			return nil, err
+		}
+		chain = append(chain, current)
+	}
+	return nil, fmt.Errorf("tsc entry %s has more than %d symlink hops", entry, typeScriptEntryMaxHops)
+}
+
+// resolveTypeScriptLayout maps a tsc entry to its closure layout. Symlinks
+// are resolved first. Two layouts are accepted: the real entry lives in the
+// typescript package's own bin directory (an npm install, global or local),
+// or some hop of the chain is a Homebrew keg's <keg>/bin/tsc whose keg is
+// typescript/<version>[_<revision>] and whose real target is that keg's own
+// typescript shim or platform compiler. Anything else, including a
+// keg-shaped link that points outside its keg, is an unsupported
+// installation layout.
+func resolveTypeScriptLayout(entry, platformPkg string) (typeScriptLayout, error) {
+	chain, err := typeScriptEntryChain(entry)
+	if err != nil {
+		return typeScriptLayout{}, fmt.Errorf("UNSUPPORTED_VERSION: resolve tsc entry: %w", err)
+	}
+	real := chain[len(chain)-1]
+	if filepath.Base(filepath.Dir(real)) == "bin" {
+		pkgRoot := filepath.Dir(filepath.Dir(real))
+		return typeScriptLayout{
+			pkgRoot:      pkgRoot,
+			compilerPath: filepath.Join(pkgRoot, "node_modules", "@typescript", platformPkg, "lib", "tsc"),
+			closureRoot:  pkgRoot,
+		}, nil
+	}
+	for _, hop := range chain[:len(chain)-1] {
+		if filepath.Base(filepath.Dir(hop)) != "bin" {
+			continue
+		}
+		keg := filepath.Dir(filepath.Dir(hop))
+		match := homebrewKegName.FindStringSubmatch(filepath.Base(keg))
+		if match == nil || filepath.Base(filepath.Dir(keg)) != typeScriptTypescriptPkgName {
+			continue
+		}
+		modules := filepath.Join(keg, "libexec", "lib", "node_modules")
+		layout := typeScriptLayout{
+			pkgRoot:      filepath.Join(modules, typeScriptTypescriptPkgName),
+			compilerPath: filepath.Join(modules, "@typescript", platformPkg, "lib", "tsc"),
+			closureRoot:  modules,
+			kegVersion:   match[1],
+		}
+		for _, member := range []string{layout.compilerPath, filepath.Join(layout.pkgRoot, "bin", "tsc")} {
+			if resolved, err := filepath.EvalSymlinks(member); err == nil && resolved == real {
+				return layout, nil
+			}
+		}
+		return typeScriptLayout{}, fmt.Errorf("UNSUPPORTED_VERSION: tsc entry %s resolves to %s, outside its package keg %s; unsupported installation layout", entry, real, keg)
+	}
+	return typeScriptLayout{}, fmt.Errorf("UNSUPPORTED_VERSION: tsc entry %s does not live in its package bin directory; unsupported installation layout", entry)
 }
