@@ -8,8 +8,8 @@ labels: [packet, gw, gv, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:8cb5304b5ca44218419e60a83843c3a29b868f9f2a2ae880916e20fc0882df4e"
-related: [MAC-036o]
+content_hash: "sha256:f39850ca0914a111bf537d757a3e5ef24521ac0a0210c76ec48c6d8decaa6ddf"
+related: [MAC-036o, MAC-d0bw]
 ---
 
 ## Description
@@ -45,6 +45,6 @@ Acceptance criteria:
 
 
 ## Links
-- Related: [[MAC-036o]]
+- Related: [[MAC-036o]], [[MAC-d0bw]]
 
 ## Comments

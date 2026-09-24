@@ -8,7 +8,8 @@ labels: [packet, gw, h2]
 created_at: 2026-09-10T19:13:53Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:46Z
-content_hash: "sha256:c90f42b1b032c7204611aed9230a96c4323455b81ee8396a40f799c601ed50af"
+content_hash: "sha256:32904f0db4965798c91624b810cbc7982f88c30f0ab8c2035aca555e79181915"
+related: [MAC-n87x]
 ---
 
 ## Description
@@ -27,6 +28,6 @@ Triage 2026-09-24: valid (planBlocksOf short-circuits on N/A, packet.go ~619) bu
 
 
 ## Links
-
+- Related: [[MAC-n87x]]
 
 ## Comments
