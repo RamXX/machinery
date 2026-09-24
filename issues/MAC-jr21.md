@@ -1,14 +1,16 @@
 ---
 id: MAC-jr21
 title: "Per-slice packet projection: generate bounded executor packets from a design without splitting its sources"
-status: open
+status: closed
 priority: 0
 type: feature
 labels: [consumer, h2, build, packets, blocks-h2]
 created_at: 2026-09-08T21:59:19Z
 created_by: ramirosalas
-updated_at: 2026-09-10T17:32:18Z
-content_hash: "sha256:396d6a34b1f7588c9562f973cc20f536ff497974e99409ea5f894f0c6f557e12"
+updated_at: 2026-09-24T21:33:43Z
+content_hash: "sha256:dc536f9aa31339c912fc4b8b22816116e4ecd4fac4adfca25f8bdc5ef0ff77a2"
+closed_at: 2026-09-24T21:33:43Z
+close_reason: "Shipped afb381c4 in 0.8.0; H2 runs 47 slices from design/slices.yaml. Follow-ups: MAC-036o, MAC-d0bw. Triage 2026-09-24."
 ---
 
 ## Description
@@ -31,7 +33,7 @@ H2 M1 slices M1-S1..M1-S6 (design/BUILD.md:1878-1955). Needed before the first R
 
 
 ## History
-
+- 2026-09-24T21:33:43Z status: open -> closed
 
 ## Links
 
