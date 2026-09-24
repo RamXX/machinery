@@ -8,7 +8,8 @@ labels: [composition, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:7ec10a8abcc971f1cd7074374e426a8ad7ba9b4eabd3a7854b5a08673a2b93b4"
+content_hash: "sha256:0aa5dd7f55b826703ba1d19116629f465be341ee777c376a67b5bebb11e76ee0"
+blocked_by: [MAC-zti7]
 ---
 
 ## Description
@@ -35,9 +36,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-24T21:33:58Z dep_added: blocked_by MAC-zti7
 
 ## Links
-
+- Blocked by: [[MAC-zti7]]
 
 ## Comments
