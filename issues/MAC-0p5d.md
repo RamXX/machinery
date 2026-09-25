@@ -8,7 +8,8 @@ labels: [modelith, dependencies]
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
 updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:d1c015861265799ce7e65cf38b28864f1218c51fba7b490ece76f55f53655bc1"
+content_hash: "sha256:51f6f1a98281f108a270d39e5f1fecf961df1cff4131f1a69c301d0157e2f386"
+related: [MAC-syos]
 ---
 
 ## Description
@@ -35,6 +36,6 @@ Order: n:n bug, then the pin bump with loud refusal of unsupported forms, then s
 
 
 ## Links
-
+- Related: [[MAC-syos]]
 
 ## Comments
