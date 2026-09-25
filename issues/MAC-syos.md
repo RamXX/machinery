@@ -8,8 +8,8 @@ labels: [context-budget, small-models, docset]
 created_at: 2026-09-25T19:39:57Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:39:57Z
-content_hash: "sha256:63429a745cfc20e12209c9ba80550108c7ee2198751e001fdf239c89ddc06f56"
-related: [MAC-cup9]
+content_hash: "sha256:8dd5eae6a8adabccd44ccee58492f640c8e96eb91226d2feeb40b8e5a3713749"
+related: [MAC-cup9, MAC-n87x]
 ---
 
 ## Description
@@ -40,6 +40,6 @@ Scope: files machinery reads or writes under design/ (DECISIONS.md and STATE.md 
 
 
 ## Links
-- Related: [[MAC-cup9]]
+- Related: [[MAC-cup9]], [[MAC-n87x]]
 
 ## Comments
