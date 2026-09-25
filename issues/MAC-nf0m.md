@@ -8,8 +8,9 @@ labels: [gv, attest, h2]
 created_at: 2026-09-25T19:38:38Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:38:38Z
-content_hash: "sha256:7fe9906482ced315f13c89e68bbaf1f9c80e6cded4abba6b36d9de45ea5a5e6b"
+content_hash: "sha256:c42a80c5b9767d21fb4c4a6dd5c018af27cbad2f284196b18465edee4b088554"
 blocked_by: [MAC-6mzy]
+related: [MAC-zlbk]
 ---
 
 ## Description
@@ -38,5 +39,6 @@ Acceptance criteria:
 
 ## Links
 - Blocked by: [[MAC-6mzy]]
+- Related: [[MAC-zlbk]]
 
 ## Comments
