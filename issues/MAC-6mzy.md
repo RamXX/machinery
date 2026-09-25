@@ -1,41 +1,38 @@
 ---
 id: MAC-6mzy
-title: "Scoped current attestation: bind a Gv current row to its subject set, not the whole tree (reverses MAC-p7jd ruling)"
+title: "Current attestation: git-tracked inventory, committed exclusion list, compact root-digest manifest (keep full-root guarantees)"
 status: open
-priority: 2
+priority: 1
 type: feature
-labels: [gv, attest, h2, needs-owner-decision, from-next]
+labels: [gv, attest, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:49Z
-content_hash: "sha256:ac65b0f4682e77e2cee784cd5417e2d3ceb1b12c3eeab3c7ae36c65febeee6ce"
+updated_at: 2026-09-25T19:38:38Z
+content_hash: "sha256:c21924b71c98806c68843010937f62de401d723382a8e5a4876855fb51b7706d"
 related: [MAC-38er, MAC-zlbk]
 ---
 
 ## Description
-Scoped current attestation: bind a Gv current row to its subject set, not the whole tree
+Current attestation (Gv kind: current, policy full-root-v1) is sound but unworkable at scale; make it stable and cheap WITHOUT narrowing its scope. Owner decision 2026-09-25: keep every MAC-p7jd guarantee; attestor-chosen scope globs are rejected (they reintroduce the under-scoping hole p7jd closed). Derived per-claim scope is a separate follow-up story.
 
-Problem (H2, 2026-09-20, v0.8.0, M2 seal): the design protocol re-attests `gt.conformance-test-shape` as `kind: current` after implementation review. A current row carries the `full-root-v1` manifest: every regular file under the implementation root with mode, size and hash; 3117 entries and about fifteen thousand lines of `attestations.yaml` for a 3000-file tree. The row goes STALE when any file anywhere in the root is added, removed or changed.
+Problem (H2, 2026-09-20, v0.8.0, M2 seal): a current row carries a full-root-v1 manifest of every regular file under the implementation root (3117 entries, about 15,000 lines of attestations.yaml for a 3000-file tree).
+1. Checkout and CI container never hold the same tree: the checkout has ignored files (.env.local, caches, provider state); the container drops paths the project's Dagger module ignores (.claude, .vault, which git tracks). A row generated in either is STALE in the other. H2 invented a "wall-shaped clone" and moved every check --impl and attest --impl into it.
+2. The manifest is inline, so every regeneration is a 15,000-line diff and history grows by the manifest each time.
 
-Consequences:
-1. Checkout and CI container never hold the same tree: the checkout has ignored files (`.env.local`, editor and tool caches, provider state); the container drops paths the project's Dagger module ignores (here `.claude` and `.vault`, which git tracks). A row generated in either is STALE in the other. H2 invented a "wall-shaped clone" (fresh clone minus the container ignore list) and moved every `machinery check --impl` and `machinery attest --impl` into it.
-2. Every commit, even a status-ledger or plan-file line, stales the row, so each commit ends with a regeneration and amend: a fifteen thousand-line diff per commit for an unchanged judgment, and history grows by the manifest each time.
-3. The row does not say which files are the SUBJECT of the claim. For `gt.conformance-test-shape` the subject is the conformance suites and the oracle registry; the manifest binds the README, the infrastructure module and the plans directory with equal weight.
+Evidence: internal/gates/attest.go:718 accepts only policy full-root-v1; attest.go:874 hard-codes it; the inventory is a filesystem walk.
 
-Evidence: internal/gates/attest.go:718 accepts only `policy == "full-root-v1"`; attest.go:874 hard-codes it. MAC-p7jd (closed) deliberately specified "policy must equal full-root-v1. There are no user include, exclude, extension, gitignore or subtree selectors", so this is a policy extension that must preserve MAC-p7jd's guarantees for rows that keep `full-root-v1`. `machinery attest` has no `--ignore` or scope flag (cmd/machinery/attest.go:92-99).
-
-Proposed fix:
-- A scoped policy beside `full-root-v1`: the attestor names subject globs (for example `test/conformance/**`, `test/support/**`, the oracle registry) plus the design covers; the gate binds those files only. Policy name and globs live in the row so the scope is reviewable.
-- An `--ignore` list for generation and checking that takes the same patterns a CI export ignores, so checkout and container agree without a clone.
-- A compact manifest form (one line per entry, or a Merkle root per directory with per-file lines in a sidecar referenced by hash) so the record stays human-readable.
+Fix:
+- Inventory = git-tracked files of the implementation root (git ls-files semantics, index or HEAD, decided and documented), not a filesystem walk. Untracked and ignored files never enter.
+- A committed exclusion list (for paths a CI export drops, e.g. .vault, .claude), itself hashed into the row, so narrowing it stales every row that depends on it. No per-row or per-attestor selectors.
+- Compact manifest: the row stores a root digest (e.g. sorted-entry Merkle root); the per-file entries live in a content-addressed sidecar referenced by hash, outside attestations.yaml.
 
 Acceptance criteria:
-1. A current row scoped to a subject set survives a commit that touches only files outside the set.
-2. A change inside the subject set stales the row.
-3. A checkout and an exported tree with the same ignore list produce the same scope hash.
-4. Record growth per regeneration is bounded by the subject set, not the tree (test with a large synthetic tree).
-5. Rows with `full-root-v1` keep byte-identical behavior and every MAC-p7jd guarantee (existing attest tests green).
-6. CHANGELOG states the proof-scope difference between a scoped row and a full-root row.
+1. A checkout with untracked/ignored files and a container export with the committed exclusion list produce the same root digest for the same commit.
+2. Any tracked add, remove, rename, mode or content change outside the exclusion list stales the row (all MAC-p7jd negative cases still fail as before).
+3. Changing the exclusion list stales every current row.
+4. attestations.yaml grows by a bounded number of lines per current row regardless of tree size (test with a large synthetic tree).
+5. Migration from inline full-root-v1 rows is explicit and never grandfathers freshness; CHANGELOG compatibility note.
+6. H2's wall-shaped clone is no longer needed (documented).
 
 ## Acceptance Criteria
 
