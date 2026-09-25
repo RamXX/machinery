@@ -8,7 +8,8 @@ labels: [gv, attest, h2]
 created_at: 2026-09-25T19:38:38Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:38:38Z
-content_hash: "sha256:43115e01297948450fbe5f826d8384563544b99fa8f146ac7325df68d4c493e1"
+content_hash: "sha256:7fe9906482ced315f13c89e68bbaf1f9c80e6cded4abba6b36d9de45ea5a5e6b"
+blocked_by: [MAC-6mzy]
 ---
 
 ## Description
@@ -33,9 +34,9 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-25T19:38:38Z dep_added: blocked_by MAC-6mzy
 
 ## Links
-
+- Blocked by: [[MAC-6mzy]]
 
 ## Comments

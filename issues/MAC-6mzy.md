@@ -8,8 +8,9 @@ labels: [gv, attest, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:38:38Z
-content_hash: "sha256:c21924b71c98806c68843010937f62de401d723382a8e5a4876855fb51b7706d"
+content_hash: "sha256:c0c28e0b631d749fae93a69cd55a8564c065c32f61dd684a2f384d3c1c3b8031"
 related: [MAC-38er, MAC-zlbk]
+blocks: [MAC-nf0m]
 ---
 
 ## Description
@@ -44,9 +45,10 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-25T19:38:38Z dep_added: blocks MAC-nf0m
 
 ## Links
+- Blocks: [[MAC-nf0m]]
 - Related: [[MAC-38er]], [[MAC-zlbk]]
 
 ## Comments
