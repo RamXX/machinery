@@ -9,8 +9,8 @@ parent: MAC-9dai
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:8126124ef701e07c20947b85ba963f6247286c3d50b70247a05cac8efdc4c21d"
-blocks: [MAC-4ah8]
+content_hash: "sha256:8384e56ded143cde1452903bb8c5134eaadfb272b1ccfa4a6a1f11f1921bdf6c"
+blocks: [MAC-4ah8, MAC-p46v]
 ---
 
 ## Description
@@ -36,9 +36,10 @@ Acceptance criteria:
 
 ## History
 - 2026-09-25T19:53:33Z dep_added: blocks MAC-4ah8
+- 2026-09-25T19:53:33Z dep_added: blocks MAC-p46v
 
 ## Links
 - Parent: [[MAC-9dai]]
-- Blocks: [[MAC-4ah8]]
+- Blocks: [[MAC-4ah8]], [[MAC-p46v]]
 
 ## Comments
