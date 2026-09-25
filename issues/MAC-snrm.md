@@ -9,8 +9,9 @@ parent: MAC-syos
 created_at: 2026-09-25T19:39:57Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:39:57Z
-content_hash: "sha256:d4ddc589ef398d5fd8c905b86c52131d9cc4d9b6f92d20665c4762a5bb276473"
+content_hash: "sha256:e42ab06ad4fc234957fbdc01b442350392163e948aac12ef673f5df380dcd421"
 blocked_by: [MAC-w44m]
+blocks: [MAC-7y8d]
 ---
 
 ## Description
@@ -33,9 +34,11 @@ Acceptance criteria:
 
 ## History
 - 2026-09-25T19:39:57Z dep_added: blocked_by MAC-w44m
+- 2026-09-25T19:39:58Z dep_added: blocks MAC-7y8d
 
 ## Links
 - Parent: [[MAC-syos]]
+- Blocks: [[MAC-7y8d]]
 - Blocked by: [[MAC-w44m]]
 
 ## Comments
