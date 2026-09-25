@@ -8,8 +8,8 @@ labels: [hard-tdd, red-approved, superseded]
 parent: MAC-ui8a
 created_at: 2026-09-05T19:30:26Z
 created_by: ramirosalas
-updated_at: 2026-09-06T19:21:17Z
-content_hash: "sha256:1f45a591fc4bbda761c2009ea5b37f606162ba78d25c6ed87d788dba53403f99"
+updated_at: 2026-09-25T01:31:05Z
+content_hash: "sha256:ae75febe5b55d51eaf8871994b4874dca54046b6b0431b9ddcab2464d7bcc5c0"
 follows: [MAC-a89e, MAC-p8ce, MAC-olrx]
 assignee: dev-MAC-sh60
 led_to: [MAC-wi5z]
@@ -117,6 +117,8 @@ Evidence (read-only review):
 - Read new dev-MAC-sh60/internal/gates/oraclecov_negative_test.go fully through its current end; shasum -a 256 matched the review snapshot above.
 - git -C .claude/worktrees/dev-MAC-sh60 rev-parse HEAD returned 6cb2d974ea8aea211a5974f453cef2b5802bb11e. git diff -- internal/gates/oraclecov_test.go internal/gates/oraclecov.go was empty; status showed only the two new untracked negative test files. PM did not edit either new file or any production/existing test.
 - No PM tests, build, preflight, installation, main change, network mutation, claim release or workflow transition occurred. Author native proof is pending and not presumed from source inspection.
+2026-09-24: branch story/MAC-sh60 (a6ac10eb, 9 unmerged commits) deleted after reassessment: every test case it added, including the final commits' constant_target_field and call_budget cases, exists on main in internal/gates/oraclecov_scope_test.go and oraclecov_negative_test.go via MAC-wi5z; only internal helper names differed. No residual value.
+
 ## Independent PM supplemental TDD audit adjudication — MAC-sh60
 Reviewed candidate a6ac10ebadc0e6b6a344d50aa10d0b810ce6b940 on 2026-09-05. Disposition: NO FROZEN RED TAMPERING FOUND in the three flagged deltas; the mechanical verify-tdd result remains FAIL and has not been waived or converted to PASS. This is a bounded audit adjudication, not acceptance, rejection, delivery, claim release or a workflow transition.
 
