@@ -9,7 +9,8 @@ parent: MAC-0p5d
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
 updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:c84e3f70a503c31b2dc6c247828df9c54eb1e8973a087053dd2c25ba898718c8"
+content_hash: "sha256:7eb9d0be8525ac857da534faba2b4d87779bd236f386d4d7508252c9e47d9dc6"
+blocked_by: [MAC-gscc]
 ---
 
 ## Description
@@ -36,9 +37,10 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-09-25T20:11:08Z dep_added: blocked_by MAC-gscc
 
 ## Links
 - Parent: [[MAC-0p5d]]
+- Blocked by: [[MAC-gscc]]
 
 ## Comments
