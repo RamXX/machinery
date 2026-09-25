@@ -8,8 +8,9 @@ labels: [self-design, dogfood, table-oracle, after-va30]
 created_at: 2026-09-24T02:38:02Z
 created_by: ramirosalas
 updated_at: 2026-09-24T02:38:21Z
-content_hash: "sha256:68207b779362cdbc25d77811e16332d22cdca236a60799d00959dbeb427975cf"
+content_hash: "sha256:2ea46bf1028383b331f46355f464263ca49395ac17a1f2bdb4cb51363a931190"
 blocked_by: [MAC-va30]
+related: [MAC-syos]
 ---
 
 ## Description
@@ -45,5 +46,6 @@ Ordering: starts after MAC-va30 (owner ruling 2026-09-23). Story 1 filed as a ch
 
 ## Links
 - Blocked by: [[MAC-va30]]
+- Related: [[MAC-syos]]
 
 ## Comments
