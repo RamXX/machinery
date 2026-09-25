@@ -8,8 +8,8 @@ labels: [context-budget, modelith, structurizr]
 parent: MAC-syos
 created_at: 2026-09-25T19:39:57Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:39:57Z
-content_hash: "sha256:a3ac7d9de2096b7f0891b4075e4fe1cb3ba9c369fa489f77507ab9e6722a2538"
+updated_at: 2026-09-25T20:11:09Z
+content_hash: "sha256:ad3fc18506953f568c91d07c528adcf4e52d030cd9aacffe731114608e8bcddf"
 blocked_by: [MAC-w44m, MAC-g7d4]
 ---
 
@@ -30,7 +30,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+2026-09-25 Modelith decision input: 0.5.0 ships same-repo imports, shared vocabulary models and qualified scope.Name refs (rendered as links to per-model .md). That makes option (a) available upstream without filing anything, superseding (b) machinery-side assembly and (c) render-only sharding. Machinery work: multi-model discovery via a declared root/manifest (replace the exactly-one *.modelith.yaml rule at ~8 sites: checker.ModelPaths callers, projection_readers.go:290, gates.go:1741-1763, alloy.go:1242-1255, checkers.go:76, checker/project.go:83); resolve scope.Name to (file, Name) with a canonical context id (file stem) since scope is importer-local: entity:<context>.Name, bare entity:Name kept for the root model to avoid churn; global invariant id uniqueness across files; fact grammar disambiguation for dotted refs (vocab.X.y vs Entity.attr.member); Alloy/Gx/Gc across files; per-model renders in complete.go. Imports are non-recursive and reciprocity/invariants stop at the boundary, so machinery owns cross-model checks. Blocked on the pin bump.
 
 ## History
 - 2026-09-25T19:39:58Z dep_added: blocked_by MAC-w44m
