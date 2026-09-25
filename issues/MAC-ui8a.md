@@ -7,7 +7,8 @@ type: epic
 created_at: 2026-09-05T19:28:10Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:7fbd37018b1ebb4353d284c34364c743113ad7ecb238c80fc1f458303d81ecaa"
+content_hash: "sha256:f2c8776d0447d0dc8c01601be506e90db09554fa5345985adbad4b37b77a9c2b"
+related: [MAC-9dai]
 ---
 
 ## Description
@@ -180,6 +181,8 @@ status: new
 
 
 ## Links
+- Related: [[MAC-9dai]]
+
 ## Comments
 
 ### 2026-09-06T09:26:01Z ramirosalas

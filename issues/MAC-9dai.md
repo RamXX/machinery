@@ -8,7 +8,8 @@ labels: [e2e, dod, acceptance]
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:976285001866cdb82cd0850b261cd7761bd92cc1fca6f501c4d811761e5996b3"
+content_hash: "sha256:a97676aea92da62338292db581f68437825d90e8c49dd2868e5cb6017bd40967"
+related: [MAC-ui8a]
 ---
 
 ## Description
@@ -38,6 +39,6 @@ Phase 1 (declarative, deterministic gates) lands without the executable-assuranc
 
 
 ## Links
-
+- Related: [[MAC-ui8a]]
 
 ## Comments
