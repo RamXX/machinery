@@ -9,8 +9,9 @@ parent: MAC-9dai
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
 updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:88e3c98abd8a9fbc8977893e963dd2c885f74984981cf86b30bf50326d34610f"
+content_hash: "sha256:1c29cdf038e37a7c7af96723a5c98c6fe69ff3b40c556230562941cb91e7f256"
 blocked_by: [MAC-p3pj, MAC-lioz]
+blocks: [MAC-qax4]
 ---
 
 ## Description
@@ -38,9 +39,11 @@ Acceptance criteria:
 ## History
 - 2026-09-25T19:53:33Z dep_added: blocked_by MAC-p3pj
 - 2026-09-25T19:53:33Z dep_added: blocked_by MAC-lioz
+- 2026-09-25T19:53:33Z dep_added: blocks MAC-qax4
 
 ## Links
 - Parent: [[MAC-9dai]]
+- Blocks: [[MAC-qax4]]
 - Blocked by: [[MAC-p3pj]], [[MAC-lioz]]
 
 ## Comments
