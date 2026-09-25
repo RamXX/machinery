@@ -9,10 +9,11 @@ parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:585245427ff8fafa388dfc7c98bbf897db5bc860b23a7d371f00e3d52539c991"
+content_hash: "sha256:598a664f9f5ede40372422c8911559c2c3a1ee138bce1de521f158a29f5fefab"
 blocked_by: [MAC-rau8]
 blocks: [MAC-5ft8, MAC-1u2v, MAC-vx24]
 was_blocked_by: [MAC-2n83, MAC-62s6]
+related: [MAC-4ah8]
 ---
 
 ## Description
@@ -114,6 +115,7 @@ Triage 2026-09-24: absorbs the only unique remnant of closed MAC-vx24: update co
 - Blocks: [[MAC-5ft8]], [[MAC-1u2v]], [[MAC-vx24]]
 - Blocked by: [[MAC-rau8]]
 - Was blocked by: [[MAC-2n83]], [[MAC-62s6]]
+- Related: [[MAC-4ah8]]
 
 ## Comments
 
