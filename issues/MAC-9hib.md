@@ -7,8 +7,8 @@ type: bug
 labels: [opencode, adapter, governance, hook]
 created_at: 2026-09-28T15:19:06Z
 created_by: ramirosalas
-updated_at: 2026-09-28T15:19:06Z
-content_hash: "sha256:b95ff479ace1ed4a272be1ebc74cf94a7807078539d4ba473460f955c6160dab"
+updated_at: 2026-09-28T15:50:10Z
+content_hash: "sha256:fe6ad69c5ca6d5195df5e934798e6e1445d59c3b1475cda659f7b117efe46f82"
 ---
 
 ## Description
@@ -93,3 +93,6 @@ Facts:
 
 
 ## Comments
+
+### 2026-09-28T15:50:10Z ramirosalas
+Idle-event finding (2026-09-28 smoke test, OpenCode 2.0.18): session.status and session.idle are ephemeral events (packages/schema/src/session-status-event.ts) and are NOT delivered to plugin ctx.event.subscribe() subscribers. A traced opencode run showed only durable events; the turn ends with session.execution.succeeded (also session.execution.failed / session.execution.interrupted, packages/schema/src/session-event.ts Execution namespace). Consequence: any v2 port that waits on session.status {idle} or session.idle never runs the Stop hook, so the Stop gate is silently off. The installed local patch now keys Stop on the three session.execution.* events; this is applied but NOT yet verified to reach machinery hook. Verified in the same run: PreToolUse and PostToolUse fire via ctx.tool.hook with the correct root. Also observed: plugin console.warn output does not appear in ~/.local/share/opencode/log/opencode.log, so the patch's warning path is invisible.
