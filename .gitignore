@@ -43,3 +43,6 @@ states/
 .vault/.dispatcher-state.json
 .vault/.vlt.lock
 .vault/.guard/
+
+# Private backlog inbox, never committed
+NEXT*.md
