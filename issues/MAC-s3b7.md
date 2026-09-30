@@ -9,7 +9,8 @@ parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
 updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:a59d27a6e950556a5d9fd8d3112421df232a924f544d4de4f1e28702af938805"
+content_hash: "sha256:dfdf0652cd1ccee00a963b1a0a5f616ea8d89146dc1b13114a291355f804fbdb"
+related: [MAC-5n2i]
 ---
 
 ## Description
@@ -43,5 +44,6 @@ ACCEPTANCE CRITERIA
 
 ## Links
 - Parent: [[MAC-lnp2]]
+- Related: [[MAC-5n2i]]
 
 ## Comments

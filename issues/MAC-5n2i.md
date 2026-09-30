@@ -9,9 +9,10 @@ parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
 updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:3087e84499deb298d57cb1a8fb0d85eb82abfeca337a7dbf4f77d62864031455"
+content_hash: "sha256:e0b763a2e12818c598241d5e86c1d82c20dc7a14a8c84db8efd218d0ff6c35dc"
 blocked_by: [MAC-m7bh]
 blocks: [MAC-o493, MAC-q24l]
+related: [MAC-s3b7]
 ---
 
 ## Description
@@ -51,5 +52,6 @@ ACCEPTANCE CRITERIA
 - Parent: [[MAC-lnp2]]
 - Blocks: [[MAC-o493]], [[MAC-q24l]]
 - Blocked by: [[MAC-m7bh]]
+- Related: [[MAC-s3b7]]
 
 ## Comments
