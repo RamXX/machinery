@@ -9,7 +9,8 @@ parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
 updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:ebb6861ab059357fbbd86ba81347cf0b1186023ac94ab3faf3c5ff640b8cd588"
+content_hash: "sha256:ce0ef9948faf538e008c3561b86a3283bc6b39e8309df8a624ae06ca9ca3d1fd"
+related: [MAC-m7bh]
 ---
 
 ## Description
@@ -41,5 +42,6 @@ ACCEPTANCE CRITERIA
 
 ## Links
 - Parent: [[MAC-lnp2]]
+- Related: [[MAC-m7bh]]
 
 ## Comments

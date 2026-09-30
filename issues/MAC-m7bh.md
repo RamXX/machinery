@@ -9,9 +9,9 @@ parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
 updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:91d3b0055be3337471573671db4f3865e5138ee3aa35fbc0a5605bfc3d3fcd41"
+content_hash: "sha256:1938f2fab56d58ff8c0d0926a603fb6e098146be875b697f9a5a0639f7beea06"
 blocks: [MAC-5n2i, MAC-o493, MAC-q24l, MAC-xj6q]
-related: [MAC-6ylh]
+related: [MAC-6ylh, MAC-pm5s]
 ---
 
 ## Description
@@ -53,6 +53,6 @@ ACCEPTANCE CRITERIA
 ## Links
 - Parent: [[MAC-lnp2]]
 - Blocks: [[MAC-5n2i]], [[MAC-o493]], [[MAC-q24l]], [[MAC-xj6q]]
-- Related: [[MAC-6ylh]]
+- Related: [[MAC-6ylh]], [[MAC-pm5s]]
 
 ## Comments
