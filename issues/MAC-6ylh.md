@@ -8,10 +8,11 @@ labels: [story, accepted]
 created_at: 2026-08-29T23:49:02Z
 created_by: ramirosalas
 updated_at: 2026-08-30T00:19:57Z
-content_hash: "sha256:beb1095c369046e5e93d37b7e3ea8368a5b913e0948c58f3ea7eee2751e5128d"
+content_hash: "sha256:306fde05ff6d7e9e7dc0ff0dc641591965aade00927688905bf08bba91356cb0"
 assignee: ramirosalas
 closed_at: 2026-08-30T00:19:51Z
 close_reason: "Accepted: Gu-surfaces target surface ledger gate lands exactly to spec. Full suite verified independently (go test ./... -json: 1177 pass/0 fail/1 skip matching proof exactly), targetsurface tests pass standalone, pvg verify clean (6 pre-existing hook.go stubs confirmed identical on origin/main), pvg gates PASS (no BLOCK), suite.go wiring matches spec (gu beside gs in activation table, run block, knownGateSet, default list, decomposed-parent narrowing), no mocks in integration-shaped tests, no push/tag/version bump confirmed via git. Both dispatcher-sanctioned deviations (gd restoration in 3 gate-vocab lists, zero-human-actor non-blocking note) verified as described and treated in-scope."
+related: [MAC-m7bh]
 ---
 
 ## Description
@@ -175,6 +176,6 @@ status: delivered
 - 2026-08-30T00:19:51Z status: in_progress -> closed
 
 ## Links
-
+- Related: [[MAC-m7bh]]
 
 ## Comments
