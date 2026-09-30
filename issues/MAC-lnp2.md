@@ -7,8 +7,8 @@ type: epic
 labels: [human-surface, h2-origin]
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:01a67fe3be2d6a826265d5d26fdb399e10cb74d84e1557ae5859faf721f8cd33"
+updated_at: 2026-09-30T23:26:44Z
+content_hash: "sha256:aca6d48b3884d2bf36308443651cb82f5f7f00f514a03800bc2a6c1ca927ebf9"
 ---
 
 ## Description
@@ -38,7 +38,7 @@ BOUNDARY (owner): this work must not hinder current H2 development. H2 keeps run
 
 
 ## Notes
-
+Related prior work: MAC-6ylh (Gu-surfaces, design/surfaces.yaml) is the act-to-surface ledger this epic extends; its gate and docs (docs/target-surfaces.md) are present in the tree while the issue still reads in_progress. Captured 2026-09-30 from the H2 conductor; H2 pins machinery v0.10.1 and is unaffected until it adopts a release.
 
 ## History
 
