@@ -9,8 +9,8 @@ parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
 updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:b62e49804acaeb15a08fed5d850f849e6410a0caa60b2dbacab88793b1c82e64"
-blocks: [MAC-5n2i, MAC-o493, MAC-q24l]
+content_hash: "sha256:97b056daf1437532e0ed4b88ab6453b81b6b0dd1e92731df04a39cbc21ec91f2"
+blocks: [MAC-5n2i, MAC-o493, MAC-q24l, MAC-xj6q]
 ---
 
 ## Description
@@ -47,9 +47,10 @@ ACCEPTANCE CRITERIA
 - 2026-09-30T23:26:37Z dep_added: blocks MAC-5n2i
 - 2026-09-30T23:26:37Z dep_added: blocks MAC-o493
 - 2026-09-30T23:26:37Z dep_added: blocks MAC-q24l
+- 2026-09-30T23:26:38Z dep_added: blocks MAC-xj6q
 
 ## Links
 - Parent: [[MAC-lnp2]]
-- Blocks: [[MAC-5n2i]], [[MAC-o493]], [[MAC-q24l]]
+- Blocks: [[MAC-5n2i]], [[MAC-o493]], [[MAC-q24l]], [[MAC-xj6q]]
 
 ## Comments
