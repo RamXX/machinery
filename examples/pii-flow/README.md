@@ -106,7 +106,7 @@ examples/pii-flow/
         generated/
           souffle-outputs.json           # the trace: every output relation Souffle derived (committed)
   souffle-image/
-    Dockerfile                           # the checker userspace: CPython 3.14.7 + Souffle 2.5, all inputs pinned
+    Dockerfile                           # the checker userspace: CPython 3.14.8 + Souffle 2.5, all inputs pinned
   checkers.local.example.yaml            # sample local registry
   README.md
 ```
@@ -188,7 +188,7 @@ or to have machinery re-run the checker and confirm the verdict was earned:
    it fails if the rebuilt digest is not the pinned one:
 
    ```
-   localhost:5959/machinery/pii-flow-souffle@sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7
+   localhost:5959/machinery/pii-flow-souffle@sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9
    ```
 
    On an arm64 host the `linux/amd64` build and every later run execute under
@@ -241,10 +241,8 @@ image removed first):
 
 | Host | Build | Digest |
 |---|---|---|
-| amd64 Linux, Docker 29.8.0, native | 1 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
-| amd64 Linux, Docker 29.8.0, native | 2 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
-| arm64 macOS, Docker Desktop 29.8.0, emulated | 1 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
-| arm64 macOS, Docker Desktop 29.8.0, emulated | 2 | `sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7` |
+| arm64 macOS, Docker Desktop 29.8.1, emulated | 1 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
+| arm64 macOS, Docker Desktop 29.8.1, emulated | 2 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
 
 ## Deriving `runtime_closure`
 

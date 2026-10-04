@@ -6,6 +6,25 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`machinery update` tolerates foreign files in the Claude Code plugin cache.** An
+  interrupted Claude Code marketplace update leaves `temp_subdir_*.clone/.git/FETCH_HEAD` under
+  `~/.claude/plugins/cache`, and plugin discovery refused it with "plugin cache topology member
+  ... is not a real directory". Regular files there are now pinned as topology leaves, so a
+  rewrite during discovery is still caught, and a stray top-level file such as `.DS_Store` is
+  skipped. Symlinks are still rejected.
+
+### Changed
+
+- **Tool and runtime pins follow the latest releases.** golangci-lint v2.14.0, Modelith v0.5.0
+  (the committed example renders now draw referenced relationships as dashed, unlabeled
+  Mermaid edges), and CPython 3.14.8. The pii-flow checker image is rebuilt on
+  `python:3.14.8-slim-trixie`, so its pinned digest becomes
+  `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` and its
+  `runtime_closure` becomes
+  `sha256:badade865809bc90e3077981472c36fb58df58b7479bb3b340b75e745efb48af`.
+
 ## [0.10.2] - 2026-10-04
 
 **Why this release.** Pinned OCI checker images could fail local verification on hosts of a

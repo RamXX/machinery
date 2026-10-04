@@ -24,7 +24,7 @@ var indexFixtures = map[string]string{
 	"/github/elixir": `[{"tag_name":"v1.21.0-rc.0","prerelease":true},{"tag_name":"v1.20.4"},{"tag_name":"v1.19.6"},{"tag_name":"v1.22.0","draft":true}]`,
 	"/node":          `[{"version":"v26.10.0","lts":false},{"version":"v26.9.0","lts":false},{"version":"v24.12.0","lts":"Krypton"}]`,
 	"/typescript":    `{"name":"typescript","version":"7.0.2"}`,
-	"/python":        `[{"name":"Python 3.14.7"},{"name":"Python 3.13.12"},{"name":"Python 3.14.10"},{"name":"Python 3.15.0rc2"}]`,
+	"/python":        `[{"name":"Python 3.14.8"},{"name":"Python 3.13.12"},{"name":"Python 3.14.10"},{"name":"Python 3.15.0rc2"}]`,
 	"/java/21":       `{"releases":["jdk-21.0.12.1+1","jdk-21.0.12+8","jdk-21.0.11+10"]}`,
 	"/java/info":     `{"available_lts_releases":[8,11,17,21,25],"most_recent_lts":25}`,
 	"/go":            `[{"version":"go1.27.1","stable":true},{"version":"go1.28rc1","stable":false},{"version":"go1.26.8","stable":true}]`,
@@ -167,7 +167,7 @@ func TestExtractVersionFromHostOutput(t *testing.T) {
 		"elixir":        {"Elixir", "Erlang/OTP 29 [erts-17.1]\n\nElixir 1.20.4 (compiled with Erlang/OTP 29)\n", "1.20.4"},
 		"node":          {"Node", "v26.9.0\n", "26.9.0"},
 		"tsc":           {"TypeScript", "Version 7.0.2\n", "7.0.2"},
-		"python":        {"Python", "Python 3.14.7\n", "3.14.7"},
+		"python":        {"Python", "Python 3.14.8\n", "3.14.8"},
 		"temurin":       {"Java", "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\n", "21.0.12.1+1"},
 		"other openjdk": {"Java", "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment Homebrew (build 21.0.12.1)\n", "21.0.12.1"},
 		"go":            {"Go", "go1.27.1\n", "1.27.1"},
@@ -185,7 +185,7 @@ func TestCompareVersions(t *testing.T) {
 		a, b string
 		want int
 	}{
-		{"29.1.1", "29.1", 1}, {"3.14.10", "3.14.7", 1}, {"26.9.0", "26.10.0", -1}, {"1.20.4", "1.20.4", 0},
+		{"29.1.1", "29.1", 1}, {"3.14.10", "3.14.8", 1}, {"26.9.0", "26.10.0", -1}, {"1.20.4", "1.20.4", 0},
 	} {
 		if got := compareVersions(c.a, c.b); got != c.want {
 			t.Errorf("compare(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
@@ -245,7 +245,7 @@ func TestSingleFailedLookupIsNotOffline(t *testing.T) {
 func TestHostBehindIsReportedAndFailsOnlyUnderHostStrict(t *testing.T) {
 	rows := []row{
 		{Runtime: "Node", Pinned: "26.10.0", Host: "26.9.0", Latest: "26.10.0"},
-		{Runtime: "Python", Pinned: "3.14.7", Host: "3.14.7", Latest: "3.14.7"},
+		{Runtime: "Python", Pinned: "3.14.8", Host: "3.14.8", Latest: "3.14.8"},
 		{Runtime: "Go", Pinned: "1.27.1", Host: absent, Latest: "1.27.1"},
 		{Runtime: "Java", Pinned: "21.0.12.1+1", Host: "21.0.12.1", Latest: "21.0.12.1+1"},
 	}

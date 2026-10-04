@@ -6,7 +6,7 @@ package adapters
 // in python_integration_test.go. On the RED stub every behavior subject
 // fails on the pending implementation; the byte-pin, fixture-freeze and
 // lookup controls pass. pySampleReport is a REAL harness stream captured
-// from a native CPython 3.14.7 execution of the frozen embedded bytes.
+// from a native CPython 3.14.8 execution of the frozen embedded bytes.
 
 import (
 	"os"
@@ -21,7 +21,7 @@ func pyUnitSuite() *tdd.Suite {
 	return &tdd.Suite{
 		ID:      "python-unit",
 		Adapter: AdapterPythonUnittest,
-		Runtime: tdd.RuntimeRef{Profile: "python-unittest/v1", Version: "3.14.7", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("a", 64)},
+		Runtime: tdd.RuntimeRef{Profile: "python-unittest/v1", Version: "3.14.8", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("a", 64)},
 		Root:    ".",
 		Files:   []string{"unit_test.py"},
 		Tests: []tdd.Test{
@@ -161,7 +161,7 @@ func TestParsePythonWitness(t *testing.T) {
 }
 
 // pySampleReport is a frozen REAL harness stream captured from a native
-// CPython 3.14.7 execution of the frozen embedded helper and bootstrap
+// CPython 3.14.8 execution of the frozen embedded helper and bootstrap
 // during RED (note the stdlib loader's alphabetical execution order).
 const pySampleReport = `{"kind": "suite-start", "schema": "machinery.tdd.harness.python/v1", "tests": ["unit_test.UnitTests.test_fail", "unit_test.UnitTests.test_pass"]}
 {"kind": "test-start", "schema": "machinery.tdd.harness.python/v1", "test": "unit_test.UnitTests.test_fail"}

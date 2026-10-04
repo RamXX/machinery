@@ -1,4 +1,4 @@
-# The pii-flow checker userspace: CPython 3.14.7 (the adapter) plus the
+# The pii-flow checker userspace: CPython 3.14.8 (the adapter) plus the
 # upstream Souffle 2.5 Datalog engine (the rules), for linux/amd64.
 #
 # Every input is pinned by content: the base by manifest digest, each package
@@ -26,7 +26,7 @@
 # their files, their copyright notices, and a regenerated /etc/ld.so.cache,
 # but no dpkg database records for them.
 
-FROM --platform=linux/amd64 python:3.14.7-slim-trixie@sha256:7bf6c3111fe094f8ee1a1cbcdc63c4cfb345b0e3df42d5aa9a90b3b4b022ab6d AS fetch
+FROM --platform=linux/amd64 python:3.14.8-slim-trixie@sha256:65a94bb37b630c482dfd31e5fb9b449cb26c31eab1b7a125cd6bd624acfe3b30 AS fetch
 ADD --checksum=sha256:c7e9dd1349506bbb23c4dcf89e87396198006235f79b1cc516c0a2b67ac067bc \
     https://github.com/souffle-lang/souffle/releases/download/2.5/x86_64-ubuntu-2404-souffle-2.5-Linux.deb \
     /pkgs/souffle.deb
@@ -48,5 +48,5 @@ RUN mkdir -p /stage/etc /stage/usr/local/bin \
  && ldconfig -C /stage/etc/ld.so.cache \
  && /stage/usr/local/bin/souffle --version >/dev/null
 
-FROM --platform=linux/amd64 python:3.14.7-slim-trixie@sha256:7bf6c3111fe094f8ee1a1cbcdc63c4cfb345b0e3df42d5aa9a90b3b4b022ab6d
+FROM --platform=linux/amd64 python:3.14.8-slim-trixie@sha256:65a94bb37b630c482dfd31e5fb9b449cb26c31eab1b7a125cd6bd624acfe3b30
 COPY --from=fetch /stage/ /

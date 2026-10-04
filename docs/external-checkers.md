@@ -660,7 +660,7 @@ reading end to end rather than taking on faith:
   trace: the real `machinery project` output and the engine's real evidence for this design, so you
   can see an actual `input_hash` binding a real projection to a real verdict rather than an
   abstract one.
-- **the image**, `examples/pii-flow/souffle-image/Dockerfile`: CPython 3.14.7 plus the upstream
+- **the image**, `examples/pii-flow/souffle-image/Dockerfile`: CPython 3.14.8 plus the upstream
   Souffle 2.5 binary, every input pinned by content. `scripts/pii-flow-image.sh` rebuilds it with a
   digest-pinned BuildKit and fixed timestamps, so the digest is reproducible, and provisions it
   locally through a loopback registry (the round trip gives the engine its `RepoDigests` entry).

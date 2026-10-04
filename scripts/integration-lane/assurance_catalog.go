@@ -1436,7 +1436,7 @@ func executeTypeScriptConformance(ctx context.Context, scope processscope.Scope,
 // executePythonConformanceSuite executes the frozen python-unittest/v1
 // conformance fixture through the REAL production assurance chain: the
 // frozen bytes are captured into a private content-addressed store bundle,
-// the pinned CPython 3.14.7 runtime closure is opened and validated under
+// the pinned CPython 3.14.8 runtime closure is opened and validated under
 // the lane's custody scope, the closed adapter prepares the suite (verified
 // materialization, embedded byte-pinned helper transport and bootstrap
 // harness, typed assertion call-site validation, native TestLoader

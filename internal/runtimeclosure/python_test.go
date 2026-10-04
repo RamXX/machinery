@@ -2,7 +2,7 @@
 
 package runtimeclosure
 
-// RED contract for MAC-imtz: the pinned CPython 3.14.7 runtime closure.
+// RED contract for MAC-imtz: the pinned CPython 3.14.8 runtime closure.
 // Every subject needs the real GREEN handle; the RED stub fails each with
 // ErrPythonClosureNotImplemented instead of silently passing. No subject
 // launches an unowned subprocess.

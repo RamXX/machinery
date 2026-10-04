@@ -2,7 +2,7 @@ package runtimeclosure
 
 // The exact approved CPython runtime closure of the first-release catalog
 // (docs/test-assurance-contract.md section 6): python-unittest/v1 executes
-// only under CPython 3.14.7 on the pinned native platforms darwin/arm64 and
+// only under CPython 3.14.8 on the pinned native platforms darwin/arm64 and
 // linux/amd64. OpenPython binds the complete closure by exact bytes without
 // launching anything: the interpreter executable, the interpreter's own
 // stdlib library tree (including any installed site-packages under that
@@ -38,7 +38,7 @@ const (
 	// python-unittest/v1 closure.
 	PythonProfile = pythonRuntimeProfile
 	// RequiredPythonVersion is the exact first-release CPython version.
-	RequiredPythonVersion = "3.14.7"
+	RequiredPythonVersion = "3.14.8"
 
 	pythonClosureDomain    = "machinery.runtime.python/v1"
 	pythonProbeDeadlineMS  = int64(30000)
@@ -70,7 +70,7 @@ type PythonRequest struct {
 	ExpectedClosure string
 }
 
-// Python is the pinned CPython 3.14.7 runtime handle implementing
+// Python is the pinned CPython 3.14.8 runtime handle implementing
 // tdd.RuntimeHandle.
 type Python struct {
 	source     string

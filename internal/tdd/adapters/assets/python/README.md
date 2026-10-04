@@ -57,4 +57,4 @@ imports are rejected by static validation.
 are the registered assertion IDs of the frozen fixture; their exact call
 sites are validated structurally (typed AST call targets at the registered
 lines, inside the declared methods) by the embedded bootstrap's `validate`
-subcommand under the pinned CPython 3.14.7 closure at Prepare time.
+subcommand under the pinned CPython 3.14.8 closure at Prepare time.

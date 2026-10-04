@@ -1428,7 +1428,7 @@ Dagger CLI at the version `dagger.json` owns (v0.21.9), verified against a commi
 
 The module does not restate the runtime pins. Its base container is built from
 `scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.1), Node (26.10.0) with TypeScript
-(7.0.2), CPython (3.14.7), and Elixir (1.20.4) on OTP (29.1.1) identities, shared with
+(7.0.2), CPython (3.14.8), and Elixir (1.20.4) on OTP (29.1.1) identities, shared with
 `make ci-linux`. The race sweep runs as an unprivileged user inside the container, because root
 bypasses permission bits and would turn the custody tests that assert an unwritable path is refused
 into silent passes. The wiring guards in `cmd/machinery/repository_contract_test.go` and

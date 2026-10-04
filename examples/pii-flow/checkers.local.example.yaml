@@ -13,7 +13,7 @@ checkers:
     runtime:
       kind: oci
       engine: [docker]
-      image: localhost:5959/machinery/pii-flow-souffle@sha256:51981e17aef416020a1faa778042473a45dda347eab30cbbd9648a264f6f0df7
+      image: localhost:5959/machinery/pii-flow-souffle@sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9
       platform: linux/amd64
       inputs:
         - {source: design/checkers/pii-flow/adapter.py, mount: adapter.py}

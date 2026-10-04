@@ -3,7 +3,7 @@
 #
 # Every runtime identity here mirrors .github/actions/assurance-runtimes, the
 # single owner of the hosted runtime pins: Go 1.27.1, Node 26.10.0 with
-# TypeScript 7.0.2, CPython 3.14.7, Elixir 1.20.4 on OTP 29.1.1. The required
+# TypeScript 7.0.2, CPython 3.14.8, Elixir 1.20.4 on OTP 29.1.1. The required
 # lane re-verifies each identity against testdata/integration-lanes and fails
 # closed, so a drifted stage here fails loudly instead of producing evidence
 # that does not match hosted CI.
@@ -14,7 +14,7 @@
 
 ARG GO_IMAGE=golang:1.27.1-trixie
 ARG NODE_IMAGE=node:26.10.0-trixie-slim
-ARG PYTHON_IMAGE=python:3.14.7-slim-trixie
+ARG PYTHON_IMAGE=python:3.14.8-slim-trixie
 ARG ELIXIR_IMAGE=hexpm/elixir:1.20.4-erlang-29.1.1-debian-trixie-20260918-slim
 ARG DOCKER_CLI_IMAGE=docker:29.7.2-cli
 
@@ -40,7 +40,7 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -sf ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
  && ln -sf ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
-# CPython 3.14.7, from the pinned upstream image.
+# CPython 3.14.8, from the pinned upstream image.
 COPY --from=python /usr/local/bin/python3.14 /usr/local/bin/python3.14
 COPY --from=python /usr/local/lib/python3.14 /usr/local/lib/python3.14
 COPY --from=python /usr/local/lib/libpython3.14.so.1.0 /usr/local/lib/libpython3.14.so.1.0

@@ -1,7 +1,7 @@
 package adapters
 
 // RED contract for MAC-imtz (native subjects): the closed python-unittest/v1
-// adapter executes REAL Python suites — pinned CPython 3.14.7 in isolated
+// adapter executes REAL Python suites — pinned CPython 3.14.8 in isolated
 // mode, the embedded byte-pinned helper and bootstrap/harness, real stdlib
 // unittest lifecycle with full TestCase.id() reconciliation, processscope
 // custody, normalized machinery.tdd.event/v1 accounting — through the REAL
@@ -198,7 +198,7 @@ func pyConformanceSuite(t *testing.T, id string) tdd.Suite {
 
 // TestPythonAdapterExecutesRealUnittestSuiteNatively is the positive native
 // proof: the frozen fixture executes through the real stdlib unittest
-// lifecycle under CPython 3.14.7 isolated mode with the embedded harness;
+// lifecycle under CPython 3.14.8 isolated mode with the embedded harness;
 // the normalized event stream accounts every identity and every registered
 // assertion, including the async member.
 func TestPythonAdapterExecutesRealUnittestSuiteNatively(t *testing.T) {

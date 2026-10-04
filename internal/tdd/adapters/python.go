@@ -70,7 +70,7 @@ const (
 	PythonHelperFile    = "machinery_check.py"
 	PythonBootstrapFile = "_machinery_bootstrap.py"
 
-	pythonRequiredVersion = "3.14.7"
+	pythonRequiredVersion = "3.14.8"
 	pythonProbeTimeoutMS  = int64(120000)
 	pythonReportMaxBytes  = int64(16 << 20)
 	pythonMaxReportLines  = 100000
@@ -159,7 +159,7 @@ type pythonPrepared struct {
 }
 
 // Prepare implements tdd.Adapter: it validates the closed request, opens and
-// validates the pinned CPython 3.14.7 runtime closure under the live scope,
+// validates the pinned CPython 3.14.8 runtime closure under the live scope,
 // materializes and re-verifies the captured source bundle plus the embedded
 // byte-pinned helper and bootstrap, validates every registered assertion as
 // a typed helper call at its exact frozen line through the embedded harness
