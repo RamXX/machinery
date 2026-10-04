@@ -1505,6 +1505,8 @@ func TestCheckerProcessFixture(t *testing.T) {
 		}
 	}
 	switch mode {
+	case "oci-inspect":
+		runCheckerOCIInspectFixture()
 	case "oci-engine":
 		runCheckerOCIEngineFixture(false, false)
 	case "oci-engine-wrong-digest":
