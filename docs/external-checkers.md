@@ -334,8 +334,10 @@ checkers:
 
 Tags are rejected. The image must end in an immutable lowercase `@sha256:` digest and `platform`
 must be exactly `linux/amd64` or `linux/arm64`. The local engine must report that exact reference in
-`RepoDigests` and the inspected image OS/architecture must match the declared platform; verification
-always inspects and executes with that `--platform` and `--pull=never`. A registry closure digest
+`RepoDigests` and the inspected image OS/architecture must match the declared platform. A reported
+variant must be absent or the default (`v8` for arm64, `v1` for amd64). Inspection selects the declared
+`--platform`; only clients or daemon APIs that reject selector support use unselected inspection,
+with the same identity checks. Execution always uses `--platform` and `--pull=never`. A registry closure digest
 binds the image digest, platform, every `run` and `verify` argument, and each declared input's
 portable mount name plus content digest. The manifest and evidence both carry that derived digest.
 A missing, extra, changed input, or platform change therefore fails before execution.
@@ -435,8 +437,9 @@ config for type "bind": bind source path does not exist` (or a permission error 
 creating the checker container. That diagnostic means path layout, not the checker contract: fix the
 mount topology rather than weakening the registry.
 
-The declared `platform` is always passed (`--platform`, `--pull=never`) for both inspection and
-execution. A daemon that emulates the other architecture (Rosetta on Apple Silicon, qemu/binfmt on
+The declared `platform` is selected during inspection when supported and is always passed with
+`--platform` and `--pull=never` during execution. An unselected compatibility inspection must still
+report the exact image reference and required platform. A daemon that emulates the other architecture (Rosetta on Apple Silicon, qemu/binfmt on
 Linux) can therefore reproduce a `linux/amd64` checker closure on an `arm64` host: the
 digest-addressed userspace still executes with the declared platform's semantics. That is emulated
 reproduction of the checker run: evidence about the pinned image and its declared platform, not
@@ -484,7 +487,7 @@ to scope a run to one checker, or `--registry <path>` to point at a registry oth
 1. loads the closed registry, snapshots the OCI engine and every declared input, derives the complete
    runtime closure, and rejects any mismatch with the manifest or committed evidence;
 2. asks the snapshotted engine to inspect the exact image reference and declared platform, rejecting
-   a missing or mismatched `RepoDigests` or OS/architecture identity before execution;
+   a missing or mismatched `RepoDigests`, OS, architecture or variant identity before execution;
 3. re-runs the adapter in that image with explicit `--platform`, `--pull=never`, and the isolation contract above, writing
    fresh evidence to `{out}`;
 4. confirms the freshly produced evidence is reproducible against the committed copy: schema,

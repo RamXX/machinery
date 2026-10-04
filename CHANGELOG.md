@@ -6,6 +6,18 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pinned OCI checker images verify on hosts of a different architecture.**
+  `verify-checkers` now selects the required platform during local image inspection,
+  so Docker's containerd image store returns the platform identity instead of empty
+  OS and architecture fields. Clients or daemons that reject the platform selector
+  fall back to unselected inspection with the same immutable reference, digest and
+  platform checks. Missing images, unavailable platforms and identity mismatches
+  still fail. Explicit variants must match exactly; an omitted variant accepts
+  Docker's default arm64 `v8` or amd64 `v1`. Registry references and runtime closure
+  digests are unchanged.
+
 ## [0.10.1] - 2026-09-24
 
 **Why this release.** 0.10.0 was withdrawn the day it shipped because it blocked valid designs.
