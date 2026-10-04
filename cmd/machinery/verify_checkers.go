@@ -1305,11 +1305,24 @@ func verifyLocalOCIImage(engineArgs []string, image, digest, platform string, ti
 	if timeout <= 0 || timeout > checkerOCIControlPlaneTimeout {
 		timeout = checkerOCIControlPlaneTimeout
 	}
+	const format = "{{json .RepoDigests}}\n{{json .Os}}\n{{json .Architecture}}\n{{json .Variant}}"
 	args := append([]string(nil), engineArgs...)
-	args = append(args, "image", "inspect", "--format", "{{json .RepoDigests}}\n{{json .Os}}\n{{json .Architecture}}", image)
+	args = append(args, "image", "inspect", "--platform", platform, "--format", format, image)
+	started := time.Now()
 	out, err := runChecker(args, timeout, workDir)
+	if err != nil && ociInspectPlatformUnsupported(out, err) {
+		// Older clients and APIs cannot select a platform. Their unselected
+		// response must pass the same identity checks within the original budget.
+		remaining := timeout - time.Since(started)
+		if remaining <= 0 {
+			return fmt.Errorf("inspect %s for required platform %s: platform selection rejected and inspection budget exhausted", image, platform)
+		}
+		args = append([]string(nil), engineArgs...)
+		args = append(args, "image", "inspect", "--format", format, image)
+		out, err = runChecker(args, remaining, workDir)
+	}
 	if err != nil {
-		return fmt.Errorf("inspect %s with the snapshotted engine: %w: %s", image, err, strings.TrimSpace(out))
+		return fmt.Errorf("inspect %s for required platform %s with the snapshotted engine: %w: %s", image, platform, err, strings.TrimSpace(out))
 	}
 	var repoDigests []string
 	dec := json.NewDecoder(strings.NewReader(out))
@@ -1323,12 +1336,25 @@ func verifyLocalOCIImage(engineArgs []string, image, digest, platform string, ti
 	if err := dec.Decode(&architecture); err != nil {
 		return fmt.Errorf("decode OCI image architecture: %w", err)
 	}
+	var variant string
+	if err := dec.Decode(&variant); err != nil {
+		return fmt.Errorf("decode OCI image variant: %w", err)
+	}
 	var trailing any
 	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return fmt.Errorf("OCI RepoDigests response has trailing data")
 	}
 	actualPlatform := imageOS + "/" + architecture
-	if actualPlatform != platform {
+	if variant != "" {
+		actualPlatform += "/" + variant
+	}
+	comparisonPlatform := actualPlatform
+	// Docker can spell the default variant explicitly. Only an omitted pin
+	// variant accepts these defaults; explicit variants still match literally.
+	if strings.Count(platform, "/") == 1 && ((architecture == "arm64" && variant == "v8") || (architecture == "amd64" && variant == "v1")) {
+		comparisonPlatform = imageOS + "/" + architecture
+	}
+	if comparisonPlatform != platform {
 		return fmt.Errorf("OCI image platform %s does not match required platform %s", actualPlatform, platform)
 	}
 	sort.Strings(repoDigests)
@@ -1338,6 +1364,16 @@ func verifyLocalOCIImage(engineArgs []string, image, digest, platform string, ti
 		}
 	}
 	return fmt.Errorf("RepoDigests %v do not contain exact reference %s", repoDigests, image)
+}
+
+func ociInspectPlatformUnsupported(output string, err error) bool {
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) || exitErr.ExitCode() != 1 || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, exec.ErrWaitDelay) {
+		return false
+	}
+	message := strings.ToLower(output)
+	return strings.Contains(message, "unknown flag: --platform") ||
+		(strings.Contains(message, "platform") && strings.Contains(message, "requires api version"))
 }
 
 // runCheckerOCI executes the checker inside one immutable, network-isolated,

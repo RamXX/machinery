@@ -1654,6 +1654,9 @@ func runCheckerOCIEngineFixture(wrongDigest, wrongPlatform bool) {
 			os.Exit(31)
 		}
 		_, _ = fmt.Fprintf(os.Stdout, "%q\n%q\n", imageOS, architecture)
+		if strings.Contains(args[imageAt-1], ".Variant") {
+			_, _ = fmt.Fprintln(os.Stdout, `""`)
+		}
 		os.Exit(0)
 	}
 	if imageAt < 0 || imageAt+1 >= len(args) || work == "" || platform != testRuntimePlatform {
