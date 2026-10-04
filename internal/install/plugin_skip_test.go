@@ -63,6 +63,35 @@ func TestInstallExplicitHomeWinsOverPluginSkip(t *testing.T) {
 	}
 }
 
+// TestPluginInstalledToleratesForeignCacheFiles: Claude Code leaves files in
+// its plugin cache that machinery does not own (an interrupted marketplace
+// update leaves temp_subdir_*.clone/.git/FETCH_HEAD; Finder leaves .DS_Store).
+// Discovery must still find the plugin, and still notice those files change.
+func TestPluginInstalledToleratesForeignCacheFiles(t *testing.T) {
+	home := t.TempDir()
+	seedCachedMachineryPlugin(t, home, "market")
+	cache := filepath.Join(home, "plugins", "cache")
+	fetchHead := filepath.Join(cache, "temp_subdir_1_x.clone", ".git", "FETCH_HEAD")
+	write(t, fetchHead, "deadbeef\n")
+	write(t, filepath.Join(cache, "temp_subdir_1_x.clone", ".git", "objects", "pack", "p.pack"), "pack")
+	write(t, filepath.Join(cache, ".DS_Store"), "finder")
+	if installed, err := pluginInstalled(home); err != nil || !installed {
+		t.Fatalf("foreign cache files must not block discovery: installed=%v err=%v", installed, err)
+	}
+
+	cachedPluginBeforeFinalTopology = func(string) {
+		cachedPluginBeforeFinalTopology = func(string) {}
+		if err := os.WriteFile(fetchHead, []byte("rewritten, longer content\n"), 0o644); err != nil {
+			t.Error(err)
+		}
+	}
+	t.Cleanup(func() { cachedPluginBeforeFinalTopology = func(string) {} })
+	installed, err := pluginInstalled(home)
+	if err == nil || installed || !strings.Contains(err.Error(), "topology") {
+		t.Fatalf("a foreign file rewritten mid-discovery must be caught: installed=%v err=%v", installed, err)
+	}
+}
+
 func TestPluginInstalledRejectsMixedVersionAndUnexpectedInventory(t *testing.T) {
 	t.Run("mixed skill version", func(t *testing.T) {
 		home := t.TempDir()

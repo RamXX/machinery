@@ -460,6 +460,11 @@ func pluginInstalled(home string) (bool, error) {
 		if statErr != nil {
 			return false, fmt.Errorf("inspect plugin cache entry %s: %w", marketplace, statErr)
 		}
+		if entryInfo.Mode().IsRegular() {
+			// A stray file (e.g. .DS_Store) cannot hold a plugin; the topology
+			// snapshot still pins it so a swap is detected.
+			continue
+		}
 		if entryInfo.Mode()&os.ModeSymlink != 0 || !entryInfo.IsDir() {
 			return false, fmt.Errorf("plugin cache entry %s is not a real directory", marketplace)
 		}
@@ -641,12 +646,18 @@ func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, i
 		if err != nil {
 			return fmt.Errorf("inspect plugin cache topology member %s: %w", path, err)
 		}
-		if childInfo.Mode()&os.ModeSymlink != 0 || !childInfo.IsDir() {
-			return fmt.Errorf("plugin cache topology member %s is not a real directory", path)
-		}
 		childDepth := depth + 1
 		if err := validateInstallTraversalDepth(childDepth, path); err != nil {
 			return err
+		}
+		if childInfo.Mode().IsRegular() {
+			// Claude Code leaves foreign files in the cache (temp marketplace
+			// clones carry .git/FETCH_HEAD); pin them as leaves, never descend.
+			inventory[path] = pluginCacheTopologyEntry{info: childInfo, depth: childDepth, changeID: installFileChangeID(childInfo)}
+			continue
+		}
+		if childInfo.Mode()&os.ModeSymlink != 0 || !childInfo.IsDir() {
+			return fmt.Errorf("plugin cache topology member %s is not a real directory", path)
 		}
 		if childDepth < 3 {
 			if err := walkPluginCacheTopology(root, path, childDepth, pass, inventory, afterDirectory); err != nil {
@@ -676,7 +687,7 @@ func revalidatePluginCacheTopologyCensus(root *os.Root, inventory map[string]plu
 	}
 	directories := make([]string, 0, len(inventory))
 	for path, entry := range inventory {
-		if entry.depth < 3 {
+		if entry.depth < 3 && entry.info.IsDir() {
 			directories = append(directories, path)
 		}
 	}
