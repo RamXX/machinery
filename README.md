@@ -4,7 +4,7 @@
 [![Formal Verification](https://github.com/RamXX/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/formal.yml)
 [![Security](https://github.com/RamXX/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/security.yml)
 [![Nightly](https://github.com/RamXX/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/nightly.yml)
-[![CI: Dagger](https://img.shields.io/badge/CI-Dagger%20v0.21.9-131226)](.dagger/main.go)
+[![CI: Dagger](https://img.shields.io/badge/CI-Dagger%20v0.21.10-131226)](.dagger/main.go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery.svg)](https://pkg.go.dev/github.com/RamXX/machinery)
 [![Go Report Card](https://goreportcard.com/badge/github.com/RamXX/machinery)](https://goreportcard.com/report/github.com/RamXX/machinery)
 
@@ -1424,7 +1424,7 @@ The [Dagger](https://dagger.io/) module in `.dagger/` is how CI runs, not a loca
 Linux job in `ci.yml`, `formal.yml`, and `security.yml` is a `dagger call` of the function named
 after it, so each gate has one definition and `make dagger-ci` runs what the runner runs. Run one
 job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted runner installs the
-Dagger CLI at the version `dagger.json` owns (v0.21.9), verified against a committed checksum.
+Dagger CLI at the version `dagger.json` owns (v0.21.10), verified against a committed checksum.
 
 The module does not restate the runtime pins. Its base container is built from
 `scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.1), Node (26.10.0) with TypeScript
