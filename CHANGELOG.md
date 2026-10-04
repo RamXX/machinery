@@ -6,6 +6,14 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-10-04
+
+**Why this release.** `machinery update` failed on any machine whose Claude Code plugin cache held
+a file left by an interrupted marketplace update ("plugin cache topology member ... is not a real
+directory"). 0.10.3 fixes that discovery bug and moves every tool and runtime pin to its latest
+release: Modelith v0.5.0, CPython 3.14.8, golangci-lint v2.14.0 and the Dagger engine v0.21.10.
+Consumers need the Modelith move together with this release (see Compatibility and migration).
+
 ### Fixed
 
 - **`machinery update` tolerates foreign files in the Claude Code plugin cache.** An
@@ -17,13 +25,50 @@ under their version heading when a release is cut.
 
 ### Changed
 
-- **Tool and runtime pins follow the latest releases.** golangci-lint v2.14.0, Modelith v0.5.0
-  (the committed example renders now draw referenced relationships as dashed, unlabeled
-  Mermaid edges), and CPython 3.14.8. The pii-flow checker image is rebuilt on
+- **Tool and runtime pins follow the latest releases.** Modelith v0.5.0, CPython 3.14.8,
+  golangci-lint v2.14.0, and the Dagger engine v0.21.10 (its linux/amd64 checksum is Dagger's
+  published value, confirmed by hashing the archive). The pii-flow checker image is rebuilt on
   `python:3.14.8-slim-trixie`, so its pinned digest becomes
   `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` and its
   `runtime_closure` becomes
   `sha256:badade865809bc90e3077981472c36fb58df58b7479bb3b340b75e745efb48af`.
+
+### Compatibility and migration
+
+- **Modelith.** Consumers who pin Modelith v0.4.0 must move to v0.5.0 together with machinery
+  0.10.3: `go install github.com/stacklok/modelith/cmd/modelith@v0.5.0`. `machinery diag` now
+  reports v0.4.0 as an ERROR against the pin. The committed renders change, because v0.5.0 draws
+  referenced relationships as dashed, unlabeled Mermaid edges, so re-render with
+  `modelith render` and commit the result. Existing models validate unchanged. `machinery check`
+  does not invoke Modelith, and its gates are unchanged.
+- **CPython.** The python-unittest/v1 runtime closure now requires CPython 3.14.8 exactly; a
+  3.14.7 interpreter is refused as an unsupported runtime pin.
+- **pii-flow example.** A registry copied from `examples/pii-flow/checkers.local.example.yaml`
+  must take the new image digest, and the manifest and evidence the new `runtime_closure`, both
+  above. `verify-checkers` names the derived closure when they disagree.
+
+**Generated output.** The oracle, TLA+, Alloy, checker-projection and packet generators now emit
+the `v0.10.3` machinery stamp. Committed example artifacts and the golden corpus are regenerated;
+only version stamps and the corresponding oracle hash pins change. To refresh a design's stamps,
+run `machinery oracle <design>/machines`, `machinery verify-formal <design> --gen-only`, and
+`machinery project <design>` where checker projections are present. Proof scope is unchanged.
+
+**Consumer-corpus diff.** Not run for this release: no change touches gates, projections,
+declarations, or the skill's grammar, and generated output differs from 0.10.2 only by the
+version stamp.
+
+### Known issues
+
+- **Dependabot alert 13** (`go.opentelemetry.io/otel/sdk/log` < 0.21.0, a CPU busy-loop under
+  exporter backpressure) is held, not fixed. The Dagger v0.21.10 Go SDK codegen writes `replace`
+  directives that pin `otel/log`, `otel/sdk/log` and both otlplog exporters to v0.16.0, and it
+  re-applies them on every `dagger develop` and inside the engine on every `dagger call`, so
+  editing `.dagger/go.mod` would hide the alert without changing the build. It affects only the
+  CI module, never the machinery binary, and that module logs only its own jobs. The alert is
+  dismissed as tolerable risk in GitHub with this reasoning. What unblocks it: a Dagger SDK
+  release that drops or raises those replaces (dagger/dagger#13040); then bump `dagger.json` and
+  `.dagger-linux-amd64.sha256`, run `dagger develop`, and confirm `otel/sdk/log` resolves to
+  0.21.0 or later.
 
 ## [0.10.2] - 2026-10-04
 

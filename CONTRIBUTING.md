@@ -212,6 +212,18 @@ findings still gate and need an allow entry citing the release note.
 
 Versions are numeric only (`vX.Y.Z`); local builds are not marked, so a bare
 `go build` reports the same plain version as the release it corresponds to.
+There are no `-dev` or pre-release suffixes.
+
+`INTERNAL_VERSION` and the other version sites change only in a release
+commit, `release: prepare machinery X.Y.Z`. That commit bumps the version
+sites (`Makefile`, `cmd/machinery/main.go`, `internal/version/version.go`,
+the plugin manifests, `skills/machinery/SKILL.md`, the README's install
+examples), regenerates the example stamps and the golden corpus through their
+generators, refreshes the oracle hash pins, and moves `[Unreleased]` in
+`CHANGELOG.md` under the new version with a "Why this release" paragraph. The
+tag follows only after ci, formal and security are green on that exact commit.
+Cut a patch release whenever `main` carries user-visible changes that
+consumers need.
 
 ## Everything else
 

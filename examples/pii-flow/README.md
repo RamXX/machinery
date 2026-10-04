@@ -241,6 +241,8 @@ image removed first):
 
 | Host | Build | Digest |
 |---|---|---|
+| amd64 Linux (Ubuntu 26.04.1 LTS), Docker 29.1.3, BuildKit v0.33.0, native | 1 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
+| amd64 Linux (Ubuntu 26.04.1 LTS), Docker 29.1.3, BuildKit v0.33.0, native | 2 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
 | arm64 macOS, Docker Desktop 29.8.1, emulated | 1 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
 | arm64 macOS, Docker Desktop 29.8.1, emulated | 2 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
 
