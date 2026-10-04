@@ -6,6 +6,14 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-04
+
+**Why this release.** Pinned OCI checker images could fail local verification on hosts of a
+different architecture because Docker's containerd image store returned empty platform fields.
+0.10.2 selects the required platform during inspection and retains strict identity checks on
+compatibility fallback. The test-budget follow-up allows race-detector fixture shutdown without
+changing the production inspection deadline.
+
 ### Fixed
 
 - **Pinned OCI checker images verify on hosts of a different architecture.**
@@ -17,6 +25,23 @@ under their version heading when a release is cut.
   still fail. Explicit variants must match exactly; an omitted variant accepts
   Docker's default arm64 `v8` or amd64 `v1`. Registry references and runtime closure
   digests are unchanged.
+
+- **OCI inspection tests allow race-detector fixture shutdown.** The inspection fixture reuses
+  the test binary, whose successful exit under `-race` includes a one-second detector delay.
+  Its test budget is now five seconds for startup, shutdown and compatibility fallback;
+  production deadlines and platform, digest and fallback checks are unchanged.
+
+### Compatibility and migration
+
+No migration is needed. Registry references and runtime closure digests are unchanged.
+Unavailable platforms and identity mismatches still fail verification; explicit variants must
+match exactly, while omitted variants accept Docker's default arm64 `v8` or amd64 `v1`.
+
+**Generated output.** The oracle, TLA+, Alloy, checker-projection and packet generators now emit
+the `v0.10.2` machinery stamp. Committed example artifacts and the golden corpus are regenerated;
+only version stamps and the corresponding oracle hash pins change. To refresh a design's stamps,
+run `machinery oracle <design>/machines`, `machinery verify-formal <design> --gen-only`, and
+`machinery project <design>` where checker projections are present. Proof scope is unchanged.
 
 ## [0.10.1] - 2026-09-24
 
