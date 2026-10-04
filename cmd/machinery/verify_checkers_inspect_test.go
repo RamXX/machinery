@@ -140,7 +140,10 @@ func TestVerifyLocalOCIImagePlatformInspect(t *testing.T) {
 				t.Fatal(err)
 			}
 			engine := append(checkerProcessFixtureCommand(t, "oci-inspect"), path)
-			err = verifyLocalOCIImage(engine, testRuntimeImage, testRuntimeClosure, required, time.Second, work)
+			// The fixture reuses the test binary, whose successful exit under
+			// -race includes a one-second detector delay. Allow that delay and
+			// subprocess startup for both inspections in the fallback path.
+			err = verifyLocalOCIImage(engine, testRuntimeImage, testRuntimeClosure, required, 5*time.Second, work)
 			if tc.wantError == "" && err != nil {
 				t.Errorf("verification failed: %v", err)
 			} else if tc.wantError != "" && (err == nil || !strings.Contains(err.Error(), tc.wantError)) {
