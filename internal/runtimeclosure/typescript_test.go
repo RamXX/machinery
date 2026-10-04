@@ -155,7 +155,7 @@ func TestTypeScriptClosureValidateProbesUnderCustody(t *testing.T) {
 		t.Fatalf("pinned closure validation failed: %v", err)
 	}
 	if *scope.runs != 2 {
-		t.Fatalf("identity probes launched %d scoped subprocesses, want exactly the node and compiler probes", scope.runs)
+		t.Fatalf("identity probes launched %d scoped subprocesses, want exactly the node and compiler probes", *scope.runs)
 	}
 	if err := handle.Close(); err != nil {
 		t.Fatalf("closure close failed: %v", err)
