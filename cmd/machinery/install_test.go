@@ -215,7 +215,7 @@ func fakeModelithPath(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "modelith")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\n[ \"${1:-}\" = --version ] || exit 2\nprintf 'modelith version 0.4.0\\n'\n"), 0o755); err != nil {
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n[ \"${1:-}\" = --version ] || exit 2\nprintf 'modelith version 0.5.0\\n'\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	return "PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")

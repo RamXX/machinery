@@ -50,8 +50,8 @@ func TestDiagnosticVersionIdentityParsersAreCanonical(t *testing.T) {
 		input string
 		want  string
 	}{
-		{name: "modelith", parse: parseModelithVersion, input: "modelith version 0.4.0\n", want: "0.4.0"},
-		{name: "modelith CRLF", parse: parseModelithVersion, input: "modelith version v0.4.0\r\n", want: "v0.4.0"},
+		{name: "modelith", parse: parseModelithVersion, input: "modelith version 0.5.0\n", want: "0.5.0"},
+		{name: "modelith CRLF", parse: parseModelithVersion, input: "modelith version v0.5.0\r\n", want: "v0.5.0"},
 		{name: "scorecard", parse: parseScorecardVersion, input: "OpenSSF Scorecard\n\nGitVersion:    v5.5.0\nGitCommit: abc\n", want: "v5.5.0"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -67,8 +67,8 @@ func TestDiagnosticVersionIdentityParsersAreCanonical(t *testing.T) {
 		parse func(string) (string, error)
 		input string
 	}{
-		{name: "modelith trailing prose", parse: parseModelithVersion, input: "warning modelith version 0.4.0\n"},
-		{name: "modelith extra line", parse: parseModelithVersion, input: "modelith version 0.4.0\nextra\n"},
+		{name: "modelith trailing prose", parse: parseModelithVersion, input: "warning modelith version 0.5.0\n"},
+		{name: "modelith extra line", parse: parseModelithVersion, input: "modelith version 0.5.0\nextra\n"},
 		{name: "scorecard missing identity", parse: parseScorecardVersion, input: "GitCommit: abc\n"},
 		{name: "scorecard malformed identity", parse: parseScorecardVersion, input: "GitVersion: present\n"},
 		{name: "scorecard malformed plus valid identity", parse: parseScorecardVersion, input: "GitVersion: present\nGitVersion: v5.5.0\n"},
@@ -87,7 +87,7 @@ func TestPreflightRejectsScorecardWithoutGitVersion(t *testing.T) {
 		t.Skip("test helper uses POSIX scripts")
 	}
 	dir := t.TempDir()
-	writeDiagnosticScript(t, dir, "modelith", "echo 'modelith version 0.4.0'\n")
+	writeDiagnosticScript(t, dir, "modelith", "echo 'modelith version 0.5.0'\n")
 	writeDiagnosticScript(t, dir, "scorecard", "echo 'GitCommit: abcdef'\n")
 	t.Setenv("PATH", dir)
 	t.Setenv(runtimeclosure.JavaEnv, "")
@@ -108,7 +108,7 @@ func TestPreflightRejectsProbeWarningOnStderr(t *testing.T) {
 	for _, tool := range []string{"modelith", "scorecard"} {
 		t.Run(tool, func(t *testing.T) {
 			dir := t.TempDir()
-			modelithBody := "echo 'modelith version 0.4.0'\n"
+			modelithBody := "echo 'modelith version 0.5.0'\n"
 			if tool == "modelith" {
 				modelithBody += "echo warning >&2\n"
 			}

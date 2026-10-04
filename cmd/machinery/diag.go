@@ -27,7 +27,7 @@ import (
 	machversion "github.com/RamXX/machinery/internal/version"
 )
 
-const modelithVersion = "v0.4.0"
+const modelithVersion = "v0.5.0"
 
 const diagnosticCommandOutputLimit = 1 << 20
 const diagnosticPluginMaxEntries = 10_000

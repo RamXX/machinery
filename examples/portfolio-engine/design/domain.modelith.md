@@ -148,7 +148,6 @@ A recommended set of exactly 16 holdings with a computed maximum drawdown, produ
 - **portfolio-from-candidates** - Every `Holding`'s `Security` is a member of the run's `CandidateSet`.
 - **portfolio-has-drawdown** - Every `Portfolio` records the `maxDrawdown` it was selected to minimize.
 - **portfolio-review-forward** - A `Portfolio` only advances Proposed to UnderReview, decides to Accepted or Rejected, or is reopened to UnderReview; it never otherwise moves backward.
-
 - **portfolio-accept-role** - Only a `Manager` or `Admin` may accept or reject a `Portfolio`.
 - **portfolio-reopen-role** - Only a `Manager` or `Admin` may reopen a decided `Portfolio`.
 - **portfolio-accepted-has-date** - A `Portfolio` in Accepted records an `acceptedAt` timestamp.
@@ -212,19 +211,18 @@ erDiagram
     Portfolio {}
     RecommendationRun {}
     Security {}
-    CandidateSet }o--o{ Index : "Source"
-    CandidateSet }o--o{ Security : "Candidate"
-    Holding }o--|| Security : "Candidate"
-    Index }o--o{ Security : "Constituent"
+    CandidateSet }o..o{ Index : "Source"
+    CandidateSet }o..o{ Security : "Candidate"
+    Holding }o..|| Security : "Candidate"
+    Index }o..o{ Security : "Constituent"
     Portfolio ||--o{ Holding : "Candidate"
-    RecommendationRun }o--|| CandidateSet : "n:1"
-    RecommendationRun ||--|| Portfolio : "Candidate"
+    RecommendationRun }o..|| CandidateSet : ""
+    RecommendationRun ||..|| Portfolio : "Candidate"
 ```
 
 ## Invariants
 
 - **feed-circuit-breaks** - When the market-data provider fails repeatedly, the feed circuit opens so calls fast-fail instead of hanging, and a run collecting prices fails cleanly rather than stalling.
-
 
 ## Scenarios
 
@@ -263,7 +261,6 @@ Repeated market-data failures trip the circuit and fail the run cleanly.
 **Invariants touched**
 
 - **feed-circuit-breaks** - When the market-data provider fails repeatedly, the feed circuit opens so calls fast-fail instead of hanging, and a run collecting prices fails cleanly rather than stalling.
-
 - **run-terminal-absorbing** - A `RecommendationRun` in Ready or Failed accepts no further lifecycle actions.
 - **run-forward-only** - A `RecommendationRun` only advances Collecting to Optimizing to Ready, or fails; it never moves backward.
 
@@ -281,7 +278,6 @@ A produced portfolio is reviewed and approved.
 **Invariants touched**
 
 - **portfolio-review-forward** - A `Portfolio` only advances Proposed to UnderReview, decides to Accepted or Rejected, or is reopened to UnderReview; it never otherwise moves backward.
-
 - **portfolio-accept-role** - Only a `Manager` or `Admin` may accept or reject a `Portfolio`.
 - **portfolio-accepted-has-date** - A `Portfolio` in Accepted records an `acceptedAt` timestamp.
 
@@ -301,7 +297,6 @@ Reopening is role-gated and returns to review.
 
 - **portfolio-reopen-role** - Only a `Manager` or `Admin` may reopen a decided `Portfolio`.
 - **portfolio-review-forward** - A `Portfolio` only advances Proposed to UnderReview, decides to Accepted or Rejected, or is reopened to UnderReview; it never otherwise moves backward.
-
 
 ### Candidate universe is deduped
 

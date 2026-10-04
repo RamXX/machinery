@@ -988,9 +988,9 @@ versions and release checks. Neither command installs anything.
 - **[modelith](https://modelith.sh/)**, for Phase 1 domain-model lint and render. With
   [Homebrew](https://brew.sh/) (macOS and Linux): `brew install stacklok/tap/modelith`. With the
   [Go](https://go.dev/dl/) toolchain on any OS:
-  `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0`, then put `$(go env GOPATH)/bin`
+  `go install github.com/stacklok/modelith/cmd/modelith@v0.5.0`, then put `$(go env GOPATH)/bin`
   on your `PATH`. Or download a prebuilt binary (macOS, Linux, Windows) from the
-  [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.4.0`,
+  [releases](https://github.com/stacklok/modelith/releases). machinery pins modelith at `v0.5.0`,
   and `machinery preflight` fails when the installed version does not match. Full options:
   [modelith.sh/cli](https://modelith.sh/cli/).
 - **machinery**: the gate tools and formal generators, plus the agent skill and role docs. It is a
@@ -1394,7 +1394,7 @@ runs `go test -race ./...`. Beyond unit tests, these nets are always green in CI
   them; an unmarked orphan pair or half fails.
 - **Rules parity.** The `datalog-parity` job runs every shipped rule file and the evaluator's
   program corpus under both engines, as described above.
-- **Engine reproduction.** Required CI installs Modelith v0.4.0 and reproduces every committed
+- **Engine reproduction.** Required CI installs Modelith v0.5.0 and reproduces every committed
   domain render after the mechanical house-style normalization; compiles every example
   `workspace.dsl` with checksum-pinned Structurizr CLI v2025.11.09; provisions the pinned checker
   runtime by digest for `linux/amd64`, verifying its local `RepoDigests` and OS/architecture;

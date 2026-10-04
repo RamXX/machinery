@@ -438,7 +438,7 @@ echo "no em dashes"`)
 // engine and rejects byte drift.
 func (m *Machinery) ModelithRender(ctx context.Context) (string, error) {
 	return shInCopy(ctx, m.Base(), `
-go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
+go install github.com/stacklok/modelith/cmd/modelith@v0.5.0
 export PATH="$(go env GOPATH)/bin:$PATH"
 make modelith-render-check`)
 }
@@ -613,7 +613,7 @@ func (m *Machinery) Gitleaks(ctx context.Context) (string, error) {
 // whose output drifted from what is committed.
 func (m *Machinery) RegenCleanTree(ctx context.Context) (string, error) {
 	return shInCopy(ctx, m.Base(), `
-go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
+go install github.com/stacklok/modelith/cmd/modelith@v0.5.0
 export PATH="$(go env GOPATH)/bin:$PATH"
 make modelith-render
 make build

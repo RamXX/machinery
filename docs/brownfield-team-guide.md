@@ -59,7 +59,7 @@ team gets a ratchet, not a big bang. The stage you are on is encoded in one plac
 - Install a pinned machinery release (`MACHINERY_VERSION=v0.3.4` or the current release) or
   `go install github.com/RamXX/machinery/cmd/machinery@v0.3.4`. Pin v0.3.4 or later: the hardened gate semantics (strict Gt citations, Rust cfg(test) scanning, wildcard-baseline rejection) ship there, and the gs, gb,
   and gt gates this ladder stages do not exist in earlier releases. Pin modelith too
-  (`v0.4.0`; `go install github.com/stacklok/modelith/cmd/modelith@v0.4.0` installs the pinned release, and
+  (`v0.5.0`; `go install github.com/stacklok/modelith/cmd/modelith@v0.5.0` installs the pinned release, and
   `machinery preflight` warns when the installed version does not match the pin. Keep the
   pin in your CI file as well).
 - Create `design/` at the repo root, per the SKILL.md output layout. It is versioned with
@@ -339,7 +339,7 @@ jobs:
           grep machinery-linux-amd64 checksums-sha256.txt | sha256sum -c -
           install -m 0755 machinery-linux-amd64 /usr/local/bin/machinery
       - name: Install modelith (pinned)
-        run: go install github.com/stacklok/modelith/cmd/modelith@v0.4.0
+        run: go install github.com/stacklok/modelith/cmd/modelith@v0.5.0
       - name: Domain model lint
         run: modelith lint design/domain.modelith.yaml
       - name: Deterministic gates (stage-scoped)

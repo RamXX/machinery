@@ -333,19 +333,19 @@ erDiagram
     Task {}
     Team {}
     User {}
-    Account ||--o{ Contact : "referenced"
-    Account ||--o{ Deal : "referenced"
-    Account }o--|| User : "referenced"
-    Activity }o--|| User : "referenced"
-    Activity }o--|| Contact : "referenced"
-    Contact }o--|| User : "referenced"
-    Deal }o--|| User : "referenced"
-    Deal }o--o{ Contact : "referenced"
-    Pipeline ||--o{ Deal : "referenced"
-    Tag }o--o{ Deal : "referenced"
-    Task }o--|| User : "referenced"
-    Task }o--|| Deal : "referenced"
-    Team ||--o{ User : "referenced"
+    Account ||..o{ Contact : ""
+    Account ||..o{ Deal : ""
+    Account }o..|| User : ""
+    Activity }o..|| User : ""
+    Activity }o..|| Contact : ""
+    Contact }o..|| User : ""
+    Deal }o..|| User : ""
+    Deal }o..o{ Contact : ""
+    Pipeline ||..o{ Deal : ""
+    Tag }o..o{ Deal : ""
+    Task }o..|| User : ""
+    Task }o..|| Deal : ""
+    Team ||..o{ User : ""
 ```
 
 ## Invariants

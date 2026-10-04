@@ -383,17 +383,17 @@ erDiagram
     Refund {}
     Reservation {}
     Shipment {}
-    Inventory ||--|| Product : "referenced"
-    LineItem }o--|| Product : "referenced"
-    Order }o--|| Customer : "referenced"
-    Order ||--o{ LineItem : "owned"
-    Order ||--|| Payment : "owned"
-    Order ||--|| Shipment : "owned"
-    Order ||--|| FulfillmentSaga : "owned"
-    Refund }o--|| Payment : "referenced"
-    Reservation }o--|| Inventory : "referenced"
-    Reservation ||--|| LineItem : "referenced"
-    Shipment ||--|| Address : "owned"
+    Inventory ||..|| Product : ""
+    LineItem }o..|| Product : ""
+    Order }o..|| Customer : ""
+    Order ||--o{ LineItem : ""
+    Order ||--|| Payment : ""
+    Order ||--|| Shipment : ""
+    Order ||--|| FulfillmentSaga : ""
+    Refund }o..|| Payment : ""
+    Reservation }o..|| Inventory : ""
+    Reservation ||..|| LineItem : ""
+    Shipment ||--|| Address : ""
 ```
 
 ## Invariants

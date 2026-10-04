@@ -151,9 +151,9 @@ set -euo pipefail
 case "${1:-}" in
   --version)
     if [[ "${MODELITH_FAKE_MODE:-}" == version-prefixed ]]; then
-      printf 'modelith version v0.4.0\n'
+      printf 'modelith version v0.5.0\n'
     else
-      printf 'modelith version 0.4.0\n'
+      printf 'modelith version 0.5.0\n'
     fi
     if [[ "${MODELITH_FAKE_MODE:-}" == version-warning ]]; then printf 'WARNING: hostile environment\n' >&2; fi
     ;;
@@ -192,7 +192,7 @@ esac
 
 func runRenderFixture(t *testing.T, repo, mode string) (string, error) {
 	t.Helper()
-	cmd := exec.CommandContext(t.Context(), "bash", "scripts/modelith-render.sh", "render", "examples", "v0.4.0")
+	cmd := exec.CommandContext(t.Context(), "bash", "scripts/modelith-render.sh", "render", "examples", "v0.5.0")
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(),
 		"PATH="+filepath.Join(repo, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"),

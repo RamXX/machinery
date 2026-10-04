@@ -5,7 +5,7 @@ set -euo pipefail
 
 action=${1:-render}
 corpus=${2:-examples}
-pin=${3:-v0.4.0}
+pin=${3:-v0.5.0}
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 repo_root=$(CDPATH='' cd -- "$script_dir/.." && pwd -P)
 cd "$repo_root"

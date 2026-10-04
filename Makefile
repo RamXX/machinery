@@ -15,7 +15,7 @@ SHELL := /bin/bash
 .SHELLFLAGS := -eu -o pipefail -c
 SRC := $(CURDIR)
 INTERNAL_VERSION := v0.10.2
-MODELITH_VERSION := v0.4.0
+MODELITH_VERSION := v0.5.0
 MACH ?= $(CURDIR)/.bin/machinery
 EXAMPLE_INVENTORY := scripts/example-inventory.sh
 # Single owner of the accepted example-gate policy, shared verbatim with the

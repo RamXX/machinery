@@ -108,9 +108,9 @@ erDiagram
     DataSubject {}
     ProcessingActivity {}
     Redactor {}
-    DataSubject ||--o{ ProcessingActivity : "1:n"
-    ProcessingActivity ||--|| Redactor : "1:1"
-    Redactor ||--|| AnalyticsExport : "1:1"
+    DataSubject ||..o{ ProcessingActivity : ""
+    ProcessingActivity ||..|| Redactor : ""
+    Redactor ||..|| AnalyticsExport : ""
 ```
 
 ## Invariants
