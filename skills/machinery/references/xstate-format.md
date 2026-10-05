@@ -284,6 +284,28 @@ machine's `_delays` map with its millisecond bound and rationale (numeric `after
 rejected), so the config stays declarative and the bounds come from C4. The implementation's
 `delays` map takes its values from there.
 
+## Fail closed by contract (state tags, lint-enforced)
+
+A component that reports a verdict or an exit status reports success only when every applicable
+check passed; "not checked" is visible and never yields caller-facing success. Say which states
+are which with XState `tags` (a string or an array of strings):
+
+- `accepting` - the state reports caller-facing success;
+- `unchecked` or `omitted` - some applicable check has not run, or an input it needs was absent.
+
+The lint (and so G3) then reports an ERROR for:
+
+- a transition of **any** kind (`on`, `after`, `always`, invoke `onDone`/`onError`, a compound
+  state's `onDone`) from an `unchecked`/`omitted` state, or from a descendant of one, that enters
+  an `accepting` state (entering a compound whose initial child is `accepting` counts);
+- an `accepting` state entered at machine start (the root `initial` and its initial child chain);
+- a state tagged both `accepting` and `unchecked`/`omitted`;
+- a `tags` value that is neither a string nor an array of non-empty strings.
+
+Route a not-checked path to a failing outcome or to an explicit not-checked state (itself tagged
+`unchecked` or `omitted`) that the caller sees as such. Other tags are inert here, and a machine
+without these tags lints exactly as before.
+
 ## Choreography (machines reacting to each other over a bus)
 
 Sagas above are orchestration: one machine drives the compensation. In choreography, machines react
