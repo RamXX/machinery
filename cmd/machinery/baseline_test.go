@@ -117,9 +117,9 @@ func TestBaselineFlagValidation(t *testing.T) {
 	}{
 		{[]string{design}, "machinery_baseline: --impl is required"},
 		{[]string{design, "--gate", "g4,gy"}, "machinery_baseline: --impl is required"},
-		{[]string{design, "--gate", "gx"}, "baseline records g4, gy and gl only"},
+		{[]string{design, "--gate", "gx"}, "baseline records g4, gy, gl, and gz only"},
 		{[]string{design, "--gate", "gy,"}, "empty gate name"},
-		{[]string{design, "--impl", ".", "--grow"}, "--grow applies to --gate gy and gl"},
+		{[]string{design, "--impl", ".", "--grow"}, "--grow applies to --gate gy, gl, and gz"},
 	}
 	for _, tc := range cases {
 		_, errOut, code := runBaseline(t, tc.args...)
@@ -200,5 +200,52 @@ armed: G4 now fails when a baselined edge gains a new offender file, and the mac
 	}
 	if string(again) != string(data) {
 		t.Fatalf("a g4 rerun must keep the recorded Gy/Gl sections:\n%s\nwas\n%s", again, data)
+	}
+}
+
+// A design whose model has one unclassified security-relevant entity under
+// an enforcing threat ledger: Gz blocks until `baseline --gate gz` records
+// the candidate, then reports it as a baselined note. A malformed ledger is
+// refused and the ratchet is left alone.
+func TestBaselineGzRecordsThreatDebt(t *testing.T) {
+	design := filepath.Join(t.TempDir(), "design")
+	writeText(t, filepath.Join(design, "domain.modelith.yaml"), "kind: modelith\nversion: 1\nentities:\n  Credential:\n    definition: A stored login secret.\n")
+	writeText(t, filepath.Join(design, "threats.yaml"), "mode: enforce\nenforced_since: 2026-10-05\n")
+	out, _, code := runCheck(t, design, "--gate", "gz")
+	if code != 1 || !strings.Contains(out, "ERROR  Credential looks security-relevant") {
+		t.Fatalf("the fixture must be red before the baseline (exit %d):\n%s", code, out)
+	}
+	out, errOut, code := runBaseline(t, design, "--gate", "gz", "--date", "2026-10-05")
+	if code != 0 {
+		t.Fatalf("baseline failed (exit %d): %s\n%s", code, errOut, out)
+	}
+	for _, want := range []string{
+		"  Gz-threat: 1 unclassified candidate(s) observed; 1 recorded (first recording)",
+		"ratchet.json: 1 Gz-threat candidate(s) baselined",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("baseline output lacks %q:\n%s", want, out)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(design, "ratchet.json"))
+	if err != nil || !strings.Contains(string(data), "\"threat_debt\": [") || !strings.Contains(string(data), "\"subject\": \"Credential\"") {
+		t.Fatalf("ratchet must record the threat debt: %v\n%s", err, data)
+	}
+	out, _, code = runCheck(t, design, "--gate", "gz")
+	if code != 0 || !strings.Contains(out, "note   baselined: Credential looks security-relevant") {
+		t.Fatalf("a baselined candidate is a note (exit %d):\n%s", code, out)
+	}
+	if _, errOut, code := runBaseline(t, design, "--gate", "gz", "--grow"); code != 0 {
+		t.Fatalf("--grow applies to gz: %s", errOut)
+	}
+
+	writeText(t, filepath.Join(design, "threats.yaml"), "mode: enforce\n")
+	out, errOut, code = runBaseline(t, design, "--gate", "gz")
+	if code == 0 || !strings.Contains(out+errOut, "enforced_since") {
+		t.Fatalf("baseline must refuse a malformed ledger (exit %d):\n%s\n%s", code, out, errOut)
+	}
+	after, err := os.ReadFile(filepath.Join(design, "ratchet.json"))
+	if err != nil || string(after) != string(data) {
+		t.Fatalf("a refused baseline leaves the ratchet alone: %v\n%s", err, after)
 	}
 }

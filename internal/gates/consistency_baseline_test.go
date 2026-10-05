@@ -347,7 +347,7 @@ func TestFinalHandoffRefusesBaselinedConsistencyDebt(t *testing.T) {
 	if final == nil {
 		t.Fatal("--complete must run the final-handoff gate")
 	}
-	if !hasErr(final, "5 baselined consistency finding(s) remain (Gy-rules 3, Gl-ledger 2)") {
+	if !hasErr(final, "5 baselined finding(s) remain (Gy-rules 3, Gl-ledger 2)") {
 		t.Fatalf("final handoff must refuse baselined debt and print the count: %v", final.Errs)
 	}
 	for _, g := range RunSelected(design, "", sel, RunOptions{}) {
