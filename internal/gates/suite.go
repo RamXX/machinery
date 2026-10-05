@@ -48,6 +48,13 @@ type RunOptions struct {
 	// summary line for a matrix past the per-file threshold
 	// (machinery check --verbose).
 	Verbose bool
+	// Landing is the per-landing selection (machinery check --landing): the
+	// checkpoint-only gates (CheckpointOnlyGates) are skipped and stale
+	// external-checker evidence is a note, because between checkpoints the
+	// main line is expected to be stale for attestation, acceptance records,
+	// and checker evidence. Import boundaries, generated-artifact DRIFT, and
+	// every design lint still run. See docs/threat-driven-verification.md.
+	Landing bool
 	// cargoWorkspaceManifest is an immutable exact-file snapshot of a Cargo
 	// workspace root above --impl. It is populated only by Snapshot.RunSelected.
 	cargoWorkspaceManifest string
@@ -270,6 +277,20 @@ var knownGateSet = map[string]bool{
 	"gm": true, "gs": true, "gu": true, "gp": true, "gi": true, "gn": true, "gc": true, "g2": true,
 	"g3": true, "gd": true, "gl": true, "gx": true, "gy": true, "gr": true, "gk": true, "gb": true, "gw": true, "ge": true, "ga": true, "gj": true, "gv": true, "g4": true, "gt": true, "g5": true,
 }
+
+// CheckpointOnlyGates are the gates whose findings are checkpoint evidence
+// (attestation freshness and milestone acceptance records), not per-landing
+// correctness. A landing run skips them; a checkpoint run includes them.
+var CheckpointOnlyGates = []string{"gv", "ga"}
+
+// checkerEvidenceStalePrefix opens the one Gk finding that is checkpoint
+// evidence rather than a generated-artifact drift: the committed verdict was
+// computed over an earlier design. The projection itself is still DRIFT.
+const checkerEvidenceStalePrefix = "evidence input_hash does not match the current design projection"
+
+// LandingNote is printed by a landing run so its green is never read as a
+// checkpoint green.
+const LandingNote = "note: landing run; checkpoint-only gates gv, ga skipped and stale external-checker evidence reported as a note (run machinery check without --landing at the checkpoint)"
 
 // KnownGate reports whether name names a gate this suite can run.
 func KnownGate(name string) bool { return knownGateSet[name] }
@@ -529,6 +550,34 @@ func RunSelected(design, impl string, sel Selection, opt RunOptions) []*Gate {
 }
 
 func runSelectedInSnapshot(design, impl string, sel Selection, opt RunOptions) []*Gate {
+	if opt.Landing {
+		trimmed := Selection{Run: map[string]bool{}, Explicit: sel.Explicit, Note: sel.Note}
+		for g, on := range sel.Run {
+			trimmed.Run[g] = on
+		}
+		for _, g := range CheckpointOnlyGates {
+			delete(trimmed.Run, g)
+		}
+		sel = trimmed
+	}
+	out := runSelectedGates(design, impl, sel, opt)
+	if opt.Landing {
+		for _, g := range out {
+			kept := g.Drift[:0]
+			for _, d := range g.Drift {
+				if strings.HasPrefix(d, checkerEvidenceStalePrefix) {
+					g.Notes = append(g.Notes, "checkpoint-only: "+d)
+					continue
+				}
+				kept = append(kept, d)
+			}
+			g.Drift = kept
+		}
+	}
+	return out
+}
+
+func runSelectedGates(design, impl string, sel Selection, opt RunOptions) []*Gate {
 	var out []*Gate
 	if sel.Run["gm"] && (sel.Explicit || HasMigrationContract(design)) {
 		out = append(out, CheckMigration(design, impl))

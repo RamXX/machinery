@@ -22,12 +22,14 @@ func newCheckCmd() *cobra.Command {
 	var complete bool
 	var explain bool
 	var verbose bool
+	var landing bool
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for Gr-reads, G4-import, Gt-tests, and Gv current implementation reviews")
 	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5")
 	c.Flags().StringVar(&commit, "commit", "", "repository-history anchor for Ga-accept evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.Flags().BoolVar(&warningsAsErrors, "warnings-as-errors", false, "treat every gate warning as a blocking finding")
 	c.Flags().BoolVar(&explain, "explain", false, "print, under each Gy-rules finding, the derivation that produced it (rule file, rule index, and the facts with their sources)")
 	c.Flags().BoolVar(&verbose, "verbose", false, fmt.Sprintf("print every Gl-ledger undeclared-fact line; without it a matrix with more than %d prints one summary line", gates.UndeclaredSummaryThreshold))
+	c.Flags().BoolVar(&landing, "landing", false, "per-landing run: skip the checkpoint-only gates (gv, ga) and report stale external-checker evidence as a note; import boundaries, DRIFT, and design lint still block")
 	c.Flags().BoolVar(&complete, "complete", false, "final-handoff mode: require all phase artifacts, --impl, closed milestones, and zero warnings")
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
 		output := trackCommandOutput()
@@ -46,15 +48,22 @@ func newCheckCmd() *cobra.Command {
 			fmt.Fprintln(stderr, "machinery_check: --complete requires --impl so final handoff includes G4-import, Gt-tests, and Gv current implementation reviews")
 			return commandExit(1)
 		}
+		if complete && landing {
+			fmt.Fprintln(stderr, "machinery_check: --complete cannot be combined with --landing; final handoff is a checkpoint and runs every gate")
+			return commandExit(1)
+		}
 		warningsAsErrors = warningsAsErrors || complete
 		// the flag wins over the environment, so a CI job's exported commit
 		// never silently overrides what the operator typed
 		if commit == "" {
 			commit = os.Getenv("MACHINERY_COMMIT")
 		}
-		sel, run, skewNote, err := gates.SelectRunAndNote(design, implDir, gateList, gates.RunOptions{Commit: commit, Complete: complete, Explain: explain, Verbose: verbose})
+		sel, run, skewNote, err := gates.SelectRunAndNote(design, implDir, gateList, gates.RunOptions{Commit: commit, Complete: complete, Explain: explain, Verbose: verbose, Landing: landing})
 		if sel.Note != "" {
 			fmt.Fprintln(stdout, sel.Note)
+		}
+		if landing && err == nil {
+			fmt.Fprintln(stdout, gates.LandingNote)
 		}
 		if err != nil {
 			fmt.Fprintf(stderr, "machinery_check: %s\n", err)
@@ -91,7 +100,9 @@ func newCheckCmd() *cobra.Command {
 		// component-green and must not be reported as the platform passing.
 		// Only a default (non-explicit) run earns the claim: an explicit
 		// --gate subset verified only what it named.
-		if fail == 0 && !sel.Explicit {
+		if fail == 0 && !sel.Explicit && landing {
+			fmt.Fprintln(stdout, "landing-green: every per-landing gate green (checkpoint evidence not checked)")
+		} else if fail == 0 && !sel.Explicit {
 			if implDir != "" {
 				fmt.Fprintln(stdout, "platform-green: design gates, G4-import, and Gt-tests all green")
 			} else {

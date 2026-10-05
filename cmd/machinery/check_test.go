@@ -1023,3 +1023,29 @@ func TestProvisionOfficialStructurizrArchiveAndReuseCache(t *testing.T) {
 		t.Fatalf("cache reuse changed Structurizr identity:\nfirst %s %x\nsecond %s %x", first, firstDigest, second, secondDigest)
 	}
 }
+
+// A landing run skips the checkpoint-only gates: a closed milestone whose
+// acceptance record is REJECTED blocks a checkpoint run and never a landing.
+func TestCheckLandingSkipsCheckpointOnlyGates(t *testing.T) {
+	design := writeAcceptanceDesign(t, "dead0000beef1111222233334444555566667777")
+	writeText(t, filepath.Join(design, "acceptance", "M0.yaml"), "milestone: 0\ncommit: dead0000beef1111222233334444555566667777\nverdict: REJECTED\n"+
+		"dod_ids: []\nfindings: []\nreviewer: conductor\ndate: 2026-08-27\n")
+	full, code := runCheckGa(t, design)
+	if code != 1 || !strings.Contains(full, "Ga-accept") {
+		t.Fatalf("checkpoint run must block on Ga: code %d\n%s", code, full)
+	}
+	landing, code := runCheckGa(t, design, "--landing")
+	if code != 0 || strings.Contains(landing, "Ga-accept") || !strings.Contains(landing, gates.LandingNote) {
+		t.Fatalf("landing run must skip Ga and say so: code %d\n%s", code, landing)
+	}
+
+	_, errB, codes := withCapturedIO(t)
+	cmd := newCheckCmd()
+	cmd.SetArgs([]string{design, "--landing", "--complete", "--impl", design})
+	if err := executeCapturedCommand(cmd); err != nil {
+		t.Fatal(err)
+	}
+	if len(*codes) == 0 || !strings.Contains(errB.String(), "--complete cannot be combined with --landing") {
+		t.Fatalf("--complete with --landing must refuse: %v %q", *codes, errB.String())
+	}
+}
