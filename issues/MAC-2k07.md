@@ -1,15 +1,17 @@
 ---
 id: MAC-2k07
 title: "tree-inventory snapshot counts nested worktrees; preflight render check fails in any checkout with worktrees"
-status: open
+status: closed
 priority: 3
 type: bug
 labels: [preflight, tooling]
 created_at: 2026-09-08T07:58:27Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:49Z
-content_hash: "sha256:818b68c13a03824d7b09b7fbd80faa8643d9b2cdcac7756273000c7e4081cf39"
+updated_at: 2026-10-06T05:53:39Z
+content_hash: "sha256:ba9c52a4e5d07e77e3129e9c4b4aceb2c29d886e210e441f37df0b3b1d177d0e"
 related: [MAC-qo6n, MAC-38er]
+closed_at: 2026-10-06T05:53:39Z
+close_reason: "Fixed in 0.11.1 (35a986d5 RED, caad9bd2 GREEN): render snapshots read tracked and non-ignored files through Git; nested worktrees no longer count."
 ---
 
 ## Description
@@ -54,7 +56,7 @@ Triage 2026-09-24: partial. b9242e8a prunes .claude (scripts/modelith-render.sh:
 Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Snapshot from tracked (or tracked plus non-ignored) files, skip nested .git-file directories, and surface the tree-inventory error text in preflight. Evidence: scripts/modelith-render.sh:117 prunes .git, .codebase-memory and .claude (so nested story worktrees under .claude no longer count; fixed by b9242e8a/330df9c5 per triage). Walk is still filesystem-based via scripts/tree-inventory with no git ls-files; worktrees elsewhere or other ignored trees still count toward the 128 MiB cap. scripts/preflight-fast.sh:156 still reports 'stale or the pinned engine is unavailable' for a snapshot overflow. Notes: Overlaps MAC-gls5 (hashes gitignored .codebase-memory) and MAC-38er in spirit; one git-ls-files-based snapshot would fix 2k07 and gls5 together. Related MAC-qo6n is tiering, not a hard dependency.
 
 ## History
-
+- 2026-10-06T05:53:39Z status: open -> closed
 
 ## Links
 - Related: [[MAC-qo6n]], [[MAC-38er]]
