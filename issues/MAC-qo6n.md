@@ -7,8 +7,8 @@ type: feature
 labels: [release-process, ci, preflight]
 created_at: 2026-09-08T16:36:40Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:5875234513c0d1fda224311e3daafabb90b17735dea25bc45efd3b41d7ddcb5c"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:9ea1df496a412385025f7b344ceccc56fcf95ee5d75ed7228f4daa8fd831746e"
 related: [MAC-2k07, MAC-awrq, MAC-y5ho]
 ---
 
@@ -41,6 +41,7 @@ Six push attempts, each paying the full pre-push gate (about 50 minutes: 20 to 3
 
 ## Notes
 Triage 2026-09-24: PARTIAL. Items 1-3 and 5 shipped 0ee03664 (0.7.1); non-root sweep 220c2b29 (0.8.0); socket-sharing defect superseded by Dagger nested dockerd. Remaining scope: item 4 only, install/custody suites out of the Dagger Test go test -race sweep into their own lane (CHANGELOG:743).
+Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Item 4 only: move the fsync-bound internal/install suite and the load-sensitive custody tests (processscope, processcontrol, adapters) out of the parallel race sweep into the required lane with fixed budgets and receipts, with before/after wall-time measurement; keep the lane validator and the three policy mirrors in sync. Evidence: Items 1-3 and 5 shipped in 0ee03664 (0.7.1: scripts/preflight-fast.sh, make ci-linux at Makefile:104-105, scripts/ci-linux.sh); non-root sweep 220c2b29 (0.8.0). Item 4 still open: .dagger/main.go:352 runs `go test -race -count=1 ./... -timeout=` over every package including internal/install and the custody suites; scripts/ci-linux.sh:119 likewise; CHANGELOG ~946 says the move stays open. Notes: Retitle to the remaining item-4 scope. Related MAC-2k07, MAC-awrq, MAC-y5ho (host-load flakes) are what item 4 would mitigate, not blockers.
 
 ## History
 
