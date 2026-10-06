@@ -2,13 +2,13 @@
 id: MAC-syos
 title: "Context-bounded design artifacts: size budget, sharded documents with generated index, id-based addressing"
 status: open
-priority: 1
+priority: 2
 type: epic
 labels: [context-budget, small-models, docset]
 created_at: 2026-09-25T19:39:57Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:39:57Z
-content_hash: "sha256:14ff88cbeee2ac92d5b900c581c22d77be8996e4e1c798e3abb6d65155789755"
+updated_at: 2026-10-06T04:03:56Z
+content_hash: "sha256:5f119a1eee7403bbb04c8b942ae9832349e0e6aab03faefd4cd30c3d72973742"
 related: [MAC-cup9, MAC-n87x, MAC-0p5d]
 ---
 
@@ -34,7 +34,7 @@ Scope: files machinery reads or writes under design/ (DECISIONS.md and STATE.md 
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Whole epic remains: reader layer (MAC-w44m), size gate (MAC-snrm), converter (MAC-7y8d), third-party formats (MAC-p88c). Evidence: No docset reader, size gate or shard command: grep for docset, 'machinery shard', INDEX, size budget finds nothing in internal or cmd; only maxExecutionPacketBytes = 64<<10 at internal/gates/buildplan.go:98 (packets only). CHANGELOG 0.11.0 has no design-file budget. Notes: Epic still makes sense; the evidence (multi-MB DECISIONS/STATE on H2) is a real usability problem for small models but not a gate correctness hole, so P1 is high. Gw-packet/slices.yaml (CHANGELOG ~698-718) already covers implementer context, lowering urgency. Related MAC-n87x is a packet warning band, MAC-cup9 the self-design epic.
 
 ## History
 
