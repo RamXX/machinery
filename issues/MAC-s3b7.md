@@ -2,14 +2,14 @@
 id: MAC-s3b7
 title: "Persona provisioning declarations and a real-path conformance obligation"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [story, human-surface, h2-origin]
 parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:dfdf0652cd1ccee00a963b1a0a5f616ea8d89146dc1b13114a291355f804fbdb"
+updated_at: 2026-10-06T04:03:55Z
+content_hash: "sha256:e0bf7456eba528ce15b40aeed60727dd37dbf4cecfd61fd217c50fd87a245b2e"
 related: [MAC-5n2i]
 ---
 
@@ -37,7 +37,7 @@ ACCEPTANCE CRITERIA
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add the provisioning field (coordinate with Modelith), lint for dangling actions and undeclared humans, Gt binding for real-path tests, plus docs/template rules. Evidence: grep for 'provisioning:' declarations, persona or actor provisioning in internal/, schemas/, skills/ finds nothing; CHANGELOG through 0.11.0 has no persona provisioning rule (only unrelated JVM/custody provisioning at CHANGELOG.md:556,1048). Model schema, lint and Gt obligation absent. Notes: Related MAC-5n2i is not a hard dependency: this is model plus Gt-binding work and does not need the screen-contract artifact (MAC-m7bh). Parent epic MAC-lnp2 (human-surface governance) still makes sense. Cost of a model-schema change depends on upstream Modelith, which owns the actor format.
 
 ## History
 
