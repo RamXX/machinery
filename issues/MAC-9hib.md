@@ -2,13 +2,13 @@
 id: MAC-9hib
 title: "OpenCode v2 governance adapter: machinery.js fails to load under OpenCode 2.x, governance silently off"
 status: open
-priority: 0
+priority: 1
 type: bug
 labels: [opencode, adapter, governance, hook]
 created_at: 2026-09-28T15:19:06Z
 created_by: ramirosalas
-updated_at: 2026-09-28T15:50:10Z
-content_hash: "sha256:fe6ad69c5ca6d5195df5e934798e6e1445d59c3b1475cda659f7b117efe46f82"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:7a0ee106111fad42a40db65a887614e9f990f35ef776109583c07eb19370a9e2"
 ---
 
 ## Description
@@ -84,7 +84,7 @@ Facts:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add v2 default entrypoint, v2 test lane, real-binary e2e, doctor version/adapter check, docs/agent-portability.md and CHANGELOG. Evidence: adapters/opencode/plugins/machinery.js has only the V1 named export (line 309 export const MachineryPlugin); no default export, ctx.tool.hook or setup(); machinery.test.mjs has no v2 lane; cmd/machinery/diag.go (doctor) has no OpenCode version check; CHANGELOG OpenCode entries (0.8.x lines 644, 1200) are V1 only. Notes: Fails open (governance silently off) for any user on OpenCode 2.x, violating the adapter fail-closed contract. Large story; consider splitting doctor detection (cheap, closes silent failure first) from the adapter port.
 
 ## History
 
