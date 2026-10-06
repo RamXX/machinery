@@ -152,3 +152,17 @@ func TestAdoptionRefusesReplacementAndCorruptLedger(t *testing.T) {
 		})
 	}
 }
+
+func TestMissingIdentityInOriginalStoreNamesMissingFile(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	event := editEvent("PreToolUse", "Write", "seat", filepath.Join(root, "design", "BUILD.md"))
+	runEvent(t, root, event)
+	if err := os.Remove(filepath.Join(stateDirPath(), stateDirectoryIdentityName)); err != nil {
+		t.Fatal(err)
+	}
+	out := runEvent(t, root, event)
+	if !strings.Contains(out, "identity file") || strings.Contains(out, "replacement store") {
+		t.Fatalf("missing identity in original directory misreported as replacement: %s", out)
+	}
+}
