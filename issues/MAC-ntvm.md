@@ -7,8 +7,8 @@ type: bug
 labels: [hook, governance, crash-safety, h2-origin]
 created_at: 2026-10-06T15:31:42Z
 created_by: ramirosalas
-updated_at: 2026-10-06T16:07:35Z
-content_hash: "sha256:3d811828926f7454ab875170a337ae375f70f945b1ab3a29b1f9c87819539cab"
+updated_at: 2026-10-06T19:09:01Z
+content_hash: "sha256:4a91ccd6bda4a0be846f389c7d77066de742baafb4ec49a700bfe63dbd3ee368"
 related: [MAC-xqu7]
 ---
 
@@ -43,6 +43,46 @@ Usable, with a sharp edge: any crash, kill or eviction during a tool call perman
 
 ## Notes
 Second field case 2026-10-06 (owner laptop, macOS, machinery v0.11.1, plugin re-enabled after being disabled): the H2 project ledger (revision 1159) holds 13 pending tokens from earlier sessions AND two route bindings (1dee6b9c..., b38873d4...). Every Stop in the repo now blocks with 'dirty obligation was armed under a different routing configuration; refusing to clear it using fallback or changed configuration'. Cause chain: plugin disable/enable cycles and binary upgrades leave PreToolUse tokens without PostToolUse, and a route recorded under an older binary/config can never match again. Needs the same operator recovery (audited release/rebind that keeps the obligation armed and re-runs the gates under the current route). Also: toggling the plugin off mid-project should not strand tokens silently; doctor should report stranded tokens and foreign routes per project.
+RESUME POINT 2026-10-06: fix work is on origin branch fix/hook-identity-device-reattach (e45350e0, 'release: prepare machinery 0.11.2', NOT tagged or published) plus uncommitted agent state at origin wip/hookfix-20261006 (843018a1). Remaining: close the last security-review finding (incomplete validation / parser differential in internal/hook/boundary.go), run make preflight and make ci-linux (Linux arm64 + amd64), then the consolidated v0.11.2 release and update verification (machinery update from v0.11.1 and fresh install, macOS and Linux, interrupted-update rollback, Claude plugin refresh). Full brief:
+You are the machinery maintainer agent for this run. Work in ~/workspace/machinery (Go; public OSS repo RamXX/machinery). The owner has given an EXPLICIT GO for one consolidated release at the end of this run (this overrides the usual "commit locally only" rule for this run only). Work fully autonomously; nobody will answer questions. Write in the repo's existing style. Never use emojis or em dashes anywhere (code, docs, commits, changelog).
+
+# Goal
+Fix the governance hook's two field-blocking bugs, prove the fixes on macOS AND Linux, and ship ONE patch release (next version after v0.11.1, i.e. v0.11.2 unless the repo's release policy says otherwise) whose update path works flawlessly on both macOS and Linux. The owner will test the update themselves on both platforms afterwards.
+
+Read first: `nd show MAC-xqu7`, `nd show MAC-ntvm` (full field reports, reproductions and expected behaviour), docs/claude-plugin.md (hook contract), internal/hook/, docs/release-notes.md, release-policy.json, the Makefile (preflight, release targets), CHANGELOG.md, install.sh and the `machinery update` implementation.
+
+# Starting point
+Branch fix/hook-identity-device-reattach (local only) has commit 6553172b: on every Unix, sameHookNativeIdentity treats an equal inode as the same store directory (macOS already did), so a Linux block volume that reattaches with a new device number no longer bricks the store. Review it critically, keep it if sound, and finish it (MAC-xqu7).
+
+# Required fixes
+1. MAC-xqu7: as above, plus `machinery hook-state adopt` must be able to rebind an operator-verified store (generation matches the independent marker) to a new native identity, printing old and new identity. `doctor` must never prescribe a command that is guaranteed to refuse.
+2. MAC-ntvm, stranded in-flight tokens. Field triggers seen 2026-10-06: (a) host process SIGKILLed mid tool call (pod eviction); (b) the user pressing Esc to interrupt while a tool runs (one stranded token observed after Esc then /exit); (c) the plugin disabled and re-enabled across sessions (13 stranded tokens on a Mac); (d) obligations recorded under two different routing configurations after binary/plugin upgrades or .machinery.json changes, so Stop refuses forever with "dirty obligation was armed under a different routing configuration". Required behaviour:
+   - A Stop must not be blocked forever by tokens it can never close. Tokens belong to the session that armed them (the immutable session route is already recorded); a different or dead session's tokens are reported as orphaned and do NOT block, while the project design/impl obligation STAYS ARMED so the gates still run at discharge. Same-session in-flight tokens still block, as today.
+   - Determine, by reading Claude Code's documented hook events (and Codex/OpenCode adapters in this repo), what is emitted on a user interrupt; if no PostToolUse/PostToolUseFailure arrives, handle the interrupt so the token does not strand.
+   - An obligation armed under an older routing configuration must be re-evaluated under the CURRENT configuration (re-run the gates) instead of refusing forever; never discharge it without running the gates.
+   - Add an audited operator command, e.g. `machinery hook-state release --root <root> (--token <id> | --orphaned)`, that records who/when/which tokens in the ledger and keeps the obligation armed.
+   - `machinery doctor` reports stranded tokens and foreign-route obligations per project, with the exact recovery command.
+3. Security posture: none of this may let an agent silently skip `machinery check` or forge a store. Explain the threat-model trade-offs in the changelog entry and in docs/claude-plugin.md.
+
+# Tests (TDD; real behaviour, no weakening of existing tests)
+- Regression tests reproducing each field case: device renumbering on Linux; SIGKILL mid tool call followed by a new session; interrupt without PostToolUse; plugin toggling; route change after an armed obligation. Each must fail on v0.11.1 behaviour and pass after the fix.
+- Run the FULL test suite and `make preflight` (or the repo's CI-equivalent) on macOS (this machine) AND on Linux amd64. For Linux use a container (`docker run --rm -v "$PWD":/src -w /src golang:<the go.mod version> ...`) or the repo's Dagger setup if it has one. Both must be green. Paste the summary lines into the release notes evidence.
+
+# Release (only after everything above is green on both platforms)
+- Follow the repo's documented release process exactly (release-policy.json, docs/release-notes.md, Makefile release targets, tags, GitHub release workflow, checksums, plugin/marketplace version bumps for Claude Code and Codex). One version bump, one CHANGELOG entry covering everything. Merge to main, tag, push, publish.
+- Verify the published release end to end on BOTH platforms before you finish:
+  - macOS (this machine): `machinery update` from the installed v0.11.1 to the new version; `machinery version`, `machinery doctor` clean; the Claude Code plugin refreshes to the new version (`claude plugin marketplace update machinery`, `claude plugin update machinery@machinery`).
+  - Linux amd64: in a fresh container, install v0.11.1 via install.sh, then `machinery update` to the new version, then `machinery doctor`; also a fresh install of the new version directly. Both must succeed with no manual steps.
+  - The install receipt, rollback journal and checksums must verify; a failed or interrupted update must roll back cleanly (test it).
+- If anything in the update path is not flawless, fix it before publishing; if already published, ship the fix in the same release cycle only if the policy allows, otherwise stop and report precisely.
+- Close MAC-xqu7 and MAC-ntvm with the release version and evidence; `nd sync`.
+
+# Do not
+- Do not touch any repository other than ~/workspace/machinery (H2 and the dev box are out of scope; the owner will update them).
+- Do not use `--no-verify`, skip hooks, or weaken tests or gates.
+
+# Final report (stdout, short, plain text)
+Version released, tag and commit, what changed (one line per fix), test evidence per platform (suite and preflight summary lines), update verification results per platform, anything the owner must do or know, and anything that failed.
 
 ## History
 
