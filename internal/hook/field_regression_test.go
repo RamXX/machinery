@@ -149,7 +149,6 @@ func TestFieldInterruptWithoutPostToolUseDoesNotStrandToken(t *testing.T) {
 			if out, err := runHookPayload(t, root, boundary); err != nil || out != "" {
 				t.Fatalf("%s boundary failed: out=%s err=%v", name, out, err)
 			}
-			requireArmed(t, root, 0, name+" boundary")
 			out := stopOutput(t, root, session)
 			requireNotWedged(t, out, name)
 			if out != "" {

@@ -168,7 +168,7 @@ func TestPostToolBatchClosesOnlyListedCalls(t *testing.T) {
 	if out, err := runHookPayload(t, root, batch); err != nil || out != "" {
 		t.Fatalf("%s %v", out, err)
 	}
-	requireArmed(t, root, 1, "an unlisted call survives the batch")
+	requireLive(t, root, 1, "an unlisted call survives the batch")
 	if out := stopOutput(t, root, "s"); !strings.Contains(out, `"decision":"block"`) {
 		t.Fatalf("the unlisted own call must still block: %s", out)
 	}
@@ -176,7 +176,7 @@ func TestPostToolBatchClosesOnlyListedCalls(t *testing.T) {
 	if _, err := runHookPayload(t, root, malformed); err == nil {
 		t.Fatal("a malformed batch must be refused, not treated as resolving anything")
 	}
-	requireArmed(t, root, 1, "a malformed batch closes nothing")
+	requireLive(t, root, 1, "a malformed batch closes nothing")
 }
 
 func TestUncomparableRouteNeverDischargesWithoutAcceptance(t *testing.T) {
@@ -197,4 +197,92 @@ func TestUncomparableRouteNeverDischargesWithoutAcceptance(t *testing.T) {
 		t.Fatalf("an uncomparable route must run the gates and retain: %s", out)
 	}
 	requireArmed(t, root, 0, "uncomparable route")
+}
+
+// Review finding F1, sequence B: a SessionEnd forged for another live session
+// marks its tokens ended, but they still withhold discharge from every other
+// session, so the forger cannot clear the obligation while that session's
+// call may still be writing.
+func TestForgedSessionEndForAnotherSessionCannotLetOthersDischarge(t *testing.T) {
+	root := greenFieldRoot(t)
+	armShell(t, root, "victim", "toolu_victim_writing")
+	forged := map[string]any{"hook_event_name": "SessionEnd", "session_id": "victim", "cwd": root}
+	if out, err := runHookPayload(t, root, forged); err != nil || out != "" {
+		t.Fatalf("%s %v", out, err)
+	}
+	out := stopOutput(t, root, "forger")
+	if strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "stays armed") {
+		t.Fatalf("forger's Stop: %s", out)
+	}
+	requireArmed(t, root, 1, "an ended foreign token still withholds discharge")
+	// The owning session's own Stop is backed by its host: it may discharge.
+	if out := stopOutput(t, root, "victim"); out != "" {
+		t.Fatalf("owner's Stop after its own session end boundary: %s", out)
+	}
+	if state, err := readStateRecord(root, "victim"); err != nil || state.design {
+		t.Fatalf("owner's green Stop must discharge: %+v %v", state, err)
+	}
+}
+
+// Review finding F1: literal spellings that a plain regular expression missed.
+func TestPreToolUseDeniesLiteralHookInvocationVariants(t *testing.T) {
+	root := greenFieldRoot(t)
+	for _, command := range []string{
+		`machinery "hook" <<<'{}'`,
+		`machinery hook<<<'{"hook_event_name":"SessionEnd"}'`,
+		`machinery hook<f`,
+		`machinery hook>o`,
+		`machinery\ hook`,
+		`/usr/local/bin/machinery --root . hook`,
+		`"$plugin"/hooks/machinery-hook.sh boundary`,
+		`(machinery hook)`,
+	} {
+		pre := Input{SessionID: "agent", ToolUseID: "v-" + command, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: command}}
+		if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("hook invocation variant was allowed: %q -> %s", command, out)
+		}
+	}
+	for _, allowed := range []string{"machinery check design --gate g2", "git commit -m 'hooks: tidy'", "machinery doctor --repair"} {
+		pre := Input{SessionID: "agent", ToolUseID: "a-" + allowed, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: allowed}}
+		if out := runEvent(t, root, pre); out != "" {
+			t.Fatalf("ordinary command denied: %q -> %s", allowed, out)
+		}
+	}
+}
+
+// Review finding F2: a staged gate list replaced by progressive selection
+// may run fewer gates, so it is narrowing.
+func TestStagedToProgressiveSelectionIsNarrowing(t *testing.T) {
+	root := greenFieldRoot(t)
+	armUnder(t, root, `{"design":"design","gates":"g2,g3,gx"}`, "s", "toolu_1")
+	writeFile(t, filepath.Join(root, ConfigName), `{"design":"design"}`)
+	out := stopOutput(t, root, "s")
+	if !strings.Contains(out, "became progressive selection") {
+		t.Fatalf("staged to progressive was not treated as narrowing: %s", out)
+	}
+	requireArmed(t, root, 0, "staged to progressive")
+}
+
+// Review finding F3: when the configuration moves the design tree between
+// PreToolUse and PostToolUse, the completion still closes its own token.
+func TestCompletionClosesItsTokenAfterTheDesignTreeMoved(t *testing.T) {
+	root := greenFieldRoot(t)
+	copyTree(t, crmDesign, filepath.Join(root, "blueprint"))
+	writeFile(t, filepath.Join(root, ConfigName), `{"design":"design"}`)
+	target := filepath.Join(root, "design", "notes.txt")
+	pre := editEvent("PreToolUse", "Write", "s", target)
+	pre.ToolUseID = "toolu_write"
+	if out := runEvent(t, root, pre); out != "" {
+		t.Fatal(out)
+	}
+	writeFile(t, filepath.Join(root, ConfigName), `{"design":"blueprint"}`)
+	post := pre
+	post.HookEventName = "PostToolUse"
+	if out := runEvent(t, root, post); out != "" {
+		t.Fatal(out)
+	}
+	requireArmed(t, root, 0, "completion after the design tree moved")
+	if out := stopOutput(t, root, "s"); strings.Contains(out, "in-flight tool") {
+		t.Fatalf("own completed call still blocks: %s", out)
+	}
 }

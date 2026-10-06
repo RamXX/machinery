@@ -1248,6 +1248,15 @@ func post(root string, cfg Config, in Input) error {
 			touchedImpl = true
 		}
 	}
+	if !touchedDesign && !touchedImpl {
+		// The configuration may have moved the design or implementation tree
+		// since PreToolUse armed this call; its completion must still close
+		// the token it armed, while the armed obligation stays.
+		if err := closeArmedToken(root, in); err != nil {
+			return fmt.Errorf("machinery hook: complete durable tool tracking for stop-time governance: %w", err)
+		}
+		return nil
+	}
 	if touchedDesign || touchedImpl {
 		if err := completeToolState(root, cfg, in, touchedDesign, touchedImpl); err != nil {
 			var refusal *hookCrashRefusal
@@ -3638,6 +3647,14 @@ type hookStateRecord struct {
 type pendingOwner struct {
 	session string
 	lane    string
+	// ended records that a boundary event of the owning lane or session
+	// reported the call over (an interrupt, the next prompt, a resolved
+	// batch, the session end). An ended token no longer blocks the owning
+	// session's own Stop, whose host has finished every foreground call, but
+	// like any foreign token it withholds discharge from every other session:
+	// a boundary event can be forged from a shell, and only the owner's own
+	// Stop is backed by the host's guarantee that its calls are done.
+	ended bool
 }
 
 func (o pendingOwner) known() bool { return o.session != "" }
@@ -3831,7 +3848,11 @@ func formatHookStateRecord(record hookStateRecord) []byte {
 	for _, token := range record.pending {
 		body.WriteString("pending " + token)
 		if owner, ok := record.pendingOwners[token]; ok && owner.known() {
-			body.WriteString(" owner " + owner.session + " " + owner.lane)
+			keyword := " owner "
+			if owner.ended {
+				keyword = " ended "
+			}
+			body.WriteString(keyword + owner.session + " " + owner.lane)
 		} else if digest := record.pendingHashes[token]; digest != "" {
 			body.WriteString(" " + digest)
 		}
@@ -3891,7 +3912,7 @@ func parseHookStateRecord(raw []byte) (hookStateRecord, error) {
 		case strings.HasPrefix(line, "pending "):
 			pendingStarted = true
 			fields := strings.Split(strings.TrimPrefix(line, "pending "), " ")
-			owned := len(fields) == 4 && fields[1] == "owner"
+			owned := len(fields) == 4 && (fields[1] == "owner" || fields[1] == "ended")
 			if len(fields) != 1 && len(fields) != 2 && !owned {
 				return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation must carry an identity and either an owner or an optional legacy tree hash")
 			}
@@ -3908,7 +3929,7 @@ func parseHookStateRecord(raw []byte) (hookStateRecord, error) {
 				if !hookStateIdentityRe.MatchString(fields[2]) || !hookStateIdentityRe.MatchString(fields[3]) {
 					return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation owner must be two 64-character lowercase hex digests")
 				}
-				record.pendingOwners[token] = pendingOwner{session: fields[2], lane: fields[3]}
+				record.pendingOwners[token] = pendingOwner{session: fields[2], lane: fields[3], ended: fields[1] == "ended"}
 			case len(fields) == 2:
 				if !hookStateIdentityRe.MatchString(fields[1]) {
 					return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation tree hash must be 64 lowercase hex characters")

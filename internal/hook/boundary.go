@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"strings"
 )
@@ -153,13 +154,16 @@ func runBoundary(in boundaryInput, root string) (retErr error) {
 	}
 	defer func() { retErr = errors.Join(retErr, lock.release()) }()
 	err = mutateStateLocked(stateFile, root, false, func(record *hookStateRecord) bool {
-		closed := false
-		for _, token := range append([]string(nil), record.pending...) {
-			if boundaryCloses(in, token, record.pendingOwners[token]) {
-				closed = record.removePending(token) || closed
+		marked := false
+		for _, token := range record.pending {
+			owner := record.pendingOwners[token]
+			if !owner.ended && boundaryCloses(in, token, owner) {
+				owner.ended = true
+				record.pendingOwners[token] = owner
+				marked = true
 			}
 		}
-		return closed
+		return marked
 	})
 	if err != nil {
 		return fmt.Errorf("machinery hook: %s could not close this session's stranded tool tokens: %w", in.HookEventName, err)
@@ -175,6 +179,9 @@ func runBoundary(in boundaryInput, root string) (retErr error) {
 // never blocks it; it keeps the project obligation armed. A Stop without a
 // session id cannot tell its own tokens from anyone's, so every token blocks
 // it.
+//
+// A token a boundary event marked ended stops blocking its owning session's
+// Stop, which may then discharge; for every other session it is orphaned.
 func partitionPending(record hookStateRecord, in Input) (own, unclassified, orphaned []string) {
 	if strings.TrimSpace(in.SessionID) == "" {
 		return append([]string(nil), record.pending...), nil, nil
@@ -185,6 +192,7 @@ func partitionPending(record hookStateRecord, in Input) (own, unclassified, orph
 		switch {
 		case !owner.known():
 			unclassified = append(unclassified, token)
+		case owner.session == session && owner.ended:
 		case owner.session == session:
 			own = append(own, token)
 		default:
@@ -274,6 +282,9 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 		if earlier.Strict && !cfg.Strict {
 			add("strict mode was switched off")
 		}
+		if earlier.Gates != "" && cfg.Gates == "" {
+			add("the staged gate list " + earlier.Gates + " became progressive selection")
+		}
 		if cfg.Gates != "" {
 			now := map[string]bool{}
 			for _, gate := range strings.Split(strings.ToLower(cfg.Gates), ",") {
@@ -306,9 +317,28 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 	return narrowed, nil
 }
 
-// machineryHookInvocation matches a shell command that pipes an event into
-// the hook itself, which would let an agent speak for its own host.
-var machineryHookInvocation = regexp.MustCompile(`(^|[^a-z0-9_.-])machinery(\.exe)?["']?\s+hook(\s|$|["';|&)])`)
+// shellWordSeparators turns shell quoting and metacharacters into word
+// breaks, so 'machinery "hook"', 'machinery hook<<<x' and 'machinery\ hook'
+// all read as the words machinery and hook.
+var shellWordSeparators = regexp.MustCompile("[\"'`\\\\|&;<>(){}\\s]+")
+
+// invokesMachineryHook reports whether the word hook follows any word that
+// names the machinery binary. It over-covers on purpose: flags and their
+// values may sit between the binary and the subcommand, and an agent loses
+// nothing it needs when a rare harmless command is refused.
+func invokesMachineryHook(folded string) bool {
+	seenBinary := false
+	for _, word := range shellWordSeparators.Split(folded, -1) {
+		if name := path.Base(word); name == "machinery" || name == "machinery.exe" {
+			seenBinary = true
+			continue
+		}
+		if seenBinary && word == "hook" {
+			return true
+		}
+	}
+	return false
+}
 
 // operatorOnlyCommand names why a shell command or file edit may not run from
 // a governed agent session: the durable hook store, its operator commands, and
@@ -321,8 +351,37 @@ func operatorOnlyCommand(folded string) string {
 		return "the machinery hook state store and its initialization marker are governance evidence; agent tools may not read, write, or move them. An operator inspects them with 'machinery doctor'."
 	case strings.Contains(folded, "hook-state"):
 		return "'machinery hook-state' (adopt, release) is an operator command; it may not run from an agent session. Ask the human operator to run it in their own terminal."
-	case machineryHookInvocation.MatchString(folded):
+	case strings.Contains(folded, "machinery-hook.sh") || invokesMachineryHook(folded):
 		return "'machinery hook' is the host's hook entry point; an agent may not send hook events on its own behalf."
 	}
 	return ""
+}
+
+// closeArmedToken removes exactly the token in armed, if the ledger holds
+// it. It never creates a ledger and never changes a touch class.
+func closeArmedToken(root string, in Input) (retErr error) {
+	operation, err := toolOperationToken(in)
+	if err != nil {
+		return err
+	}
+	stateFile, err := statePathExact(root)
+	if err != nil {
+		return nil // no addressable store, so nothing was armed
+	}
+	if _, err := os.Lstat(stateFile); errors.Is(err, os.ErrNotExist) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if err := requireStateDir(); err != nil {
+		return err
+	}
+	lock, err := acquireHookStateLock(stateFile)
+	if err != nil {
+		return err
+	}
+	defer func() { retErr = errors.Join(retErr, lock.release()) }()
+	return mutateStateLocked(stateFile, root, false, func(record *hookStateRecord) bool {
+		return record.removePending(operation)
+	})
 }

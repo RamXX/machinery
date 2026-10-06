@@ -89,17 +89,17 @@ func TestBoundaryClosesOnlyItsOwnLane(t *testing.T) {
 	if out, err := runHookPayload(t, root, prompt); err != nil || out != "" {
 		t.Fatalf("prompt boundary: %s %v", out, err)
 	}
-	requireArmed(t, root, 2, "a main-lane prompt must keep the background subagent's and the other session's tokens")
+	requireLive(t, root, 2, "a main-lane prompt must keep the background subagent's and the other session's tokens")
 	batch := map[string]any{"hook_event_name": "PostToolBatch", "session_id": "s1", "agent_id": "background-agent", "cwd": root, "tool_calls": []any{map[string]any{"tool_use_id": "toolu_sub"}, map[string]any{"tool_use_id": "toolu_main"}}}
 	if out, err := runHookPayload(t, root, batch); err != nil || out != "" {
 		t.Fatalf("batch boundary: %s %v", out, err)
 	}
-	requireArmed(t, root, 1, "the subagent lane batch closes only that lane")
+	requireLive(t, root, 1, "the subagent lane batch closes only that lane")
 	end := map[string]any{"hook_event_name": "SessionEnd", "session_id": "s1", "cwd": root, "reason": "other"}
 	if out, err := runHookPayload(t, root, end); err != nil || out != "" {
 		t.Fatalf("end boundary: %s %v", out, err)
 	}
-	requireArmed(t, root, 1, "another session's token survives this session's end")
+	requireLive(t, root, 1, "another session's token survives this session's end")
 }
 
 func TestBoundaryNeverClosesLegacyOwnerlessTokens(t *testing.T) {
@@ -411,5 +411,24 @@ func TestShimBoundaryModeNeverBlocks(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// requireLive counts the armed obligation's tokens that no boundary event has
+// marked ended.
+func requireLive(t *testing.T, root string, live int, context string) {
+	t.Helper()
+	state, err := readStateRecord(root, "inspector")
+	if err != nil || !state.design {
+		t.Fatalf("%s: obligation not armed: %+v %v", context, state, err)
+	}
+	count := 0
+	for _, token := range state.pending {
+		if !state.pendingOwners[token].ended {
+			count++
+		}
+	}
+	if count != live {
+		t.Fatalf("%s: want %d live token(s), got %d of %d", context, live, count, len(state.pending))
 	}
 }

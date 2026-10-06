@@ -29,18 +29,23 @@ under their version heading when a release is cut.
 - **Hook: interrupts, denials and session ends close their tokens.** Claude Code sends no
   PostToolUse or PostToolUseFailure for a cancelled or manually denied call and no Stop after
   an interrupt. The plugin now also listens to `UserPromptSubmit` and `PostToolBatch` (Claude
-  Code), `Interrupt` (Codex) and `SessionEnd` (both). These boundary notices close the tokens of
-  the lane or session that can no longer complete them (a `PostToolBatch` only the exact calls it
-  lists), never another session's or an owner-less one, and never discharge an obligation. They
-  never block a prompt: a missing or failing binary on a boundary event exits 0 and closes
-  nothing, so the token keeps blocking its own session's Stop.
+  Code), `Interrupt` (Codex) and `SessionEnd` (both). These boundary notices mark the tokens of
+  the lane or session that can no longer complete them as ended (a `PostToolBatch` only the
+  exact calls it lists), never another session's or an owner-less one. An ended token stops
+  blocking its owning session's own Stop, which may discharge after green gates, but it still
+  withholds discharge from every other session, because a boundary event can be forged from a
+  shell and only the owner's Stop is backed by its host. They never block a prompt: a missing or
+  failing binary on a boundary event exits 0 and marks nothing, so the token keeps blocking its
+  own session's Stop. A completion now closes its own token even when the configuration moved
+  the design or implementation tree after PreToolUse.
 - **Hook: an obligation armed under an older routing configuration is re-evaluated, not refused
   forever.** A Stop with a usable `.machinery.json` now runs the gates under the configuration in
   force and names the route change in its message, instead of blocking with "dirty obligation
   was armed under a different routing configuration" after a plugin or binary upgrade or an
   operator edit. A configuration that narrows what the gates check compared with the recorded
   route (another design or implementation tree, the implementation tree dropped, strict mode
-  dropped, staged gates removed, or no stop-time gate selected at all) still runs whatever gates
+  dropped, staged gates removed or replaced by progressive selection, or no stop-time gate
+  selected at all) still runs whatever gates
   it selects, but never discharges the obligation until an operator accepts the change with the
   journaled `machinery hook-state release --root <root> --routes`. When no usable configuration
   exists (both markers gone, or hooks switched off while work is outstanding) the recorded route
@@ -78,9 +83,11 @@ keep that property and narrow two fail-closed behaviours that had become permane
   gates. If that other host is killed after writing and before PostToolUse, the write is covered
   only by later Stops in the project (which keep running while the token stays) and by CI.
 - **Boundary events** are host-originated. PreToolUse denies agent shell commands that invoke
-  `machinery hook` or `machinery hook-state`, and file or shell access to the hook store and its
-  marker. A boundary removes a token the same way a PostToolUseFailure does and leaves the
-  obligation armed; an unclassifiable token is never closed by one.
+  `machinery hook` (literal and quoted forms, redirections, flags before the subcommand) or
+  `machinery hook-state`, any reference to the plugin's `machinery-hook.sh`, and file or shell
+  access to the hook store and its marker. A boundary only marks a token ended and leaves the
+  obligation armed; a forged one cannot let any other session discharge, and an unclassifiable
+  token is never marked by one.
 - **Release and adopt are operator-only.** Besides the PreToolUse denial, `hook-state release` and
   `hook-state adopt` refuse to run when an agent host's session markers are in the environment
   (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `AI_AGENT`, `CODEX_THREAD_ID`, `CODEX_SANDBOX`,
