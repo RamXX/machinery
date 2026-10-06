@@ -7,8 +7,8 @@ type: feature
 labels: [hook, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:177c72687237a66b266d99f6455645ba204f286766ae9347f9fa9b29024d571e"
+updated_at: 2026-10-06T04:03:51Z
+content_hash: "sha256:5b6bd88a585ffd928e29e6f52a0e359e125b058977fb3e5fa043fadf8d36407d"
 ---
 
 ## Description
@@ -34,7 +34,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add a conservative single-invocation read-only git verb admission (show, diff, log, cat-file, ls-tree, blame) with no redirection or write options, keep all other refusals. Evidence: internal/hook/hook.go:984 (shellProtectedMutation) still returns 'shell commands may not reference protected output regardless of verb' on any marker match (.oracle.md, .tla, ratchet.json, ...) with no read-only git verb admission; the classifier has no git verb parsing. Notes: Safety-sensitive: the admission parser must be strict (hook is a gate). Tests per AC 3-4 are the main work.
 
 ## History
 
