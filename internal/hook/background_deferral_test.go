@@ -52,8 +52,14 @@ func TestBackgroundStopDefersWithoutChangingLedger(t *testing.T) {
 				if pending && !strings.Contains(later, "in-flight tool") {
 					t.Fatalf("later Stop did not enforce pending obligation: %s", later)
 				}
-				if !pending && !strings.Contains(later, `"decision":"block"`) {
+				if !pending && !strings.Contains(later, "gate ERROR") {
 					t.Fatalf("later Stop did not run gates: %s", later)
+				}
+				if !pending {
+					state, err := readStateRecord(root, "deferred")
+					if err != nil || state.design || state.impl {
+						t.Fatalf("idle Stop did not discharge: %+v %v", state, err)
+					}
 				}
 			})
 		}

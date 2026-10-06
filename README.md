@@ -1241,7 +1241,9 @@ In a machinery-managed project (a `.machinery.json` at the root, or the conventi
 hand-edits to generated artifacts (`*.oracle.md`, `formal/*.tla`, `*.cfg`, and `*.als`, `packs/`,
 `pack/`, `ratchet.json`), and run `machinery check` before any turn that touched the design (or
 watched sources, with `"impl"` configured) is allowed to end. DRIFT and armed import-boundary
-violations block; mid-phase ERRORs only warn. During a deliberate multi-agent wave, the operator
+violations block; mid-phase ERRORs only warn. Stop and SubagentStop defer while the host
+reports background tasks: the turn ends, every pending token and touched flag stays recorded,
+and the next Stop without background tasks enforces the outstanding checks. During a deliberate multi-agent wave, the operator
 creates `<design>/.machinery-wave` and red gates surface as messages instead of blocking while it
 is open. The sentinel is operator-created, never agent-created: the PreToolUse hook denies agent
 writes to it, so a session cannot defer its own gates (deleting it, which closes the wave, stays

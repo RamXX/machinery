@@ -959,12 +959,12 @@ func TestStopRetainsCompletedObligationWhileBackgroundTasksRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := stopOutput.String()
-	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "background task") {
+	if out != "" {
 		t.Fatalf("Stop discharged a project obligation while a background task remained: %s", out)
 	}
 	state, err := readStateRecord(root, "replacement-session")
 	if err != nil || !state.design || len(state.pending) != 0 {
-		t.Fatalf("background-task block lost the completed dirty obligation: state=%+v err=%v", state, err)
+		t.Fatalf("background-task deferral lost the completed dirty obligation: state=%+v err=%v", state, err)
 	}
 }
 
@@ -4326,7 +4326,7 @@ func TestStopRefusesToReapWhileBackgroundTasksRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := stopOutput.String()
-	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "background task") {
+	if out != "" {
 		t.Fatalf("re-fired Stop reaped while a background task was live: %s", out)
 	}
 	record, err := readStateRecord(root, sid)

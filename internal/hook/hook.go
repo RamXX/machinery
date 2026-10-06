@@ -1237,6 +1237,10 @@ type stopOut struct {
 const reasonCap = 8000
 
 func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr error) {
+	// Background writers keep their obligations until a later idle Stop.
+	if in.BackgroundTasks > 0 {
+		return nil
+	}
 	state, stateErr := readStateRecord(root, in.SessionID)
 	if stateErr != nil {
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot read its touched-file state; refusing to end the turn without running the required checks: " + stateErr.Error()})
@@ -1257,17 +1261,11 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		// A matching tree hash only says that no governed bytes have changed
 		// yet. It cannot prove that a writer is finished. Only an exact
 		// PostToolUse or PostToolUseFailure event removes an armed token.
-		if in.BackgroundTasks > 0 {
-			return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance sees %d background task(s) still running; refusing to discharge or clear the project gate obligation", in.BackgroundTasks)})
-		}
 		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) whose PostToolUse completion or host denial was not durably recorded; refusing to discharge or clear the project gate obligation while a mutation may still be running", len(state.pending))})
 	}
 	touchedDesign, touchedImpl := state.design, state.impl
 	if !touchedDesign && !touchedImpl {
 		return nil
-	}
-	if in.BackgroundTasks > 0 {
-		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance sees %d background task(s) still running; refusing to discharge or clear the project gate obligation while a process may still mutate the design or implementation", in.BackgroundTasks)})
 	}
 	design := designRel(cfg)
 	designDir := filepath.Join(root, filepath.FromSlash(design))
