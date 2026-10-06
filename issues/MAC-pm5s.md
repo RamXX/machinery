@@ -8,8 +8,8 @@ labels: [story, human-surface, h2-origin]
 parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:ce0ef9948faf538e008c3561b86a3283bc6b39e8309df8a624ae06ca9ca3d1fd"
+updated_at: 2026-10-06T04:03:55Z
+content_hash: "sha256:9988c41877ee095b8a2b5449d511b6ad402c4f2f22246b02969027cf1a5a407a"
 related: [MAC-m7bh]
 ---
 
@@ -35,7 +35,7 @@ ACCEPTANCE CRITERIA
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add the verbatim item to SKILL.md, both agent prompts, both target-surfaces docs and the BUILD template attestations, and keep adapter mirrors in sync. Evidence: skills/machinery/SKILL.md has no persona-can-do-it-on-the-page review item. The five-question phase-exit self-review text lives in agents/machinery-build-writer.md:222 and agents/machinery-fsm-author.md:198; docs/target-surfaces.md has the persona-walk sweep at line 40 with no such question. Notes: Independent prose change with no code dependency; Related m7bh only adds a pointer to screen contracts when they exist. The SKILL.md anchor named in the story (the five-question self-review) is in the agent files, so find the SKILL.md equivalent when editing. Cheapest, safest win in the epic; could ship first.
 
 ## History
 
