@@ -103,6 +103,42 @@ func TestRenderScriptIgnoresCodebaseMemoryCacheChurn(t *testing.T) {
 	assertNoTransactionResidue(t, repo)
 }
 
+func TestRenderScriptIgnoresOversizedLocalTrees(t *testing.T) {
+	t.Parallel()
+	for _, kind := range []string{"ignored", "worktree"} {
+		t.Run(kind, func(t *testing.T) {
+			t.Parallel()
+			repo := scriptFixture(t)
+			local := filepath.Join(repo, "local-tree")
+			if kind == "worktree" {
+				if output, err := testgit.Run(t.Context(), repo, "worktree", "add", "-q", "--detach", local, "HEAD"); err != nil {
+					t.Fatalf("create nested worktree: %v\n%s", err, output)
+				}
+			} else {
+				if err := os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("local-tree/\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(local, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			file, err := os.Create(filepath.Join(local, "oversized"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			truncateErr := file.Truncate(129 << 20)
+			closeErr := file.Close()
+			if truncateErr != nil || closeErr != nil {
+				t.Fatalf("sparse fixture: %v, %v", truncateErr, closeErr)
+			}
+			if output, err := runRenderFixture(t, repo, "exact"); err != nil {
+				t.Fatalf("local %s tree blocked render: %v\n%s", kind, err, output)
+			}
+			assertNoTransactionResidue(t, repo)
+		})
+	}
+}
+
 func scriptFixture(t *testing.T) string {
 	t.Helper()
 	_, thisFile, _, _ := runtime.Caller(0)
