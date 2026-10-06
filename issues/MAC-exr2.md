@@ -2,13 +2,13 @@
 id: MAC-exr2
 title: "Reopen Dependabot #13 handling once Dagger unpins otel/sdk/log v0.16.0"
 status: open
-priority: 3
+priority: 4
 type: chore
 labels: [dagger, security, deps]
 created_at: 2026-10-04T22:06:02Z
 created_by: ramirosalas
-updated_at: 2026-10-04T22:06:02Z
-content_hash: "sha256:2f92353e019079cabcf9c12e302a2508b711d20501670cdc4acc60d392f24d56"
+updated_at: 2026-10-06T04:03:51Z
+content_hash: "sha256:4b05f86ab653c42450c42a7ef6c3410cf711f731d0ca771579cf5f6732345554"
 ---
 
 ## Description
@@ -27,7 +27,7 @@ Done when: a Dagger release drops or raises those replaces (track dagger/dagger#
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: When a Dagger release drops the replace, bump engineVersion and sha256, run dagger develop, confirm sdk/log >= 0.21.0, run make dagger-job JOB=lint. Evidence: Still pinned: .dagger/go.mod:53 replace go.opentelemetry.io/otel/sdk/log => v0.16.0; dagger.json engineVersion v0.21.10 (commit d74354dc, 2026-10-04). Upstream dagger/dagger#13040 status not verified from here. Notes: Waiting-on-upstream chore; CI-only module, risk accepted. Could be deferred with a re-check at each Dagger bump.
 
 ## History
 
