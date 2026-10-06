@@ -7,8 +7,8 @@ type: bug
 labels: [gt, assurance, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:a86226d859170739158cde96db5ffa2399c94d35b911d2741be141fba17e4dcd"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:35a55d798db066f2f4dd2a9b8ed63bf730126769c9b346d61acfdf20cd1def38"
 blocks: [MAC-9azz]
 ---
 
@@ -38,7 +38,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement the skip vocabulary per framework (ExUnit moduletag/tag skip, runner-config exclude, literal-false env gate; Go t.Skip at top, pytest skip, node test.skip or document as out of scope), the UNRUN finding class, and the opt-in content-hash out-of-band record with staleness. Evidence: internal/gates/oraclecov.go handles Go //go:build ignore (:209-213, :270) and Go test function validity (:957-960) but has no skip vocabulary: grep for skip/pending/@tag/@moduletag/exclude in oraclecov*.go finds only build-ignore handling. Elixir .exs files are parsed (:472, :603) with no moduletag skip handling. No UNRUN class exists; CHANGELOG 0.10.x-0.11.0 does not mention it. Notes: Correctness hole in a gate (credits obligations as bound that no wall runs). Blocks MAC-9azz (overlapping 'skipped suites credit nothing' AC); do qxaa first. No dependency on MAC-va30.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-9azz
