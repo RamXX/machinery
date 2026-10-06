@@ -203,38 +203,57 @@ hooks are reloaded.
 ## OpenCode
 
 OpenCode natively discovers `~/.agents/skills`, so the shared skill needs no translation. The target
-installer renders the role wrappers, installs four native commands, and installs a dependency-free
-JavaScript plugin. The plugin translates `write`, `edit`, and `apply_patch` calls into machinery's
-shared hook protocol. In particular, it forwards OpenCode's `patchText`, whose paths are embedded in
-`*** Add/Update/Move/Delete File` markers.
+installer renders the role wrappers under `agents/`, installs four native commands under `commands/`,
+and installs a dependency-free JavaScript plugin at `~/.config/opencode/plugins/machinery.js`.
+The adapter supports OpenCode v2 and v1 >= 1.18.29. The default definition provides v2 `setup(ctx)`
+and v1 `server()`; v1's object loader chooses `server()` once, without also invoking the legacy
+named export. Older v1 releases are outside the supported floor.
 
-The adapter can reject a generated-artifact edit synchronously in `tool.execute.before`. It also
-runs exact `PostToolUseFailure` completion when OpenCode reports a rejected permission, a tool-part
-error, or a tool error in the after hook.
-When OpenCode reports `session.idle` with a recorded file-tool before call but no matching after
-call, the adapter records that terminal asymmetry with an explicit idle reason before asking the
-hook to check the gate. A shell can leave a delayed writer running after idle, so its unmatched
-call stays armed until OpenCode reports an exact refusal or completion. Existing hook ledgers
-with tree hashes remain readable, but new pending calls carry no tree hash because it cannot
-prove completion. The adapter
-runs the stop check on `session.idle`, but OpenCode's event API does not provide the same reliable
-"block this stop and force another agent turn" contract as Claude Code and Codex. A red idle check is
-therefore surfaced in a warning toast and the application log, while its touched-file ledger is
-retained until the deterministic hook discharges it. This is an ergonomics difference, not a
-correctness exception: `machinery check` in CI remains authoritative for every host.
+The plugin translates `write`, `edit`, `patch` / `apply_patch`, and `shell` / `bash` calls into the
+shared hook protocol. It forwards `patchText`, whose paths are embedded in
+`*** Add/Update/Move/Delete File` markers. V2 always uses `ctx.location.directory`, including in
+worktrees; the shared background service's process directory is not a project root. Global session
+events without a location are resolved through `ctx.session.get` so only the owning project
+instance runs Stop.
 
-Every governance subprocess the plugin spawns is bounded (a deadline plus a capped output capture
-terminates the child on breach), and every hook response is validated against the documented
-protocols before it is honored: unrecognized, truncated, or combined-protocol responses block
-rather than best-effort parse.
+The adapter can reject a generated-artifact edit synchronously in the before hook, with the denial
+reason returned to the agent. V2 after-hooks cannot reject execution: a PostToolUse block replaces
+model-facing result content with the reason and removes structured success output. Tool errors and
+rejected permission replies run exact `PostToolUseFailure` once per pending call, even when both
+notifications arrive. V2's execute.after error channel replaces v1's tool-part error fallback.
 
-OpenCode also lacks an equivalent guaranteed SessionStart context-injection hook. The native Agent
+V2 runs Stop on the durable `session.execution.succeeded`, `session.execution.failed`, and
+`session.execution.interrupted` events. Public subscriptions do not deliver ephemeral idle events;
+`session.status` idle and deprecated `session.idle` are compatibility fallbacks, deduplicated against
+the execution ending within a turn. A Stop block is delivered as a synthetic session message with
+`resume: false`, visible in the session inbox and available to the next agent turn. This reports the
+red gate without automatically restarting the agent and creating an unbounded retry loop. V2 has
+no plugin warning toast or application-log API. If session-message delivery fails, the adapter
+reports the failure on stderr; server log capture is host-dependent. It retains the shared
+touched-file ledger until the deterministic hook discharges it.
+
+V1 runs exact failure completion for tool-part errors and unmatched file calls at `session.idle`.
+A shell can leave a delayed writer running after idle, so its unmatched call stays armed until an
+exact refusal or completion. A red idle check surfaces in a warning toast and application log.
+OpenCode's event API does not guarantee "block this stop and force another agent turn";
+`machinery check` in CI remains authoritative for every host.
+
+Every governance subprocess is bounded (a deadline plus a capped output capture terminates the
+child on breach), with SIGTERM followed by SIGKILL. Every response is validated:
+unrecognized, truncated, or combined-protocol responses block.
+`machinery doctor` probes the installed OpenCode version and reports an error when a v2 host has
+an adapter missing the default id/setup definition. This is a structural compatibility check,
+not proof that the host successfully loaded and registered every hook.
+
+OpenCode also lacks an equivalent guaranteed SessionStart context-injection hook. Native Agent
 Skills discovery and the installed `/design` command load the portability contract instead; after
-compaction, the agent must reload the skill when it resumes machinery work. The adapter does not
-pretend an application log message is model context.
+compaction, the agent must reload the skill when it resumes machinery work.
 
-Restart OpenCode after installing or upgrading the adapter so the global plugin and commands are
-reloaded.
+Restart OpenCode after installing or upgrading the adapter so global plugins and commands reload.
+V2 plugins hot-reload, but a run started during reload may return empty output; wait for plugin
+registration before checking governance. The
+[OpenCode v2 migration guide](https://github.com/anomalyco/opencode/blob/v2.0.18/services/www/src/docs/content/build/plugins/migrate-v1.mdx)
+describes the dual entrypoint and Promise API.
 
 ## Enforcement layers
 

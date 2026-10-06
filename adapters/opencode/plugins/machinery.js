@@ -424,3 +424,135 @@ export const MachineryPlugin = async ({ client, directory, worktree }, options =
 }
 
 export { defaultRunner }
+
+// V1 object entrypoints require OpenCode >= 1.18.29. Its loader selects
+// default.server before legacy named exports, so governance registers once.
+export default {
+  id: "machinery.governance",
+  server: MachineryPlugin,
+  async setup(ctx) {
+    const run = ctx.options?.runner ?? defaultRunner
+    const root = ctx.location.directory
+    const pending = new Map()
+    const permissions = new Map()
+    const stopped = new Set()
+    const controller = new AbortController()
+    const callsFor = (id) => {
+      if (!pending.has(id)) pending.set(id, new Map())
+      return pending.get(id)
+    }
+    const warn = async (id, message) => {
+      if (!message) return
+      // A queued synthetic message is visible in the session and next turn.
+      // resume:false avoids an automatic retry loop when a Stop gate stays red.
+      try {
+        await ctx.session.synthetic({ sessionID: id, text: message, resume: false })
+      } catch (error) {
+        console.error("Machinery governance warning could not be delivered:", message, error)
+      }
+    }
+    const payloadFor = (event, name) => ({
+      session_id: event.sessionID,
+      tool_use_id: event.id,
+      cwd: root,
+      hook_event_name: name,
+      tool_name: toolNames[event.tool],
+      tool_input: toolInput(event.input),
+    })
+    const failedCompletion = async (id, callID, reason) => {
+      const calls = pending.get(id)
+      const call = calls?.get(callID)
+      if (!call) return
+      // Claim completion before awaiting transport: permission replies and
+      // execute.after can arrive concurrently for the same rejected call.
+      calls.delete(callID)
+      const response = await runMachinery(run, root, {
+        ...payloadFor(call, "PostToolUseFailure"), error: reason,
+      })
+      await warn(id, denial(response) || response?.systemMessage)
+    }
+    await ctx.tool.hook("execute.before", async (event) => {
+      if (!toolNames[event.tool]) return
+      stopped.delete(event.sessionID)
+      const response = await runMachinery(run, root, payloadFor(event, "PreToolUse"))
+      const failure = denial(response)
+      if (failure) throw new Error(failure)
+      callsFor(event.sessionID).set(event.id, { ...event })
+    })
+    await ctx.tool.hook("execute.after", async (event) => {
+      if (!toolNames[event.tool]) return
+      if (event.status === "error") {
+        await failedCompletion(event.sessionID, event.id, event.error?.message || "OpenCode tool execution failed")
+        return
+      }
+      pending.get(event.sessionID)?.delete(event.id)
+      const response = await runMachinery(run, root, payloadFor(event, "PostToolUse"))
+      const message = denial(response) || response?.systemMessage
+      if (message) {
+        // V2 after-hooks cannot reject. Content is the model-facing channel;
+        // remove structured success output so it cannot contradict the denial.
+        event.result = { content: message }
+      }
+    })
+    const subscription = (async () => {
+      for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+        const data = event.data || {}
+        const id = data.sessionID
+        if (!id) continue
+        if (event.type === "session.deleted") {
+          pending.delete(id)
+          stopped.delete(id)
+          for (const [key, value] of permissions) {
+            if (value.id === id) permissions.delete(key)
+          }
+          continue
+        }
+        if (!["permission.asked", "permission.replied", "session.execution.started",
+          "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted",
+          "session.status", "session.idle"].includes(event.type)) continue
+        // Durable session events can be global and omit their location. Each
+        // project has its own plugin instance; only the owning instance may
+        // complete that session's governance ledger.
+        let location = event.location
+        if (!location) {
+          try {
+            location = (await ctx.session.get({ sessionID: id })).location
+          } catch (error) {
+            await warn(id, `Machinery governance could not resolve the session location: ${error?.message || error}`)
+            continue
+          }
+        }
+        if (location?.directory !== root) continue
+        if (event.type === "permission.asked") {
+          if (data.source?.type === "tool") {
+            permissions.set(data.id, { id, callID: data.source.id })
+          }
+        } else if (event.type === "permission.replied") {
+          const permission = permissions.get(data.requestID)
+          permissions.delete(data.requestID)
+          if (permission && data.reply === "reject") {
+            await failedCompletion(permission.id, permission.callID, "OpenCode permission.replied refused the tool call")
+          }
+        } else if (event.type === "session.execution.started" ||
+          (event.type === "session.status" && data.status?.type !== "idle")) {
+          stopped.delete(id)
+        } else if (["session.execution.succeeded", "session.execution.failed", "session.execution.interrupted",
+          "session.idle"].includes(event.type) ||
+          (event.type === "session.status" && data.status?.type === "idle")) {
+          // Public subscriptions deliver durable execution events. Idle is a
+          // fallback for hosts that also deliver ephemeral status events.
+          if (stopped.has(id)) continue
+          stopped.add(id)
+          const response = await runMachinery(run, root, { session_id: id, cwd: root, hook_event_name: "Stop" })
+          await warn(id, denial(response) || response?.systemMessage)
+        }
+      }
+    })().catch((error) => {
+      if (!controller.signal.aborted) console.error("Machinery governance event subscription failed:", error)
+    })
+    return async () => {
+      controller.abort()
+      await subscription
+    }
+  },
+}

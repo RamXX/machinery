@@ -639,4 +639,11 @@ func TestDoctorReportsOpenCodeV2IncompatibleAdapter(t *testing.T) {
 	if reportHookWiring(&output) || !strings.Contains(output.String(), "OpenCode v2.0.18") || !strings.Contains(output.String(), "cannot load") {
 		t.Fatalf("doctor failed to report V1-only adapter under V2:\n%s", output.String())
 	}
+	if err := os.WriteFile(plugin, []byte(mustRepositoryFile(t, filepath.Join(repoRootDir(t), "adapters", "opencode", "plugins", "machinery.js"))), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	output.Reset()
+	if !reportHookWiring(&output) || !strings.Contains(output.String(), "governance adapter has a v2 default") {
+		t.Fatalf("doctor rejected the compatible adapter:\n%s", output.String())
+	}
 }

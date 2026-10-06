@@ -460,7 +460,7 @@ func doctorCheckerExecutable(command string) (string, error) {
 // hook silently never fires (GATE-11 doctor check).
 func reportHookWiring(out io.Writer) bool {
 	roots, discoveryErr := pluginRoots()
-	ok := discoveryErr == nil
+	ok := reportOpenCodeAdapter(out) && discoveryErr == nil
 	if discoveryErr != nil {
 		fmt.Fprintf(out, "  ERROR    machinery plugin discovery failed: %v\n", discoveryErr)
 	}
@@ -469,7 +469,7 @@ func reportHookWiring(out io.Writer) bool {
 			return false
 		}
 		fmt.Fprintln(out, "  auto     no machinery plugin layout found (.claude-plugin/ + hooks/); governance hooks run only where the plugin is installed")
-		return true
+		return ok
 	}
 	for _, root := range roots {
 		pluginManifest := filepath.Join(root, ".claude-plugin", "plugin.json")
@@ -510,6 +510,52 @@ func reportHookWiring(out io.Writer) bool {
 		}
 	}
 	return ok
+}
+
+// reportOpenCodeAdapter probes only an installed adapter, using the same
+// bounded command transport as other doctor version checks.
+func reportOpenCodeAdapter(out io.Writer) bool {
+	path := filepath.Join(os.Getenv("HOME"), ".config", "opencode", "plugins", "machinery.js")
+	raw, err := safefile.Read(path, "OpenCode adapter", diagnosticConfigMaxBytes)
+	if os.IsNotExist(err) {
+		return true
+	}
+	if err != nil {
+		fmt.Fprintf(out, "  ERROR    OpenCode adapter at %s cannot be read: %v\n", path, err)
+		return false
+	}
+	executable, absent, err := lookupDiagnosticExecutable("opencode")
+	if absent && err == nil {
+		return true
+	}
+	var output string
+	if err == nil {
+		output, err = runCommand(executable, false, "--version")
+	}
+	if err != nil {
+		fmt.Fprintf(out, "  ERROR    OpenCode adapter compatibility probe failed: %v\n", err)
+		return false
+	}
+	identity := strings.TrimPrefix(strings.TrimSpace(output), "opencode ")
+	match := regexp.MustCompile(`^v?([0-9]+)\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$`).FindStringSubmatch(identity)
+	if len(match) != 2 {
+		fmt.Fprintf(out, "  ERROR    unrecognized OpenCode version %q\n", output)
+		return false
+	}
+	major, err := strconv.Atoi(match[1])
+	if err != nil {
+		fmt.Fprintf(out, "  ERROR    unrecognized OpenCode major version %q\n", match[1])
+		return false
+	}
+	if major >= 2 {
+		text := string(raw)
+		if !strings.Contains(text, "export default") || !strings.Contains(text, `id: "machinery.governance"`) || !strings.Contains(text, "setup(") {
+			fmt.Fprintf(out, "  ERROR    OpenCode %s cannot load governance adapter at %s: missing v2 default id/setup definition -- run machinery install --target opencode\n", identity, path)
+			return false
+		}
+		fmt.Fprintf(out, "  ok       OpenCode %s governance adapter has a v2 default id/setup definition\n", identity)
+	}
+	return true
 }
 
 func readDoctorJSON(path string, dst any) error {

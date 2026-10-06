@@ -54,6 +54,12 @@ const closedInventory = [
   "native real machinery binary governs a managed root end to end",
   "adapter source keeps shell-free argv and stdin construction structural",
   "explicit Node runtime executes the native governance transport",
+  "V2 before denial throws with the governance reason",
+  "V2 translates native tools, completions, and error deduplication",
+  "V2 after block replaces model content without throwing",
+  "V2 durable execution endings and idle fallbacks run Stop once per turn",
+  "V2 Stop denial is visible as a synthetic session message",
+  "V2 locationless session events do not run governance in another project",
 ]
 
 // The lane strips NODE_TEST_CONTEXT/NODE_OPTIONS at its boundary; a direct

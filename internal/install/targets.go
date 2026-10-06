@@ -171,7 +171,7 @@ func ValidateArtifact(artifact Artifact) error {
 			return fmt.Errorf("role document is truncated or does not match %s schema", base)
 		}
 	case base == "machinery.js":
-		for _, required := range []string{"async function runMachinery", `"tool.execute.before"`, `"tool.execute.after"`, `event: async`, `"session.idle"`} {
+		for _, required := range []string{"export default", `id: "machinery.governance"`, "async setup(ctx)", "server: MachineryPlugin", "async function runMachinery", `"tool.execute.before"`, `"tool.execute.after"`, `event: async`, `"session.idle"`} {
 			if len(raw) < 1024 || !strings.Contains(text, required) {
 				return fmt.Errorf("OpenCode adapter is truncated or missing contract %q", required)
 			}

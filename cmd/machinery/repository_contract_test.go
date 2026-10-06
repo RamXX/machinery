@@ -68,6 +68,11 @@ func TestOpenCodeAdapterContracts(t *testing.T) {
 	root := repoRootDir(t)
 	plugin := mustRepositoryFile(t, filepath.Join(root, "adapters", "opencode", "plugins", "machinery.js"))
 	for _, required := range []string{
+		`export default`,
+		`id: "machinery.governance"`,
+		`server: MachineryPlugin`,
+		`async setup(ctx)`,
+		`"session.execution.succeeded"`,
 		`"tool.execute.before"`,
 		`"tool.execute.after"`,
 		`"session.idle"`,
