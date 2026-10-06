@@ -75,6 +75,12 @@ const (
 	// costs tens of milliseconds each, so the hold stays far inside the
 	// hookStateLockWaitLimit an enumeration elsewhere is waiting on.
 	hookStateRouteReclaimBatch = 8
+
+	// hookCrashEvidenceRetention is how many preserved crash temps one
+	// project keeps, newest first. Each one already marked the project dirty,
+	// so an older one is evidence only; the bound keeps a disk that fails
+	// repeatedly from growing the store without limit.
+	hookCrashEvidenceRetention = 4
 )
 
 // hookStateRepairDepth raises the store enumeration ceiling while compaction
@@ -387,6 +393,10 @@ const (
 	// noncanonical name bound to a project base. It is never reclaimed and it
 	// retains its whole generation.
 	hookStateEntryEvidence
+	// hookStateEntryCrashed is a crash temp the hook already moved aside
+	// (".<base>.crashed-<hex>") after marking the project dirty. It belongs to
+	// its generation and is reclaimed with it; it never freezes it.
+	hookStateEntryCrashed
 )
 
 // classifyHookStateEntry maps one store filename onto the project generation
