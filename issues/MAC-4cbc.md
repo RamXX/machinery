@@ -7,8 +7,8 @@ type: task
 labels: [dagger, ci, gates]
 created_at: 2026-09-24T21:33:44Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:63495e5b872d1e3cf75673c5c633b1a18cebaf6bc52eda98108a3d64038d720e"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:61d91c4f378ef00646dd857720fc1f24d40d1ea6800da3835e34b839a922c10e"
 blocked_by: [MAC-n35t]
 related: [MAC-y8lj]
 ---
@@ -28,7 +28,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Route every heavy-tier step through make dagger-job or dagger call; declare the lane hosted-equivalent only after MAC-n35t. Evidence: scripts/preflight.sh:79 is the only dagger-job call (JOB=datalog-parity); the race sweep, integration lane and other heavy steps remain native (header lines 9-13). make dagger-job exists (Makefile:100). Notes: MAC-n35t blocker is real per AC2 only for the 'hosted-equivalent' declaration, not for the routing itself; routing could start earlier and the declaration wait.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocked_by MAC-n35t
