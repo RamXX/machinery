@@ -60,9 +60,11 @@ func sameHookNativeIdentity(a, b string) bool {
 	if a == b {
 		return true
 	}
-	if runtime.GOOS != "darwin" {
-		return false
-	}
+	// The device number is not stable for a directory that never moved: macOS
+	// renumbers volumes, and Linux renumbers a block volume that is detached and
+	// reattached (a Kubernetes persistent volume rescheduled to another node).
+	// The inode plus the random store generation bound into the independent
+	// initialization marker still detect a replacement store.
 	first, second := strings.Split(a, ":"), strings.Split(b, ":")
 	return len(first) >= 3 && len(second) >= 3 && first[0] == "unix" && second[0] == "unix" && first[2] == second[2]
 }

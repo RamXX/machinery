@@ -52,10 +52,7 @@ func TestDarwinWitnessSurvivesVolatileStatFields(t *testing.T) {
 	}
 }
 
-func TestDarwinLegacyStoreBindingSurvivesVolatileFields(t *testing.T) {
-	if runtime.GOOS != "darwin" {
-		return
-	}
+func TestStoreBindingSurvivesDeviceRenumbering(t *testing.T) {
 	isolateHookState(t)
 	root := managedRoot(t)
 	event := editEvent("PreToolUse", "Write", "seat", filepath.Join(root, "design", "BUILD.md"))
@@ -78,5 +75,17 @@ func TestDarwinLegacyStoreBindingSurvivesVolatileFields(t *testing.T) {
 	}
 	if out := runEvent(t, root, event); out != "" {
 		t.Fatalf("legacy binding denied unchanged inode: %s", out)
+	}
+}
+
+func TestNativeIdentityToleratesOnlyDeviceChange(t *testing.T) {
+	if !sameHookNativeIdentity("unix:850:80e50", "unix:840:80e50") {
+		t.Fatal("a reattached volume with the same inode must keep its identity")
+	}
+	if sameHookNativeIdentity("unix:850:80e50", "unix:850:80e51") {
+		t.Fatal("a different inode must be a different store")
+	}
+	if sameHookNativeIdentity("unix:850:80e50", "other:850:80e50") {
+		t.Fatal("a non-Unix witness must never match a Unix one")
 	}
 }
