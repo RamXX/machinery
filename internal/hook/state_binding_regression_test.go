@@ -166,3 +166,51 @@ func TestMissingIdentityInOriginalStoreNamesMissingFile(t *testing.T) {
 		t.Fatalf("missing identity in original directory misreported as replacement: %s", out)
 	}
 }
+
+func TestAdoptionPreservesLegacyRootlessLedger(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	event := editEvent("PreToolUse", "Write", "seat", filepath.Join(root, "design", "BUILD.md"))
+	runEvent(t, root, event)
+	ledger := statePath(root, "")
+	raw, err := os.ReadFile(ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var legacy strings.Builder
+	for _, line := range strings.Split(string(raw), "\n") {
+		if line != "" && !strings.HasPrefix(line, "root ") {
+			legacy.WriteString(line + "\n")
+		}
+	}
+	before := []byte(legacy.String())
+	if err := os.WriteFile(ledger, before, 0600); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := stateInitializationMarkerPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, binding, err := readStateInitializationMarker(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binding.generation = strings.Repeat("0", 64)
+	if err := os.WriteFile(marker, binding.markerBody(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := AdoptState(&output, root, ""); err != nil {
+		t.Fatalf("valid legacy ledger refused: %v", err)
+	}
+	after, err := os.ReadFile(ledger)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("legacy ledger rewritten or lost: %s %v", after, err)
+	}
+	if !strings.Contains(output.String(), "pending=1") || !strings.Contains(output.String(), root) {
+		t.Fatalf("legacy obligations not reported: %s", output.String())
+	}
+	if out := runEvent(t, root, event); out != "" {
+		t.Fatalf("adopted legacy store denied tool: %s", out)
+	}
+}
