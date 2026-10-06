@@ -133,7 +133,11 @@ One line per subcommand:
 - `machinery doctor` checks dependencies and install status.
 - `machinery hook-state adopt --root <root> [--from <quarantine>]` reaffirms the hook store's recorded
   binding after an operator handoff, journals the transition, and reports retained obligations without
-  clearing them; `--from` restores a quarantined store.
+  clearing them; `--from` restores a quarantined store; `--rebind-identity` accepts a verified store whose
+  directory inode changed (moved or restored to another filesystem) when its generation matches.
+- `machinery hook-state release --root <root> (--token <id> | --orphaned) [--routes]` removes in-flight
+  tool tokens no session can complete (and, with `--routes`, accepts a narrowing `.machinery.json`
+  change); it journals the release and never clears the gate obligation.
 - `machinery preflight` the same check, for use before a design session.
 - `machinery install` / `machinery uninstall` place or remove the skill and role docs in the agent
   homes (`--target claude|codex|opencode|all` for native host adapters).

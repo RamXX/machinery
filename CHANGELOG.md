@@ -6,6 +6,16 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-06
+
+**Why this release.** Two field lockouts in the governance hook, both found on 2026-10-06 in
+unattended and long-running agent use. A home directory on a reattachable Linux block volume
+bricked the hook state store after a pod reschedule, and any tool call that never reported its
+completion (a killed host, an Esc interrupt, a denied permission dialog, a toggled plugin) or any
+routing change after an upgrade blocked every later Stop in the repository forever, with no
+supported recovery. This release keeps every gate obligation armed while removing those
+permanent lockouts, and adds audited operator recovery for what remains.
+
 ### Fixed
 
 - **Hook: a state store on a reattached block volume no longer bricks every event.**
@@ -132,6 +142,10 @@ keep that property and narrow two fail-closed behaviours that had become permane
 - **Stop messages.** A Stop that previously blocked with "in-flight tool operation(s)" because of
   another session's token, or with "different routing configuration", now runs the gates and
   reports instead. Tests or tooling that matched those blocks for foreign sessions need updating.
+
+**Generated output.** Generators emit the `v0.11.2` stamp; committed example artifacts, the
+golden corpus, and the oracle hash pins are regenerated with only stamp changes. No gate,
+projection, declaration, or skill grammar changed, so no consumer-corpus diff applies.
 
 ## [0.11.1] - 2026-10-06
 
