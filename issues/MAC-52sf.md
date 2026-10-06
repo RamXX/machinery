@@ -1,15 +1,16 @@
 ---
 id: MAC-52sf
 title: "Threat-driven TDD and shift-right verification (process change A1-A9, B1-B8)"
-status: in_progress
+status: closed
 priority: 1
 type: feature
 labels: [gates, process, security, delivered]
 created_at: 2026-10-05T23:50:58Z
 created_by: ramirosalas
-updated_at: 2026-10-06T02:47:17Z
-content_hash: "sha256:77d8c57e35ab8c7d5cb94977bee1c0d6b56d533f7b0ee2aefaa096ee08d1ee06"
+updated_at: 2026-10-06T02:47:19Z
+content_hash: "sha256:3400ee92e9b810ee921847a6bf8e1a3f57fb6bcaa3eabce1bca1d27e45eee4c3"
 assignee: ramirosalas
+closed_at: 2026-10-06T02:47:19Z
 ---
 
 ## Description
@@ -27,6 +28,7 @@ Encode adversary classification (design/threats.yaml, Gz-threat), threat invaria
 ## History
 - 2026-10-06T02:47:15Z status: open -> in_progress
 - 2026-10-06T02:47:15Z claimed by ramirosalas
+- 2026-10-06T02:47:19Z status: in_progress -> closed
 
 ## Links
 
