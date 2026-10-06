@@ -2288,7 +2288,10 @@ func ensureStateDirectoryIdentity(dir string, requireExisting bool, expected sta
 	}
 	if witness == nil {
 		if requireExisting {
-			return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s no longer contains its bound identity; refusing to accept a replacement store", dir)
+			if !sameHookNativeIdentity(native, expected.native) {
+				return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s changed native identity (bound identity %s, current %s); refusing to accept a replacement store", dir, expected.native, native)
+			}
+			return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s is missing its bound identity file; cannot verify its store generation", dir)
 		}
 		generationBytes := make([]byte, 32)
 		if _, err := io.ReadFull(cryptorand.Reader, generationBytes); err != nil {
