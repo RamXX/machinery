@@ -7,8 +7,8 @@ type: bug
 labels: [hook, governance, crash-safety, h2-origin]
 created_at: 2026-10-06T15:31:42Z
 created_by: ramirosalas
-updated_at: 2026-10-06T19:09:01Z
-content_hash: "sha256:4a91ccd6bda4a0be846f389c7d77066de742baafb4ec49a700bfe63dbd3ee368"
+updated_at: 2026-10-06T23:12:16Z
+content_hash: "sha256:1319c9e5da0c73c2a651961400eaf1468f3f4247c7521b773c81c653668895cc"
 related: [MAC-xqu7]
 ---
 
@@ -45,6 +45,31 @@ Usable, with a sharp edge: any crash, kill or eviction during a tool call perman
 Second field case 2026-10-06 (owner laptop, macOS, machinery v0.11.1, plugin re-enabled after being disabled): the H2 project ledger (revision 1159) holds 13 pending tokens from earlier sessions AND two route bindings (1dee6b9c..., b38873d4...). Every Stop in the repo now blocks with 'dirty obligation was armed under a different routing configuration; refusing to clear it using fallback or changed configuration'. Cause chain: plugin disable/enable cycles and binary upgrades leave PreToolUse tokens without PostToolUse, and a route recorded under an older binary/config can never match again. Needs the same operator recovery (audited release/rebind that keeps the obligation armed and re-runs the gates under the current route). Also: toggling the plugin off mid-project should not strand tokens silently; doctor should report stranded tokens and foreign routes per project.
 RESUME POINT 2026-10-06: fix work is on origin branch fix/hook-identity-device-reattach (e45350e0, 'release: prepare machinery 0.11.2', NOT tagged or published) plus uncommitted agent state at origin wip/hookfix-20261006 (843018a1). Remaining: close the last security-review finding (incomplete validation / parser differential in internal/hook/boundary.go), run make preflight and make ci-linux (Linux arm64 + amd64), then the consolidated v0.11.2 release and update verification (machinery update from v0.11.1 and fresh install, macOS and Linux, interrupted-update rollback, Claude plugin refresh). Full brief:
 You are the machinery maintainer agent for this run. Work in ~/workspace/machinery (Go; public OSS repo RamXX/machinery). The owner has given an EXPLICIT GO for one consolidated release at the end of this run (this overrides the usual "commit locally only" rule for this run only). Work fully autonomously; nobody will answer questions. Write in the repo's existing style. Never use emojis or em dashes anywhere (code, docs, commits, changelog).
+## Status 2026-10-06 (postponed by owner; nothing tagged or released)
+
+Branch fix/hook-identity-device-reattach pushed at 73e4196c. NOTE: origin/main was fast-forwarded to e45350e0 ("release: prepare machinery 0.11.2", version sites at 0.11.2) before the release was blocked; there is NO v0.11.2 tag or GitHub release. main does not yet carry 73e4196c. PR #21 is open (hosted ci/formal/security all green on e45350e0).
+
+Done (all with tests; field regressions fail on v0.11.1 and pass now, on macOS and linux/arm64):
+- MAC-xqu7: device number ignored on every Unix; identity qualifiers must match when both present; adopt --rebind-identity (generation must match marker, prints old -> new); doctor names only a recovery that can succeed.
+- Tokens record owner session+lane digests. Own tokens block; other sessions' tokens are orphaned (non-blocking, withhold discharge); owner-less (legacy/session-less) tokens block every Stop until operator release.
+- Boundary hooks UserPromptSubmit / PostToolBatch (exact listed ids) / Interrupt / SessionEnd mark tokens ended; only the owner's main-thread Stop may discharge over an ended main-lane token; never block a prompt.
+- Route change: gates re-run under current .machinery.json; narrowing (design/impl tree change, strict dropped, staged gates removed or replaced by progressive, no stop-time gate, uncomparable route) never discharges without 'hook-state release --routes'.
+- hook-state release (--token/--orphaned/--routes) and adopt are operator-only (agent env markers + TTY gate), journaled, never clear obligations. PreToolUse denies agent access to machinery hook / hook-state / the store (canonical paths, shell-joined words, unresolved expansions mentioning the binary).
+- Strict boundary JSON (duplicate/case-variant keys refused; routing fields re-decoded by the enforcing decoder).
+- Docs/CHANGELOG [0.11.2] written.
+- Evidence: macOS make preflight green on e45350e0 ("preflight OK: all required local CI/formal gates passed"); hosted CI green on e45350e0 (PR #21); linux/arm64 container race suite: internal/hook, internal/install, cmd/machinery ok (runtimeclosure/tdd/integration-lane fail only because linux/arm64 is not a pinned native assurance platform).
+
+Open:
+1. Security review findings on the latest pushed commits, reported by the coordinator's automated reviewer: (a) parser-differential / guard bypass in internal/hook/boundary.go (the PreToolUse text guard over shell commands); (b) path-validation-differential in internal/hook/hook.go. 73e4196c addresses both (canonical paths everywhere, unresolved-expansion deny) but has NOT been re-reviewed. Inherent residual: no text guard over a shell is complete (e.g. a name assembled from variables with no 'machin' substring, or a script written by a file tool then executed); the semantic bound is the host Stop contract plus PostToolUse re-arm, and CI.
+2. 73e4196c not yet verified by full make preflight, hosted CI, or Linux runs.
+3. Release not cut: no tag, no GitHub release, no update verification (macOS update from v0.11.1, Claude plugin refresh, Linux install.sh v0.11.1 -> update, fresh install, interrupted-update rollback). Linux verify script drafted (not in repo).
+4. Close MAC-xqu7 and MAC-ntvm after release.
+
+Next steps:
+1. Get the reviewer's verdict on 73e4196c; fix anything left with tests; commit + push each step.
+2. make preflight (macOS, run alone: concurrent heavy load caused one timing flake) and Linux: hosted CI via PR #21 (linux/amd64 race + integration) plus a linux/arm64 container race run with --init and the repo copied into the container (Docker Desktop bind-mounted TMPDIR breaks identity-sensitive tests; make ci-linux on this Mac is not usable as-is).
+3. Fast-forward main to the final commit, push, wait for ci/formal/security push runs on that exact SHA, tag v0.11.2, push tag (release.yml publishes).
+4. Verify updates on macOS and Linux, then close MAC-xqu7 and MAC-ntvm and nd sync.
 
 # Goal
 Fix the governance hook's two field-blocking bugs, prove the fixes on macOS AND Linux, and ship ONE patch release (next version after v0.11.1, i.e. v0.11.2 unless the repo's release policy says otherwise) whose update path works flawlessly on both macOS and Linux. The owner will test the update themselves on both platforms afterwards.
