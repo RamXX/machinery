@@ -9,8 +9,9 @@ parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
 updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:63266709a6a70fc6523f21ad7812ca943f8a4e952a88ebeff67adb5a7a486872"
-blocked_by: [MAC-m7bh, MAC-5n2i]
+content_hash: "sha256:5487f9fbc7a550e5b35336a7661d0a265e4c13e7dbb63ee46f97e9fbd8e5431b"
+blocked_by: [MAC-m7bh]
+was_blocked_by: [MAC-5n2i]
 ---
 
 ## Description
@@ -41,9 +42,11 @@ ACCEPTANCE CRITERIA
 ## History
 - 2026-09-30T23:26:37Z dep_added: blocked_by MAC-m7bh
 - 2026-09-30T23:26:37Z dep_added: blocked_by MAC-5n2i
+- 2026-10-06T04:03:40Z dep_removed: was_blocked_by MAC-5n2i
 
 ## Links
 - Parent: [[MAC-lnp2]]
-- Blocked by: [[MAC-m7bh]], [[MAC-5n2i]]
+- Blocked by: [[MAC-m7bh]]
+- Was blocked by: [[MAC-5n2i]]
 
 ## Comments
