@@ -546,6 +546,13 @@ func acquireStoreWriter(ctx context.Context, store string) (*storeWriter, error)
 			}
 		}
 		if stagingReady {
+			parent, statErr := os.Stat(staging)
+			if statErr != nil {
+				if os.IsNotExist(statErr) {
+					continue
+				}
+				return nil, fmt.Errorf("CUSTODY_ERROR: inspecting writer staging: %w", statErr)
+			}
 			err := os.Mkdir(token, storeRootMod)
 			if err == nil {
 				deadline := time.Now().Add(writerLease).UnixMilli()
@@ -567,6 +574,14 @@ func acquireStoreWriter(ctx context.Context, store string) (*storeWriter, error)
 					}
 				}
 			} else if !os.IsNotExist(err) {
+				// macOS can return EINVAL when mkdir races removal of its
+				// parent. Retry only when staging actually lost its identity.
+				if errors.Is(err, syscall.EINVAL) {
+					current, inspectErr := os.Stat(staging)
+					if os.IsNotExist(inspectErr) || (inspectErr == nil && !os.SameFile(parent, current)) {
+						continue
+					}
+				}
 				return nil, fmt.Errorf("CUSTODY_ERROR: acquiring store writer: %w", err)
 			}
 		}
