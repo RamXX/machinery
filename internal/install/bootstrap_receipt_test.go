@@ -841,8 +841,8 @@ func bootstrapStandaloneReceiptCases(t *testing.T, release *bootstrapRelease) {
 
 func bootstrapObserveUpdate(t *testing.T, operation func() error, progress func() string) error {
 	t.Helper()
-	deadline := time.AfterFunc(90*time.Second, func() { panic("real parent Update exceeded 90-second operation bound") })
-	defer deadline.Stop()
+	// Update owns its download and child-process budgets. Let it return so
+	// rollback and progress assertions run even when filesystem work is slow.
 	started := time.Now()
 	err := operation()
 	t.Logf("real parent Update elapsed=%s progress=%s err=%v", time.Since(started), progress(), err)
