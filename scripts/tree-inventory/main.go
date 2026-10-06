@@ -31,6 +31,7 @@ func (values *stringList) Set(value string) error {
 }
 
 type inventoryOptions struct {
+	gitTree          bool
 	maxEntries       int
 	maxDepth         int
 	maxBytes         int64
@@ -101,6 +102,7 @@ func run() int {
 	var fileName string
 	var regularFilesOnly bool
 	var snapshotMode bool
+	var gitTree bool
 	var excludeFile string
 	var maxFileBytes int64
 	var maxTotalBytes int64
@@ -114,12 +116,13 @@ func run() int {
 	flag.StringVar(&suffix, "file-suffix", "", "emit only entries with this suffix")
 	flag.StringVar(&fileName, "file-name", "", "emit only entries with this exact base name")
 	flag.BoolVar(&regularFilesOnly, "regular-files-only", false, "emit only regular non-symlink files")
+	flag.BoolVar(&gitTree, "git-tree", false, "snapshot tracked and non-ignored files, omitting nested Git checkouts")
 	flag.BoolVar(&snapshotMode, "snapshot", false, "emit a typed, content-hashed tree snapshot")
 	flag.StringVar(&excludeFile, "exclude-file", "", "newline-delimited root-relative snapshot exclusions")
 	flag.Int64Var(&maxFileBytes, "max-file-bytes", 32<<20, "snapshot per-file byte ceiling")
 	flag.Int64Var(&maxTotalBytes, "max-total-bytes", 128<<20, "snapshot aggregate regular-file byte ceiling")
 	flag.Parse()
-	if flag.NArg() != 0 || len(roots)+len(literals) == 0 || maxEntries <= 0 || maxDepth < 0 || maxBytes <= 0 || timeout <= 0 || maxFileBytes <= 0 || maxTotalBytes <= 0 || strings.ContainsAny(fileName, `/\\`) || (snapshotMode && (len(roots) != 1 || len(literals) != 0 || suffix != "" || fileName != "" || regularFilesOnly)) {
+	if (gitTree && !snapshotMode) || flag.NArg() != 0 || len(roots)+len(literals) == 0 || maxEntries <= 0 || maxDepth < 0 || maxBytes <= 0 || timeout <= 0 || maxFileBytes <= 0 || maxTotalBytes <= 0 || strings.ContainsAny(fileName, `/\\`) || (snapshotMode && (len(roots) != 1 || len(literals) != 0 || suffix != "" || fileName != "" || regularFilesOnly)) {
 		fmt.Fprintln(os.Stderr, "usage: tree-inventory -root PATH... [-literal FILE...] -max-entries N -max-depth N -max-bytes N -timeout DURATION")
 		return 2
 	}
@@ -140,6 +143,7 @@ func run() int {
 	})
 	defer watchdog.Stop()
 	inventoryLimits := inventoryOptions{
+		gitTree:          gitTree,
 		maxEntries:       maxEntries,
 		maxDepth:         maxDepth,
 		maxBytes:         maxBytes,
@@ -242,6 +246,9 @@ func exactInventoryWatched(ctx context.Context, roots, literals []string, option
 }
 
 func inventoryPass(ctx context.Context, roots, literals []string, options inventoryOptions, witness *inventoryMutationWitness) (inventoryResult, error) {
+	if options.gitTree {
+		return gitInventoryPass(ctx, roots[0], options)
+	}
 	if options.maxEntries <= 0 || options.maxDepth < 0 || options.maxBytes <= 0 {
 		return inventoryResult{}, fmt.Errorf("inventory limits must be positive (depth may be zero)")
 	}
