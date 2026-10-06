@@ -926,7 +926,7 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 		}})
 	}
 	if shellTools[in.ToolName] {
-		reason, err := shellProtectedMutation(root, cfg, in.ToolInput.Command)
+		reason, err := shellProtectedMutation(root, in.Cwd, cfg, in.ToolInput.Command)
 		if err != nil {
 			return deny("protected-artifact inventory is unreadable or invalid; refusing a shell command that could bypass generated-file governance: " + err.Error())
 		}
@@ -958,8 +958,14 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	// and letting os.Stat/os.ReadFile find it under the canonical spelling.
 	// On a case-sensitive filesystem the folded deny over-covers only
 	// near-case variants of reserved names, which no legitimate edit uses.
-	for _, edited := range editedPaths(in) {
-		if reason := operatorOnlyPath(strings.ToLower(filepath.ToSlash(resolveEventPath(in.Cwd, edited)))); reason != "" {
+	// Every judged path is canonicalized once, by canonicalHookPath, before
+	// any decision; a path that cannot be canonicalized is refused.
+	for _, edited := range append(editedPaths(in), deletedPaths(in)...) {
+		canonical, err := canonicalHookPath(in.Cwd, edited)
+		if err != nil {
+			return deny("machinery governance cannot canonicalize the path " + edited + " this edit names; refusing it: " + err.Error())
+		}
+		if reason := operatorOnlyCanonicalPath(canonical); reason != "" {
 			return deny(reason)
 		}
 	}
@@ -1012,7 +1018,7 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	return nil
 }
 
-func shellProtectedMutation(root string, cfg Config, command string) (string, error) {
+func shellProtectedMutation(root, cwd string, cfg Config, command string) (string, error) {
 	folded := strings.ToLower(filepath.ToSlash(command))
 	for _, reserved := range []string{strings.ToLower(ConfigName), strings.ToLower(waveSentinelName), strings.ToLower(conventionalMarker)} {
 		if strings.Contains(folded, reserved) {
@@ -1020,6 +1026,9 @@ func shellProtectedMutation(root string, cfg Config, command string) (string, er
 		}
 	}
 	if reason := operatorOnlyCommand(folded); reason != "" {
+		return reason, nil
+	}
+	if reason := operatorOnlyShellPaths(cwd, command); reason != "" {
 		return reason, nil
 	}
 	for _, marker := range []string{"ratchet.json", ".oracle.md", ".tla", ".cfg", ".als", "/packs/", "/pack/"} {
@@ -1047,7 +1056,7 @@ func shellProtectedMutation(root string, cfg Config, command string) (string, er
 		if candidate == "" || strings.HasPrefix(candidate, "-") {
 			continue
 		}
-		rel := relToRoot(root, resolveEventPath("", candidate))
+		rel := relToRoot(root, resolveEventPath(cwd, candidate))
 		if reason := generatedReason(designRel(cfg), rel); reason != "" {
 			return reason, nil
 		}

@@ -480,3 +480,76 @@ func TestOperatorGuardFlattensSplitExpansions(t *testing.T) {
 		}
 	}
 }
+
+// Unresolvable means deny: any command carrying an expansion the guard cannot
+// resolve is refused when any reading of it mentions the binary or the hook.
+func TestOperatorGuardDeniesEveryUnresolvedMention(t *testing.T) {
+	root := greenFieldRoot(t)
+	for _, command := range []string{
+		`m=hook; machinery $m`,
+		`$BIN hook`,
+		`machinery ${SUB}`,
+		`eval "machin""ery h""ook"`,
+		`machinery $(printf hook)`,
+		`x=machinery; $x $(echo h)ook`,
+	} {
+		pre := Input{SessionID: "agent", ToolUseID: "u-" + command, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: command}}
+		if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("unresolved mention allowed: %q -> %s", command, out)
+		}
+	}
+}
+
+// Path differential: every path naming the hook store is judged in its
+// canonical form, so symlink aliases, relative spellings from the event cwd,
+// a home-relative spelling, dot segments, and (on case-folding hosts) case
+// variants are all refused, for file tools and shell commands alike.
+func TestStorePathIsJudgedCanonically(t *testing.T) {
+	root := greenFieldRoot(t)
+	armShell(t, root, "seed", "toolu_seed") // materializes the store
+	store := stateDirPath()
+	alias := filepath.Join(t.TempDir(), "innocent")
+	if err := os.Symlink(store, alias); err != nil {
+		t.Fatal(err)
+	}
+	rel, err := filepath.Rel(root, filepath.Join(store, "forged.state"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := []string{
+		filepath.Join(alias, "forged.state"),
+		rel,
+		filepath.Join(store, "..", filepath.Base(store), "forged.state"),
+	}
+	if nativeFoldsCase() {
+		paths = append(paths, filepath.Join(filepath.Dir(store), strings.ToUpper(filepath.Base(store)), "forged.state"))
+	}
+	for _, p := range paths {
+		edit := editEvent("PreToolUse", "Write", "agent", p)
+		edit.Cwd = root
+		if out := runEvent(t, root, edit); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("file tool reached the store through %s: %s", p, out)
+		}
+		pre := Input{SessionID: "agent", ToolUseID: "p-" + p, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: "rm -f '" + p + "'"}}
+		if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("shell reached the store through %s: %s", p, out)
+		}
+	}
+	marker, err := stateInitializationMarkerPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	homeRel := "~/" + filepath.Base(marker) + ".handoffs"
+	pre := Input{SessionID: "agent", ToolUseID: "p-home", Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: "cat " + homeRel}}
+	if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+		t.Fatalf("shell reached the handoff journal through %s: %s", homeRel, out)
+	}
+	markerAlias := filepath.Join(t.TempDir(), "m")
+	if err := os.Symlink(marker, markerAlias); err != nil {
+		t.Fatal(err)
+	}
+	edit := editEvent("PreToolUse", "Write", "agent", markerAlias)
+	if out := runEvent(t, root, edit); !strings.Contains(out, `"permissionDecision":"deny"`) {
+		t.Fatalf("file tool reached the marker through a symlink: %s", out)
+	}
+}

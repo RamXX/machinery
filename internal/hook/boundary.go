@@ -8,7 +8,9 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -434,7 +436,10 @@ func invokesMachineryHook(folded string) bool {
 			shellExpansionChars.Replace(joined),
 			shellExpansionConstructs.ReplaceAllString(joined, ""),
 		} {
-			if hookWord.MatchString(reading) || strings.Contains(reading, "hook") && strings.Contains(reading, "machin") {
+			// Unresolvable means deny: with an expansion present, any reading
+			// that mentions the binary at all, or the subcommand as a word,
+			// is refused.
+			if hookWord.MatchString(reading) || strings.Contains(reading, "machin") {
 				return true
 			}
 		}
@@ -576,6 +581,98 @@ func mentionsBoundaryEvent(raw []byte) bool {
 func operatorOnlyPath(folded string) string {
 	if strings.Contains(folded, "machinery-hook-state") {
 		return "the machinery hook state store and its initialization marker are governance evidence; agent tools may not read, write, or move them. An operator inspects them with 'machinery doctor'."
+	}
+	return ""
+}
+
+// canonicalHookPath is the one canonical form of a path the hook judges:
+// interpreted from the event's cwd, absolute, cleaned, and with symlinks
+// resolved through the longest existing prefix (a not-yet-created tail is
+// kept). A path that cannot be canonicalized is an error the caller refuses.
+func canonicalHookPath(cwd, p string) (string, error) {
+	resolved := resolveEventPath(cwd, p)
+	if !filepath.IsAbs(resolved) {
+		abs, err := filepath.Abs(resolved)
+		if err != nil {
+			return "", err
+		}
+		resolved = abs
+	}
+	return evalPathWithMissingTail(resolved)
+}
+
+// nativeFoldsCase reports whether the host's default filesystems resolve
+// names case-insensitively, so a case variant names the same file.
+func nativeFoldsCase() bool {
+	return runtime.GOOS == "darwin" || runtime.GOOS == "windows"
+}
+
+func sameNativePath(a, b string) bool {
+	if nativeFoldsCase() {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
+}
+
+func underNativePath(p, dir string) bool {
+	if sameNativePath(p, dir) {
+		return true
+	}
+	prefix := dir + string(filepath.Separator)
+	if len(p) <= len(prefix) {
+		return false
+	}
+	return sameNativePath(p[:len(prefix)], prefix)
+}
+
+// operatorOnlyCanonicalPath refuses a canonical path inside the durable hook
+// store or naming its initialization marker or handoff journal, compared
+// against their own canonical forms, as well as any path naming them.
+func operatorOnlyCanonicalPath(canonical string) string {
+	if reason := operatorOnlyPath(strings.ToLower(filepath.ToSlash(canonical))); reason != "" {
+		return reason
+	}
+	reason := operatorOnlyPath("machinery-hook-state")
+	if dir, err := stateDirPathExact(); err == nil {
+		if canonicalDir, err := evalPathWithMissingTail(dir); err == nil && underNativePath(canonical, canonicalDir) {
+			return reason
+		}
+	}
+	if marker, err := stateInitializationMarkerPath(); err == nil {
+		if canonicalMarker, err := evalPathWithMissingTail(marker); err == nil &&
+			(sameNativePath(canonical, canonicalMarker) || underNativePath(canonical, canonicalMarker) || strings.HasPrefix(strings.ToLower(canonical), strings.ToLower(canonicalMarker))) {
+			return reason
+		}
+	}
+	return ""
+}
+
+// operatorOnlyShellPaths canonicalizes every word of a shell command that
+// can name a path (after the shell's own quote joining, with a leading ~
+// read as the home directory) and refuses one that lands in the hook store.
+// A path-like word that cannot be canonicalized is refused.
+func operatorOnlyShellPaths(cwd, command string) string {
+	home, _ := os.UserHomeDir()
+	for _, word := range shellWordSeparators.Split(shellJoiners.Replace(command), -1) {
+		if word == "" || strings.HasPrefix(word, "-") {
+			continue
+		}
+		if _, value, ok := strings.Cut(word, "="); ok && strings.ContainsAny(value, `/~`) {
+			word = value
+		}
+		if !strings.ContainsAny(word, `/~`) && !strings.HasPrefix(word, ".") {
+			continue
+		}
+		if home != "" && (word == "~" || strings.HasPrefix(word, "~/")) {
+			word = filepath.Join(home, strings.TrimPrefix(word, "~"))
+		}
+		canonical, err := canonicalHookPath(cwd, word)
+		if err != nil {
+			return "machinery governance cannot canonicalize the path " + word + " in this shell command; refusing it: " + err.Error()
+		}
+		if reason := operatorOnlyCanonicalPath(canonical); reason != "" {
+			return reason
+		}
 	}
 	return ""
 }
