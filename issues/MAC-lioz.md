@@ -8,8 +8,8 @@ labels: [e2e, c4, g2, external-deps]
 parent: MAC-9dai
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:afb121cb71896c45c0a8b544f6798b64588c78323c31fdcae378701cb87d8177"
+updated_at: 2026-10-06T04:03:56Z
+content_hash: "sha256:49bf8a24565f778d509c10323ea877d3fdf9ff494311cc14ce3c8e653c94e39c"
 blocks: [MAC-4ah8, MAC-qax4]
 ---
 
@@ -35,7 +35,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add posture vocabulary to the Architecture Contract, G2 checks, Gt binding of the contract-suite id, stale-evidence report, docs rewrite. Evidence: Architecture Contract has no e2e posture field; grep 'verified-stand-in' and 'e2e posture' across repo finds nothing. G2 unchanged in CHANGELOG through 0.11.0. Notes: Independent of MAC-p3pj for the posture field itself; only AC3 (behaviors list touched dependencies) needs the E2E block, so land the posture field first or accept a soft ordering on MAC-p3pj.
 
 ## History
 - 2026-09-25T19:53:33Z dep_added: blocks MAC-4ah8
