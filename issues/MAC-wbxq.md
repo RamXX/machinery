@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:a5754cf6efe874940504224db076c7e7171ecd0794e71c7897c550594cbd0c38"
+updated_at: 2026-10-06T04:03:55Z
+content_hash: "sha256:38ea3f13084d3ebde440e33bad0a38dcdc95dbac83f3a67b07fc3987a0a8c309"
 blocked_by: [MAC-pe9v]
 blocks: [MAC-rau8, MAC-vx24]
 was_blocked_by: [MAC-lnu6, MAC-p9z1]
@@ -89,6 +89,7 @@ status: new
 
 ## Notes
 Triage 2026-09-24: suite.go changed 9 times since 09-07; refresh interface text.
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add CheckTDDAssurance, Gtd suite wiring and RunOptions.TDDStatus/TDDRequired with replay-not-performed messaging. Evidence: CHANGELOG 0.7.0 says the assurance substrate ships with no CLI/gate consumer. Greps of *.go find no CheckTDDAssurance, GateExecution, TDDStatus, assurance_store or strict-check. internal/assuranceflow holds only register.go. internal/tdd has no execute.go, replay.go or evidence.go, and has CheckExecutor only as a type in types.go. internal/gates has assurance_inventory.go (MAC-6h0s) but no tdd.go and no Gtd registration. Notes: The pe9v dependency is real because suite.go gains TDDStatus beside Execution and the AC says to preserve those fields. If this is done first the two touch the same struct and merge. Note 0.11.0 added Gz, so the Gtd letter and selection grouping must be checked against current gates.go. tdd.Status already exists at internal/tdd/status.go:36.
 
 ## History
 - 2026-09-06T09:10:08Z dep_added: blocked_by MAC-p9z1
