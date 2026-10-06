@@ -7,8 +7,8 @@ type: feature
 labels: [relational, formal, h2-ask, unapproved-scope, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:d879026d49b961939a7e749aca2c4302475fc6754fd6d43da88ab501c198f654"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:06fc566289c209ca4ccf71a98b30ae04eb4019e13b810e7f8f861ce53631e77c"
 blocked_by: [MAC-p8f1]
 ---
 
@@ -32,7 +32,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Owner authorization first; then set-valued holdings in the policy annotation, Alloy and oracle generation over capability rows, byte-identical output for role_attr designs. Evidence: internal/alloy/alloy.go:269 (subjectKeys includes role_attr) and :432-434 (`subjects.role_attr is required`) still force exactly one role attribute per subject. No set-valued holding support. Issue states unapproved feature scope until the owner authorizes it. Notes: Dependency on MAC-p8f1 is real for capability-keyed grants and AC3 (capability not declared diagnostic); the union-of-roles core alone could proceed without it. Needs explicit owner go-ahead.
 
 ## History
 - 2026-09-24T21:33:57Z dep_added: blocked_by MAC-p8f1
