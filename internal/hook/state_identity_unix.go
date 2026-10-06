@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"runtime"
+	"strings"
 	"syscall"
 )
 
@@ -19,6 +21,9 @@ func hookNativeDirectoryWitness(_ *os.File, info os.FileInfo) (string, error) {
 	ino, inoOK := hookNativeInteger(value.FieldByName("Ino"))
 	if !devOK || !inoOK {
 		return "", fmt.Errorf("hook state directory lacks native Unix device/inode identity")
+	}
+	if runtime.GOOS == "darwin" {
+		return fmt.Sprintf("unix:0:%x", ino), nil
 	}
 	// A native filesystem generation or birth time strengthens the stable
 	// device/inode identity where the operating system exposes it. The random,
@@ -49,4 +54,15 @@ func hookNativeInteger(value reflect.Value) (uint64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func sameHookNativeIdentity(a, b string) bool {
+	if a == b {
+		return true
+	}
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+	first, second := strings.Split(a, ":"), strings.Split(b, ":")
+	return len(first) >= 3 && len(second) >= 3 && first[0] == "unix" && second[0] == "unix" && first[2] == second[2]
 }

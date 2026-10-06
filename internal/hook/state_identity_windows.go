@@ -15,3 +15,5 @@ func hookNativeDirectoryWitness(file *os.File, _ os.FileInfo) (string, error) {
 	}
 	return fmt.Sprintf("windows:%x:%08x%08x:birth:%08x%08x", info.VolumeSerialNumber, info.FileIndexHigh, info.FileIndexLow, info.CreationTime.HighDateTime, info.CreationTime.LowDateTime), nil
 }
+
+func sameHookNativeIdentity(a, b string) bool { return a == b }

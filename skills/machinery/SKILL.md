@@ -34,6 +34,23 @@ portable. Subagents and hooks are optional accelerators:
 The design contract is identical across Claude Code, Codex, OpenCode, and other
 Agent Skills runtimes.
 
+Hook Stop and SubagentStop defer while background tasks run, preserving pending
+operations, touched flags, and route bindings until an idle Stop enforces checks.
+Hook snapshots omit declared `.machineryignore` paths while guarding the ignore
+policy itself. Log outside the design tree or declare transient paths. Standalone
+`kill`, `pkill`, and `killall` commands can stop a writer during snapshot instability.
+
+The per-user durable store binds a native directory identity and random generation
+to an independent `~/.machinery-hook-state-<key>.initialized` loss sentinel. Project
+ledgers bind canonical roots, not agent seats. Darwin uses the inode without volatile
+device or stat generation fields; other platforms retain native filesystem identity.
+`machinery doctor` validates this binding. For an operator-inspected handoff, stop
+hook callers and run `machinery hook-state adopt --root <root>`. It validates the
+store, journals the handoff, and preserves and reports outstanding obligations.
+Restore the original quarantined store with the same command plus `--from <path>`.
+Keep the loss sentinel; adoption updates it. Replacement or lost ledgers cannot be
+adopted as empty stores, and corrupt or interrupted records must be recovered first.
+
 ## Start and route
 
 1. Read `design/STATE.md` and `design/DECISIONS.md` if they exist.

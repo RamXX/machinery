@@ -1257,6 +1257,22 @@ Unignored changes still fail closed and name the changing path. Standalone `kill
 and `killall` commands can stop a writer even when the design inventory is unstable; commands
 with shell expansion, redirection, or chaining use normal governance.
 
+The per-user hook store binds its private directory's native identity and a random store
+generation to an independent `~/.machinery-hook-state-<key>.initialized` loss sentinel.
+Project ledgers are keyed by canonical root and shared across agent sessions and hosts.
+On Darwin the stable witness is the inode; OS-volatile device and stat generation fields
+are excluded, including when reading older bindings. Other platforms retain their native
+filesystem identity checks. A different directory inode still fails closed.
+
+`machinery doctor` checks the same binding as the hook. Stop hook callers before an operator
+handoff, inspect the store and diagnosis, then run `machinery hook-state adopt --root <root>`.
+Adoption validates the recorded identity, ledgers and route snapshots, journals the prior
+and adopted binding beside the loss sentinel, and reports retained obligations without
+clearing them. It refuses replaced directories and interrupted or corrupt entries. If the
+original store was quarantined, use `machinery hook-state adopt --root <root> --from <path>`
+to restore that same recorded directory and ledger. Keep the loss sentinel in place; this
+command updates it after restoration. A lost ledger cannot be reset to empty by adoption.
+
 With the plugin installed, the default `machinery install` detects it and skips `~/.claude` (the
 plugin already serves the skill and agents there). Codex and OpenCode users can opt into their
 native adapters with `--target`.

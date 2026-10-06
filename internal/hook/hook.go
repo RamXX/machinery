@@ -2317,11 +2317,14 @@ func ensureStateDirectoryIdentity(dir string, requireExisting bool, expected sta
 	if err != nil {
 		return stateDirectoryBinding{}, fmt.Errorf("hook state directory identity %s is corrupt or noncanonical: %w", identityPath, err)
 	}
-	if binding.native != native {
+	if !sameHookNativeIdentity(binding.native, native) {
 		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s changed native identity; refusing to accept a replacement store", dir)
 	}
-	if requireExisting && binding != expected {
-		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s does not match its independent initialization marker; refusing to accept a replacement store", dir)
+	if requireExisting && !sameHookNativeIdentity(binding.native, expected.native) {
+		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s has initialization-marker directory binding mismatch (store %s, marker %s); run machinery hook-state adopt --root <root> after verifying the store", dir, binding.native, expected.native)
+	}
+	if requireExisting && binding.generation != expected.generation {
+		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s has initialization-marker generation mismatch (store %s, marker %s); run machinery hook-state adopt --root <root> after verifying the store", dir, binding.generation, expected.generation)
 	}
 	return binding, nil
 }
@@ -2616,7 +2619,7 @@ func readBoundedHookFileExpectedParent(path, kind string, limit int64, expectedP
 		if err := errors.Join(statErr, nativeErr, closeErr); err != nil {
 			return nil, err
 		}
-		if !os.SameFile(parentInside, openedParent) || parentNative != expectedParentNative {
+		if !os.SameFile(parentInside, openedParent) || !sameHookNativeIdentity(parentNative, expectedParentNative) {
 			return nil, fmt.Errorf("%s parent %s does not match the bound hook state directory identity", kind, parent)
 		}
 	}

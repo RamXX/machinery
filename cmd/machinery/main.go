@@ -96,7 +96,8 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newUpdateCmd())
 	root.AddCommand(newUninstallCmd())
 	root.AddCommand(newIRDumpCmd()) // hidden: the Phase-2 parity probe
-	root.AddCommand(newHookCmd())   // hidden: agent-host adapter plumbing
+	root.AddCommand(newHookStateCmd())
+	root.AddCommand(newHookCmd()) // hidden: agent-host adapter plumbing
 
 	// top-level --version
 	root.AddCommand(newVersionCmd())

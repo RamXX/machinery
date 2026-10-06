@@ -302,7 +302,7 @@ func compactHookStateDir(dir string, target int) (result hookStateCompaction, re
 	if err != nil {
 		return result, err
 	}
-	if native != binding.native {
+	if !sameHookNativeIdentity(native, binding.native) {
 		return result, fmt.Errorf("hook state store %s does not match its bound directory identity", dir)
 	}
 	storeRoot, err := os.OpenRoot(dir)
@@ -754,6 +754,18 @@ func StateReport(w io.Writer, repair bool) (ok bool, retErr error) {
 	}
 	info, err := os.Lstat(dir)
 	if errors.Is(err, os.ErrNotExist) {
+		marker, markerErr := stateInitializationMarkerPath()
+		if markerErr != nil {
+			return false, markerErr
+		}
+		present, markerErr := inspectStateInitializationMarker(marker)
+		if markerErr != nil {
+			return false, markerErr
+		}
+		if present {
+			fmt.Fprintf(w, "  ERROR    governance hook state store %s is missing after prior initialization; restore the recorded store with machinery hook-state adopt --root <root> --from <quarantined-store>\n", dir)
+			return false, nil
+		}
 		fmt.Fprintf(w, "  auto     no governance hook state store at %s; nothing has armed a gate obligation on this machine\n", dir)
 		return true, nil
 	}
@@ -763,6 +775,10 @@ func StateReport(w io.Writer, repair bool) (ok bool, retErr error) {
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		fmt.Fprintf(w, "  ERROR    governance hook state store %s must be a real directory\n", dir)
+		return false, nil
+	}
+	if _, err := validatedStateDirectoryBinding(); err != nil {
+		fmt.Fprintf(w, "  ERROR    governance hook state store binding: %v; run machinery hook-state adopt --root <root> after verifying the store\n", err)
 		return false, nil
 	}
 	if repair {

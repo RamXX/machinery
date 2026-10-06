@@ -50,3 +50,105 @@ func TestSeatSessionChangeKeepsStoreBinding(t *testing.T) {
 		}
 	}
 }
+
+func TestAdoptionPreservesLedgerAndRestoresQuarantine(t *testing.T) {
+	for _, quarantine := range []bool{false, true} {
+		t.Run(map[bool]string{false: "marker", true: "quarantine"}[quarantine], func(t *testing.T) {
+			isolateHookState(t)
+			root := managedRoot(t)
+			pre := editEvent("PreToolUse", "Write", "first-seat", filepath.Join(root, "design", "BUILD.md"))
+			runEvent(t, root, pre)
+			ledger := statePath(root, "")
+			before, err := os.ReadFile(ledger)
+			if err != nil {
+				t.Fatal(err)
+			}
+			marker, err := stateInitializationMarkerPath()
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _, binding, err := readStateInitializationMarker(marker)
+			if err != nil {
+				t.Fatal(err)
+			}
+			from := ""
+			if quarantine {
+				from = stateDirPath() + ".parked"
+				if err := os.Rename(stateDirPath(), from); err != nil {
+					t.Fatal(err)
+				}
+				var report bytes.Buffer
+				ok, err := StateReport(&report, false)
+				if err != nil || ok || !strings.Contains(report.String(), "missing after prior initialization") {
+					t.Fatalf("doctor missed missing initialized store: %v %v %s", ok, err, report.String())
+				}
+			} else {
+				binding.generation = strings.Repeat("0", 64)
+				if err := os.WriteFile(marker, binding.markerBody(), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var output bytes.Buffer
+			if err := AdoptState(&output, root, from); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(output.String(), "pending=1") || !strings.Contains(output.String(), "routes=1") {
+				t.Fatalf("handoff did not report obligations: %s", output.String())
+			}
+			after, err := os.ReadFile(ledger)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatalf("handoff lost ledger: %v before=%s after=%s", err, before, after)
+			}
+			journal, err := os.ReadFile(marker + ".handoffs")
+			if err != nil || !strings.Contains(string(journal), "prior_generation") {
+				t.Fatalf("handoff was not journaled: %s %v", journal, err)
+			}
+			pre.SessionID = "second-seat"
+			if out := runEvent(t, root, pre); out != "" {
+				t.Fatalf("adopted store denies second seat: %s", out)
+			}
+			var report bytes.Buffer
+			if ok, err := StateReport(&report, false); err != nil || !ok {
+				t.Fatalf("doctor denies adopted store: %s %v", report.String(), err)
+			}
+		})
+	}
+}
+
+func TestAdoptionRefusesReplacementAndCorruptLedger(t *testing.T) {
+	for _, replacement := range []bool{true, false} {
+		t.Run(map[bool]string{true: "replacement", false: "corrupt"}[replacement], func(t *testing.T) {
+			isolateHookState(t)
+			root := managedRoot(t)
+			runEvent(t, root, editEvent("PreToolUse", "Write", "seat", filepath.Join(root, "design", "BUILD.md")))
+			if replacement {
+				dir := stateDirPath()
+				identity, err := os.ReadFile(filepath.Join(dir, stateDirectoryIdentityName))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(dir, dir+".parked"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(dir, 0700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, stateDirectoryIdentityName), identity, 0600); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.WriteFile(statePath(root, ""), []byte("corrupt\n"), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var output bytes.Buffer
+			err := AdoptState(&output, root, "")
+			if err == nil {
+				t.Fatal("invalid store adopted")
+			}
+			if replacement && !strings.Contains(err.Error(), "replacement store") {
+				t.Fatalf("replacement not identified: %v", err)
+			}
+		})
+	}
+}
