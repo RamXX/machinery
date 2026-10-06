@@ -361,7 +361,7 @@ func compactHookStateDir(dir string, target int) (result hookStateCompaction, re
 			continue
 		}
 		pending = append(pending, generation)
-		need -= 1 + len(generation.routes)
+		need -= 1 + len(generation.routes) + len(generation.crashed)
 		if len(pending) < hookStateReclaimBatch {
 			continue
 		}
@@ -415,6 +415,9 @@ func classifyHookStateEntry(name string) (string, hookStateEntryKind) {
 	if !temp && rest == "" {
 		return base, hookStateEntryLedger
 	}
+	if temp && looksLikeHookCrashEvidence(name, base) {
+		return base, hookStateEntryCrashed
+	}
 	if !temp && strings.HasPrefix(rest, ".route-") {
 		digest := strings.TrimSuffix(strings.TrimPrefix(rest, ".route-"), ".json")
 		if strings.HasSuffix(rest, ".json") && validHookHexDigest(digest) {
@@ -429,6 +432,7 @@ type hookStateGeneration struct {
 	base    string
 	ledger  bool
 	routes  []string
+	crashed []string
 	blocked bool
 	modTime time.Time
 }
@@ -464,6 +468,9 @@ func groupHookStateGenerations(entries []os.DirEntry) ([]*hookStateGeneration, b
 		case hookStateEntryRoute:
 			owner := generation(base)
 			owner.routes = append(owner.routes, entry.Name())
+		case hookStateEntryCrashed:
+			owner := generation(base)
+			owner.crashed = append(owner.crashed, entry.Name())
 		case hookStateEntryEvidence:
 			generation(base).blocked = true
 		}
@@ -471,6 +478,7 @@ func groupHookStateGenerations(entries []os.DirEntry) ([]*hookStateGeneration, b
 	ordered := make([]*hookStateGeneration, 0, len(byBase))
 	for _, owner := range byBase {
 		sort.Strings(owner.routes)
+		sort.Strings(owner.crashed)
 		ordered = append(ordered, owner)
 	}
 	sort.Slice(ordered, func(i, j int) bool {
@@ -559,6 +567,14 @@ func reclaimHookStateGeneration(storeRoot *os.Root, dir string, generation *hook
 	}
 	if !hookStateRootVanished(record.root) {
 		return 0, errHookStateGenerationRetained
+	}
+	// preserved crash temps of a dead generation were accounted for when they
+	// were preserved (the ledger was marked dirty); they go with it
+	for _, name := range generation.crashed {
+		if err := removeHookCrashEvidence(storeRoot, dir, name, nil); err != nil {
+			return removed, err
+		}
+		removed++
 	}
 	for _, name := range generation.routes {
 		if err := removeWitnessedHookStateFile(storeRoot, name, filepath.Join(dir, name), "hook route snapshot", hookRouteMaxBytes); err != nil {

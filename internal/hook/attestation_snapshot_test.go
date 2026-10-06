@@ -17,7 +17,6 @@ import (
 	"github.com/RamXX/machinery/internal/gates"
 )
 
-const hookReviewLimits = "Hashes bind the observed files and scope; they do not prove tests ran, reviewer identity, or judgment correctness. Top-level Git administration and the exact Machinery attestation record are excluded; applications that use them as runtime inputs are outside this review boundary."
 const hookReviewSource = "package example\n"
 
 type hookReviewScenario struct {

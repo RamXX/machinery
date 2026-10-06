@@ -2633,10 +2633,25 @@ func TestRouteTempCrashBlocksWritersAndStop(t *testing.T) {
 	if !strings.Contains(out, `"permissionDecision":"deny"`) || !strings.Contains(out, "route transaction") {
 		t.Fatalf("new writer overwrote route crash residue: %s", out)
 	}
-	for _, temp := range temps {
-		if err := os.Remove(temp); err != nil {
-			t.Fatal(err)
-		}
+	// Amended (B8, crash-temp recovery). Original lines:
+	//     for _, temp := range temps { if err := os.Remove(temp); err != nil {
+	// Reason: the refused writer now moves the unprovable route temp aside as
+	// crash evidence (it was never overwritten), marks the project dirty, and
+	// the next writer proceeds instead of the session blocking forever. What
+	// this still protects: Stop blocks on the residue, the first writer after
+	// the crash is refused, and the temp's bytes survive as evidence.
+	if left, err := routeStateTemps(root); err != nil || len(left) != 0 {
+		t.Fatalf("the refused writer left the route temp in place: %v %v", left, err)
+	}
+	evidence, err := filepath.Glob(filepath.Join(filepath.Dir(statePath(root, "")), "."+filepath.Base(statePath(root, ""))+".crashed-*"))
+	if err != nil || len(evidence) != 1 {
+		t.Fatalf("route crash residue was not preserved as evidence: %v %v", evidence, err)
+	}
+	if out := runEvent(t, root, pre); strings.Contains(out, `"permissionDecision":"deny"`) {
+		t.Fatalf("the next writer after a crash refusal must proceed: %s", out)
+	}
+	if err := os.Remove(evidence[0]); err != nil {
+		t.Fatal(err)
 	}
 	if err := clearState(root, "cleanup"); err != nil {
 		t.Fatal(err)
