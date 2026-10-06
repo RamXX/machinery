@@ -8,8 +8,8 @@ labels: [story, human-surface, h2-origin]
 parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:55Z
-content_hash: "sha256:9eede9685618f3da7785588ff5d83fdb16819f6e9f197fb0ddea609789546d64"
+updated_at: 2026-10-06T04:04:16Z
+content_hash: "sha256:40734ddfca13f4696703eca444ed2f5dec1fa5aef27dabed37923a6200df202d"
 blocked_by: [MAC-m7bh]
 blocks: [MAC-o493]
 related: [MAC-s3b7]
@@ -42,6 +42,7 @@ ACCEPTANCE CRITERIA
 
 ## Notes
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add evidence kinds to the Gt binding grammar, the page-obligation rule, element-id resolution against the generated control list, and STALE rules for attestation rows. Evidence: No evidence-kind (command, rendered-surface, walkthrough) vocabulary exists in the Gt code; Gt credits tests only by stable ids (internal/gates, Gt-tests). Notes: m7bh is a real dependency: element ids and the page-obligation marker come from the screen contract. Related s3b7 is not required. Re-check the grammar against 0.11.0 threat-driven Gt/Ga changes.
+0.11.0 took gate letter gz (Gz-threat). Pick a free letter (f, h, o, q) when this lands.
 
 ## History
 - 2026-09-30T23:26:37Z dep_added: blocked_by MAC-m7bh
