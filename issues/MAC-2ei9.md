@@ -1,14 +1,16 @@
 ---
 id: MAC-2ei9
 title: "Stop hook blocks every turn while background tasks run; defer instead of block"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [governance, hook, claude-code, stop]
 created_at: 2026-10-03T19:42:12Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:49Z
-content_hash: "sha256:1d315856fff407827c72f5fdef5090e08ffded15020c089c4291fc46860b8c42"
+updated_at: 2026-10-06T05:53:40Z
+content_hash: "sha256:e9b22a3454590b7643ff8343a6b932657f9b2a11093d2022a5c80b9f77c95791"
+closed_at: 2026-10-06T05:53:40Z
+close_reason: "Fixed in 0.11.1 (339c0de7 RED, 009ee7ee GREEN): Stop and SubagentStop defer while background tasks run; obligations stay recorded."
 ---
 
 ## Description
@@ -49,7 +51,7 @@ On one host the installed plugin shim `hooks/machinery-hook.sh` (cache copy, v0.
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Return no-block (defer) on Stop/SubagentStop with background tasks, leaving pending tokens and touched flags untouched; tests per ACs; document in README/skill hook contract. Evidence: internal/hook/hook.go:1260-1261 and :1269-1270 still return decision block when in.BackgroundTasks > 0 (pending tokens and touched design/impl cases). No deferral path; CHANGELOG 0.11.0 hook work covers crash recovery only (348a0109), not background-task deferral. stop_hook_active is only used at hook.go:1420 for message wording. Notes: Real consumer pain (up to 9 forced turns per wake-up) but fail-closed is preserved by deferral design. Check interaction with the 0.11.0 --landing and crash-recovery changes when implementing.
 
 ## History
-
+- 2026-10-06T05:53:40Z status: open -> closed
 
 ## Links
 
