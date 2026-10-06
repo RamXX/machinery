@@ -7,8 +7,8 @@ type: feature
 labels: [check, performance, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:cfcaf044c7b8fa45233b211f3fb7ae28b782b1134c22aa24d01141dbbffc1ece"
+updated_at: 2026-10-06T04:03:49Z
+content_hash: "sha256:8ea70cbb625c5f4da70db4a577a221dcd133fb8cdc77cfe9bf9e10c6f657c4b8"
 related: [MAC-6mzy, MAC-2k07]
 ---
 
@@ -35,7 +35,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Under --impl in a git repo walk tracked plus untracked-not-ignored files (or honor .gitignore), add --no-ignore, keep non-git behavior, measure, confirm example findings byte-identical. Evidence: No .gitignore handling under --impl: internal/gates/ignore.go covers only .machineryignore at the design root; the impl-side pruning is the Architecture Contract ignore globs (internal/gates/oraclecov.go testCorpus). grep for no-ignore/ls-files in internal and cmd finds nothing. Not in CHANGELOG through 0.11.0. Notes: Performance and DX, not correctness. Design choice interacts with MAC-6mzy (git-tracked inventory for attestation); sharing one git-tracked inventory helper with 6mzy would avoid two definitions, but this is not a hard blocker.
 
 ## History
 
