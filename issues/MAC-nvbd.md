@@ -1,13 +1,13 @@
 ---
 id: MAC-nvbd
-title: "install: TestBootstrapReceiptCLI fails on darwin/arm64 at v0.10.3 (later-target-failure rollback not restored)"
+title: "install: TestBootstrapReceiptCLI later-target-failure subtest flakes under heavy host load (passes in isolation)"
 status: open
 priority: 3
 type: bug
 labels: [install, tests]
 created_at: 2026-10-06T02:35:36Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:52Z
+updated_at: 2026-10-06T04:04:06Z
 content_hash: "sha256:8842baf67419d7d1ead714a138fc3f57407e980560dfcdd90916d25356b241f4"
 ---
 
