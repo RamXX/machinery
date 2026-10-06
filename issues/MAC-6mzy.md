@@ -7,8 +7,8 @@ type: feature
 labels: [gv, attest, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:38:38Z
-content_hash: "sha256:78f71fd1c1cdd2181a6d6458721df7f26171ba9ffec6de08e004a3ac94762903"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:ee6fefea32c2152e1e7d2d5b13b24c4680759f6c7ea84a540aa844b8efc424d8"
 related: [MAC-38er, MAC-zlbk, MAC-7y8d]
 blocks: [MAC-nf0m]
 ---
@@ -42,7 +42,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement git-tracked inventory, committed hashed exclusion list, root-digest row with content-addressed sidecar, explicit migration and CHANGELOG note. Evidence: internal/gates/attest.go:718 still accepts only policy full-root-v1; attest.go:874 hard-codes it; no git ls-files inventory, exclusion list or sidecar digest in internal/gates; CHANGELOG through 0.11.0 has no root-digest or git-tracked inventory entry. Notes: Blocks MAC-nf0m (real: per-claim scope builds on the new manifest). Real consumer pain (H2 stale rows, 15k-line diffs).
 
 ## History
 - 2026-09-25T19:38:38Z dep_added: blocks MAC-nf0m
