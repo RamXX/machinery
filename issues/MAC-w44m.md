@@ -2,14 +2,14 @@
 id: MAC-w44m
 title: "Docset reader layer: logical documents as single file or indexed shards, id-based citation resolution"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [context-budget, docset]
 parent: MAC-syos
 created_at: 2026-09-25T19:39:57Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:39:57Z
-content_hash: "sha256:6de6be07d91a8c344f2ca7fee36dd711baa58d2be31e66dee77679d84d3c0fe8"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:d4394def382273bd16c767cfa3ddd6c12f7245d3b441d5335bd46ff93e169260"
 blocks: [MAC-snrm, MAC-7y8d, MAC-p88c]
 ---
 
@@ -30,7 +30,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Whole story: reader layer, shard format docs, generated INDEX with drift check, id-based citation resolution, lock/snapshot treat docset as one subject. Evidence: No docset/shard/INDEX code exists: grep for docset, INDEX generation and shard readers finds nothing outside the nd issue files; no design/ dir at repo root. Design files are read directly by each gate. Notes: Foundation of epic MAC-syos; large cross-cutting change touching every gate that opens design files. P1 is high for a context-budget optimization with no consumer breakage.
 
 ## History
 - 2026-09-25T19:39:57Z dep_added: blocks MAC-snrm
