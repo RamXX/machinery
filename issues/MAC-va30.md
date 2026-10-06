@@ -7,8 +7,8 @@ type: feature
 labels: [assurance, adapters, consumer]
 created_at: 2026-09-08T19:32:45Z
 created_by: ramirosalas
-updated_at: 2026-09-08T19:32:45Z
-content_hash: "sha256:e4af2e534a009794e1d86792ed2c0eb92464fc9a3088ce54fce4eda741650312"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:5459633975ed6cebac732782d60bd28bf907756112d5dc63a26fe7b806218fd3"
 blocks: [MAC-sd7g]
 ---
 
@@ -29,7 +29,7 @@ H2 (Elixir modular monolith), first affected at M1 RED.
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Let design/assurance/plan.json (or the adapter manifest) declare the consumer runtime identity, verified byte for byte fail-closed; keep machinery's pinned catalog for its own lane; document the per-adapter supported floor. Evidence: Runtime identity is still machinery-global: internal/runtimeclosure/elixir.go:41 RequiredElixirVersion = "1.20.4" (OTP 29.1.1); testdata/integration-lanes/assurance-runtime-pins.json:8 pins elixir-exunit/v1 1.20.4; no consumer-declared identity field in the assurance plan or adapter manifest. Notes: Blocks MAC-sd7g (real: exact replay state needs the declared identity). The blocks on MAC-cup9 (self-design epic) and MAC-9azz (table oracles) look soft: neither needs a non-global runtime pin to be built. Candidate stale blocks: MAC-cup9, MAC-9azz.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-sd7g
