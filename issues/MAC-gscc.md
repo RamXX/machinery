@@ -9,8 +9,7 @@ parent: MAC-0p5d
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
 updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:898caa60dd3dc70ae3b0052d816bf3464cd6461981b25933a56b37e970ec8c16"
-blocks: [MAC-g7d4]
+content_hash: "sha256:b596466f87d4c3254334c3fa28f17242af4f8341a6728bede5ac4e0f5bece339"
 ---
 
 ## Description
@@ -32,9 +31,9 @@ Acceptance criteria:
 
 ## History
 - 2026-09-25T20:11:08Z dep_added: blocks MAC-g7d4
+- 2026-10-06T04:03:39Z dep_removed: no_longer_blocks MAC-g7d4
 
 ## Links
 - Parent: [[MAC-0p5d]]
-- Blocks: [[MAC-g7d4]]
 
 ## Comments

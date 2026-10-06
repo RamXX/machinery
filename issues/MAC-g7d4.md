@@ -9,9 +9,9 @@ parent: MAC-0p5d
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
 updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:17383777dc70e76c78d1c1bf566a4d67bc783c553327b01ac7ac70789391d766"
-blocked_by: [MAC-gscc]
+content_hash: "sha256:c100638b324d72c7827270a12c9e06be4b24f9c2281a9cddb746402b100b1dcd"
 blocks: [MAC-r3b0, MAC-o3p2, MAC-p88c, MAC-p46v]
+was_blocked_by: [MAC-gscc]
 ---
 
 ## Description
@@ -43,10 +43,11 @@ Acceptance criteria:
 - 2026-09-25T20:11:08Z dep_added: blocks MAC-o3p2
 - 2026-09-25T20:11:08Z dep_added: blocks MAC-p88c
 - 2026-09-25T20:11:08Z dep_added: blocks MAC-p46v
+- 2026-10-06T04:03:39Z dep_removed: was_blocked_by MAC-gscc
 
 ## Links
 - Parent: [[MAC-0p5d]]
 - Blocks: [[MAC-r3b0]], [[MAC-o3p2]], [[MAC-p88c]], [[MAC-p46v]]
-- Blocked by: [[MAC-gscc]]
+- Was blocked by: [[MAC-gscc]]
 
 ## Comments
