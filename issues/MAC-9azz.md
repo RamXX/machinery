@@ -2,14 +2,14 @@
 id: MAC-9azz
 title: "Table oracles: a declared fixture set a matrix row cites and Gt binds like transition ids"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [self-design, table-oracle, gt, gw, gv]
 parent: MAC-cup9
 created_at: 2026-09-24T02:38:21Z
 created_by: ramirosalas
-updated_at: 2026-09-24T02:38:21Z
-content_hash: "sha256:d3b75eceab26a141e20bc94c0feee6d864e4addcbf17018839259b8755111b7d"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:10770bd0d1799670a13cfac8bddda4ed6cd3366fa389804b17faa47e0d21951e"
 blocked_by: [MAC-qxaa]
 blocks: [MAC-cup9]
 was_blocked_by: [MAC-va30]
@@ -25,7 +25,7 @@ First story of MAC-cup9; blocks the rest. A non-machine unit (a parser, a hasher
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Whole story: table oracle format, matrix row citation, Gt binding by whole-token case id, Gw packet carriage, Gv staleness, refresh command, synthetic design tests. Evidence: No table-oracle construct exists: ORACLESET citations only reference machine oracle files (cmd/machinery/attest_implementation_test.go:25); no .table.md/yaml, no Gt binding of case ids from a table. Notes: qxaa (Gt credits ids from self-skipping suites) is a real prerequisite: the new binding must reuse the corrected credit logic. va30 (native test adapters) is an owner-ordering ruling, not a technical dependency of the table-oracle design.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocked_by MAC-va30
