@@ -8,8 +8,8 @@ labels: [story, human-surface, h2-origin]
 parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:5487f9fbc7a550e5b35336a7661d0a265e4c13e7dbb63ee46f97e9fbd8e5431b"
+updated_at: 2026-10-06T04:03:55Z
+content_hash: "sha256:36018895798cc81a96389d5b5fc6aaffcb188df73233b00a27d111c8daae9085"
 blocked_by: [MAC-m7bh]
 was_blocked_by: [MAC-5n2i]
 ---
@@ -37,7 +37,7 @@ ACCEPTANCE CRITERIA
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Project the screen contract and the rule line into packets, document the hand-back block and optional `handback check` validator, and update the conductor text. Evidence: machinery packet (internal/gates/packet.go and internal/pack) has no screen-contract projection or hand-back block; no handback command exists. Notes: m7bh is a real dependency (the contract being projected). 5n2i is only needed for the 'rendered-surface' wording; it is a soft dependency that could be dropped by wording the rule line against the screen contract alone, so list it as a stale blocker only if the owner accepts that. The validator is optional and could be split into its own story.
 
 ## History
 - 2026-09-30T23:26:37Z dep_added: blocked_by MAC-m7bh
