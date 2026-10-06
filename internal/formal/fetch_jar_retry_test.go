@@ -7,32 +7,43 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestFetchJarRetriesTransientFailures(t *testing.T) {
-	for _, failure := range []string{"server error", "header EOF", "body EOF"} {
+	for _, failure := range []string{"server error", "header EOF", "body EOF", "connection reset"} {
 		t.Run(failure, func(t *testing.T) {
 			t.Parallel()
 			body := []byte("verified jar")
 			sum := sha256.Sum256(body)
 			var attempts atomic.Int32
+			var starts []time.Time
+			var mu sync.Mutex
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				mu.Lock()
+				starts = append(starts, time.Now())
+				mu.Unlock()
 				if attempts.Add(1) <= 2 {
 					switch failure {
 					case "server error":
 						http.Error(w, "temporary failure", http.StatusServiceUnavailable)
-					case "header EOF":
+					case "header EOF", "connection reset":
 						conn, _, err := w.(http.Hijacker).Hijack()
 						if err != nil {
 							t.Error(err)
 							return
+						}
+						if failure == "connection reset" {
+							_ = conn.(*net.TCPConn).SetLinger(0)
 						}
 						_ = conn.Close()
 					case "body EOF":
@@ -52,6 +63,11 @@ func TestFetchJarRetriesTransientFailures(t *testing.T) {
 			}
 			if attempts.Load() != 3 {
 				t.Fatalf("attempts = %d, want 3", attempts.Load())
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			if starts[1].Sub(starts[0]) < 200*time.Millisecond || starts[2].Sub(starts[1]) < 400*time.Millisecond {
+				t.Fatalf("retry backoff missing: %v", starts)
 			}
 			cached, err := os.ReadFile(dest)
 			if err != nil || !bytes.Equal(cached, body) {

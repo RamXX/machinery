@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/RamXX/machinery/internal/alloy"
@@ -408,6 +410,50 @@ func recoverFormalJarStages(root *os.Root, prefix string) error {
 	return syncFormalDirectory(root)
 }
 
+func transientFormalDownloadError(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) || errors.Is(err, syscall.EPIPE) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func downloadFormalJar(ctx context.Context, dst *os.File, url, label string) (retry bool, retErr error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return transientFormalDownloadError(err), err
+	}
+	defer func() { retErr = errors.Join(retErr, resp.Body.Close()) }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return resp.StatusCode >= 500 && resp.StatusCode <= 599, fmt.Errorf("fetching %s: HTTP %s", label, resp.Status)
+	}
+	if resp.ContentLength <= 0 {
+		return false, fmt.Errorf("fetching %s: response Content-Length must be present and positive", label)
+	}
+	if resp.ContentLength > formalJarDownloadLimit {
+		return false, fmt.Errorf("fetching %s: response Content-Length %d exceeds %d-byte limit", label, resp.ContentLength, formalJarDownloadLimit)
+	}
+	written, err := io.Copy(dst, io.LimitReader(resp.Body, formalJarDownloadLimit+1))
+	if err != nil {
+		return transientFormalDownloadError(err), err
+	}
+	if written > formalJarDownloadLimit {
+		return false, fmt.Errorf("fetching %s: response body exceeds %d-byte limit", label, formalJarDownloadLimit)
+	}
+	if written != resp.ContentLength {
+		return false, fmt.Errorf("fetching %s: response body length %d does not match Content-Length %d", label, written, resp.ContentLength)
+	}
+	return false, nil
+}
+
 // fetchJar verifies every use, including an already-cached jar. The stable
 // cache-ancestor lock covers recovery, download, and installation for every
 // formal engine. After acquiring it, fetchJar retains one handle-relative root
@@ -491,33 +537,28 @@ func fetchJarContext(ctx context.Context, dest, url, label, wantSHA string) (_ s
 	}()
 	downloadCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	req, err := http.NewRequestWithContext(downloadCtx, http.MethodGet, url, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { retErr = errors.Join(retErr, resp.Body.Close()) }()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("fetching %s: HTTP %s", label, resp.Status)
-	}
-	if resp.ContentLength <= 0 {
-		return "", fmt.Errorf("fetching %s: response Content-Length must be present and positive", label)
-	}
-	if resp.ContentLength > formalJarDownloadLimit {
-		return "", fmt.Errorf("fetching %s: response Content-Length %d exceeds %d-byte limit", label, resp.ContentLength, formalJarDownloadLimit)
-	}
-	written, err := io.Copy(tmpFile, io.LimitReader(resp.Body, formalJarDownloadLimit+1))
-	if err != nil {
-		return "", err
-	}
-	if written > formalJarDownloadLimit {
-		return "", fmt.Errorf("fetching %s: response body exceeds %d-byte limit", label, formalJarDownloadLimit)
-	}
-	if written != resp.ContentLength {
-		return "", fmt.Errorf("fetching %s: response body length %d does not match Content-Length %d", label, written, resp.ContentLength)
+	attempt := 1
+	for ; ; attempt++ {
+		if err := tmpFile.Truncate(0); err != nil {
+			return "", err
+		}
+		if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
+			return "", err
+		}
+		retry, downloadErr := downloadFormalJar(downloadCtx, tmpFile, url, label)
+		if downloadErr == nil {
+			break
+		}
+		if !retry || attempt == 3 || downloadCtx.Err() != nil {
+			return "", fmt.Errorf("fetching %s after %d attempts: %w", label, attempt, downloadErr)
+		}
+		timer := time.NewTimer(200 * time.Millisecond << (attempt - 1))
+		select {
+		case <-downloadCtx.Done():
+			timer.Stop()
+			return "", fmt.Errorf("fetching %s after %d attempts: %w", label, attempt, downloadCtx.Err())
+		case <-timer.C:
+		}
 	}
 	if err := tmpFile.Sync(); err != nil {
 		return "", err
@@ -532,7 +573,7 @@ func fetchJarContext(ctx context.Context, dest, url, label, wantSHA string) (_ s
 		return "", err
 	}
 	if got != wantSHA {
-		return "", fmt.Errorf("checksum mismatch for %s: got %s, want %s", label, got, wantSHA)
+		return "", fmt.Errorf("fetching %s after %d attempts: checksum mismatch: got %s, want %s", label, attempt, got, wantSHA)
 	}
 	installErr := fsatomic.RenameNoReplace(parentRoot, tmpBase, destBase)
 	if installErr != nil {
