@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:963556de8896b25645cc9f27d67e381d5bde4dc6db0f4b07271c1bcf61587ee5"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:4c4c0056e7cf6dcd755206fdd1b5518116feedc6033797a8a0749ea4876639b9"
 blocked_by: [MAC-5ft8]
 blocks: [MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-bz1y]
@@ -93,6 +93,7 @@ status: new
 
 ## Notes
 Triage 2026-09-24: NEEDS-REWRITE. Retarget ci.yml wiring to .dagger/main.go (a9dd4b53) and the tiered preflight (0ee03664).
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Rewrite targets to the Dagger module and tiered preflight, then wire every complete example onto the strict path with explicit stores. Evidence: Verified at HEAD 8c620d8f (v0.11.0). No machinery tdd command is registered (cmd/machinery has no tdd.go; CHANGELOG 0.7.0 'no CLI surface yet'; docs/test-assurance-contract.md:9,22 state the CLI is target only). internal/assuranceflow holds only register.go (no run.go), scripts/assurance-examples.sh does not exist, examples/go-crm/design/assurance/ does not exist. scripts/example-inventory.sh exists but scripts/assurance-examples.sh and scripts/assurance-examples-test.sh do not; CI is now delegated to the Dagger module (.dagger/main.go) and preflight is tiered (preflight-fast.sh, preflight.sh), so PRODUCES list (ci.yml, preflight.sh wiring) targets superseded surfaces. Notes: Real dep: go-crm must be migrated first (5ft8) because it is the only complete example. Needs rewrite per 09-24 triage.
 
 ## History
 - 2026-09-06T09:10:12Z dep_added: blocked_by MAC-5ft8
