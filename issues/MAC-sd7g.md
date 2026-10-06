@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:3fa45adbf8b9e587c28ee2f2b3ca0cb1c17dd80538f0cc22941fcdbb80d45cbc"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:2fbcfa21014caf8d25cde9df334bbd410937f12a57f320f5c820892a5f95eed6"
 blocked_by: [MAC-pe9v, MAC-va30]
 blocks: [MAC-sqpt, MAC-vx24]
 was_blocked_by: [MAC-wi2u, MAC-avfp, MAC-imtz, MAC-8yai]
@@ -93,7 +93,7 @@ status: new
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement the closed CheckExecutor with the eight fixed profiles, PendingChecks gating on view release, and the native checks lane. Evidence: CHANGELOG 0.7.0 says the assurance substrate ships with no CLI/gate consumer. Greps of *.go find no CheckTDDAssurance, GateExecution, TDDStatus, assurance_store or strict-check. internal/assuranceflow holds only register.go. internal/tdd has no execute.go, replay.go or evidence.go, and has CheckExecutor only as a type in types.go. internal/assuranceflow/checks.go does not exist. Notes: The four adapters (wi2u, avfp, imtz, 8yai) are closed and present in internal/tdd/adapters/. pe9v is real because Run and RunSelected need the GateExecution fields in suite.go. va30 (consumer-declared runtime identity) was added on 2026-09-24 and is a real contract dependency, since the profiles bind runtime handles that va30 changes from a machinery-global pin. Both can be worked in parallel with the rest of the chain until then.
 
 ## History
 - 2026-09-06T09:10:05Z dep_added: blocked_by MAC-wi2u
