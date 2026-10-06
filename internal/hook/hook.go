@@ -959,7 +959,7 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	// On a case-sensitive filesystem the folded deny over-covers only
 	// near-case variants of reserved names, which no legitimate edit uses.
 	for _, edited := range editedPaths(in) {
-		if reason := operatorOnlyCommand(strings.ToLower(filepath.ToSlash(resolveEventPath(in.Cwd, edited)))); reason != "" {
+		if reason := operatorOnlyPath(strings.ToLower(filepath.ToSlash(resolveEventPath(in.Cwd, edited)))); reason != "" {
 			return deny(reason)
 		}
 	}

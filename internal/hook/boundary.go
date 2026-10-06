@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"regexp"
@@ -43,13 +44,15 @@ type boundaryInput struct {
 }
 
 func decodeBoundaryInput(raw []byte) (boundaryInput, bool, error) {
-	event := boundaryEventName(raw)
-	if !boundaryEvents[event] {
-		return boundaryInput{}, false, nil
+	fields, scanErr := scanHookObject(raw)
+	var event string
+	if rawEvent, ok := fields["hook_event_name"]; ok && json.Unmarshal(rawEvent, &event) == nil && boundaryEvents[event] {
+		// a boundary event: from here every ambiguity is refused
+	} else if scanErr == nil || !mentionsBoundaryEvent(raw) {
+		return boundaryInput{}, false, nil // the strict decoder owns it
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return boundaryInput{}, true, err
+	if scanErr != nil {
+		return boundaryInput{}, true, scanErr
 	}
 	var batch boundaryInput
 	if event == "PostToolBatch" {
@@ -82,18 +85,6 @@ func decodeBoundaryInput(raw []byte) (boundaryInput, bool, error) {
 	}
 	batch.Input = in
 	return batch, true, nil
-}
-
-// boundaryEventName reads only the event name; anything unreadable is not a
-// boundary event and goes to the strict decoder, which reports it.
-func boundaryEventName(raw []byte) string {
-	var probe struct {
-		HookEventName string `json:"hook_event_name"`
-	}
-	if json.Unmarshal(raw, &probe) != nil {
-		return ""
-	}
-	return probe.HookEventName
 }
 
 // boundaryCloses reports whether a boundary event of in proves that the token
@@ -327,10 +318,19 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 	return narrowed, nil
 }
 
-// shellWordSeparators turns shell quoting and metacharacters into word
-// breaks, so 'machinery "hook"', 'machinery hook<<<x' and 'machinery\ hook'
-// all read as the words machinery and hook.
-var shellWordSeparators = regexp.MustCompile("[\"'`\\\\|&;<>(){}\\s]+")
+// shellJoiners are the characters a shell removes while joining one word
+// (quotes and backslash escapes): 'mach''inery', "ho"ok and machin\ery all
+// run machinery. Deleting them first reads words the way the shell does.
+var shellJoiners = strings.NewReplacer(`"`, "", `'`, "", `\`, "")
+
+// shellWordSeparators split words where the shell does.
+var shellWordSeparators = regexp.MustCompile("[|&;<>(){}`\\s]+")
+
+// canonicalShellWords is the single reading of a command the operator-only
+// guard decides on.
+func canonicalShellWords(folded string) []string {
+	return shellWordSeparators.Split(shellJoiners.Replace(folded), -1)
+}
 
 // invokesMachineryHook reports whether the word hook follows any word that
 // names the machinery binary. It over-covers on purpose: flags and their
@@ -338,7 +338,7 @@ var shellWordSeparators = regexp.MustCompile("[\"'`\\\\|&;<>(){}\\s]+")
 // nothing it needs when a rare harmless command is refused.
 func invokesMachineryHook(folded string) bool {
 	seenBinary := false
-	for _, word := range shellWordSeparators.Split(folded, -1) {
+	for _, word := range canonicalShellWords(folded) {
 		if name := path.Base(word); name == "machinery" || name == "machinery.exe" {
 			seenBinary = true
 			continue
@@ -356,12 +356,13 @@ func invokesMachineryHook(folded string) bool {
 // this is a literal guard; command text assembled dynamically can evade it,
 // which the operator gate on hook-state itself and CI's machinery check back.
 func operatorOnlyCommand(folded string) string {
+	joined := shellJoiners.Replace(folded)
 	switch {
-	case strings.Contains(folded, "machinery-hook-state"):
-		return "the machinery hook state store and its initialization marker are governance evidence; agent tools may not read, write, or move them. An operator inspects them with 'machinery doctor'."
-	case strings.Contains(folded, "hook-state"):
+	case operatorOnlyPath(joined) != "":
+		return operatorOnlyPath(joined)
+	case strings.Contains(joined, "hook-state"):
 		return "'machinery hook-state' (adopt, release) is an operator command; it may not run from an agent session. Ask the human operator to run it in their own terminal."
-	case strings.Contains(folded, "machinery-hook.sh") || invokesMachineryHook(folded):
+	case strings.Contains(joined, "machinery-hook") || invokesMachineryHook(folded):
 		return "'machinery hook' is the host's hook entry point; an agent may not send hook events on its own behalf."
 	}
 	return ""
@@ -394,4 +395,79 @@ func closeArmedToken(root string, in Input) (retErr error) {
 	return mutateStateLocked(stateFile, root, false, func(record *hookStateRecord) bool {
 		return record.removePending(operation)
 	})
+}
+
+// boundaryRoutingKeys are the fields a boundary decision reads. A key that
+// matches one of them only after case folding is refused, because Go's
+// struct decoding matches keys case-insensitively and another consumer could
+// read the variant where this one reads the exact key.
+var boundaryRoutingKeys = []string{"hook_event_name", "session_id", "agent_id", "cwd", "tool_calls"}
+
+// scanHookObject reads one top-level JSON object exactly once, in order,
+// refusing duplicate keys, case-folded aliases of the routing keys, and
+// trailing content, so the boundary decision and the strict decoder can never
+// see different values for the same field.
+func scanHookObject(raw []byte) (map[string]json.RawMessage, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	start, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if delim, ok := start.(json.Delim); !ok || delim != '{' {
+		return nil, fmt.Errorf("root must be a JSON object")
+	}
+	fields := map[string]json.RawMessage{}
+	for dec.More() {
+		keyToken, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		key, ok := keyToken.(string)
+		if !ok {
+			return nil, fmt.Errorf("hook-event key must be a string")
+		}
+		if _, dup := fields[key]; dup {
+			return nil, fmt.Errorf("duplicate hook-event key %q", key)
+		}
+		for _, routing := range boundaryRoutingKeys {
+			if key != routing && strings.EqualFold(key, routing) {
+				return nil, fmt.Errorf("hook-event key %q is a case variant of %q", key, routing)
+			}
+		}
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return nil, err
+		}
+		fields[key] = value
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); err != io.EOF {
+		return nil, fmt.Errorf("trailing JSON value after hook-event object")
+	}
+	return fields, nil
+}
+
+// mentionsBoundaryEvent reports whether an unparseable or ambiguous payload
+// names a boundary event anywhere, so it is refused as a boundary instead of
+// being handed to a decoder that might read it differently.
+func mentionsBoundaryEvent(raw []byte) bool {
+	for event := range boundaryEvents {
+		if bytes.Contains(raw, []byte(event)) {
+			return true
+		}
+	}
+	return false
+}
+
+// operatorOnlyPath names why a file tool or shell command may not touch a
+// path: the durable hook store and its initialization marker are both named
+// machinery-hook-state-<key>.
+func operatorOnlyPath(folded string) string {
+	if strings.Contains(folded, "machinery-hook-state") {
+		return "the machinery hook state store and its initialization marker are governance evidence; agent tools may not read, write, or move them. An operator inspects them with 'machinery doctor'."
+	}
+	return ""
 }

@@ -19,8 +19,16 @@ import (
 //     session markers or no terminal on stdin). Release never clears an
 //     obligation and is journaled.
 //  2. Pipe forged events into 'machinery hook' through a tool call: denied
-//     in PreToolUse by command text. A forged boundary event still closes
-//     only tokens of a known owner and never discharges an obligation.
+//     in PreToolUse on the command as the shell joins it (quotes and
+//     backslashes removed before splitting). The guard is defense in depth:
+//     a forged boundary event only marks tokens of a known owner ended, an
+//     ended token withholds discharge from every Stop except the owner's
+//     main-thread Stop (which the host fires only after every foreground
+//     call resolved), and nothing discharges an obligation without gates.
+// 10. Ambiguous hook JSON (duplicate keys, case-folded aliases of a routing
+//     key, trailing content) naming a boundary event is refused; one
+//     scanner reads the routing keys once, and owners are always derived by
+//     the same digest functions from the same decoded ids.
 //  3. Read, write, or move the hook store or its marker with a file or shell
 //     tool: denied in PreToolUse by path text.
 //  4. A token with no recorded owner (older ledger, or armed by an event
@@ -308,5 +316,75 @@ func TestForgedOwnSessionEndLetsOnlyTheMainThreadStopDischarge(t *testing.T) {
 	}
 	if state, err := readStateRecord(root, "s"); err != nil || state.design {
 		t.Fatalf("main-thread Stop must discharge after green gates: %+v %v", state, err)
+	}
+}
+
+// Parser differential: the guard must read a command the way the shell joins
+// it (quotes and backslashes removed before word splitting), across case,
+// whitespace, aliases of the binary path, and redirections.
+func TestOperatorGuardReadsWordsAsTheShellJoinsThem(t *testing.T) {
+	root := greenFieldRoot(t)
+	for _, command := range []string{
+		`mach''inery hook`,
+		`machinery ho''ok`,
+		`machin\ery hook`,
+		`"machinery" "hook"`,
+		`MACHINERY HOOK`,
+		"machinery\thook",
+		"machinery\n hook",
+		`./bin/../bin/machinery hook`,
+		`$HOME/.local/bin/machinery hook`,
+		`machinery-hook''.sh boundary`,
+		`machinery hook-st''ate release --orphaned`,
+		`machinery hook\-state adopt`,
+		`ca''t ~/.config/machinery-hook-st"a"te-x/y.state`,
+		"`machinery hook`",
+		`x=$(machinery hook)`,
+	} {
+		pre := Input{SessionID: "agent", ToolUseID: "d-" + command, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: command}}
+		if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("guard read %q differently from the shell: %s", command, out)
+		}
+	}
+}
+
+// Parser differential: a boundary payload with duplicate keys, case-folded
+// aliases of a routing key, or trailing content is refused, never routed.
+func TestBoundaryPayloadAmbiguityIsRefused(t *testing.T) {
+	root := greenFieldRoot(t)
+	armShell(t, root, "victim", "toolu_v")
+	for _, raw := range []string{
+		`{"hook_event_name":"SessionEnd","session_id":"attacker","session_id":"victim","cwd":"` + filepath.ToSlash(root) + `"}`,
+		`{"hook_event_name":"SessionEnd","session_id":"attacker","SESSION_ID":"victim","cwd":"` + filepath.ToSlash(root) + `"}`,
+		`{"hook_event_name":"Stop","Hook_Event_Name":"SessionEnd","session_id":"victim","cwd":"` + filepath.ToSlash(root) + `"}`,
+		`{"hook_event_name":"SessionEnd","hook_event_name":"SessionEnd","session_id":"victim","cwd":"` + filepath.ToSlash(root) + `"}`,
+		`{"hook_event_name":"SessionEnd","session_id":"victim","cwd":"` + filepath.ToSlash(root) + `"} {}`,
+		`{"hook_event_name":"SessionEnd","session_id":"victim","cwd":"` + filepath.ToSlash(root) + `"`,
+		`{"hook_event_name":"SessionEnd","hook_event_name":"Stop","session_id":"victim","cwd":"` + filepath.ToSlash(root) + `"}`,
+		`{"hook_event_name":"SessionEnd","session_id":7,"cwd":"` + filepath.ToSlash(root) + `"}`,
+	} {
+		var out bytes.Buffer
+		if err := Run(strings.NewReader(raw), &out, root); err == nil {
+			t.Fatalf("ambiguous payload was routed: %s -> %s", raw, out.String())
+		}
+	}
+	requireLive(t, root, 1, "no ambiguous payload marked the victim's token")
+}
+
+// Single source of truth: the owner a PreToolUse records and the owner a
+// boundary or Stop computes come from the same decoded session and agent
+// ids, including non-ASCII and escaped spellings of the same id.
+func TestOwnerDigestsAgreeAcrossDecoders(t *testing.T) {
+	root := greenFieldRoot(t)
+	session := "sessión-☃"
+	armShell(t, root, session, "toolu_u")
+	raw := `{"hook_event_name":"UserPromptSubmit","session_id":"sessión-☃","cwd":"` + filepath.ToSlash(root) + `","user_prompt":"x"}`
+	var out bytes.Buffer
+	if err := Run(strings.NewReader(raw), &out, root); err != nil || out.Len() != 0 {
+		t.Fatalf("%s %v", out.String(), err)
+	}
+	requireLive(t, root, 0, "an escaped spelling of the same session id is the same owner")
+	if out := stopOutput(t, root, "sessiÓn-☃"); !strings.Contains(out, "stays armed") {
+		t.Fatalf("a case-different session id is another session: %s", out)
 	}
 }

@@ -85,9 +85,12 @@ keep that property and narrow two fail-closed behaviours that had become permane
 - **Boundary events** are host-originated. PreToolUse denies agent shell commands that invoke
   `machinery hook` (literal and quoted forms, redirections, flags before the subcommand) or
   `machinery hook-state`, any reference to the plugin's `machinery-hook.sh`, and file or shell
-  access to the hook store and its marker. A boundary only marks a token ended and leaves the
-  obligation armed; a forged one cannot let any other session discharge, and an unclassifiable
-  token is never marked by one.
+  access to the hook store and its marker, reading the command as the shell joins words (quotes
+  and backslashes removed first). That guard is defense in depth, not the boundary: a boundary
+  only marks a token ended, an ended token withholds discharge from every Stop except its owning
+  session's main-thread Stop (which the host fires only after every foreground call resolved),
+  an unclassifiable token is never marked, and a boundary payload with duplicate keys,
+  case-folded aliases of a routing key, or trailing content is refused.
 - **Release and adopt are operator-only.** Besides the PreToolUse denial, `hook-state release` and
   `hook-state adopt` refuse to run when an agent host's session markers are in the environment
   (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `AI_AGENT`, `CODEX_THREAD_ID`, `CODEX_SANDBOX`,
