@@ -239,13 +239,13 @@ func TestGzVerifierMustBeGovernedByContract(t *testing.T) {
 func TestGzUnlistedVerifierLookingElement(t *testing.T) {
 	dsl := strings.Replace(threatDSL, `report = component "Report" "renders summaries" "Go"`,
 		`report = component "Report" "renders summaries" "Go"
-        stamp = component "Stamp" "signs receipts before export" "Go"`, 1)
+        stamp = component "Stamp" "signing receipts before export" "Go"`, 1)
 	arch := threatArch("  - id: app.authz\n    element: authz\n    code: [\"authz/**\"]\n")
 
 	// audit: a note naming the element and its evidence
 	design := writeThreatDesign(t, map[string]string{"workspace.dsl": dsl, "ARCHITECTURE.md": arch})
 	g := CheckThreats(design, "")
-	if len(g.Errs) != 0 || !hasNote(g, "audit: workspace.dsl element stamp speaks of \"signs\"") {
+	if len(g.Errs) != 0 || !hasNote(g, "audit: workspace.dsl element stamp speaks of \"signing\"") {
 		t.Fatalf("an unlisted verifier-looking element is an audit note: errs %v notes %v", g.Errs, g.Notes)
 	}
 	if !hasNote(g, "audit: workspace.dsl element authz speaks of \"authz\"") {
@@ -256,7 +256,7 @@ func TestGzUnlistedVerifierLookingElement(t *testing.T) {
 	// name clears it, and the element-name exemption is no resolve error
 	design = writeThreatDesign(t, map[string]string{"workspace.dsl": dsl, "ARCHITECTURE.md": arch, "threats.yaml": verifierLedger()})
 	g = CheckThreats(design, "")
-	if !hasErr(g, "workspace.dsl element stamp speaks of \"signs\" in its name or description and is neither a declared verifier nor listed under not_security_relevant") {
+	if !hasErr(g, "workspace.dsl element stamp speaks of \"signing\" in its name or description and is neither a declared verifier nor listed under not_security_relevant") {
 		t.Fatalf("enforce mode makes it an error: %v", g.Errs)
 	}
 	if hasErr(g, "element authz") {

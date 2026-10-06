@@ -1736,6 +1736,9 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 		// CLI default suite arms it the same way; omitting it here let a
 		// carrier defect introduced mid-session pass the stop unexamined
 		run["gc"] = true
+		// the threat-ledger gate reads the same model; without a ledger, or
+		// in audit mode, it only adds notes, so arming it costs nothing
+		run["gz"] = true
 	}
 	if fileExists(filepath.Join(designDir, "workspace.dsl")) || fileExists(filepath.Join(designDir, "ARCHITECTURE.md")) {
 		run["g2"] = true

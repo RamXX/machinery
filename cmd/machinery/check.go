@@ -11,7 +11,7 @@ import (
 
 func newCheckCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5]",
+		Use:   "check <design-dir> [--impl d] [--commit sha] [--gate gm,gs,gu,gp,gi,gn,gc,gz,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5]",
 		Short: "Run the deterministic verification gates on a design",
 		Args:  cobra.ExactArgs(1),
 	}
@@ -24,7 +24,7 @@ func newCheckCmd() *cobra.Command {
 	var verbose bool
 	var landing bool
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory for Gr-reads, G4-import, Gt-tests, and Gv current implementation reviews")
-	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5")
+	c.Flags().StringVar(&gateList, "gate", "", "comma list of gates to run: gm,gs,gu,gp,gi,gn,gc,gz,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5")
 	c.Flags().StringVar(&commit, "commit", "", "repository-history anchor for Ga-accept evidence (env MACHINERY_COMMIT; the flag wins)")
 	c.Flags().BoolVar(&warningsAsErrors, "warnings-as-errors", false, "treat every gate warning as a blocking finding")
 	c.Flags().BoolVar(&explain, "explain", false, "print, under each Gy-rules finding, the derivation that produced it (rule file, rule index, and the facts with their sources)")

@@ -42,11 +42,17 @@ One line per subcommand:
 - `machinery compose <composition.yaml> <coordinator.machine.json> [out-dir]` validates a
   `<name>.composition.yaml` against the coordinator machine, then generates the cross-aggregate
   composition (failures, per-obligation compensation, the FailedDirty stall) with its invariants.
-- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5]` the deterministic
+- `machinery check <design-dir> [--impl <code-dir>] [--commit <sha>] [--gate gm,gs,gu,gp,gi,gn,gc,gz,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5]` the deterministic
   gate suite (Gm-transition on rebuild/hybrid contracts; Gs-surface on legacy surface ledgers;
   Gu-surfaces on the target surface ledger `surfaces.yaml` (every action whose actor is a person is
   mapped to a named surface or explicitly deferred, and every mapped act resolves against the domain
   model with the actor it declares);
+  Gz-threat on the domain model (every model subject whose wording looks security-relevant is
+  classified in `design/threats.yaml` against the standard adversary set, declared not
+  security-relevant with a reason, or waived by an owner; a threat invariant is never closed by a
+  `formal/waivers.yaml` note; every declared verifier is a `workspace.dsl` element the contract
+  governs; with `--impl` every locked negative test appears in a test file; without the ledger, or
+  under `mode: audit`, missing classifications are `audit:` notes);
   Gp/Gi/Gn relational gates; G2-c4 (the contract parses and binds, the allow graph is acyclic,
   mitigation coverage, and an interface-contract row per allowed edge with no row for an edge no
   allow rule declares);
@@ -108,7 +114,10 @@ One line per subcommand:
   readable and age from the first of that month). `--gate gy,gl` records the Gy-rules findings
   and Gl-ledger undeclared-fact warnings instead (with `g4` as well, both); a recorded finding
   then reports as a `baselined:` note, and a rerun only shrinks that part of the ratchet unless
-  `--grow` is given. It refuses while Gy-rules has projection errors.
+  `--grow` is given. It refuses while Gy-rules has projection errors. `--gate gz` records each
+  Gz-threat candidate `design/threats.yaml` does not classify, with a hash of its model
+  definition; a changed definition makes it a finding again. It refuses while the ledger does not
+  parse or resolve.
 - `machinery scale <design>` measures a design's size (stateful components, bounded contexts,
   synthesis input) and recommends sharding or recursive decomposition.
 - `machinery verify-formal <design-dir>` regenerates the tla/refine/compose specs into

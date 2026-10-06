@@ -637,6 +637,7 @@ Phase 1  Modelith     domain model
          tool: modelith lint clean; pinned render engine reproduces every committed *.modelith.md
                after the mechanical em-dash normalization
                Gc-carrier (every invariant has a named carrier or a reasoned waiver)
+               Gz-threat (security-relevant subjects classified against the adversary set)
          attested: lifecycle enums, action pre/post, invariant owners, scenario coverage
 Phase 1.5 Relational  static relational models (opt-in, per invariant shape):
            policy    access control      -> Gp-policy    (Policy.als + Policy.oracle.md)
@@ -701,7 +702,7 @@ and is the operator's contract.
 takes a comma list from exactly this vocabulary:
 
 ```
-gm,gs,gu,gp,gi,gn,gc,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5
+gm,gs,gu,gp,gi,gn,gc,gz,g2,g3,gd,gl,gx,gy,gr,gk,gb,gw,ge,ga,gj,gv,g4,gt,g5
 ```
 
 Each gate prints a header, a `checked:` line with its counts, and either `ok` or findings at one of
@@ -735,6 +736,15 @@ Modelith's own linter.
   relational layer, a machine matrix unit, an external checker's coverage claim) or an explicit
   waiver with a reason. It needs only the domain model, so it runs from Phase 1: an obligation the
   design does not carry fails the moment it is written.
+- **Gz-threat** (on the domain model; the ledger `design/threats.yaml` is optional): every
+  entity or action whose wording looks security-relevant is classified against the standard
+  adversary set, declared not security-relevant with a reason, or waived by an owner; a threat
+  invariant is never closed by a `formal/waivers.yaml` note; every declared verifier is a
+  `workspace.dsl` element the Architecture Contract governs, and every verifier-looking element is
+  declared or exempted; with `--impl`, every locked negative test appears in a test file. Without
+  the ledger, or under `mode: audit`, missing classifications are `audit:` notes; `mode: enforce`
+  makes them errors, and `machinery baseline --gate gz` records today's candidates so only new
+  and changed ones block. See [threat-driven verification](docs/threat-driven-verification.md).
 - **Gp-policy** (a policy annotation): the annotation binds to the domain model, covers every
   top-level invariant, and the committed `Policy.als` and `Policy.oracle.md` byte-match a fresh
   generation.
@@ -1090,6 +1100,7 @@ machinery check <design> --impl <dir> \
 machinery baseline <design> --impl .  # brownfield Stage 1: propose baseline rules, write the ratchet
 machinery baseline <design> --gate gy,gl --impl .
                                       # record Gy-rules and Gl-ledger debt in the ratchet (shrink-only)
+machinery baseline <design> --gate gz # record unclassified Gz-threat candidates (shrink-only)
 machinery verify-formal <your-design> # regenerate + TLC/Alloy-check the proofs (needs Java)
 machinery verify-c4 <your-design>     # compile workspace.dsl under structurizr-cli (needs Java)
 machinery project <design>            # write the external-checker projections

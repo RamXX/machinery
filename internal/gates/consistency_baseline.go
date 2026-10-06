@@ -30,7 +30,7 @@ const (
 // DebtRecord is what one `machinery baseline --gate gy|gl` did for one gate,
 // in occurrences (a Gl key recorded with count 2 is two).
 type DebtRecord struct {
-	Gate        string // "Gy-rules" or "Gl-ledger"
+	Gate        string // "Gy-rules", "Gl-ledger", or "Gz-threat"
 	Observed    int    // findings the gate reports today
 	Recorded    int    // occurrences the ratchet now tolerates
 	NotRecorded int    // observed but left out: new since the last baseline (no --grow); they keep blocking
@@ -116,10 +116,11 @@ func RecordConsistencyDebt(design, impl string, r *Ratchet, gy, gl, grow bool) (
 	return recs, nil
 }
 
-// requireNoBaselinedDebt closes final handoff over the consistency baseline:
-// --complete refuses while any Gy-rules or Gl-ledger finding is still
-// tolerated by ratchet.json, the way it refuses an open milestone, and prints
-// the count per gate. G4's baselined edges are judged by G4 alone.
+// requireNoBaselinedDebt closes final handoff over the recorded adoption debt:
+// --complete refuses while any Gy-rules or Gl-ledger finding, or any
+// Gz-threat candidate, is still tolerated by ratchet.json, the way it refuses
+// an open milestone, and prints the count per gate. G4's baselined edges are
+// judged by G4 alone.
 func requireNoBaselinedDebt(final *Gate, run []*Gate) {
 	counts := map[string]int{}
 	for _, g := range run {
@@ -129,7 +130,7 @@ func requireNoBaselinedDebt(final *Gate, run []*Gate) {
 	}
 	total := 0
 	var parts []string
-	for _, name := range []string{"Gy-rules", "Gl-ledger"} {
+	for _, name := range []string{"Gy-rules", "Gl-ledger", threatGateName} {
 		if n := counts[name]; n > 0 {
 			total += n
 			parts = append(parts, fmt.Sprintf("%s %d", name, n))
@@ -138,6 +139,6 @@ func requireNoBaselinedDebt(final *Gate, run []*Gate) {
 	if total == 0 {
 		return
 	}
-	final.Errs = append(final.Errs, fmt.Sprintf("%d baselined consistency finding(s) remain (%s); final handoff requires the Gy/Gl debt recorded in %s burned down: fix each, then rerun machinery baseline to shrink the ratchet",
+	final.Errs = append(final.Errs, fmt.Sprintf("%d baselined finding(s) remain (%s); final handoff requires the Gy/Gl/Gz debt recorded in %s burned down: fix or classify each, then rerun machinery baseline to shrink the ratchet",
 		total, strings.Join(parts, ", "), RatchetFile))
 }

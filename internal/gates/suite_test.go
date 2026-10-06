@@ -290,7 +290,7 @@ func TestSelectDefaultListAndVocabulary(t *testing.T) {
 	if _, err := Select(design, "gb,gt", ""); err != nil {
 		t.Errorf("gb,gt must be a valid explicit list: %v", err)
 	}
-	if _, err := Select(design, "gz", ""); err == nil {
+	if _, err := Select(design, "gq", ""); err == nil {
 		t.Error("an unknown gate must be rejected")
 	}
 }
