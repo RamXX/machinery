@@ -8,8 +8,8 @@ labels: [e2e, ga, acceptance]
 parent: MAC-9dai
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:8e99edb0b2f4510c45ef24f26bba76c0562411a6a8c251698a2b2d614cf6b90c"
+updated_at: 2026-10-06T04:03:56Z
+content_hash: "sha256:ec741ae5a32e020091fcd8763d4f95ae268b472d76ffbb754cd5bb8e6c3e762f"
 blocked_by: [MAC-p3pj, MAC-lioz]
 blocks: [MAC-qax4]
 related: [MAC-u4oo]
@@ -35,7 +35,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Define the e2e evidence record, Ga binding to the reviewed commit and declared behaviors, waiver line, submitted-vs-replayed wording; Phase 2 follow-up on MAC-u4oo. Evidence: No e2e evidence record in Ga: no E2E block or e2e evidence symbols in internal/gates; CHANGELOG 0.11.0 does not mention it. Acceptance still binds a reviewer to a commit only. Notes: Blockers are real: needs declared behaviors (p3pj) and postures (lioz, for dependency postures used in the record). Phase 2 should be filed as its own issue blocked by MAC-u4oo (AC5).
 
 ## History
 - 2026-09-25T19:53:33Z dep_added: blocked_by MAC-p3pj
