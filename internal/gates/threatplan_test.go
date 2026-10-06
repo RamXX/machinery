@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// threatModel is a minimal domain model: Session reads as security-relevant
+// planThreatModel is a minimal domain model: Session reads as security-relevant
 // (its definition authenticates), Note does not.
-const threatModel = `kind: DomainModel
+const planThreatModel = `kind: DomainModel
 version: v1
 title: Thing
 entities:
@@ -76,7 +76,7 @@ func threatPlan(m1Body string) string {
 
 func threatFixture(t *testing.T, build, ledger string, extra map[string]string) string {
 	t.Helper()
-	files := map[string]string{"domain.modelith.yaml": threatModel}
+	files := map[string]string{"domain.modelith.yaml": planThreatModel}
 	if ledger != "" {
 		files["threats.yaml"] = ledger
 	}

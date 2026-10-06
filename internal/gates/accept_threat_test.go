@@ -48,7 +48,7 @@ func acceptThreatFixture(t *testing.T, ledger, evidence string) string {
 	t.Helper()
 	files := map[string]string{
 		"BUILD.md":             acceptThreatPlan,
-		"domain.modelith.yaml": threatModel,
+		"domain.modelith.yaml": planThreatModel,
 		"acceptance/M1.yaml":   evidence,
 	}
 	if ledger != "" {
