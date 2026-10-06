@@ -121,6 +121,9 @@ func scriptFixture(t *testing.T) string {
 	}
 	copyFixtureTree(t, filepath.Join(sourceRepo, "scripts", "run-safe"), filepath.Join(repo, "scripts", "run-safe"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "scripts", "tree-inventory"), filepath.Join(repo, "scripts", "tree-inventory"), "_test.go")
+	// The tree-inventory helper reuses internal/dirscan's mutation witness
+	// (MAC-n35t), so the synthetic module must carry that package too.
+	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "dirscan"), filepath.Join(repo, "internal", "dirscan"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "modelithtx"), filepath.Join(repo, "internal", "modelithtx"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "fsatomic"), filepath.Join(repo, "internal", "fsatomic"), "_test.go")
 	copyFixtureTree(t, filepath.Join(sourceRepo, "internal", "filelock"), filepath.Join(repo, "internal", "filelock"), "_test.go")
