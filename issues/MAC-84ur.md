@@ -1,14 +1,16 @@
 ---
 id: MAC-84ur
 title: "Twin rule residual: a residual mark resolving in both policy layer and model is a finding (confirm still relevant)"
-status: open
+status: closed
 priority: 4
 type: feature
 labels: [gy, consistency-layer, twins, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:f82f2c919cac6895b78d0648793bdbe345fe7e6f5e1d3c0044db7c062ca887a8"
+updated_at: 2026-10-06T04:04:06Z
+content_hash: "sha256:adbf4422877c855ccdd7febed76a3b4eb65b2f75e85515e34ad1e29c17813e9e"
+closed_at: 2026-10-06T04:04:06Z
+close_reason: "Obsolete (revalidated 2026-10-06): since 0.10.0 machinery reads no design-private residual verb tables and nothing parses a relational 'residuals:' section, so there is no twin to detect."
 ---
 
 ## Description
@@ -37,7 +39,7 @@ Acceptance criteria:
 
 
 ## History
-
+- 2026-10-06T04:04:06Z status: open -> closed
 
 ## Links
 
