@@ -8,8 +8,8 @@ labels: [story, human-surface, h2-origin]
 parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:55Z
-content_hash: "sha256:793f01a91ca20b13c7f345acb4a23e3c1e4180326f8999e83d1bb5d371764cd3"
+updated_at: 2026-10-06T04:04:16Z
+content_hash: "sha256:8708da490b4afcdb8debd873dae24779b2fe6a33975c75618aa448325c369686"
 blocks: [MAC-5n2i, MAC-o493, MAC-q24l, MAC-xj6q]
 related: [MAC-6ylh, MAC-pm5s]
 ---
@@ -43,6 +43,7 @@ ACCEPTANCE CRITERIA
 
 ## Notes
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Design and ship the screens schema, generator with drift check, and the opt-in coverage gate with docs and a worked H2 example. Evidence: No design/screens.yaml schema, `generate screens` command or screen-coverage gate exists (grep finds none). internal/gates/surface.go and targetsurface.go handle only surfaces.yaml acts. Notes: Foundation of the epic: blocks 5n2i, o493, q24l, xj6q. Needs a gate letter that does not collide with Gz added in 0.11.0. No blockers.
+0.11.0 took gate letter gz (Gz-threat). Pick a free letter (f, h, o, q) when this lands.
 
 ## History
 - 2026-09-30T23:26:37Z dep_added: blocks MAC-5n2i
