@@ -20,7 +20,7 @@ Status: closed
 Status: closed
 `
 
-const acceptThreatReview = `threat_review:
+const acceptThreatReviewYAML = `threat_review:
   - adversary: outsider_without_key
     subject: Session
     probe: "forged credential file passed to the real CLI"
@@ -58,7 +58,7 @@ func acceptThreatFixture(t *testing.T, ledger, evidence string) string {
 }
 
 func TestGaThreatReviewCompleteIsClean(t *testing.T) {
-	design := acceptThreatFixture(t, threatLedgerEnforce, acceptEvidenceM1("2026-10-02", acceptThreatReview))
+	design := acceptThreatFixture(t, threatLedgerEnforce, acceptEvidenceM1("2026-10-02", acceptThreatReviewYAML))
 	g := CheckAcceptance(design, acceptedCommit)
 	if len(g.Errs) != 0 || len(g.Notes) != 0 {
 		t.Fatalf("a complete threat-first review is clean: errs=%v notes=%v", g.Errs, g.Notes)
@@ -73,15 +73,15 @@ func TestGaThreatReviewEnforceFindings(t *testing.T) {
 		name, review, want string
 	}{
 		{"missing row",
-			strings.Replace(acceptThreatReview, "  - adversary: trusted_key_holder\n    subject: Session\n    probe: \"credential signed by the audit key\"\n    expected_reason: \"key not authorized for the session role\"\n    observed_reason: \"key not authorized for the session role\"\n", "", 1),
+			strings.Replace(acceptThreatReviewYAML, "  - adversary: trusted_key_holder\n    subject: Session\n    probe: \"credential signed by the audit key\"\n    expected_reason: \"key not authorized for the session role\"\n    observed_reason: \"key not authorized for the session role\"\n", "", 1),
 			"records no threat_review row for Session adversary trusted_key_holder"},
 		{"no threat_review at all", "",
 			"records no threat_review row for Session adversary outsider_without_key"},
 		{"mismatched reasons",
-			strings.Replace(acceptThreatReview, "observed_reason: \"credential signature invalid\"", "observed_reason: \"file not found\"", 1),
+			strings.Replace(acceptThreatReviewYAML, "observed_reason: \"credential signature invalid\"", "observed_reason: \"file not found\"", 1),
 			"expected_reason \"credential signature invalid\" but observed_reason \"file not found\""},
 		{"exit status only",
-			strings.Replace(strings.Replace(acceptThreatReview, "expected_reason: \"credential signature invalid\"", "expected_reason: \"non-zero exit\"", 1),
+			strings.Replace(strings.Replace(acceptThreatReviewYAML, "expected_reason: \"credential signature invalid\"", "expected_reason: \"non-zero exit\"", 1),
 				"observed_reason: \"credential signature invalid\"", "observed_reason: \"exit 1\"", 1),
 			"a non-zero exit is not a reason"},
 	}
@@ -121,7 +121,7 @@ func TestGaThreatReviewAuditModes(t *testing.T) {
 		})
 	}
 	// a recorded review satisfies the no-ledger audit
-	design := acceptThreatFixture(t, "", acceptEvidenceM1("2026-10-02", acceptThreatReview))
+	design := acceptThreatFixture(t, "", acceptEvidenceM1("2026-10-02", acceptThreatReviewYAML))
 	if g := CheckAcceptance(design, acceptedCommit); len(g.Errs) != 0 || len(g.Notes) != 0 {
 		t.Fatalf("a recorded review satisfies the audit: errs=%v notes=%v", g.Errs, g.Notes)
 	}

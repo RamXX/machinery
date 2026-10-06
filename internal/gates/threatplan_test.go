@@ -230,7 +230,8 @@ func TestGbThreatClosedMilestoneIsHistory(t *testing.T) {
 }
 
 func TestGbThreatInvariantIDMakesMilestoneRelevant(t *testing.T) {
-	plan := strings.Replace(threatPlan("Nothing else.\n"), "Login and resume for Session.", "Holds session-requires-valid-credential.", 1)
+	body := strings.Replace(threatCriteria, "| outsider_without_key | SESS-forged-credential-refused | - |\n", "", 1)
+	plan := strings.Replace(threatPlan(body), "Login and resume for Session.", "Holds session-requires-valid-credential.", 1)
 	plan = strings.Replace(plan, "Session slice", "Login slice", 1)
 	design := threatFixture(t, plan, threatLedgerEnforce, nil)
 	g := CheckBuildPlan(design)

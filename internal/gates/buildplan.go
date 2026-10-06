@@ -817,9 +817,11 @@ func CheckBuildPlan(design string) *Gate {
 		}
 		checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design, g))
 		checkManifestFiles(g, design, text, manifestFiles, linkage)
+		checkThreatMilestones(g, design, text)
 		return g
 	}
 	checkPlanDoc(g, "BUILD.md", text, planOracleIDs(design, g))
+	checkThreatMilestones(g, design, text)
 	return g
 }
 
