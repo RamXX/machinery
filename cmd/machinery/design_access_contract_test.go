@@ -49,6 +49,7 @@ func TestEveryTopLevelCommandClassifiesDesignAccess(t *testing.T) {
 		"newVersionCmd":        {access: "none"},
 		"newIRDumpCmd":         {"reader", []string{"default"}},
 		"newHookCmd":           {access: "event-mixed"},
+		"newHookStateCmd":      {access: "none"},
 	}
 	body, err := os.ReadFile("main.go")
 	if err != nil {
