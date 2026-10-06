@@ -1,10 +1,13 @@
-note: decomposed parent with no machines/; running gu,gc,g2,gl,gb,gv,g5 (G3/Gx run on the child designs; gt skipped: no machines)
+note: decomposed parent with no machines/; running gu,gc,gz,g2,gl,gb,gv,g5 (G3/Gx run on the child designs; gt skipped: no machines)
 == Gu-surfaces  target surface ledger ==
   checked: 4 obligated actions, 4 covered, 0 deferred acts, 0 deferred personas, 0 knob rows, 0 actorless actions
   ok
 == Gc-carrier  invariant carrier reconciliation ==
   note   relational layers not opted in: policy, integrity, isolation
   checked: 3 invariants declared, 3 preserves references, 3 carried by preserves
+  ok
+== Gz-threat  adversary classification ==
+  checked: 6 workspace.dsl elements scanned
   ok
 == G2-c4  Architecture Contract ==
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)

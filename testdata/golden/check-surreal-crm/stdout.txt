@@ -19,6 +19,14 @@
 == Gc-carrier  invariant carrier reconciliation ==
   checked: 27 invariants declared, 22 preserves references, 18 carried by preserves, 8 carried by a relational layer, 1 carried by a machine unit
   ok
+== Gz-threat  adversary classification ==
+  note   audit: User looks security-relevant ("authenticates" in definition) and is not classified in design/threats.yaml; list it under subjects with its adversary rows, under not_security_relevant with a reason, or under waivers with an owner, date, and reason
+  note   audit: workspace.dsl element authz speaks of "authz" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
+  note   audit: workspace.dsl element cli speaks of "authorize" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
+  note   audit: workspace.dsl element session speaks of "auth" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
+  note   audit: set mode: enforce and enforced_since in design/threats.yaml to make these blocking; see docs/threat-driven-verification.md
+  checked: 1 candidates detected, 11 workspace.dsl elements scanned
+  ok
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)

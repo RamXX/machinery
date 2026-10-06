@@ -8,6 +8,12 @@
   note   relational layers not opted in: policy, isolation
   checked: 25 invariants declared, 29 preserves references, 20 carried by preserves, 5 carried by a machine unit
   ok
+== Gz-threat  adversary classification ==
+  note   audit: Payment.authorize looks security-relevant ("authorize" in action name) and is not classified in design/threats.yaml; list it under subjects with its adversary rows, under not_security_relevant with a reason, or under waivers with an owner, date, and reason
+  note   audit: workspace.dsl element stripe speaks of "authorizes" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
+  note   audit: set mode: enforce and enforced_since in design/threats.yaml to make these blocking; see docs/threat-driven-verification.md
+  checked: 1 candidates detected, 17 workspace.dsl elements scanned
+  ok
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   checked: 5 boundaries, 4 allow rules, 4 transitive pairs, 3 deny rules, 3 no_path assertions, 1 boundaries with exposes, 19 dsl elements, 20 drawn relationships, 20 drawn edges outside the contract vocabulary, 5 boundaries bound to dsl, 5 mitigation rows, 7 dependencies with mitigation rows, 3 nfr topics recorded, 1 event tables with sources, 48 event-contract cells answered, 8 at-least-once rows with a dedupe answer, 16 event-contract participants resolved, 6 adoption rows, 1 closures waived, 8 closure members with mitigation rows, 12 action-ownership rows, 37 actions owned, 4 edges contracted, 8 event contracts
