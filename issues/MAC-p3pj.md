@@ -8,8 +8,8 @@ labels: [e2e, dod, gb-plan, gt]
 parent: MAC-9dai
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:5bf0b16639e4e435f438d5cd781350db2bf6e002436378ffd201fd7098115bc9"
+updated_at: 2026-10-06T04:03:56Z
+content_hash: "sha256:6a36a71795c1026e23d5183a1e9a66ef855248a7f1dd024a5f97ab6147a37f44"
 blocks: [MAC-4ah8, MAC-p46v, MAC-qax4]
 ---
 
@@ -32,7 +32,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Decide grammar, Gb-plan check, Demo must cite behavior ids, Gt e2e category, projection rows, template and build-writer updates, ratchet and compat note. Evidence: No E2E block grammar anywhere: grep 'E2E:' and 'E2E block' finds nothing; build-md-template.md:242-243 still defines only the prose Demo line; projection milestones layer has no e2e rows. Notes: Root of the e2e chain. Needs a ratchet so existing designs and examples do not break (AC5).
 
 ## History
 - 2026-09-25T19:53:33Z dep_added: blocks MAC-4ah8
