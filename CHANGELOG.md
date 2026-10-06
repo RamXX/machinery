@@ -6,6 +6,83 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Added
+
+- **Threat ledger and Gz-threat.** `design/threats.yaml` classifies every model entity or
+  action that verifies, authenticates, signs, hashes, approves, admits input, or gates a decision
+  against a standard set of eight adversaries: an outsider without a key, the holder of any
+  trusted key (including one used in the wrong role), the controller of every unsigned document
+  who recomputes unsigned digests, a valid signature over the wrong meaning, omission of an
+  optional input, duplicate/replay/reorder, delimiter or encoding injection in signed fields, and
+  substitution from another valid bundle. Each adversary row is a threat invariant (a Modelith
+  invariant, so Gc requires its carrier) with a locked negative test, an owner-signed accepted
+  risk that names where the component's own output shows it, or a reasoned not-applicable. The
+  new gate `gz` (default whenever the design has a model) holds the ledger: unclassified
+  security-relevant candidates (found by a word match over names, definitions, attributes, and
+  actions), incomplete or duplicated adversary rows, threat invariants the model does not
+  declare, a threat invariant closed only by a `formal/waivers.yaml` note, "documented" or
+  agreement-with-a-reference closures, declared verifiers that are not governed `workspace.dsl`
+  elements, verifier-looking elements nobody declared, and, with `--impl`, negative tests no test
+  file contains.
+- **Paired criteria, the RED threat table, and `Pass-wrongly:` (Gb-plan).** An open milestone
+  whose block, packet, or shard names a classified subject or threat invariant must state each
+  property as an `Accept:` line followed by its `Refuse:` line, carry a threat table mapping every
+  adversary row to its locked negative test or accepted risk, and answer "what would make this
+  pass wrongly?" on one `Pass-wrongly:` line.
+- **Threat-first review (Ga-accept).** Acceptance files gain `threat_review` (adversary,
+  subject, probe, expected and observed failure reason) and `reopened_limits`. In enforce mode an
+  accepted security-relevant milestone dated on or after `enforced_since` needs one probe row per
+  adversary row, with matching reasons; a non-zero exit is not a reason.
+- **Fail closed by contract (lint, G3).** States tagged `accepting` report caller-facing
+  success; states tagged `unchecked` or `omitted` have not run a check or lacked an input. The
+  lint fails any transition from the latter into the former, an `accepting` state on the
+  initial chain, and a state carrying both tags.
+- **`machinery check --landing`.** Skips the checkpoint-only gates (gv, ga) and reports stale
+  external-checker evidence as a note; prints `landing-green` when clean. Refused with
+  `--complete`.
+- **`machinery baseline --gate gz`.** Records each unclassified candidate with a hash of its model
+  definition under `threat_debt` in `ratchet.json`; a recorded candidate prints as `baselined:`
+  until its definition changes. `--complete` refuses remaining Gz debt.
+- **Skill references** `threat-modeling.md` and `verification-cadence.md`, routed from the skill;
+  the build-writer and fsm-author roles and the design command encode security-relevant work as a
+  threat table plus paired criteria and plan per-change, landing, and checkpoint verification.
+
+### Changed
+
+- **The stop hook runs the landing selection.** Attestation and acceptance freshness no longer
+  block a turn, in strict mode included; import-boundary violations, generated-artifact DRIFT,
+  and (strict) design lint still do. Gv implementation-custody checks now run only in
+  `machinery check`.
+- **Hook crash recovery.** A leftover hook-state or route temp from an interrupted write no
+  longer blocks every later command. An empty or provably stale temp is removed automatically;
+  any other is preserved as crash evidence (at most four per project), the project is marked dirty
+  for design and implementation, and that one command is refused with a one-line recovery note.
+- **Locked tests are amended in place** when a decided behavior changes: the amending change
+  quotes the original line, gives the reason and what the test still protects, backs it with a
+  byte or behavior proof, and replays RED. Weakening is never allowed.
+- **go-crm example** opts into enforce mode; classifying its `User` subject added three threat
+  invariants and two negative tests (tampered session token, delimiter injection in the signed
+  token fields) that its suite had never exercised.
+
+### Compatibility and migration
+
+- Existing designs keep passing. Without `design/threats.yaml`, Gz and the new Gb/Ga rules run in
+  audit mode and only add `audit:` notes. A ledger with `mode: audit` validates what it says;
+  `mode: enforce` (with `enforced_since`) makes the findings errors. To adopt on an existing
+  design, classify what you can, set enforce, and run
+  `machinery baseline <design> --gate gz --date <YYYY-MM-DD>` for the rest. Closed milestones and
+  acceptances dated before `enforced_since` are not rechecked.
+- `--gate` lists gain `gz`. A malformed `threats.yaml` is an error in every mode.
+- Machines that already use the tags `accepting`, `unchecked`, or `omitted` with another meaning
+  must rename them; a `tags` value that is not a string or list of non-empty strings is now a
+  lint error.
+
+**Proof scope.** Gz, and the Gb/Ga threat rules in enforce mode, prove more than before: a
+classified subject's adversary coverage, its threat invariants' presence and carriers, and the
+presence of its negative tests are now checked. A stop-hook turn end proves less than before: it
+no longer checks attestation freshness or acceptance records, which move to the checkpoint run
+of `machinery check`.
+
 ## [0.10.3] - 2026-10-04
 
 **Why this release.** `machinery update` failed on any machine whose Claude Code plugin cache held

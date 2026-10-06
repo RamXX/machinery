@@ -65,7 +65,7 @@ waivers:
     date: 2026-10-05
     reason: "excavated as-is; classification scheduled with the importer rewrite"
 verifiers:
-  - component: Authz
+  - component: authz          # the workspace.dsl identifier
     decides: "record visibility and CRUD admission"
 ```
 
@@ -114,7 +114,7 @@ lists every one of them exactly once:
 | A2 threat invariant | a row whose `invariant` is not declared in the model |
 | A6 agreement | a `negative_test` that only states agreement with a reference implementation ("matches reference", "agrees with", "same as") |
 | A7 closure | an `accepted_risk` without `visible_in`; a threat invariant closed only by a `formal/waivers.yaml` note; any row whose disposition is the word "documented" |
-| A8 governance | a declared verifier that is not a `workspace.dsl` element, or that no Architecture Contract import rule governs; a `workspace.dsl` element whose name or description speaks of verifying, checking, attesting, signing, or gating and that is neither a declared verifier nor listed as not security-relevant |
+| A8 governance | a declared verifier that is not a `workspace.dsl` element identifier, or that no Architecture Contract boundary binds to code; a `workspace.dsl` element whose identifier, name, or description speaks of verifying, checking, attesting, signing, authorizing, or gating and that is neither a declared verifier nor listed under `not_security_relevant` (which may name a DSL element as well as a model subject) |
 | `--impl` | a `negative_test` token that no test file under the implementation contains |
 
 Detection is a deliberately broad word match. It finds candidates; a human
@@ -136,7 +136,7 @@ or shard (manifest mode):
    rows. Each row names its locked negative test, or the accepted risk that
    `threats.yaml` records for it. A cell that reads "documented", or that only
    claims agreement with a reference, fails.
-3. **The third RED quality check.** One non-empty `Pass-wrongly:` line that
+3. **The third RED quality check.** Exactly one non-empty `Pass-wrongly:` line that
    answers "what would make this pass wrongly?" for the milestone.
 
 Tamper tests in the table target the untrusted artifact being checked, not only

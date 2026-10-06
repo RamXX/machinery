@@ -69,7 +69,7 @@ waivers:                       # brownfield excavation only
     date: 2026-10-05
     reason: "excavated as-is; classified with the importer rewrite"
 verifiers:
-  - component: Verifier        # a workspace.dsl element
+  - component: verifier        # a workspace.dsl element identifier
     decides: "credential admission"
 ```
 
@@ -105,10 +105,11 @@ Independent verifiers, checkers, CLIs, and gate scripts that make security
 decisions are components like any other: they are `workspace.dsl` elements,
 the Architecture Contract's import rules govern them, and `threats.yaml` lists
 them under `verifiers`. Being "a tool" or "integrity only" is not an exemption.
-Gz fails a declared verifier the model or the contract does not hold, and a
+A `verifiers` row names the element by its `workspace.dsl` identifier. Gz fails
+a declared verifier the model or the contract does not hold, and a
 verifier-looking element (its name or description speaks of verifying,
 checking, attesting, signing, authorizing, or gating) that is neither declared
-nor listed as not security-relevant.
+nor listed under `not_security_relevant` (which may name a DSL element as well as a model subject).
 
 ## 3. Fail closed by contract (Phase 3)
 
@@ -148,7 +149,7 @@ classified subject or one of its threat invariants. Its handoff carries:
    Tamper tests target the untrusted artifact being checked, not only the
    trusted inputs, and every tamper test also asserts that each check it did
    not touch still passes.
-3. **The third RED quality check**, on one `Pass-wrongly:` line: what would
+3. **The third RED quality check**, on exactly one `Pass-wrongly:` line: what would
    make this pass wrongly? Answer it concretely (an omitted input, a reused
    key, a recomputed digest) and make sure a row of the table refuses it.
 
