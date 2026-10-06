@@ -388,3 +388,48 @@ func TestOwnerDigestsAgreeAcrossDecoders(t *testing.T) {
 		t.Fatalf("a case-different session id is another session: %s", out)
 	}
 }
+
+// Review R1: expansions the canonical reading cannot resolve fail closed
+// whenever the command also names the hook subcommand.
+func TestOperatorGuardFailsClosedOnUnresolvableExpansions(t *testing.T) {
+	root := greenFieldRoot(t)
+	for _, command := range []string{
+		`$'mach'inery hook`,
+		`{machinery,hook} <<<x`,
+		`/usr/local/bin/machiner? hook`,
+		`/usr/local/bin/m*y hook`,
+		`/usr/local/bin/machiner[y] hook`,
+		`$M hook`,
+		"`echo machinery` hook",
+	} {
+		pre := Input{SessionID: "agent", ToolUseID: "e-" + command, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: command}}
+		if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("unresolvable expansion with a hook word was allowed: %q -> %s", command, out)
+		}
+	}
+	for _, allowed := range []string{`ls .githooks/*`, `echo $HOME`, `git log --grep=webhook`} {
+		pre := Input{SessionID: "agent", ToolUseID: "f-" + allowed, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: allowed}}
+		if out := runEvent(t, root, pre); out != "" {
+			t.Fatalf("ordinary command denied: %q -> %s", allowed, out)
+		}
+	}
+}
+
+// Review R3: an ended token from a subagent lane (possibly a background
+// agent the host did not list) never lets the main-thread Stop discharge.
+func TestEndedSubagentLaneTokenWithholdsMainThreadDischarge(t *testing.T) {
+	root := greenFieldRoot(t)
+	sub := Input{SessionID: "s", AgentID: "background", ToolUseID: "toolu_bg", Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: "true"}}
+	if out := runEvent(t, root, sub); out != "" {
+		t.Fatal(out)
+	}
+	batch := map[string]any{"hook_event_name": "PostToolBatch", "session_id": "s", "agent_id": "background", "cwd": root, "tool_calls": []any{map[string]any{"tool_use_id": "toolu_bg"}}}
+	if out, err := runHookPayload(t, root, batch); err != nil || out != "" {
+		t.Fatalf("%s %v", out, err)
+	}
+	out := stopOutput(t, root, "s")
+	if strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "stays armed") {
+		t.Fatalf("main Stop over an ended subagent token: %s", out)
+	}
+	requireArmed(t, root, 1, "an ended subagent-lane token withholds discharge")
+}

@@ -182,14 +182,17 @@ func partitionPending(record hookStateRecord, in Input) (own, unclassified, orph
 	}
 	session := hookSessionDigest(in.SessionID)
 	mainLaneStop := in.HookEventName == "Stop" && in.AgentID == ""
+	mainLane := hookLaneDigest(in.SessionID, "")
 	for _, token := range record.pending {
 		owner := record.pendingOwners[token]
 		switch {
 		case !owner.known():
 			unclassified = append(unclassified, token)
-		case owner.session == session && owner.ended && mainLaneStop:
-			// the owner's main-thread Stop: its host has finished every
-			// foreground call of the session, so the ended call is done
+		case owner.session == session && owner.ended && mainLaneStop && owner.lane == mainLane:
+			// the owner's main-thread Stop over a main-thread call: the host
+			// fires it only after every foreground call resolved. A subagent
+			// lane's ended call may belong to a background agent, so it
+			// stays orphaned below.
 		case owner.session == session && owner.ended:
 			// a subagent Stop of the owning session cannot vouch for the main
 			// lane or a sibling lane; the ended token withholds discharge
@@ -332,13 +335,26 @@ func canonicalShellWords(folded string) []string {
 	return shellWordSeparators.Split(shellJoiners.Replace(folded), -1)
 }
 
+// ambiguousShellExpansion matches what the canonical reading cannot resolve
+// without running the shell: parameter and command substitution, brace
+// expansion, globs, and ANSI-C quoting.
+var ambiguousShellExpansion = regexp.MustCompile("[$`{}*?\\[\\]]")
+
+// hookWord matches hook as a whole word, including inside a brace list.
+var hookWord = regexp.MustCompile(`(^|[^a-z0-9_-])hook([^a-z0-9_-]|$)`)
+
 // invokesMachineryHook reports whether the word hook follows any word that
-// names the machinery binary. It over-covers on purpose: flags and their
+// names the machinery binary, or appears in a command whose words the guard
+// cannot resolve (an expansion could produce the binary's name). It over-covers on purpose: flags and their
 // values may sit between the binary and the subcommand, and an agent loses
 // nothing it needs when a rare harmless command is refused.
 func invokesMachineryHook(folded string) bool {
+	words := canonicalShellWords(folded)
+	if ambiguousShellExpansion.MatchString(folded) && hookWord.MatchString(shellJoiners.Replace(folded)) {
+		return true // fail closed: an expansion may name the binary
+	}
 	seenBinary := false
-	for _, word := range canonicalShellWords(folded) {
+	for _, word := range words {
 		if name := path.Base(word); name == "machinery" || name == "machinery.exe" {
 			seenBinary = true
 			continue
