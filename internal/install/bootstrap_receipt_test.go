@@ -40,7 +40,7 @@ type bootstrapRelease struct {
 
 func bootstrapCommand(t *testing.T, dir string, env []string, name string, args ...string) []byte {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := bootstrapTestContext(t)
 	defer cancel()
 	c := exec.CommandContext(ctx, name, args...)
 	c.Dir, c.Env = dir, env
@@ -468,7 +468,13 @@ func bootstrapAssertConvergence(t *testing.T, f bootstrapInstall, release *boots
 	}
 }
 
-func bootstrapRollbackContext(deadline time.Time) (context.Context, context.CancelFunc) {
+func bootstrapTestContext(t *testing.T) (context.Context, context.CancelFunc) {
+	t.Helper()
+	deadline, _ := t.Deadline()
+	return bootstrapDeadlineContext(deadline)
+}
+
+func bootstrapDeadlineContext(deadline time.Time) (context.Context, context.CancelFunc) {
 	// Keep the package deadline, while allowing Update's own operation
 	// budgets to finish the intended failure and transaction rollback.
 	if !deadline.IsZero() {
@@ -479,7 +485,7 @@ func bootstrapRollbackContext(deadline time.Time) (context.Context, context.Canc
 
 func TestBootstrapRollbackAllowsSlowProgress(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := bootstrapRollbackContext(time.Now().Add(time.Minute))
+		ctx, cancel := bootstrapDeadlineContext(time.Now().Add(time.Minute))
 		defer cancel()
 		time.Sleep(31 * time.Second)
 		if err := ctx.Err(); err != nil {
@@ -572,8 +578,7 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				before := bootstrapState(t, f)
 				release.broken.Store(true)
 				defer release.broken.Store(false)
-				deadline, _ := t.Deadline()
-				ctx, cancel := bootstrapRollbackContext(deadline)
+				ctx, cancel := bootstrapTestContext(t)
 				defer cancel()
 				cmd := exec.CommandContext(ctx, f.binary, f.args(bootstrap)...)
 				cmd.Dir, cmd.Env = f.root, f.env
@@ -636,7 +641,7 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				write(t, parent, "unsafe non-directory parent")
 			}
 			before := bootstrapState(t, f)
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := bootstrapTestContext(t)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, f.binary, f.args(true)...)
 			cmd.Dir, cmd.Env = f.root, f.env
@@ -656,7 +661,7 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 		before := bootstrapState(t, f)
 		release.hold.Store(true)
 		defer release.hold.Store(false)
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := bootstrapTestContext(t)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, f.binary, f.args(true)...)
 		cmd.Dir, cmd.Env = f.root, f.env
@@ -841,7 +846,7 @@ func bootstrapStandaloneReceiptCases(t *testing.T, release *bootstrapRelease) {
 			for _, name := range names {
 				args = append(args, "--home", filepath.Join(f.home, name))
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			ctx, cancel := bootstrapTestContext(t)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, f.binary, args...)
 			cmd.Dir, cmd.Env = f.root, f.env
@@ -1155,7 +1160,7 @@ func bootstrapAuthorityCase(t *testing.T, release *bootstrapRelease, source, aut
 			}
 		})
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := bootstrapTestContext(t)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, release.next, "install", "--from", release.source, "--home", selected)
 	cmd.Dir, cmd.Env = root, append(env, installLockCapabilityEnv+"="+encoded)
