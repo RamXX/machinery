@@ -8,7 +8,8 @@ labels: [hook, governance, crash-safety, h2-origin]
 created_at: 2026-10-06T15:31:42Z
 created_by: ramirosalas
 updated_at: 2026-10-06T15:31:42Z
-content_hash: "sha256:e232916e594fb2970145de3dae7a4c453d750bd31c24a2da9b0d76b6aef5a215"
+content_hash: "sha256:4c2ad0406be9ea2c57341131b369d4854e94c6786f4b38511e9408ff5bffb82b"
+related: [MAC-xqu7]
 ---
 
 ## Description
@@ -47,6 +48,6 @@ Usable, with a sharp edge: any crash, kill or eviction during a tool call perman
 
 
 ## Links
-
+- Related: [[MAC-xqu7]]
 
 ## Comments

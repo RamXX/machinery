@@ -8,7 +8,8 @@ labels: [hook, governance, linux, kubernetes, h2-origin]
 created_at: 2026-10-06T15:30:56Z
 created_by: ramirosalas
 updated_at: 2026-10-06T15:30:56Z
-content_hash: "sha256:ce4e631d01aa4d58caf6b913073172294da388e8c4805ed6ff67cd175930222e"
+content_hash: "sha256:67b32be8ca01af5d018778bb50b8fa271cb9e75ec431e5a4a1489b7a430cbadd"
+related: [MAC-ntvm]
 ---
 
 ## Description
@@ -51,6 +52,6 @@ Yes on macOS and on Linux machines whose home directory never changes block devi
 
 
 ## Links
-
+- Related: [[MAC-ntvm]]
 
 ## Comments
