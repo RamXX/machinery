@@ -7,8 +7,8 @@ type: feature
 labels: [external-checkers, evidence, hooks, unapproved-scope, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:c650a8c5a96ad335f3ddf6551c411c1bb457d9185f6bbe4fc7360bf758a75760"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:3effa2239034fdf9e688782b284e06e7d17105047f18032f1aa7eabfb362b72f"
 ---
 
 ## Description
@@ -39,7 +39,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Introduce a new evidence schema with four outcomes, deterministic aggregation, 1.0 read compatibility, verify-checkers exact replay, and fail-closed collapse at the host hook boundary, with checker-agnostic docs and fixtures. Evidence: internal/checker/checker.go:29 SchemaVersion = "1.0" and internal/checker/evidence.go:137-138 reject any other evidence_schema; no unknown/not_applicable outcome anywhere in internal/checker or docs/external-checkers.md. CHANGELOG has no four-state work. Notes: Schema change plus hook adapter work across Claude, Codex and OpenCode; large but self-contained.
 
 ## History
 
