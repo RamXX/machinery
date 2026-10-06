@@ -150,7 +150,7 @@ func CheckOracleCoverage(design, impl string) *Gate {
 		checkClauseCoverage(g, design, corpus)
 	}
 	// Gt is static: it discovers references, it does not run the suite. The
-	// disclosure keeps every green output honest about that limit.
+	// disclosure keeps every green output explicit about that limit.
 	g.CheckedExtra("static discovery; tests not executed; unsupported parser structures remain uncovered")
 	return g
 }
@@ -171,9 +171,13 @@ func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (whol
 		return true, true
 	}
 	var missing []string
+	unrun := false
 	for _, id := range stableIDs {
 		if idTokenIn(id, corpus.joinedCode) {
 			g.Count("ids covered by literal")
+		} else if paths := skippedOraclePaths(base, id, corpus); len(paths) > 0 {
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: UNRUN %s: binding tests are skipped (%s)", label, id, strings.Join(paths, ", ")))
+			unrun = true
 		} else {
 			missing = append(missing, id)
 		}
@@ -186,7 +190,7 @@ func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (whol
 		g.Errs = append(g.Errs, fmt.Sprintf("%s: %d of %d stable ids appear in no test file (%s); key the tests on the stable ids, or parse the committed table at runtime by naming %s in a test", label, len(missing), len(stableIDs), show, base))
 		return false, false
 	}
-	return false, true
+	return false, !unrun
 }
 
 // testCorpusData is the scanned test suite reduced to its EXECUTABLE part:
@@ -197,6 +201,7 @@ func coverOracle(g *Gate, label, base, text string, corpus testCorpusData) (whol
 // non-test declarations prove nothing.
 type testCorpusData struct {
 	files      []corpusFile
+	skipped    []corpusFile
 	joinedCode string
 }
 
@@ -247,6 +252,8 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 	sort.Strings(files)
 	var corpus testCorpusData
 	var codeTexts []string
+	excludes := exUnitExclusions(files, inventory, g)
+	recorded := recordedTestRuns(design, inventory, g)
 	for _, rel := range files {
 		ignored := false
 		for _, ig := range ignore {
@@ -288,7 +295,18 @@ func testCorpus(design, impl string, g *Gate) testCorpusData {
 		default:
 			continue
 		}
-		codeTexts = append(codeTexts, corpus.files[len(corpus.files)-1].bodies...)
+		index := len(corpus.files) - 1
+		active, skipped := splitSkippedTests(corpus.files[index], text, ext, excludes)
+		if recorded[filepath.ToSlash(rel)] {
+			active = corpus.files[index]
+			if active.goFile == nil {
+				active.bodies = append(active.bodies, skipped.bodies...)
+			}
+		} else if len(skipped.bodies) > 0 {
+			corpus.skipped = append(corpus.skipped, skipped)
+		}
+		corpus.files[index] = active
+		codeTexts = append(codeTexts, active.bodies...)
 	}
 	corpus.joinedCode = strings.Join(codeTexts, "\n")
 	return corpus

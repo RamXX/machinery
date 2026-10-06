@@ -178,3 +178,117 @@ func mustRead(t *testing.T, path string) string {
 	}
 	return string(b)
 }
+
+func TestOracleCoverageSkippedParser(t *testing.T) {
+	for _, language := range []string{"go", "exs", "js"} {
+		t.Run(language, func(t *testing.T) {
+			source := ""
+			path := ""
+			switch language {
+			case "go":
+				path = "rows_test.go"
+				source = strings.Replace(covActiveParser("fixture", "Thing.oracle.md"), "func TestOracle(t *testing.T) {", "func TestOracle(t *testing.T) { t.SkipNow()", 1)
+			case "exs":
+				path = "test/rows_test.exs"
+				source = `defmodule RowsTest do
+ test "rows" do
+  rows = File.read!("Thing.oracle.md") |> String.split("|")
+  assert length(rows) > 0
+ end
+ @moduletag skip: true
+end`
+			case "js":
+				path = "rows.test.js"
+				source = `test.skip("rows", () => { const rows = read("Thing.oracle.md").split("|"); expect(rows.length).toBeGreaterThan(0); });`
+			}
+			design, impl := writeCovFixture(t, map[string]string{"machines/Thing.oracle.md": covOracleMD, "impl/" + path: source})
+			g := CheckOracleCoverage(design, impl)
+			if errs := strings.Join(g.Errs, "\n"); !strings.Contains(errs, "UNRUN THIN-aaa111") || g.Counts["machines covered by conformance parse"] != 0 {
+				t.Fatalf("skipped parser credited: %s %v", errs, g.Counts)
+			}
+			writeRunRecord(t, design, impl, path, nil)
+			if g := CheckOracleCoverage(design, impl); len(g.Errs) != 0 || g.Counts["machines covered by conformance parse"] != 1 {
+				t.Fatalf("recorded parser lost credit: %v %v", g.Errs, g.Counts)
+			}
+		})
+	}
+}
+
+func TestOracleCoverageSkipIsPerTest(t *testing.T) {
+	for _, language := range []string{"go", "exs", "py", "js"} {
+		t.Run(language, func(t *testing.T) {
+			sources := map[string]string{
+				"go": `package rows
+import "testing"
+func TestSkipped(t *testing.T) { t.Skip("unavailable"); t.Log("THIN-aaa111") }
+func TestActive(t *testing.T) { t.Log("THIN-bbb222") }`,
+				"exs": `defmodule RowsTest do
+ @tag skip: true
+ test "skipped" do
+  assert "THIN-aaa111"
+ end
+ test "active" do
+  assert "THIN-bbb222"
+ end
+end`,
+				"py": `import pytest
+@pytest.mark.skip(reason="unavailable")
+def test_skipped():
+ assert "THIN-aaa111"
+def test_active():
+ assert "THIN-bbb222"
+`,
+				"js": `test.skip("skipped", () => { expect("THIN-aaa111").toBeTruthy(); });
+test("active", () => { expect("THIN-bbb222").toBeTruthy(); });`,
+			}
+			paths := map[string]string{"go": "rows_test.go", "exs": "rows_test.exs", "py": "test_rows.py", "js": "rows.test.js"}
+			design, impl := writeCovFixture(t, map[string]string{"machines/Thing.oracle.md": covOracleMD, "impl/" + paths[language]: sources[language]})
+			g := CheckOracleCoverage(design, impl)
+			if len(g.Errs) != 1 || !strings.Contains(g.Errs[0], "UNRUN THIN-aaa111") || g.Counts["ids covered by literal"] != 1 {
+				t.Fatalf("skip leaked between tests: %v %v", g.Errs, g.Counts)
+			}
+		})
+	}
+}
+
+func TestOracleCoverageRecordValidation(t *testing.T) {
+	for _, mutation := range []string{"duplicate", "traversal", "unknown field", "trailing JSON", "symlink source", "failed"} {
+		t.Run(mutation, func(t *testing.T) {
+			suite := "test/rows_test.exs"
+			design, impl := writeCovFixture(t, map[string]string{
+				"machines/Thing.oracle.md": covOracleMD,
+				"impl/" + suite:            "defmodule RowsTest do\n @moduletag skip: true\n test \"rows\" do\n assert [\"THIN-aaa111\", \"THIN-bbb222\"]\n end\nend\n",
+				"impl/lib/reader.ex":       "defmodule Reader do\nend\n",
+			})
+			writeRunRecord(t, design, impl, suite, []string{"lib/reader.ex"})
+			path := filepath.Join(design, "assurance/test-runs.json")
+			record := mustRead(t, path)
+			switch mutation {
+			case "duplicate":
+				record = strings.TrimSuffix(record, "]") + "," + strings.TrimPrefix(record, "[")
+			case "traversal":
+				record = strings.Replace(record, "lib/reader.ex", "../reader.ex", 1)
+			case "unknown field":
+				record = strings.Replace(record, `"result":`, `"unknown":true,"result":`, 1)
+			case "trailing JSON":
+				record += "{}"
+			case "failed":
+				record = strings.Replace(record, `"passed"`, `"failed"`, 1)
+			case "symlink source":
+				target := filepath.Join(design, "reader.ex")
+				writeSuiteFile(t, target, mustRead(t, filepath.Join(impl, "lib/reader.ex")))
+				if err := os.Remove(filepath.Join(impl, "lib/reader.ex")); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(target, filepath.Join(impl, "lib/reader.ex")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			writeSuiteFile(t, path, record)
+			g := CheckOracleCoverage(design, impl)
+			if errs := strings.Join(g.Errs, "\n"); !strings.Contains(errs, "test-runs.json") || !strings.Contains(errs, "UNRUN") || g.Counts["ids covered by literal"] != 0 {
+				t.Fatalf("invalid record established coverage: %s %v", errs, g.Counts)
+			}
+		})
+	}
+}
