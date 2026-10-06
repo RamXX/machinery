@@ -655,7 +655,7 @@ func readConfinedRegular(rootPath, name string, maxBytes int64) (body []byte, pr
 // root overrides project-root resolution (flag > $CLAUDE_PROJECT_DIR > the
 // event's cwd). A nil return with no output means "nothing to say": the
 // event was either not machinery's business or clean.
-func Run(r io.Reader, w io.Writer, root string) error {
+func Run(r io.Reader, w io.Writer, root string) (retErr error) {
 	in, err := decodeInput(r)
 	if err != nil {
 		return fmt.Errorf("machinery hook: stdin is not hook-event JSON: %w", err)
@@ -700,6 +700,22 @@ func Run(r io.Reader, w io.Writer, root string) error {
 			}
 			if !durable {
 				return nil
+			}
+		}
+		if in.HookEventName == "PostToolUse" || in.HookEventName == "PostToolUseFailure" {
+			// A completion must never be stranded by a crashed earlier write:
+			// the route inventory below refuses while a route temp exists, so
+			// recover first (under the state lock) and report the evidence
+			// after this completion is recorded. Stop never recovers; it stays
+			// conservative and names the recovery instead.
+			if requireStateDir() == nil {
+				refusal, err := recoverHookCrashTemps(root)
+				if err != nil {
+					return errors.New("machinery governance cannot recover an interrupted hook state write: " + err.Error())
+				}
+				if refusal != nil {
+					defer func() { retErr = errors.Join(retErr, refusal) }()
+				}
 			}
 		}
 		routeCfg, routePresent, routeErr := loadRouteSnapshot(root, in.SessionID)
@@ -883,6 +899,10 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 			return deny(reason)
 		}
 		if err := armShellState(root, in, cfg); err != nil {
+			var refusal *hookCrashRefusal
+			if errors.As(err, &refusal) {
+				return deny(refusal.Error())
+			}
 			return deny("machinery governance could not durably arm pre-shell design/implementation tracking; refusing shell execution: " + err.Error())
 		}
 		return nil
@@ -943,6 +963,10 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 		return deny(reason)
 	}
 	if err := armFileState(root, cfg, in); err != nil {
+		var refusal *hookCrashRefusal
+		if errors.As(err, &refusal) {
+			return deny(refusal.Error())
+		}
 		return deny("machinery governance could not durably arm project tracking before the file edit; refusing execution: " + err.Error())
 	}
 	return nil
@@ -1183,6 +1207,10 @@ func post(root string, cfg Config, in Input) error {
 	}
 	if touchedDesign || touchedImpl {
 		if err := completeToolState(root, cfg, in, touchedDesign, touchedImpl); err != nil {
+			var refusal *hookCrashRefusal
+			if errors.As(err, &refusal) {
+				return refusal // tracking completed; the evidence is reported once
+			}
 			return fmt.Errorf("machinery hook: complete durable tool tracking for stop-time governance: %w", err)
 		}
 	}
@@ -1294,6 +1322,18 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		}
 		selWarn += mix
 	}
+	// The stop hook is a landing gate, never the checkpoint gate. Between
+	// checkpoints the main line is expected to be stale for attestation,
+	// acceptance records, and external-checker evidence, so the checkpoint-
+	// only gates never run at turn end, in strict mode too. They are dropped
+	// from the selection here as well as by RunOptions.Landing below, so no
+	// checkpoint-only custody work (the attestation subject capture) runs at
+	// stop time and a selection naming only them is the empty decision.
+	// Import boundaries, generated-artifact DRIFT, and every design lint
+	// still run. See docs/threat-driven-verification.md.
+	for _, gate := range gates.CheckpointOnlyGates {
+		delete(sel.Run, gate)
+	}
 	if len(sel.Run) == 0 {
 		if observer, ok := w.(interface {
 			beforeAttestationFinalization(*gates.Snapshot, []*gates.Gate)
@@ -1320,9 +1360,10 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	var buf bytes.Buffer
 	blocking, drift, g4Blocking := 0, 0, 0
 	// A stop-time run binds no commit: the working tree is mid-change and the
-	// commit under review does not exist yet, so Ga states that non-check
-	// rather than guessing. CI passes --commit and stays the outer wall.
-	run := snapshot.RunSelected(implDir, sel, gates.RunOptions{})
+	// commit under review does not exist yet. It is the landing selection:
+	// stale external-checker evidence is a note, not DRIFT, and the
+	// checkpoint run (machinery check without --landing) stays the outer wall.
+	run := snapshot.RunSelected(implDir, sel, gates.RunOptions{Landing: true})
 	// a ratchet recording only Gy/Gl debt carries no G4 snapshot and arms nothing
 	armed := gates.RatchetArmsImports(sourceDesignDir)
 	left, waveStale, waveActive := waveSentinel(sourceDesignDir)
@@ -1791,6 +1832,11 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 		// exactly the drift that survives a review
 		run["ge"] = true
 	}
+	// Ga and Gv activate here exactly as in the CLI default suite, so the
+	// selection stays one truth; both are checkpoint-only, and stop() drops
+	// them (the landing selection). Between checkpoints acceptance records
+	// and attestation rows are expected to be stale; `machinery check`
+	// without --landing is where they gate.
 	if gates.AcceptanceActive(designDir) {
 		// the acceptance directory, or a milestone marked closed: either is a
 		// claim that a milestone was discharged, and the claim is checkable
@@ -1798,9 +1844,7 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 	}
 	if gates.AttestationActive(designDir) {
 		// committed attestation evidence is checkable from the design tree
-		// alone, and its whole value is freshness: an artifact edited this
-		// turn invalidates the judgment recorded over it, so the stop hook is
-		// exactly where that must surface
+		// alone; its value is freshness, judged at the checkpoint
 		run["gv"] = true
 	}
 	if gates.HasCheckers(designDir) {
@@ -2705,6 +2749,14 @@ func armProjectState(root string, in Input, cfg Config, designTouched, implTouch
 		return err
 	}
 	defer func() { returnErr = errors.Join(returnErr, lock.release()) }()
+	// a crashed earlier write never blocks every later command: stale temps
+	// go, unprovable ones are preserved and refuse this one command (the
+	// ledger is already dirty), and no operation is armed for a refused tool
+	if refusal, err := recoverHookCrashTempsLocked(root, p); err != nil {
+		return err
+	} else if refusal != nil {
+		return refusal
+	}
 	if temps, err := routeStateTemps(root); err != nil {
 		return err
 	} else if len(temps) > 0 {
@@ -2749,6 +2801,13 @@ func completeToolState(root string, cfg Config, in Input, designTouched, implTou
 		return err
 	}
 	defer func() { returnErr = errors.Join(returnErr, lock.release()) }()
+	// The tool already ran, so a completion is never refused: it recovers,
+	// still removes its own in-flight token (a stranded token would block
+	// every later stop), and then reports any preserved evidence once.
+	refusal, err := recoverHookCrashTempsLocked(root, p)
+	if err != nil {
+		return err
+	}
 	if temps, err := routeStateTemps(root); err != nil {
 		return err
 	} else if len(temps) > 0 {
@@ -2757,7 +2816,10 @@ func completeToolState(root string, cfg Config, in Input, designTouched, implTou
 	if err := updateStateLocked(p, root, designTouched, implTouched, "", operation, routeSnapshotDigest(raw)); err != nil {
 		return err
 	}
-	return publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw)
+	if err := publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw); err != nil {
+		return err
+	}
+	return refusal.asError()
 }
 
 func toolOperationToken(in Input) (string, error) {
@@ -2883,7 +2945,7 @@ func loadRouteSnapshot(root, sessionID string) (Config, bool, error) {
 	if temps, err := routeStateTemps(root); err != nil {
 		return Config{}, false, err
 	} else if len(temps) > 0 {
-		return Config{}, false, fmt.Errorf("incomplete hook route transaction: durable temp %s exists", temps[0])
+		return Config{}, false, fmt.Errorf("incomplete hook route transaction: durable temp %s exists; the next governed shell or file command recovers it", temps[0])
 	}
 	raw, err := readRouteStateFile(routeStatePath(root, sessionID))
 	if err != nil {
@@ -3418,6 +3480,11 @@ func appendState(root, sessionID, kind string) (returnErr error) {
 	defer func() {
 		returnErr = errors.Join(returnErr, lock.release())
 	}()
+	if refusal, err := recoverHookCrashTempsLocked(root, p); err != nil {
+		return err
+	} else if refusal != nil {
+		return refusal // the ledger is already dirty for design and impl
+	}
 	if err := updateStateLocked(p, root, kind == "design", kind == "impl", "", "", ""); err != nil {
 		return err
 	}
@@ -3631,12 +3698,12 @@ func readStateRecord(root, sessionID string) (record hookStateRecord, returnErr 
 		return hookStateRecord{}, err
 	}
 	if len(temps) > 0 {
-		return hookStateRecord{}, fmt.Errorf("incomplete hook state transaction for this project: durable temp %s exists; refusing to treat it as untouched", temps[0])
+		return hookStateRecord{}, fmt.Errorf("incomplete hook state transaction for this project: durable temp %s exists; refusing to treat it as untouched; the next governed shell or file command recovers it", temps[0])
 	}
 	if routeTemps, err := routeStateTemps(root); err != nil {
 		return hookStateRecord{}, err
 	} else if len(routeTemps) > 0 {
-		return hookStateRecord{}, fmt.Errorf("incomplete hook route transaction: durable temp %s exists", routeTemps[0])
+		return hookStateRecord{}, fmt.Errorf("incomplete hook route transaction: durable temp %s exists; the next governed shell or file command recovers it", routeTemps[0])
 	}
 	raw, err := readStateFile(p)
 	if err != nil {
@@ -3702,7 +3769,7 @@ func clearStateRevision(root, sessionID string, expectedRevision uint64) (cleare
 	if temps, err := routeStateTemps(root); err != nil {
 		return false, err
 	} else if len(temps) > 0 {
-		return false, fmt.Errorf("incomplete hook route transaction: durable temp %s exists", temps[0])
+		return false, fmt.Errorf("incomplete hook route transaction: durable temp %s exists; the next governed shell or file command recovers it", temps[0])
 	}
 	if raw != nil && expectedRevision != 0 {
 		record, err := parseHookStateRecord(raw)

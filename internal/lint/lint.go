@@ -855,6 +855,9 @@ func LintMachine(m *ir.Value, base string) (errs, warns, notes []string, counts 
 		}
 	}
 
+	// fail closed by contract: not-checked never reaches caller-facing success
+	errs = append(errs, lintFailClosed(base, ro, states, res)...)
+
 	cerrs, cwarns := LintCounters(m, base)
 	errs = append(errs, cerrs...)
 	warns = append(warns, cwarns...)
