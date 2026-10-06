@@ -405,12 +405,16 @@ tools (including how to run `machinery oracle` and `machinery check`).
    under the project's own gates, so the implementer has no correct move except delivering the
    designed behavior inside the designed boundaries.
 4. The tests are then LOCKED. The implementer agent may not modify them to make them pass.
-   Frozen test identity is defined by exact bytes and file inventory.
-   Any amendment requires explicit owner authorization, a new evidence revision, and replay
-   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
-   equality authorizes an editing exemption.
-   A gate demanding a locked-file change is a RED-phase defect requiring the design round-trip
-   in step 8; the original evidence revision remains immutable.
+   Frozen test identity is defined by exact bytes and file inventory. Locking serves a purpose,
+   not a ritual: when a decided behavior changes, the change that alters it amends the locked
+   test in place. Such an amendment must be explicit, is a new evidence revision, and replays
+   RED and all applicable gates before the amended test locks again: its header quotes the
+   original line, gives the reason, and says what the test still protects, and a byte or
+   behavior proof backs it. Weakening is never allowed; tightening always is; only an
+   undecided contract stops the work. Neither formatting nor token equality authorizes an
+   editing exemption. A gate demanding a locked-file change without a decided behavior change
+   is a RED-phase defect requiring the design round-trip in step 8; the original evidence
+   revision remains immutable.
 5. The implementer agent writes the code until the locked tests pass.
 6. GREEN acceptance bar, both together: the locked suite passes AND
    `machinery check design --impl <impl-dir>` is green again. Code that passes the tests by
