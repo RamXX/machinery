@@ -7,8 +7,8 @@ type: feature
 labels: [readiness, evidence, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:9c4ae7aea60c22305f9b2eb5bae10c5167e898c057ddeeacdf2b8bf07f268d17"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:57cd6bac3fe863826c79a1b236c6e8fed3f7d3d9c06c3bd0578b5f865a9a592d"
 blocks: [MAC-ik8q, MAC-b27n]
 related: [MAC-wbxq]
 ---
@@ -35,7 +35,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Design and build the versioned assumption/evidence inventory and a readiness report that never claims overall readiness from selected gates; reuse attestations (MAC-ug4h class C). Evidence: Verified at HEAD 8c620d8f (v0.11.0). grep -ril readiness over Go sources finds only an example test; docs/consistency-layer-proposal.md:708 still lists readiness (entry 9) as outside the rule layer; no assumption/evidence inventory or readiness report exists. 0.11.0 threat ledger (docs/threat-driven-verification.md) covers adversaries, not assumption evidence. Notes: Sizeable design item; it is the root of blocks MAC-kyh6, MAC-ik8q, MAC-q1kf, MAC-b27n (blocked edges are real). Overlap risk with the 0.11.0 threat ledger: reuse its evidence vocabulary rather than create a second framework.
 
 ## History
 - 2026-09-24T21:33:57Z dep_added: blocks MAC-kyh6
