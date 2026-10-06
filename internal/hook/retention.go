@@ -778,7 +778,7 @@ func StateReport(w io.Writer, repair bool) (ok bool, retErr error) {
 		return false, nil
 	}
 	if _, err := validatedStateDirectoryBinding(); err != nil {
-		fmt.Fprintf(w, "  ERROR    governance hook state store binding: %v; run machinery hook-state adopt --root <root> after verifying the store\n", err)
+		fmt.Fprintf(w, "  ERROR    governance hook state store binding: %v; %s\n", err, storeBindingRemedy(dir))
 		return false, nil
 	}
 	if repair {
@@ -792,14 +792,53 @@ func StateReport(w io.Writer, repair bool) (ok bool, retErr error) {
 		if compaction.FirstRetainedErr != nil {
 			fmt.Fprintf(w, "  present  governance hook state store %s kept a generation it cannot reclaim: %v\n", dir, compaction.FirstRetainedErr)
 		}
-		return reportHookStateCount(w, dir, compaction.Remaining), nil
+		ok = reportHookStateCount(w, dir, compaction.Remaining)
+		return reportProjectObligations(w, dir) && ok, nil
 	}
 	count, err := countHookStateEntries(dir)
 	if err != nil {
 		fmt.Fprintf(w, "  ERROR    governance hook state store %s cannot be enumerated: %v\n", dir, err)
 		return false, nil
 	}
-	return reportHookStateCount(w, dir, count), nil
+	ok = reportHookStateCount(w, dir, count)
+	return reportProjectObligations(w, dir) && ok, nil
+}
+
+// storeBindingRemedy names the one recovery that can succeed for a store
+// whose binding no longer validates. It asks adoption's own decision, so it
+// never prescribes a command that is guaranteed to refuse.
+func storeBindingRemedy(dir string) string {
+	const restore = "no command repairs this store in place; move it aside and restore the recorded store from a copy with machinery hook-state adopt --root <root> --from <copy>"
+	marker, err := stateInitializationMarkerPath()
+	if err != nil {
+		return restore
+	}
+	present, legacy, expected, err := readStateInitializationMarker(marker)
+	if err != nil {
+		return "the independent initialization marker " + marker + " is unreadable; " + restore
+	}
+	if !present || legacy {
+		return "the next governed hook event rebinds the initialization marker from this store; no command is needed"
+	}
+	identity, err := readBoundedHookFile(filepath.Join(dir, stateDirectoryIdentityName), "hook state directory identity", hookStateIdentityMaxBytes)
+	if err != nil || identity == nil {
+		return "the store's identity record is missing or unreadable; " + restore
+	}
+	stored, err := parseStateDirectoryBinding(identity.body, "machinery-hook-state-directory-v1")
+	if err != nil {
+		return "the store's identity record is corrupt; " + restore
+	}
+	native, err := captureStateDirectoryIdentity(dir)
+	if err != nil {
+		return "the store directory cannot be inspected; " + restore
+	}
+	if adoptionRefusal(stored, native, expected, false, AdoptOptions{}) == nil {
+		return "after verifying the store, run machinery hook-state adopt --root <root>"
+	}
+	if adoptionRefusal(stored, native, expected, false, AdoptOptions{RebindIdentity: true}) == nil {
+		return fmt.Sprintf("the store's directory identity changed (%s, now %s) while its generation still matches the marker; after verifying that this is the recorded store moved or restored to another filesystem, run machinery hook-state adopt --root <root> --rebind-identity", stored.native, native)
+	}
+	return "this directory is not the recorded store (its identity and its generation both differ from the marker); " + restore
 }
 
 func reportHookStateCount(w io.Writer, dir string, count int) bool {

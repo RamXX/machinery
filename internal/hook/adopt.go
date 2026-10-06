@@ -15,10 +15,52 @@ import (
 	"github.com/RamXX/machinery/internal/filelock"
 )
 
+// AdoptOptions are the operator's explicit acknowledgements for adoption.
+type AdoptOptions struct {
+	// RebindIdentity accepts a store whose native directory identity changed
+	// (an inode change: the store was moved or restored onto another
+	// filesystem). The store's generation must still match the independent
+	// initialization marker, so this rebinds the recorded store and never
+	// accepts a different one.
+	RebindIdentity bool
+}
+
 // AdoptState reaffirms an operator-inspected store without discharging any
 // project obligation. A parked store can be restored only with its sentinel's
 // generation. Live hook writers cause a refusal rather than a partial handoff.
-func AdoptState(w io.Writer, root, from string) (retErr error) {
+func AdoptState(w io.Writer, root, from string) error {
+	return AdoptStateWith(w, root, from, AdoptOptions{})
+}
+
+// adoptionRefusal decides, from the store's own identity record, its current
+// native identity, and the independent marker, whether adoption may proceed.
+// doctor asks the same question so it never prescribes a command that is
+// guaranteed to refuse.
+func adoptionRefusal(stored stateDirectoryBinding, native string, marker stateDirectoryBinding, restoring bool, opts AdoptOptions) error {
+	generationMatches := stored.generation == marker.generation
+	if !sameHookNativeIdentity(stored.native, native) {
+		if !opts.RebindIdentity {
+			hint := ""
+			if generationMatches {
+				hint = "; its generation matches the independent initialization marker, so if you verified that this is the recorded store moved or restored to another filesystem, rerun with --rebind-identity"
+			}
+			return fmt.Errorf("store changed native identity (%s versus %s); refusing to accept a replacement store%s", stored.native, native, hint)
+		}
+		if !generationMatches {
+			return fmt.Errorf("store changed native identity (%s versus %s) and its generation %s does not match the independent initialization marker %s; refusing to rebind a different store", stored.native, native, stored.generation, marker.generation)
+		}
+	}
+	if restoring && (!generationMatches || (!sameHookNativeIdentity(stored.native, marker.native) && !opts.RebindIdentity)) {
+		if generationMatches {
+			return fmt.Errorf("quarantined store does not match the independent initialization marker's directory identity (%s versus %s); if you verified it is the recorded store, rerun with --rebind-identity", stored.native, marker.native)
+		}
+		return fmt.Errorf("quarantined store does not match the independent initialization marker; refusing to restore a different ledger")
+	}
+	return nil
+}
+
+// AdoptStateWith is AdoptState with explicit operator acknowledgements.
+func AdoptStateWith(w io.Writer, root, from string, opts AdoptOptions) (retErr error) {
 	root, err := canonicalHookRoot(root)
 	if err != nil {
 		return err
@@ -79,11 +121,8 @@ func AdoptState(w io.Writer, root, from string) (retErr error) {
 	if err != nil {
 		return err
 	}
-	if !sameHookNativeIdentity(binding.native, native) {
-		return fmt.Errorf("store changed native identity (%s versus %s); refusing to accept a replacement store", binding.native, native)
-	}
-	if from != "" && (binding.generation != expected.generation || !sameHookNativeIdentity(binding.native, expected.native)) {
-		return fmt.Errorf("quarantined store does not match the independent initialization marker; refusing to restore a different ledger")
+	if err := adoptionRefusal(binding, native, expected, from != "", opts); err != nil {
+		return err
 	}
 	entries, err := dirscan.Read(source, hookStateDirMaxEntries)
 	if err != nil {
@@ -206,6 +245,13 @@ func AdoptState(w io.Writer, root, from string) (retErr error) {
 			return err
 		}
 	}
+	if from != "" {
+		// a rename within one filesystem keeps the directory; bind what is live
+		if native, err = captureStateDirectoryIdentity(dir); err != nil {
+			return err
+		}
+	}
+	priorNative := expected.native
 	binding.native = native
 	if err := writeAdoptionFile(filepath.Join(dir, stateDirectoryIdentityName), binding.identityBody()); err != nil {
 		return err
@@ -214,6 +260,9 @@ func AdoptState(w io.Writer, root, from string) (retErr error) {
 		return err
 	}
 	fmt.Fprintf(w, "Adopted governance hook state store %s; initialization marker retained.\n", dir)
+	if priorNative != native {
+		fmt.Fprintf(w, "  rebound store identity: %s -> %s\n", priorNative, native)
+	}
 	if !requested {
 		fmt.Fprintf(w, "  no recorded obligations for %s\n", root)
 	}

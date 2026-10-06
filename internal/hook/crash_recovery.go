@@ -194,7 +194,7 @@ func recoverHookCrashTempsLocked(root, p string) (*hookCrashRefusal, error) {
 	}
 	// conservative: whatever the lost write meant to record, the stop-time
 	// checks must run over both trees
-	if err := updateStateLocked(p, root, true, true, "", "", ""); err != nil {
+	if err := updateStateLocked(p, root, ledgerMutation{addDesign: true, addImpl: true}); err != nil {
 		return nil, err
 	}
 	keep := make([]string, 0, len(evidence))

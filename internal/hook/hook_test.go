@@ -922,8 +922,15 @@ func TestPreEditObligationSurvivesLostPostAndReplacementSession(t *testing.T) {
 	if design, impl, err := readStateErr(root, after); err != nil || !design || impl {
 		t.Fatalf("replacement session did not inherit the project obligation: design=%v impl=%v err=%v", design, impl, err)
 	}
-	if out := runEvent(t, root, Input{SessionID: after, HookEventName: "Stop"}); !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "in-flight tool") {
-		t.Fatalf("replacement session discharged an operation whose Post event was lost: %s", out)
+	// The replacement session cannot complete another session's tool call, so
+	// that token must not wedge its Stop forever. The gates run, the token is
+	// reported with its recovery, and the project obligation stays armed.
+	out := runEvent(t, root, Input{SessionID: after, HookEventName: "Stop"})
+	if strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "hook-state release") || !strings.Contains(out, "--orphaned") {
+		t.Fatalf("replacement session Stop must report, not block on, another session's lost operation: %s", out)
+	}
+	if state, err := readStateRecord(root, after); err != nil || !state.design || len(state.pending) != 1 {
+		t.Fatalf("replacement session discharged an operation whose Post event was lost: state=%+v err=%v", state, err)
 	}
 	post := editEvent("PostToolUse", "Write", before, target)
 	post.ToolUseID = pre.ToolUseID
@@ -1432,8 +1439,11 @@ func TestPreShellRouteSurvivesGovernanceMarkerDeletion(t *testing.T) {
 	if err := Run(bytes.NewReader(stopRaw), &stopOutput, root); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(stopOutput.String(), `"decision":"block"`) || !strings.Contains(stopOutput.String(), "in-flight tool") {
+	if !strings.Contains(stopOutput.String(), `"decision":"block"`) {
 		t.Fatalf("Stop silently unmanaged a pre-shell governed session: %s", stopOutput.String())
+	}
+	if state, err := readStateRecord(root, sid); err != nil || !state.design || len(state.pending) != 1 {
+		t.Fatalf("Stop after marker deletion lost the obligation: state=%+v err=%v", state, err)
 	}
 	t.Cleanup(func() {
 		_ = clearState(root, sid)
@@ -1474,8 +1484,11 @@ func TestDurableStateRecoversManagedAncestorFromNestedDirectoryAfterMarkerDeleti
 		t.Fatalf("durable project identity did not recover the managed ancestor: got=%q want=%q err=%v", gotRoot, wantRoot, err)
 	}
 	out := runEvent(t, nested, Input{SessionID: "replacement-session", Cwd: nested, HookEventName: "Stop"})
-	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "in-flight tool") {
+	if !strings.Contains(out, `"decision":"block"`) {
 		t.Fatalf("nested Stop silently unmanaged an in-flight operation after marker deletion: %s", out)
+	}
+	if state, err := readStateRecord(root, "replacement-session"); err != nil || !state.design || len(state.pending) != 1 {
+		t.Fatalf("nested Stop after marker deletion lost the obligation: state=%+v err=%v", state, err)
 	}
 }
 

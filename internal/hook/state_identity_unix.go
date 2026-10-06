@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 )
@@ -63,8 +64,16 @@ func sameHookNativeIdentity(a, b string) bool {
 	// The device number is not stable for a directory that never moved: macOS
 	// renumbers volumes, and Linux renumbers a block volume that is detached and
 	// reattached (a Kubernetes persistent volume rescheduled to another node).
-	// The inode plus the random store generation bound into the independent
-	// initialization marker still detect a replacement store.
+	// The inode, any native generation or birth time both witnesses carry, and
+	// the random store generation bound into the independent initialization
+	// marker still detect a replacement store. A qualifier present on only one
+	// side is a binding written by an older witness format on the same platform.
 	first, second := strings.Split(a, ":"), strings.Split(b, ":")
-	return len(first) >= 3 && len(second) >= 3 && first[0] == "unix" && second[0] == "unix" && first[2] == second[2]
+	if len(first) < 3 || len(second) < 3 || first[0] != "unix" || second[0] != "unix" || first[2] != second[2] {
+		return false
+	}
+	if qualifierA, qualifierB := first[3:], second[3:]; len(qualifierA) > 0 && len(qualifierB) > 0 {
+		return slices.Equal(qualifierA, qualifierB)
+	}
+	return true
 }

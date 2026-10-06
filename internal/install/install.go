@@ -1279,7 +1279,7 @@ func nativeInstallFileChangeID(info os.FileInfo) string {
 	return ""
 }
 
-const canonicalCachedHookShimSHA256 = "3dc3e14ca878325a35125b85bc2db7a5d1a1cc792fdee12e8602bf1ab279e90b"
+const canonicalCachedHookShimSHA256 = "2083efd114c40e82fb7203f2cb1cc8d3ecf3e6296696925efc211310811f19d9"
 
 func validateCachedHookManifest(raw []byte) error {
 	if err := rejectDuplicateJSONKeys(raw); err != nil {
@@ -1299,14 +1299,21 @@ func validateCachedHookManifest(raw []byte) error {
 		event   string
 		matcher string
 		timeout int
+		command string
 	}
+	const shim = "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh"
+	const boundary = shim + " boundary"
 	expected := []expectedHookEvent{
-		{"PreToolUse", "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell", 15},
-		{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell", 15},
-		{"PostToolUseFailure", "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell", 15},
-		{"Stop", "*", 180},
-		{"SubagentStop", "*", 180},
-		{"SessionStart", "startup|resume|clear|compact", 15},
+		{"PreToolUse", "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell", 15, shim},
+		{"PostToolUse", "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell", 15, shim},
+		{"PostToolUseFailure", "Edit|Write|MultiEdit|NotebookEdit|apply_patch|edit|write|patch|Bash|bash|Shell|shell", 15, shim},
+		{"Stop", "*", 180, shim},
+		{"SubagentStop", "*", 180, shim},
+		{"SessionStart", "startup|resume|clear|compact", 15, shim},
+		{"UserPromptSubmit", "", 15, boundary},
+		{"PostToolBatch", "", 15, boundary},
+		{"Interrupt", "", 5, boundary},
+		{"SessionEnd", "", 5, boundary},
 	}
 	if strings.TrimSpace(manifest.Description) == "" || len(manifest.Hooks) != len(expected) {
 		return fmt.Errorf("cached hook inventory is incomplete or has unexpected events")
@@ -1317,7 +1324,7 @@ func validateCachedHookManifest(raw []byte) error {
 			return fmt.Errorf("cached hook event %s does not have the canonical matcher and single command", want.event)
 		}
 		command := bindings[0].Hooks[0]
-		if command.Type != "command" || command.Command != "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh" || command.Timeout != want.timeout {
+		if command.Type != "command" || command.Command != want.command || command.Timeout != want.timeout {
 			return fmt.Errorf("cached hook event %s does not wire the canonical shim contract", want.event)
 		}
 		if command.Async != nil {

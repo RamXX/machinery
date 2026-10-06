@@ -82,6 +82,7 @@ type Input struct {
 	ToolName        string    `json:"tool_name"`
 	ToolInput       toolInput `json:"tool_input"`
 	StopHookActive  bool      `json:"stop_hook_active"`
+	AgentID         string    `json:"agent_id,omitempty"`
 	BackgroundTasks int       `json:"-"`
 }
 
@@ -299,7 +300,9 @@ func decodeInput(r io.Reader) (Input, error) {
 			}
 		// Official adapter metadata is accepted but never allowed to steer
 		// machinery's routing. Keeping the list explicit catches typos.
-		case "transcript_path", "scratchpad_dir", "permission_mode", "source", "model", "agent_id", "agent_type", "agent_transcript_path", "last_assistant_message", "session_title":
+		case "agent_id":
+			in.AgentID, err = decodeInputString(dec, key)
+		case "transcript_path", "scratchpad_dir", "permission_mode", "source", "model", "agent_type", "agent_transcript_path", "last_assistant_message", "session_title", "turn_id":
 			_, err = decodeInputString(dec, key)
 		case "tool_response":
 			var ignored json.RawMessage
@@ -656,7 +659,20 @@ func readConfinedRegular(rootPath, name string, maxBytes int64) (body []byte, pr
 // event's cwd). A nil return with no output means "nothing to say": the
 // event was either not machinery's business or clean.
 func Run(r io.Reader, w io.Writer, root string) (retErr error) {
-	in, err := decodeInput(r)
+	rawInput, err := io.ReadAll(io.LimitReader(r, hookInputMaxBytes+1))
+	if err != nil {
+		return fmt.Errorf("machinery hook: stdin is not hook-event JSON: read hook-event JSON: %w", err)
+	}
+	if int64(len(rawInput)) > hookInputMaxBytes {
+		return fmt.Errorf("machinery hook: stdin is not hook-event JSON: hook-event JSON exceeds %d-byte limit", hookInputMaxBytes)
+	}
+	if boundaryIn, isBoundary, err := decodeBoundaryInput(rawInput); isBoundary {
+		if err != nil {
+			return fmt.Errorf("machinery hook: stdin is not hook-event JSON: %w", err)
+		}
+		return runBoundary(boundaryIn, root)
+	}
+	in, err := decodeInput(bytes.NewReader(rawInput))
 	if err != nil {
 		return fmt.Errorf("machinery hook: stdin is not hook-event JSON: %w", err)
 	}
@@ -718,7 +734,20 @@ func Run(r io.Reader, w io.Writer, root string) (retErr error) {
 				}
 			}
 		}
-		routeCfg, routePresent, routeErr := loadRouteSnapshot(root, in.SessionID)
+		// The current operator configuration routes a completion or a Stop
+		// whenever it is usable: an obligation armed under an older route is
+		// re-evaluated by running the gates under the configuration in force
+		// now, and the Stop names the change, so an operator edit or an
+		// upgrade can never strand a token or wedge a Stop. Only when no
+		// usable configuration exists (both markers deleted, or governance
+		// switched off while work is outstanding) does the durable route
+		// snapshot decide.
+		var routeCfg Config
+		var routePresent bool
+		var routeErr error
+		if !ok || cfg.loadError != "" {
+			routeCfg, routePresent, routeErr = loadRouteSnapshot(root, in.SessionID)
+		}
 		if routeErr != nil {
 			reason := "machinery governance cannot recover pre-shell routing state: " + routeErr.Error()
 			if in.HookEventName == "Stop" || in.HookEventName == "SubagentStop" {
@@ -1251,23 +1280,56 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	if stateErr != nil {
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot read its touched-file state; refusing to end the turn without running the required checks: " + stateErr.Error()})
 	}
+	routeNote := ""
 	if len(state.routes) > 0 {
 		routeBody, err := routeSnapshotBody(cfg)
 		if err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot bind the dirty obligation to its routing identity: " + err.Error()})
 		}
 		want := routeSnapshotDigest(routeBody)
+		changed := 0
 		for _, bound := range state.routes {
 			if bound != want {
-				return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance dirty obligation was armed under a different routing configuration; refusing to clear it using fallback or changed configuration"})
+				changed++
 			}
 		}
+		if changed > 0 {
+			routeNote = fmt.Sprintf("machinery: this project's gate obligation was armed under %d routing configuration(s) that differ from the one in force now; it was re-evaluated by running the gates under the current configuration.", changed)
+		}
 	}
-	if len(state.pending) > 0 {
+	own, orphaned := partitionPending(state, in)
+	if len(own) > 0 {
 		// A matching tree hash only says that no governed bytes have changed
 		// yet. It cannot prove that a writer is finished. Only an exact
-		// PostToolUse or PostToolUseFailure event removes an armed token.
-		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) whose PostToolUse completion or host denial was not durably recorded; refusing to discharge or clear the project gate obligation while a mutation may still be running", len(state.pending))})
+		// PostToolUse or PostToolUseFailure event, or a boundary event of the
+		// lane that armed it, removes this session's armed token.
+		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) whose PostToolUse completion or host denial was not durably recorded; refusing to discharge or clear the project gate obligation while a mutation may still be running", len(own))})
+	}
+	orphanNote := ""
+	if len(orphaned) > 0 {
+		orphanNote = orphanedTokenNote(root, orphaned, cfg.plainDialog())
+	}
+	notes := func(msg string) string {
+		for _, note := range []string{routeNote, orphanNote} {
+			if note == "" {
+				continue
+			}
+			if msg != "" {
+				msg += "\n"
+			}
+			msg += note
+		}
+		return msg
+	}
+	// discharge clears the ledger after a decision that would otherwise end
+	// the obligation. While another session's token remains, that token's
+	// mutation may not be finished, so the obligation stays armed and the
+	// gates run again at the next Stop.
+	discharge := func(revision uint64) error {
+		if len(orphaned) > 0 {
+			return nil
+		}
+		return clearCheckedState(root, in.SessionID, revision)
 	}
 	touchedDesign, touchedImpl := state.design, state.impl
 	if !touchedDesign && !touchedImpl {
@@ -1294,7 +1356,10 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot inspect its routing config: " + err.Error()})
 	}
 	freshCfg, freshOK, freshWarn := Load(root)
-	if !freshOK || !sameConfig(cfg, freshCfg) {
+	if !freshOK {
+		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance configuration is absent or switched off (" + ConfigName + " and " + conventionalMarker + " are missing, or hooks are disabled) while a gate obligation is outstanding; restore the operator configuration and retry the stop. The obligation is retained."})
+	}
+	if !sameConfig(cfg, freshCfg) {
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance routing config changed while acquiring the design snapshot; retry the stop so selection and design use one config revision"})
 	}
 	// The same config bytes should reproduce the same warning. Preserve an
@@ -1347,12 +1412,12 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		if err := errors.Join(snapshot.CheckUnchanged(), snapshot.Release()); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery design changed while the empty gate decision was being derived; retry the stop: " + err.Error()})
 		}
-		if err := clearCheckedState(root, in.SessionID, state.revision); err != nil {
+		if err := discharge(state.revision); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery gates could not durably clear the hook state ledger: " + err.Error()})
 		}
-		if selWarn != "" {
+		if msg := notes(selWarn); msg != "" {
 			// nothing ran, but the dropped-gates gap must stay visible
-			return emitJSON(w, stopOut{SystemMessage: selWarn})
+			return emitJSON(w, stopOut{SystemMessage: msg})
 		}
 		return nil
 	}
@@ -1410,7 +1475,7 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 					plain := fmt.Sprintf("machinery: a review window is %s; %d design-check item(s) are held until it closes.", left, blocking)
 					return emitJSON(w, stopOut{SystemMessage: plain})
 				}
-				return emitJSON(w, stopOut{SystemMessage: capString(msg+"\n"+buf.String(), reasonCap)})
+				return emitJSON(w, stopOut{SystemMessage: notes(capString(msg+"\n"+buf.String(), reasonCap))})
 			}
 		}
 	}
@@ -1430,10 +1495,10 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		if warn != "" {
 			reason = warn + "\n" + reason
 		}
-		return emitJSON(w, stopOut{Decision: "block", Reason: reason})
+		return emitJSON(w, stopOut{Decision: "block", Reason: notes(reason)})
 	case blocking > 0:
 		// ERRORs without DRIFT: normal for a design mid-interrogation
-		if err := clearCheckedState(root, in.SessionID, state.revision); err != nil {
+		if err := discharge(state.revision); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery gates ran, but the hook state ledger could not be durably cleared: " + err.Error()})
 		}
 		msg := fmt.Sprintf("machinery: %d gate ERROR finding(s) remain (no DRIFT); normal mid-phase. "+
@@ -1454,14 +1519,13 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		if selWarn != "" {
 			msg = selWarn + "\n" + msg
 		}
-		return emitJSON(w, stopOut{SystemMessage: msg})
+		return emitJSON(w, stopOut{SystemMessage: notes(msg)})
 	default:
-		if err := clearCheckedState(root, in.SessionID, state.revision); err != nil {
+		if err := discharge(state.revision); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery gates passed, but the hook state ledger could not be durably cleared: " + err.Error()})
 		}
-		switch {
-		case selWarn != "":
-			return emitJSON(w, stopOut{SystemMessage: selWarn})
+		if msg := notes(selWarn); msg != "" {
+			return emitJSON(w, stopOut{SystemMessage: msg})
 		}
 		return nil
 	}
@@ -2321,7 +2385,10 @@ func ensureStateDirectoryIdentity(dir string, requireExisting bool, expected sta
 		return stateDirectoryBinding{}, fmt.Errorf("hook state directory identity %s is corrupt or noncanonical: %w", identityPath, err)
 	}
 	if !sameHookNativeIdentity(binding.native, native) {
-		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s changed native identity; refusing to accept a replacement store", dir)
+		if requireExisting && binding.generation == expected.generation {
+			return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s changed native identity (bound %s, current %s); refusing to accept a replacement store. Its generation still matches the independent initialization marker: after verifying that this is the recorded store moved or restored to another filesystem, run machinery hook-state adopt --root <root> --rebind-identity", dir, binding.native, native)
+		}
+		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s changed native identity (bound %s, current %s); refusing to accept a replacement store", dir, binding.native, native)
 	}
 	if requireExisting && !sameHookNativeIdentity(binding.native, expected.native) {
 		return stateDirectoryBinding{}, fmt.Errorf("durable hook state directory %s has initialization-marker directory binding mismatch (store %s, marker %s); run machinery hook-state adopt --root <root> after verifying the store", dir, binding.native, expected.native)
@@ -2772,7 +2839,7 @@ func armProjectState(root string, in Input, cfg Config, designTouched, implTouch
 	} else if len(temps) > 0 {
 		return fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
-	if err := updateStateLocked(p, root, designTouched, implTouched, operation, "", routeSnapshotDigest(raw)); err != nil {
+	if err := updateStateLocked(p, root, ledgerMutation{addDesign: designTouched, addImpl: implTouched, addPending: operation, owner: ownerOf(in), addRoute: routeSnapshotDigest(raw)}); err != nil {
 		return err
 	}
 	return publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw)
@@ -2823,7 +2890,7 @@ func completeToolState(root string, cfg Config, in Input, designTouched, implTou
 	} else if len(temps) > 0 {
 		return fmt.Errorf("incomplete hook route transaction: durable temp %s exists; refusing to overwrite crash evidence", temps[0])
 	}
-	if err := updateStateLocked(p, root, designTouched, implTouched, "", operation, routeSnapshotDigest(raw)); err != nil {
+	if err := updateStateLocked(p, root, ledgerMutation{addDesign: designTouched, addImpl: implTouched, removePending: []string{operation}, addRoute: routeSnapshotDigest(raw)}); err != nil {
 		return err
 	}
 	if err := publishRouteSnapshotLocked(root, routeStatePath(root, in.SessionID), raw); err != nil {
@@ -2948,7 +3015,9 @@ func removeOwnedHookFile(path, kind string, limit int64) error {
 	return removeHookFileWitnessWithPrefix(path, kind, limit, witness, "d")
 }
 
-func loadRouteSnapshot(root, sessionID string) (Config, bool, error) {
+// loadOwnRouteSnapshot recovers only the route this session itself armed
+// under. It never guesses between other sessions' routes.
+func loadOwnRouteSnapshot(root, sessionID string) (Config, bool, error) {
 	if err := requireStateDir(); err != nil {
 		return Config{}, false, err
 	}
@@ -2958,18 +3027,23 @@ func loadRouteSnapshot(root, sessionID string) (Config, bool, error) {
 		return Config{}, false, fmt.Errorf("incomplete hook route transaction: durable temp %s exists; the next governed shell or file command recovers it", temps[0])
 	}
 	raw, err := readRouteStateFile(routeStatePath(root, sessionID))
-	if err != nil {
+	if err != nil || raw == nil {
 		return Config{}, false, err
 	}
-	if raw != nil {
-		cfg, err := decodeConfig(raw)
-		if err != nil {
-			return Config{}, false, fmt.Errorf("pre-shell route snapshot is corrupt: %w", err)
-		}
-		if cfg.Design == "" {
-			cfg.Design = "design"
-		}
-		return cfg, true, nil
+	cfg, err := decodeConfig(raw)
+	if err != nil {
+		return Config{}, false, fmt.Errorf("pre-shell route snapshot is corrupt: %w", err)
+	}
+	if cfg.Design == "" {
+		cfg.Design = "design"
+	}
+	return cfg, true, nil
+}
+
+func loadRouteSnapshot(root, sessionID string) (Config, bool, error) {
+	cfg, present, err := loadOwnRouteSnapshot(root, sessionID)
+	if err != nil || present {
+		return cfg, present, err
 	}
 	// A replacement session has no exact route filename. Recover the sole
 	// project route, or one common route shared by every unfinished session;
@@ -3495,7 +3569,7 @@ func appendState(root, sessionID, kind string) (returnErr error) {
 	} else if refusal != nil {
 		return refusal // the ledger is already dirty for design and impl
 	}
-	if err := updateStateLocked(p, root, kind == "design", kind == "impl", "", "", ""); err != nil {
+	if err := updateStateLocked(p, root, ledgerMutation{addDesign: kind == "design", addImpl: kind == "impl"}); err != nil {
 		return err
 	}
 	return boundHookStateStore()
@@ -3508,7 +3582,48 @@ type hookStateRecord struct {
 	impl          bool
 	pending       []string
 	pendingHashes map[string]string
+	pendingOwners map[string]pendingOwner
 	routes        []string
+}
+
+// pendingOwner binds an in-flight tool token to the host session and lane
+// (main thread or one subagent) that armed it. Both are one-way digests: the
+// ledger never stores a raw session or agent identifier. A token without an
+// owner was written before owners were recorded and belongs to no live
+// session this binary can name.
+type pendingOwner struct {
+	session string
+	lane    string
+}
+
+func (o pendingOwner) known() bool { return o.session != "" }
+
+func hookOwnerDigest(domain string, values ...string) string {
+	h := sha256.New()
+	for _, value := range append([]string{domain}, values...) {
+		var size [8]byte
+		binary.BigEndian.PutUint64(size[:], uint64(len(value)))
+		_, _ = h.Write(size[:])
+		_, _ = h.Write([]byte(value))
+	}
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// hookSessionDigest names one host session in the ledger.
+func hookSessionDigest(sessionID string) string {
+	return hookOwnerDigest("machinery-hook-session", sessionID)
+}
+
+// hookLaneDigest names one sequential tool lane of a session: the main thread
+// (empty agent id) or one subagent. Tool calls inside one lane resolve before
+// that lane's next model request, which is what lets a lane boundary event
+// prove its earlier tokens can no longer complete.
+func hookLaneDigest(sessionID, agentID string) string {
+	return hookOwnerDigest("machinery-hook-lane", sessionID, agentID)
+}
+
+func ownerOf(in Input) pendingOwner {
+	return pendingOwner{session: hookSessionDigest(in.SessionID), lane: hookLaneDigest(in.SessionID, in.AgentID)}
 }
 
 // hookStateRootLine encodes the canonical project root the ledger belongs to.
@@ -3534,7 +3649,86 @@ func parseHookStateRootLine(value string) (string, error) {
 	return root, nil
 }
 
-func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, removePending, addRoute string) error {
+// ledgerMutation is one durable change to a project ledger. Touch classes
+// and route identities only accumulate; a token is added with its owner or
+// removed by its exact identity.
+type ledgerMutation struct {
+	addDesign, addImpl bool
+	addPending         string
+	owner              pendingOwner
+	removePending      []string
+	addRoute           string
+}
+
+func updateStateLocked(p, root string, m ledgerMutation) error {
+	return mutateStateLocked(p, root, true, func(record *hookStateRecord) bool {
+		record.design = record.design || m.addDesign
+		record.impl = record.impl || m.addImpl
+		if m.addPending != "" {
+			record.addPending(m.addPending, m.owner)
+		}
+		for _, token := range m.removePending {
+			record.removePending(token)
+		}
+		if m.addRoute != "" {
+			found := false
+			for _, digest := range record.routes {
+				found = found || digest == m.addRoute
+			}
+			if !found {
+				record.routes = append(record.routes, m.addRoute)
+				sort.Strings(record.routes)
+			}
+		}
+		return true
+	})
+}
+
+func (record *hookStateRecord) addPending(token string, owner pendingOwner) {
+	for _, existing := range record.pending {
+		if existing == token {
+			record.setOwner(token, owner)
+			return
+		}
+	}
+	record.pending = append(record.pending, token)
+	sort.Strings(record.pending)
+	record.setOwner(token, owner)
+}
+
+func (record *hookStateRecord) setOwner(token string, owner pendingOwner) {
+	delete(record.pendingHashes, token)
+	if record.pendingOwners == nil {
+		record.pendingOwners = map[string]pendingOwner{}
+	}
+	if owner.known() {
+		record.pendingOwners[token] = owner
+	} else {
+		delete(record.pendingOwners, token)
+	}
+}
+
+func (record *hookStateRecord) removePending(token string) bool {
+	kept := record.pending[:0]
+	removed := false
+	for _, existing := range record.pending {
+		if existing == token {
+			removed = true
+			continue
+		}
+		kept = append(kept, existing)
+	}
+	record.pending = kept
+	delete(record.pendingHashes, token)
+	delete(record.pendingOwners, token)
+	return removed
+}
+
+// mutateStateLocked applies fn to the parsed ledger under the caller's state
+// lock and publishes the result as a new revision when fn reports a change.
+// create is false for callers that must never materialize a ledger: an
+// absent ledger then stays absent and fn is not called.
+func mutateStateLocked(p, root string, create bool, fn func(*hookStateRecord) bool) error {
 	temps, err := hookStateTemps(p)
 	if err != nil {
 		return err
@@ -3546,6 +3740,9 @@ func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, remo
 	if err != nil {
 		return err
 	}
+	if raw == nil && !create {
+		return nil
+	}
 	record, err := parseHookStateRecord(raw)
 	if err != nil {
 		return err
@@ -3553,39 +3750,20 @@ func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, remo
 	if record.revision == ^uint64(0) {
 		return fmt.Errorf("hook state revision overflow")
 	}
+	if !fn(&record) {
+		return nil
+	}
 	record.revision++
 	if root != "" {
 		record.root = root
 	}
-	record.design = record.design || addDesign
-	record.impl = record.impl || addImpl
-	pending := make(map[string]bool, len(record.pending)+1)
-	for _, token := range record.pending {
-		pending[token] = true
+	if !record.design && !record.impl {
+		return fmt.Errorf("hook state ledger mutation would leave no touch class; refusing to discharge an obligation outside a gate run")
 	}
-	if addPending != "" {
-		pending[addPending] = true
-		delete(record.pendingHashes, addPending)
-	}
-	if removePending != "" {
-		delete(pending, removePending)
-		delete(record.pendingHashes, removePending)
-	}
-	record.pending = record.pending[:0]
-	for token := range pending {
-		record.pending = append(record.pending, token)
-	}
-	sort.Strings(record.pending)
-	if addRoute != "" {
-		found := false
-		for _, digest := range record.routes {
-			found = found || digest == addRoute
-		}
-		if !found {
-			record.routes = append(record.routes, addRoute)
-			sort.Strings(record.routes)
-		}
-	}
+	return writeHookStateBody(p, formatHookStateRecord(record), true)
+}
+
+func formatHookStateRecord(record hookStateRecord) []byte {
 	var body strings.Builder
 	fmt.Fprintf(&body, "revision %d\n", record.revision)
 	if record.root != "" {
@@ -3602,12 +3780,14 @@ func updateStateLocked(p, root string, addDesign, addImpl bool, addPending, remo
 	}
 	for _, token := range record.pending {
 		body.WriteString("pending " + token)
-		if digest := record.pendingHashes[token]; digest != "" {
+		if owner, ok := record.pendingOwners[token]; ok && owner.known() {
+			body.WriteString(" owner " + owner.session + " " + owner.lane)
+		} else if digest := record.pendingHashes[token]; digest != "" {
 			body.WriteString(" " + digest)
 		}
 		body.WriteByte('\n')
 	}
-	return writeHookStateBody(p, []byte(body.String()), true)
+	return []byte(body.String())
 }
 
 var hookStateIdentityRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -3627,7 +3807,7 @@ func parseHookStateRecord(raw []byte) (hookStateRecord, error) {
 	if strconv.FormatUint(revision, 10) != strings.TrimPrefix(lines[0], "revision ") {
 		return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: revision must be a positive canonical integer")
 	}
-	record := hookStateRecord{revision: revision, pendingHashes: map[string]string{}}
+	record := hookStateRecord{revision: revision, pendingHashes: map[string]string{}, pendingOwners: map[string]pendingOwner{}}
 	classIndex := 0
 	routeStarted := false
 	pendingStarted := false
@@ -3660,9 +3840,10 @@ func parseHookStateRecord(raw []byte) (hookStateRecord, error) {
 			record.routes = append(record.routes, digest)
 		case strings.HasPrefix(line, "pending "):
 			pendingStarted = true
-			fields := strings.Fields(strings.TrimPrefix(line, "pending "))
-			if len(fields) < 1 || len(fields) > 2 {
-				return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation must carry an identity and optional tree hash")
+			fields := strings.Split(strings.TrimPrefix(line, "pending "), " ")
+			owned := len(fields) == 4 && fields[1] == "owner"
+			if len(fields) != 1 && len(fields) != 2 && !owned {
+				return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation must carry an identity and either an owner or an optional legacy tree hash")
 			}
 			token := fields[0]
 			if !hookStateIdentityRe.MatchString(token) {
@@ -3672,7 +3853,13 @@ func parseHookStateRecord(raw []byte) (hookStateRecord, error) {
 				return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operations must be unique and sorted")
 			}
 			record.pending = append(record.pending, token)
-			if len(fields) == 2 {
+			switch {
+			case owned:
+				if !hookStateIdentityRe.MatchString(fields[2]) || !hookStateIdentityRe.MatchString(fields[3]) {
+					return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation owner must be two 64-character lowercase hex digests")
+				}
+				record.pendingOwners[token] = pendingOwner{session: fields[2], lane: fields[3]}
+			case len(fields) == 2:
 				if !hookStateIdentityRe.MatchString(fields[1]) {
 					return hookStateRecord{}, fmt.Errorf("hook state ledger is corrupt or noncanonical: pending operation tree hash must be 64 lowercase hex characters")
 				}

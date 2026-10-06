@@ -91,3 +91,26 @@ func jsonString(s string) string {
 	b.WriteByte('"')
 	return b.String()
 }
+
+func TestHookStateReleaseRequiresExactlyOneSelector(t *testing.T) {
+	root := t.TempDir()
+	for _, args := range [][]string{
+		{"release", "--root", root},
+		{"release", "--root", root, "--orphaned", "--token", strings.Repeat("a", 64)},
+		{"release", "--orphaned"},
+	} {
+		cmd := newHookStateCmd()
+		cmd.SetArgs(args)
+		if err := executeCapturedCommand(cmd); err == nil {
+			t.Fatalf("hook-state %v was accepted", args)
+		}
+	}
+}
+
+func TestHookStateAdoptOffersRebindIdentity(t *testing.T) {
+	cmd := newHookStateCmd()
+	adopt, _, err := cmd.Find([]string{"adopt"})
+	if err != nil || adopt.Flags().Lookup("rebind-identity") == nil {
+		t.Fatalf("adopt must offer --rebind-identity: %v", err)
+	}
+}

@@ -1,5 +1,5 @@
 {
-  "description": "machinery design governance for Claude Code and Codex. Every hook routes through one shim; an available binary recovers durable project routing after mutable markers disappear, while a missing binary remains a silent no-op only outside managed ancestors. PreToolUse denies hand-edits to generated artifacts; PostToolUse and PostToolUseFailure close exact tracked operations while retaining touched obligations; Stop/SubagentStop run deterministic gates before the turn may end; SessionStart announces the governance contract.",
+  "description": "machinery design governance for Claude Code and Codex. Every hook routes through one shim; an available binary recovers durable project routing after mutable markers disappear, while a missing binary remains a silent no-op only outside managed ancestors. PreToolUse denies hand-edits to generated artifacts; PostToolUse and PostToolUseFailure close exact tracked operations while retaining touched obligations; Stop/SubagentStop run deterministic gates before the turn may end; SessionStart announces the governance contract; UserPromptSubmit, Interrupt, PostToolBatch and SessionEnd are non-blocking boundary notices that close tool tokens an interrupted, denied, or ended lane can no longer complete, while retaining the gate obligation.",
   "hooks": {
     "PreToolUse": [
       {
@@ -69,6 +69,50 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh boundary",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh boundary",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Interrupt": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh boundary",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/machinery-hook.sh boundary",
+            "timeout": 5
           }
         ]
       }

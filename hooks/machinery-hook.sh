@@ -10,7 +10,14 @@
 #   2. If the binary is absent, a truly unmanaged project stays a silent no-op.
 #   3. Managed with no binary, or a failing binary, fails closed (exit 2)
 #      with a diagnostic. A broken guard must never become no governance.
+#   4. Boundary events (invoked with the argument "boundary": a new prompt,
+#      an interrupt, a resolved tool batch, a session end) only close tool
+#      tokens their session can no longer complete. They never gate, so they
+#      never block: a missing or failing binary leaves the token for the next
+#      Stop, doctor, and 'machinery hook-state release' to report.
 set -u
+
+mode="${1:-}"
 
 if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
   root="$CLAUDE_PROJECT_DIR"
@@ -28,6 +35,16 @@ fi
 path_present() {
   [ -e "$1" ] || [ -L "$1" ]
 }
+if [ "$mode" = boundary ]; then
+  if [ -z "$bin" ]; then
+    exit 0
+  fi
+  if ! "$bin" hook --root "$root"; then
+    echo "machinery plugin: could not record that this session's interrupted or denied tool calls ended; the next Stop reports any token left in flight. See 'machinery doctor'." >&2
+  fi
+  exit 0
+fi
+
 if [ -z "$bin" ]; then
   if ! probe=$(unset CDPATH; cd -- "$root" 2>/dev/null && pwd -P); then
     echo "machinery plugin: BLOCKED because the project root cannot be inspected while the 'machinery' binary is unavailable." >&2
