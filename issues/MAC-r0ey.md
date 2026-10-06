@@ -7,8 +7,8 @@ type: feature
 labels: [gates, hard-tdd, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:f9a1be362c909eb3467f46e17461a9cc2ee27c9a94ceb23caf348e8ea334a1cd"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:ac6d49ee600802a64bdfed1a32280dc5de3c40f90ae81125a0e5e477ab302b7e"
 ---
 
 ## Description
@@ -36,7 +36,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add the `locked:` inventory declaration and a gate under --impl --commit <anchor> that blocks a locked file changed vs the anchor without an AMEND- token in range commit messages or a dated DECISIONS.md entry; include deleted/renamed files and byte-identical output when no inventory exists. Evidence: No locked/AMEND handling exists: grep -rl AMEND over *.go and *.md (excluding vault/plans/tmp) returns nothing; internal/gates has no locked-inventory reader (internal/gates/threat.go:118 'locked' refers to negative tests named in the Gz threat ledger, not hard-TDD locked suites). CHANGELOG 0.7.0-0.11.0 has no such gate. Notes: Safety hole in hard-TDD enforcement (H2 evidence). Hard TDD is a rigor option, so P2 is defensible; kept P1 as filed.
 
 ## History
 
