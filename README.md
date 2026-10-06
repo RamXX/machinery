@@ -962,7 +962,10 @@ The gates and proofs are exactly as strong as stated above. No deterministic che
 - whether migration transformations preserve real production data (Gm proves decision coverage;
   mapping, reconciliation, and rollback tests hold the rest);
 - coupling through shared database tables or bus topics, which import analysis cannot see;
-- security, capacity, and observability beyond what the Phase 2 NFR record captures;
+- security, capacity, and observability beyond what the Phase 2 NFR record captures, and, for
+  the threat ledger, whether the adversary classification is right and whether a negative test
+  really refuses its adversary (Gz checks that every adversary row is classified and its test is
+  present, not that the test is adequate; the threat-first review carries that judgment);
 - facts a design states only in prose (the rules read declarations).
 
 The methodology names each residual in the design artifacts rather than letting a green check
