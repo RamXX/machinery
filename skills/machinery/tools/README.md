@@ -131,6 +131,9 @@ One line per subcommand:
   reproduces (verdict, `input_hash`, coverage). Needs the committed projection present; runs where the
   checker's runtime is available, exactly as verify-formal needs Java.
 - `machinery doctor` checks dependencies and install status.
+- `machinery hook-state adopt --root <root> [--from <quarantine>]` reaffirms the hook store's recorded
+  binding after an operator handoff, journals the transition, and reports retained obligations without
+  clearing them; `--from` restores a quarantined store.
 - `machinery preflight` the same check, for use before a design session.
 - `machinery install` / `machinery uninstall` place or remove the skill and role docs in the agent
   homes (`--target claude|codex|opencode|all` for native host adapters).

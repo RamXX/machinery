@@ -6,6 +6,74 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-06
+
+**Why this release.** A corrective batch: every open bug in the backlog, fixed together. The
+most serious was silent data loss: `machinery oracle` run on a single machine deleted every
+other committed oracle in the directory. Gt also credited oracle ids in suites that skip
+themselves, the Modelith 1.0 projection rejected valid `n:n` relationships, the OpenCode 2.x
+adapter did not load (so governance was silently off there), and three hook defects could
+deadlock or misreport an agent seat.
+
+### Fixed
+
+- **`machinery oracle` no longer deletes sibling oracles.** Single-file and multi-file runs
+  now remove only generated oracles whose source machine is gone; every other committed oracle
+  is preserved.
+- **Gt reports skipped suites as UNRUN.** An oracle id whose only binding test is skipped
+  (ExUnit `skip`/`pending` tags and runner `exclude` lists, Go `t.Skip` as the first statement,
+  pytest skip markers, Node `test.skip`/`it.skip`/`.todo`) no longer earns coverage; Gt reports
+  `UNRUN <stable-id>` with the test paths. A suite intentionally run out of band can bind a
+  passed run by content hash in `design/assurance/test-runs.json`; the record stales when the
+  suite or a named source changes. See `docs/gt-test-discovery.md`.
+- **The 1.0 checker projection accepts Modelith's `n:n`.** It is normalized to the existing
+  `n:m` representation, so committed projections keep their shape.
+- **OpenCode 2.x governance adapter.** The adapter now exports the v2 plugin entrypoint,
+  delivers Stop events durably, and resolves the session's project location; `machinery doctor`
+  reports an incompatible adapter instead of passing silently.
+- **Hook: background tasks no longer re-prompt every turn.** Stop and SubagentStop defer while
+  the host reports background tasks; pending operations and touched state stay recorded and the
+  next idle Stop enforces the checks.
+- **Hook: a process writing into the design tree no longer deadlocks the seat.** Hook design
+  snapshots exclude paths declared in `<design>/.machineryignore` (the ignore file itself stays
+  protected), and standalone `kill`, `pkill`, and `killall` can stop a writer even while the
+  design inventory is unstable. Unignored changes still fail closed and name the changing path.
+- **Hook-state store handoff.** Refusals now name the component that failed (marker binding
+  versus directory replacement); `machinery doctor` checks the same binding as the hook; Darwin
+  device and stat-generation volatility no longer reads as a replaced store. A new
+  `machinery hook-state adopt --root <root> [--from <quarantine>]` reaffirms the recorded
+  binding, journals the transition, and reports retained obligations without clearing them.
+- **Directory mutation detection in containers.** Outer validation windows and the plugin-cache
+  walk keep mutation witnesses instead of trusting timestamps, and EMFILE/ENOSPC from the
+  mutation channel are retried with a hint naming the limit to raise.
+- **`verify-formal` retries transient jar downloads** (up to three attempts with backoff,
+  checksum verified before install), so one connection reset no longer fails the run.
+- **`machinery packet` resolves milestone citations** when a shard's Build plan section opens
+  with an `N/A` preamble.
+- **Render and pre-push snapshots** read tracked and non-ignored files through Git, so nested
+  worktrees, ignored caches, and churn in `.codebase-memory/` no longer fail
+  `make modelith-render-check` or report a misleading stale render.
+- **Test reliability under load.** Bootstrap and rollback CLI tests use the package deadline
+  instead of fixed 30 and 90 second bounds, and the assurance store retries writer acquisition
+  after a staging identity change.
+
+### Compatibility and migration
+
+- **Gt can newly block.** A design whose oracle ids are bound only by skipped tests now gets
+  `UNRUN` findings. Run those suites, or record a passed out-of-band run in
+  `design/assurance/test-runs.json`.
+- **OpenCode** users rerun `machinery install --target opencode` (or `machinery update`) to
+  place the v2 adapter.
+- **`.machineryignore`** is optional; without it hook snapshots behave as before.
+
+**Generated output.** Generators emit the `v0.11.1` stamp; committed example artifacts, the
+golden corpus, and the oracle hash pins are regenerated with only stamp changes.
+
+**Consumer-corpus diff.** 0.11.0 against this candidate, no allow file, over five consumer
+designs: 0 new and 0 resolved findings in every design. Two ran with their implementation
+(`--impl`); three ran design-only because their repository roots are not valid `--impl` trees
+for either binary (symlinks and dependency caches).
+
 ## [0.11.0] - 2026-10-05
 
 **Why this release.** Two lessons from heavy use, encoded in the process every adopter inherits.
