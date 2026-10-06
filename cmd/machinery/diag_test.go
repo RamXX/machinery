@@ -618,3 +618,25 @@ func countStoreEntries(t *testing.T, store string) int {
 	}
 	return len(entries)
 }
+
+func TestDoctorReportsOpenCodeV2IncompatibleAdapter(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PLUGIN_ROOT", "")
+	bin := t.TempDir()
+	t.Setenv("PATH", bin)
+	if err := os.WriteFile(filepath.Join(bin, "opencode"), []byte("#!/bin/sh\nprintf 'opencode v2.0.18\\n'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plugin := filepath.Join(home, ".config", "opencode", "plugins", "machinery.js")
+	if err := os.MkdirAll(filepath.Dir(plugin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(plugin, []byte("export const MachineryPlugin = async () => ({})\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if reportHookWiring(&output) || !strings.Contains(output.String(), "OpenCode v2.0.18") || !strings.Contains(output.String(), "cannot load") {
+		t.Fatalf("doctor failed to report V1-only adapter under V2:\n%s", output.String())
+	}
+}

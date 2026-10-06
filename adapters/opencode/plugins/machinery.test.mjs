@@ -7,7 +7,7 @@ import test from "node:test"
 
 const source = await readFile(new URL("./machinery.js", import.meta.url), "utf8")
 const moduleURL = `data:text/javascript;base64,${Buffer.from(source).toString("base64")}`
-const { MachineryPlugin, defaultRunner } = await import(moduleURL)
+const { MachineryPlugin, defaultRunner, default: definition } = await import(moduleURL)
 
 // The native-subprocess lane drives the real spawn transport: adversarial
 // `machinery` executables are provisioned into isolated PATH fixtures, so the
@@ -546,4 +546,119 @@ test("explicit Node runtime executes the native governance transport", () => {
   const major = Number(process.versions.node.split(".")[0])
   assert.ok(major >= 22, `native transport requires Node >= 22, got ${process.versions.node}`)
   assert.match(process.execPath, /node/)
+})
+
+// V2 drives the Promise API with mutable tool events and an abortable stream.
+async function v2Lane(config = {}) {
+  const calls = []
+  const hooks = {}
+  const queue = []
+  let wake
+  let signal
+  const warnings = []
+  const ctx = {
+    location: { directory: "/project", project: { directory: "/parent" } },
+    options: { runner: fakeRunner(config, calls) },
+    tool: { hook: async (name, fn) => { hooks[name] = fn } },
+    session: { synthetic: async (input) => { warnings.push(input) } },
+    event: { subscribe: async function* (options) {
+      signal = options.signal
+      signal.addEventListener("abort", () => wake?.(), { once: true })
+      while (!signal.aborted) {
+        if (!queue.length) await new Promise((resolve) => { wake = resolve })
+        if (signal.aborted) return
+        const item = queue.shift()
+        yield item.event
+        item.done()
+      }
+    } },
+  }
+  assert.equal(definition?.id, "machinery.governance", "V2 loader requires a default definition")
+  const cleanup = await definition.setup(ctx)
+  return { calls, hooks, warnings, cleanup, get signal() { return signal },
+    event: (event) => new Promise((done) => { queue.push({ event, done }); wake?.() }),
+  }
+}
+
+function v2Tool(tool = "write", input = { path: "design/BUILD.md", content: "text" }, id = "call-v2") {
+  return { tool, sessionID: "session-v2", agent: "build", messageID: "message-v2", id, input }
+}
+
+test("V2 before denial throws with the governance reason", async () => {
+  const lane = await v2Lane({ stdout: JSON.stringify({ decision: "block", reason: "generated file" }) })
+  try { await assert.rejects(() => lane.hooks["execute.before"](v2Tool()), /generated file/) }
+  finally { await lane.cleanup() }
+})
+
+test("V2 translates native tools, completions, and error deduplication", async () => {
+  const lane = await v2Lane()
+  try {
+    for (const [tool, input, name] of [
+      ["write", { path: "design/BUILD.md", content: "text" }, "Write"],
+      ["edit", { path: "design/BUILD.md", oldString: "old", newString: "new", replaceAll: true }, "Edit"],
+      ["patch", { patchText: "*** Update File: design/BUILD.md" }, "apply_patch"],
+      ["shell", { command: "pwd", workdir: "/project", timeout: 1000, background: false }, "Bash"],
+    ]) {
+      const event = v2Tool(tool, input)
+      await lane.hooks["execute.before"](event)
+      await lane.hooks["execute.after"]({ ...event, status: "completed", result: { output: {}, content: "done" } })
+      const pair = lane.calls.slice(-2)
+      assert.deepEqual(pair.map(({ payload }) => payload.hook_event_name), ["PreToolUse", "PostToolUse"])
+      assert.ok(pair.every(({ root, payload }) => root === "/project" && payload.cwd === "/project" && payload.tool_name === name))
+      assert.equal(pair[0].payload.tool_input.command, input.command ?? input.patchText ?? "")
+      assert.equal(pair[0].payload.tool_input.file_path, input.path ?? "")
+    }
+    for (const first of ["reply", "after"]) {
+      const event = v2Tool("shell", { command: "pwd" }, first)
+      await lane.hooks["execute.before"](event)
+      await lane.event({ type: "permission.asked", data: { id: first, sessionID: event.sessionID, source: { type: "tool", id: event.id, messageID: event.messageID } } })
+      const reply = () => lane.event({ type: "permission.replied", data: { requestID: first, sessionID: event.sessionID, reply: "reject" } })
+      const after = () => lane.hooks["execute.after"]({ ...event, status: "error", error: { message: "permission rejected" } })
+      await (first === "reply" ? reply() : after())
+      await (first === "reply" ? after() : reply())
+      assert.equal(lane.calls.filter(({ payload }) => payload.tool_use_id === first && payload.hook_event_name === "PostToolUseFailure").length, 1)
+    }
+  } finally { await lane.cleanup() }
+})
+
+test("V2 after block replaces model content without throwing", async () => {
+  const lane = await v2Lane({ stdout: JSON.stringify({ decision: "block", reason: "red check" }) })
+  try {
+    for (const content of ["done", [{ type: "text", text: "done" }]]) {
+      const event = { ...v2Tool(), status: "completed", result: { content, output: { success: true }, metadata: {} } }
+      await lane.hooks["execute.after"](event)
+      assert.equal(event.result.content, "red check")
+      assert.equal(event.result.output, undefined)
+    }
+  } finally { await lane.cleanup() }
+})
+
+test("V2 durable execution endings and idle fallbacks run Stop once per turn", async () => {
+  const lane = await v2Lane()
+  try {
+    const emit = (type, data = {}) => lane.event({ type, data: { sessionID: "session-v2", ...data } })
+    await emit("session.status", { status: { type: "idle" } })
+    await emit("session.idle")
+    await emit("session.execution.succeeded")
+    assert.equal(lane.calls.filter(({ payload }) => payload.hook_event_name === "Stop").length, 1)
+    for (const ending of ["succeeded", "failed", "interrupted"]) {
+      await emit("session.execution.started")
+      await emit(`session.execution.${ending}`)
+      await emit("session.status", { status: { type: "idle" } })
+    }
+    assert.equal(lane.calls.filter(({ payload }) => payload.hook_event_name === "Stop").length, 4)
+    await emit("session.execution.started")
+    await emit("session.idle")
+    assert.equal(lane.calls.filter(({ payload }) => payload.hook_event_name === "Stop").length, 5)
+  } finally { await lane.cleanup() }
+  assert.equal(lane.signal.aborted, true)
+})
+
+test("V2 Stop denial is visible as a synthetic session message", async () => {
+  const lane = await v2Lane({ stdout: JSON.stringify({ decision: "block", reason: "red Stop" }) })
+  try {
+    await lane.event({ type: "session.execution.succeeded", data: { sessionID: "session-v2" } })
+    assert.equal(lane.warnings.length, 1)
+    assert.match(JSON.stringify(lane.warnings[0]), /red Stop/)
+  } finally { await lane.cleanup() }
 })
