@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:15Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:b30798407e317d81ef68986bc1267afdea7bcd146aa175ec10209dcaa69938bf"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:3fcb91ae0cff8cf2033ea2ed98426d4eccd510ad888f877822b3feef15026f03"
 blocked_by: [MAC-u4oo]
 blocks: [MAC-al5u, MAC-vx24]
 ---
@@ -96,6 +96,7 @@ status: new
 
 ## Notes
 Triage 2026-09-24: NEEDS-REWRITE. go-crm changed since 09-06 (slices, Gy/Gl, acceptance); obligation inventory is stale.
+Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Rewrite the obligation inventory against current go-crm, then do the prospective strict migration once the CLI exists. Evidence: Verified at HEAD 8c620d8f (v0.11.0). No machinery tdd command is registered (cmd/machinery has no tdd.go; CHANGELOG 0.7.0 'no CLI surface yet'; docs/test-assurance-contract.md:9,22 state the CLI is target only). internal/assuranceflow holds only register.go (no run.go), scripts/assurance-examples.sh does not exist, examples/go-crm/design/assurance/ does not exist. Its authoring reality has moved: go-crm now has slices.yaml, threats.yaml, acceptance/, Gy/Gl, opted into enforce mode in 0.11.0, so the obligation inventory in the issue is stale (also noted by 09-24 triage). Notes: Verdict is valid-but-needs-rewrite, filed as partial only because ACs 1-7 are all open and the premise changed. Real blocker u4oo (needs machinery tdd CLI).
 
 ## History
 - 2026-09-06T09:10:12Z dep_added: blocked_by MAC-u4oo
