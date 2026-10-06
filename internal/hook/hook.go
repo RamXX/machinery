@@ -761,8 +761,14 @@ func Run(r io.Reader, w io.Writer, root string) (retErr error) {
 	}
 	switch in.HookEventName {
 	case "PreToolUse":
+		if processControl(in) {
+			return nil
+		}
 		return withRoutingSnapshot(root, cfg, func(current Config) error { return pre(w, root, current, in) })
 	case "PostToolUse", "PostToolUseFailure":
+		if processControl(in) {
+			return nil
+		}
 		return withRoutingSnapshot(root, cfg, func(current Config) error { return post(root, current, in) })
 	case "Stop", "SubagentStop":
 		return stop(w, root, cfg, in, warn)
@@ -824,7 +830,7 @@ func withRoutingSnapshot(root string, cfg Config, fn func(Config) error) (retErr
 	} else if err != nil {
 		return err
 	}
-	snapshot, err := gates.AcquireSnapshot(designDir)
+	snapshot, err := gates.AcquireHookSnapshot(designDir)
 	if err != nil {
 		return err
 	}
@@ -1273,7 +1279,7 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot run because the configured design directory " +
 			design + "/ is missing or is not a directory. Restore it or correct the operator-owned configuration; the touched state is retained."})
 	}
-	snapshot, snapshotErr := gates.AcquireSnapshot(designDir)
+	snapshot, snapshotErr := gates.AcquireHookSnapshot(designDir)
 	if snapshotErr != nil {
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot acquire a consistent design snapshot: " + snapshotErr.Error()})
 	}
@@ -1714,7 +1720,7 @@ func selectGates(designDir string, cfg Config) (gates.Selection, string) {
 }
 
 func selectGatesChecked(designDir string, cfg Config) (gates.Selection, string, error) {
-	snapshot, err := gates.AcquireSnapshot(designDir)
+	snapshot, err := gates.AcquireHookSnapshot(designDir)
 	if err != nil {
 		return gates.Selection{}, "", err
 	}
@@ -4137,3 +4143,14 @@ func capString(s string, n int) string {
 func emitJSON(w io.Writer, v any) error {
 	return json.NewEncoder(w).Encode(v)
 }
+
+// Only standalone process-control commands bypass design inventory reads.
+// Shell expansion, redirection and command chaining still take the normal route.
+func processControl(in Input) bool {
+	if !shellTools[in.ToolName] {
+		return false
+	}
+	return processControlCommand.MatchString(strings.TrimSpace(in.ToolInput.Command))
+}
+
+var processControlCommand = regexp.MustCompile(`^(kill|pkill|killall)([ \t]+[-%a-zA-Z0-9_./:]+)+$`)

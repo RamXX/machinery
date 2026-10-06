@@ -50,6 +50,7 @@ type Lock struct {
 	retiredSourceCleanups []*privateSnapshotCleanup
 	sourceAliases         []string
 	inputAliases          []pathAlias
+	skip                  func(string) bool
 	snapshot              map[string]string
 	external              map[string]externalFileState
 	externalTrees         map[string]externalTreeState
@@ -209,6 +210,9 @@ func (l *Lock) TrackExternalTree(path string) error {
 }
 
 func (l *Lock) fingerprintExternalTree(root string) (map[string]string, error) {
+	if root == l.root {
+		return fingerprintFiltered(root, l.skip)
+	}
 	values, err := fingerprint(root)
 	if err != nil {
 		return nil, err
@@ -427,14 +431,14 @@ func ExpectTree(path string, files map[string][]byte, dirMode, fileMode fs.FileM
 // scope. A separate scope suffix prevents collision with legacy subsystem
 // locks which may already use the design directory itself as their key.
 func Acquire(designRoot string) (*Lock, error) {
-	return acquire(designRoot, false)
+	return acquire(designRoot, false, nil)
 }
 
 // AcquireReader refuses to expose a design while any supported transaction
 // family has crash residue. Writers use Acquire so they can run recovery;
 // gates use AcquireReader and fail before reading a parked/installing set.
 func AcquireReader(designRoot string) (*Lock, error) {
-	return acquire(designRoot, true)
+	return acquire(designRoot, true, nil)
 }
 
 // FingerprintTree returns the content-and-topology digest used by design
@@ -449,7 +453,13 @@ func FingerprintTree(root string) (string, error) {
 	return fingerprintDigest(values), nil
 }
 
-func acquire(designRoot string, reader bool) (*Lock, error) {
+// AcquireReaderFiltered excludes declared transient paths from every source
+// read and recheck. The predicate must remain fixed for the lifetime of the lock.
+func AcquireReaderFiltered(designRoot string, skip func(string) bool) (*Lock, error) {
+	return acquire(designRoot, true, skip)
+}
+
+func acquire(designRoot string, reader bool, skip func(string) bool) (*Lock, error) {
 	root, err := filepath.Abs(designRoot)
 	if err != nil {
 		return nil, fmt.Errorf("resolve design root: %w", err)
@@ -484,11 +494,11 @@ func acquire(designRoot string, reader bool) (*Lock, error) {
 			return nil, errors.Join(fmt.Errorf("interrupted Machinery publication journal %s prevents a consistent design snapshot; no gate reads were performed; rerun the exact writer command that was interrupted to recover, or inspect it read-only with `machinery recover %s`, then retry `machinery check %s`", journal, root, root), lock.Release())
 		}
 	}
-	snapshot, err := fingerprint(root)
+	snapshot, err := fingerprintFiltered(root, skip)
 	if err != nil {
 		return nil, errors.Join(fmt.Errorf("snapshot design root %s: %w", root, err), lock.Release())
 	}
-	result := &Lock{lock: lock, root: root, rootInfo: rootInfo, snapshot: snapshot}
+	result := &Lock{lock: lock, root: root, rootInfo: rootInfo, snapshot: snapshot, skip: skip}
 	if err := result.materializeDesignSource(); err != nil {
 		return nil, errors.Join(err, lock.Release())
 	}
@@ -642,7 +652,7 @@ func (l *Lock) ResumeExpected(writer, recovery string) error {
 		return fmt.Errorf("publication sentinel belongs to operation %q; %s", prior.Operation, prior.Recovery)
 	}
 	recoveryDirs := recoveryOutputDirs(prior.Outputs)
-	now, err := fingerprint(l.root)
+	now, err := fingerprintFiltered(l.root, l.skip)
 	if err != nil {
 		return err
 	}
@@ -2169,7 +2179,7 @@ func (l *Lock) CheckUnchanged() error {
 	if err != nil || !os.SameFile(l.rootInfo, rootInfo) {
 		return fmt.Errorf("design root changed identity outside the snapshot lock")
 	}
-	now, err := fingerprint(l.root)
+	now, err := fingerprintFiltered(l.root, l.skip)
 	if err != nil {
 		return fmt.Errorf("recheck design snapshot: %w", err)
 	}
@@ -2245,7 +2255,7 @@ func (l *Lock) Refresh() error {
 	if err != nil || !os.SameFile(l.rootInfo, rootInfo) {
 		return fmt.Errorf("design root changed identity before snapshot refresh")
 	}
-	now, err := fingerprint(l.root)
+	now, err := fingerprintFiltered(l.root, l.skip)
 	if err != nil {
 		return fmt.Errorf("refresh design snapshot: %w", err)
 	}
@@ -2272,15 +2282,19 @@ func (l *Lock) Refresh() error {
 	return nil
 }
 
-func fingerprint(rootPath string) (out map[string]string, retErr error) {
-	first, err := fingerprintRoot(rootPath, true)
+func fingerprint(rootPath string) (map[string]string, error) {
+	return fingerprintFiltered(rootPath, nil)
+}
+
+func fingerprintFiltered(rootPath string, skip func(string) bool) (out map[string]string, retErr error) {
+	first, err := fingerprintRootFiltered(rootPath, true, skip)
 	if err != nil {
 		return nil, err
 	}
 	if testBetweenFingerprintPasses != nil {
 		testBetweenFingerprintPasses(rootPath)
 	}
-	second, err := fingerprintRoot(rootPath, true)
+	second, err := fingerprintRootFiltered(rootPath, true, skip)
 	if err != nil {
 		return nil, err
 	}
@@ -2290,7 +2304,11 @@ func fingerprint(rootPath string) (out map[string]string, retErr error) {
 	return second, nil
 }
 
-func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retErr error) {
+func fingerprintRoot(rootPath string, skipGit bool) (map[string]string, error) {
+	return fingerprintRootFiltered(rootPath, skipGit, nil)
+}
+
+func fingerprintRootFiltered(rootPath string, skipGit bool, skip func(string) bool) (out map[string]string, retErr error) {
 	before, err := os.Lstat(rootPath)
 	if err != nil {
 		return nil, err
@@ -2343,6 +2361,9 @@ func fingerprintRoot(rootPath string, skipGit bool) (out map[string]string, retE
 				rel = filepath.Join(dir, name)
 			}
 			display := filepath.ToSlash(rel)
+			if skip != nil && skip(display) {
+				continue
+			}
 			if err := validateInventoryPath(display, caseFolded); err != nil {
 				return err
 			}

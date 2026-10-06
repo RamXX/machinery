@@ -1251,6 +1251,12 @@ allowed). In every other repository the hooks are a strict no-op and never distu
 or plugins. Details, including the `.machinery.json` reference and the exact sentinel contents:
 the [Claude Code plugin guide](docs/claude-plugin.md).
 
+Hook design snapshots exclude paths declared in `<design>/.machineryignore`; the ignore file
+itself stays guarded. Put logs and caches outside the design tree, or declare them there.
+Unignored changes still fail closed and name the changing path. Standalone `kill`, `pkill`,
+and `killall` commands can stop a writer even when the design inventory is unstable; commands
+with shell expansion, redirection, or chaining use normal governance.
+
 With the plugin installed, the default `machinery install` detects it and skips `~/.claude` (the
 plugin already serves the skill and agents there). Codex and OpenCode users can opt into their
 native adapters with `--target`.

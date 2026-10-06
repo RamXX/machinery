@@ -5,6 +5,7 @@
 package gates
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -85,7 +86,30 @@ type implementationSnapshot interface {
 }
 
 func AcquireSnapshot(design string) (*Snapshot, error) {
-	lock, err := designlock.AcquireReader(design)
+	return acquireSnapshot(design, nil)
+}
+
+// AcquireHookSnapshot omits declared transient paths while retaining the ignore
+// file itself, so edits to the exclusion policy still invalidate the snapshot.
+func AcquireHookSnapshot(design string) (*Snapshot, error) {
+	body, err := readDesignFile(design, filepath.Join(design, IgnoreFileName))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	ignore := parseIgnore(string(body), err == nil)
+	snapshot, err := acquireSnapshot(design, func(rel string) bool { return rel != IgnoreFileName && ignore.skips(rel) })
+	if err != nil {
+		return nil, err
+	}
+	held, readErr := readDesignFile(snapshot.DesignPath(), filepath.Join(snapshot.DesignPath(), IgnoreFileName))
+	if (readErr != nil && !os.IsNotExist(readErr)) || !bytes.Equal(body, held) || ignore.present != (readErr == nil) {
+		return nil, errors.Join(fmt.Errorf("design ignore policy changed while acquiring hook snapshot"), readErr, snapshot.Release())
+	}
+	return snapshot, nil
+}
+
+func acquireSnapshot(design string, skip func(string) bool) (*Snapshot, error) {
+	lock, err := designlock.AcquireReaderFiltered(design, skip)
 	if err != nil {
 		return nil, err
 	}

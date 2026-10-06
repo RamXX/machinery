@@ -252,7 +252,8 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 		return nil, fmt.Errorf("implementation root changed identity while opening stable snapshot")
 	}
 	exclude := l.externalDesignRel(source)
-	if err := validateExternalTreeForCopy(root, exclude); err != nil {
+	skip := l.sourceSkip(source)
+	if err := validateExternalTreeForCopy(root, exclude, l.sourceSkip(source)); err != nil {
 		return nil, err
 	}
 	values := map[string]string{}
@@ -281,7 +282,7 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 			if dir != "." {
 				rel = filepath.Join(dir, name)
 			}
-			if exclude != "" && (rel == exclude || strings.HasPrefix(rel, exclude+string(filepath.Separator))) {
+			if (exclude != "" && (rel == exclude || strings.HasPrefix(rel, exclude+string(filepath.Separator)))) || (skip != nil && skip(filepath.ToSlash(rel))) {
 				continue
 			}
 			info, err := root.Lstat(rel)
@@ -371,7 +372,7 @@ func (l *Lock) copyExternalTree(source, dest string, beforeOpen, afterRead func(
 	return copied, nil
 }
 
-func validateExternalTreeForCopy(root *os.Root, exclude string) error {
+func validateExternalTreeForCopy(root *os.Root, exclude string, skip func(string) bool) error {
 	budget := snapshotBudget{maxEntries: snapshotInventoryMaxEntries, maxBytes: snapshotAggregateMaxBytes, maxDepth: snapshotInventoryMaxDepth}
 	caseFolded := map[string]string{}
 	var walk func(string, int) error
@@ -403,7 +404,7 @@ func validateExternalTreeForCopy(root *os.Root, exclude string) error {
 			if dir != "." {
 				rel = filepath.Join(dir, name)
 			}
-			if exclude != "" && (rel == exclude || strings.HasPrefix(rel, exclude+string(filepath.Separator))) {
+			if (exclude != "" && (rel == exclude || strings.HasPrefix(rel, exclude+string(filepath.Separator)))) || (skip != nil && skip(filepath.ToSlash(rel))) {
 				continue
 			}
 			display := filepath.ToSlash(rel)
@@ -436,4 +437,11 @@ func validateExternalTreeForCopy(root *os.Root, exclude string) error {
 		return nil
 	}
 	return walk(".", 0)
+}
+
+func (l *Lock) sourceSkip(source string) func(string) bool {
+	if source == l.root {
+		return l.skip
+	}
+	return nil
 }
