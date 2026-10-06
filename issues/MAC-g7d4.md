@@ -8,8 +8,8 @@ labels: [modelith, dependencies]
 parent: MAC-0p5d
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
-updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:8969fde5876fe3fc216363bf0ca81397d046dde5797a21626411b8d7e0e9dc97"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:a9b696746fae91def620dd1f8cb82a44a72511da0e464a1391bf5796ddb85df1"
 blocks: [MAC-r3b0, MAC-o3p2]
 was_blocked_by: [MAC-gscc]
 ---
@@ -35,7 +35,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Implement loud refusal of imports:, dotted entity/type refs and dotted subtypeOf in the gates model reader; CHANGELOG consumer notes (re-render drift, bare 1 meaning, refused forms); probe-model test; e2e over bundled examples with real modelith 0.5.0. Evidence: Pin sites all moved to v0.5.0 and examples re-rendered in 2bd125b0 (Makefile:18, diag.go:30, modelith-render.sh:8, .dagger/main.go, README:1004-1411, docs/brownfield-team-guide.md:62,367). No 'not yet supported by machinery' refusal of imports:/dotted refs exists (grep finds only projection layer 'scenarios' refusal, internal/checker/projection.go:129). 0.5 bare-1 semantic note not in CHANGELOG. Notes: Silent mis-projection of imports/qualified refs is a gate correctness hole (zero findings). Blocker gscc is not technical: n:n handling is independent of the refusal logic (only AC2 of gscc, bounded-form failure, overlaps and can be done in one pass with g7d4). Pin part could be closed out and the rest retitled.
 
 ## History
 - 2026-09-25T20:11:08Z dep_added: blocked_by MAC-gscc
