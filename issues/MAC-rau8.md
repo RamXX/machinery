@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:fa25ef13397c556a461d805e82b1ce5028a7a183e15a28760869b6ea0f05e949"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:e8bf0e79cab0aad292f27e2b4f4acdb2ac0dc0b23321fe7d1c3b1aa1d6dfa3b2"
 blocked_by: [MAC-sqpt, MAC-wbxq]
 blocks: [MAC-u4oo, MAC-vx24]
 ---
@@ -95,7 +95,7 @@ status: new
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement assuranceflow.Run with the five modes, the sealed Verification, the nine-stage finalization, the 4h owner cap, and the native two-platform finalization lane. Evidence: CHANGELOG 0.7.0 says the assurance substrate ships with no CLI/gate consumer. Greps of *.go find no CheckTDDAssurance, GateExecution, TDDStatus, assurance_store or strict-check. internal/assuranceflow holds only register.go. internal/tdd has no execute.go, replay.go or evidence.go, and has CheckExecutor only as a type in types.go. internal/assuranceflow/run.go and verification.go do not exist. Notes: Real dependencies via CONSUMES (tdd.Execute/Verify, CheckExecutor, CheckTDDAssurance). MAC-pe9v is consumed too but already reached transitively through sd7g and wbxq. Body carries stale boilerplate (pvg nd, Anchor HOLD, MAC-l7m0 acceptance); l7m0 is closed and accepted. Blocks MAC-vx24, which is closed (superseded); drop it.
 
 ## History
 - 2026-09-06T09:10:09Z dep_added: blocked_by MAC-sqpt
