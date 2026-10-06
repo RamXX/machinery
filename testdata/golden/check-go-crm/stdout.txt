@@ -17,15 +17,10 @@
   checked: 4 records, 2 references, 2 invariants carried, 5 solver commands generated, 8 tenant oracle rows generated, 2 committed artifacts fresh (byte-identical)
   ok
 == Gc-carrier  invariant carrier reconciliation ==
-  checked: 27 invariants declared, 22 preserves references, 18 carried by preserves, 8 carried by a relational layer, 1 carried by a machine unit
+  checked: 30 invariants declared, 25 preserves references, 21 carried by preserves, 8 carried by a relational layer, 1 carried by a machine unit
   ok
 == Gz-threat  adversary classification ==
-  note   audit: User looks security-relevant ("authenticates" in definition) and is not classified in design/threats.yaml; list it under subjects with its adversary rows, under not_security_relevant with a reason, or under waivers with an owner, date, and reason
-  note   audit: workspace.dsl element authz speaks of "authz" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
-  note   audit: workspace.dsl element cli speaks of "authorize" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
-  note   audit: workspace.dsl element session speaks of "auth" in its name or description and is neither a declared verifier nor listed under not_security_relevant; declare it under verifiers with what it decides, or list it under not_security_relevant with a reason
-  note   audit: set mode: enforce and enforced_since in design/threats.yaml to make these blocking; see docs/threat-driven-verification.md
-  checked: 1 candidates detected, 10 workspace.dsl elements scanned
+  checked: 1 candidates detected, 1 candidates classified, 1 subjects classified, 8 adversary rows, 2 verifiers, 10 workspace.dsl elements scanned, 14 test files scanned, 4 negative tests found
   ok
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
@@ -36,19 +31,19 @@
   checked: 5 machines, 197 transitions, 5 tla-generable, 5 oracles fresh, 197 matrix rows reconciled, 186 named units covered
   ok
 == Gd-idcite  design-side stable-id citations ==
-  checked: 387 citations resolved, 36 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
+  checked: 387 citations resolved, 37 files scanned, 275 committed oracle ids, 6 guards with clause declarations, 31 guard rows read for clause completeness, 6 guard rows with a clause declaration
   ok
 == Gl-ledger  session ledgers + house style ==
-  checked: 36 files style-scanned
+  checked: 37 files style-scanned
   ok
 == Gx-trace  cross-layer traceability ==
   note   Deal: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   Task: 3 operational-overlay states (persisting, persistRetry, rolledBack)
   note   User: 3 operational-overlay states (persisting, persistRetry, rolledBack)
-  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 3 lifecycle semantics annotations, 2 control-flow-only semantics, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 residual handlers waived, 12 declaration groups parsed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 27 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 15 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
+  checked: 9 entities, 2 operational machines, 3 lifecycle machines traced, 3 lifecycle entities with machines, 3 lifecycle semantics annotations, 2 control-flow-only semantics, 5 placement rows with machines, 2 placement rows waived, 9 entities placed, 6 mitigation rows with residual handlers, 1 residual handlers waived, 12 declaration groups parsed, 1 build mode declared, 1 toolchain section present, 1 state-migration section present, 30 invariants enforced, 6 invariants policy-checked (relational model), 2 invariants isolation-checked (relational model), 18 invariants unit-backed (guard/action/actor), 4 invariants integrity-checked (relational model)
   ok
 == Gy-rules  consistency rules over projected facts ==
-  checked: 8 rule files evaluated, 1985 facts
+  checked: 8 rule files evaluated, 1991 facts
   ok
 == Gb-plan  build plan structure ==
   checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 6 closed milestones, 1 skeleton NFR lines, 14 skeleton citations
@@ -57,8 +52,7 @@
   checked: 1 milestones, 58 obligations owed, 58 obligations claimed, 2 slices, M1-S1 39613/90000 bytes, M1-S2 16272/60000 bytes
   ok
 == Ga-accept  milestone acceptance evidence ==
-  note   audit: acceptance/M3.yaml: milestone M3 names security-relevant subject(s) User but records no threat_review; the independent review writes its own threat table first, probes each row with a real process, and records the probe with its expected and observed failure reason
-  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 1 security-relevant acceptances, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
+  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
   ok
 == Gv-attest  attestation evidence ==
   note   Historical acceptance-file judgment only; Gv does not execute Ga ancestry validation or establish current implementation approval.
