@@ -7,8 +7,8 @@ type: feature
 labels: [formal, gc, invariants]
 created_at: 2026-09-24T21:27:28Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:27:28Z
-content_hash: "sha256:983998a1dc5ab0803a29cb05a88d1401410584b0c32dd7098647db9c534f58e0"
+updated_at: 2026-10-06T04:03:49Z
+content_hash: "sha256:d26c9d3ef0e4ec2a7b3e3bbf4346366eee7458af2b831e379efd3d7ad1621db5"
 blocked_by: [MAC-534p]
 related: [MAC-0b1e]
 ---
@@ -42,7 +42,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Decide where the class lives (Modelith vs machinery-side annotation keyed by invariant id), closed vocabulary, Gc compatibility matrix, default/migration rule, tests, one example migration. Evidence: No property-class vocabulary exists in code or docs (grep for 'property class' and hyperproperty finds only nd issue files). Gc carrier check exists but has no class compatibility. Notes: blockedBy MAC-534p is only partly real: the possibility->structural-refutation routing needs 534p, but the class vocabulary and the other class routings do not. Could be split so the rest ships first.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocked_by MAC-534p
