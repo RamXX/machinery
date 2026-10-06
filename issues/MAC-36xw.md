@@ -1,14 +1,16 @@
 ---
 id: MAC-36xw
 title: "cmd/machinery: TestProvisionStructurizrWaiterRecoversFromCrashedWinner flaked once on the hosted macOS runner (waiter returned a provisioned path while the helper held the lock)"
-status: open
+status: closed
 priority: 3
 type: bug
 labels: [flaky-under-load, macos, ci, cmd-machinery, structurizr]
 created_at: 2026-09-23T22:35:13Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:31:55Z
-content_hash: "sha256:3bb2d037152fa798cdd4cf2a394a7b3ea182279dc85b52e263d90ee05a8f3bdb"
+updated_at: 2026-10-06T04:04:06Z
+content_hash: "sha256:7241583c12dc38dd78169af4c0af046f3b2040d38e83a12f222bb26582752ce3"
+closed_at: 2026-10-06T04:04:06Z
+close_reason: "Fixed by 4bb85b78 (helpers sleep-loop instead of bare select, waiter diagnostics); no recurrence since. Reopen if it flakes again."
 ---
 
 ## Description
@@ -25,7 +27,7 @@ Second occurrence 2026-09-24 on ci run 35955372364 (the cancellation variant, sa
 Triage 2026-09-24: 4bb85b78 replaced select{} with a sleep loop and instrumented the waiter; ci green. Close after one or two more green hosted macOS native-tests runs.
 
 ## History
-
+- 2026-10-06T04:04:06Z status: open -> closed
 
 ## Links
 
