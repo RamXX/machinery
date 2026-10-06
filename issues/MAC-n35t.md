@@ -7,8 +7,8 @@ type: bug
 labels: [linux, containers, aba, dirscan]
 created_at: 2026-09-24T21:32:05Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:05Z
-content_hash: "sha256:459b2c9e1e4cfe8a9072841ba427a3ca08145fc362d30326ea780f31f2206879"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:4e372df4ab00e0d81f2853dc582992fce1d346545c8762f9d6942b92cc5ab95f"
 blocks: [MAC-4cbc]
 ---
 
@@ -33,7 +33,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Move WalkBounded outer window and plugin-cache walk to the mutation-channel witness (fail closed where unavailable), retry EMFILE/ENOSPC with named sysctl in the error, and get the tree-inventory ABA tests green in the Dagger ci-linux container. Evidence: Core fix shipped in 0.8.0 (a56bbe32). Remaining confirmed: dirscan.WalkBounded outer window still stamp-only (internal/dirscan/dirscan.go:285 captureDirectoryState vs :324-325, no mutation channel; the channel is armed only in Read at :111); walkPluginCacheTopology still uses installFileChangeID ctime (internal/install/install.go:642,656,668 and :1182-1209); no EMFILE/ENOSPC handling or sysctl hint anywhere (grep of internal/ cmd/ finds none outside comments); tree-inventory ABA tests (scripts/tree-inventory/main_test.go:211,385) not re-verified in ci-linux. Notes: Correctness of a fail-closed gate on pre-6.13 kernels (the CI substrate); it blocks MAC-4cbc and the hosted-equivalence claim for the Dagger lane (MAC-zafm). MAC-4cbc blockedBy is real.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-4cbc
