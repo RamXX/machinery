@@ -127,6 +127,53 @@ func TestPacketProjectionClean(t *testing.T) {
 	}
 }
 
+func TestPacketMilestoneAfterNAPreamble(t *testing.T) {
+	for _, preamble := range []string{
+		"N/A - the build plan is the root BUILD.md section 9 plan",
+		"n/a - the build plan is the root BUILD.md section 9 plan",
+	} {
+		t.Run(preamble, func(t *testing.T) {
+			design := packetFixture(t)
+			rewriteFixtureFile(t, design, "BUILD/core.md", "## 9. Build plan\n\n", "## 9. Build plan\n\n"+preamble+"\n\n")
+			rewriteFixtureFile(t, design, "BUILD/core.md", "### 9.1 Notes", "- **M2** (later work). This milestone must stay out of the M1 packet.\n\n### 9.1 Notes")
+			packets, g := ProjectPackets(design, "M1", "M1-S1")
+			if len(g.Errs) > 0 {
+				t.Fatalf("milestone citation after N/A preamble failed: %q", g.Errs)
+			}
+			body := string(packetByID(t, packets, "M1-S1").Body)
+			want := "### milestone:BUILD/core.md (BUILD/core.md:29-30)\n\n" +
+				"- **M1** (deal lifecycle). Core's slice: the win path, the lose path, and the policy\n" +
+				"  rows held to the oracle. Both paths persist inside one write transaction."
+			if !strings.Contains(body, want) {
+				t.Fatalf("packet lacks verbatim M1 block and source range %q\n%s", want, body)
+			}
+			for _, absent := range []string{preamble, "- **M0**", "- **M2**", "### 9.1 Notes"} {
+				if strings.Contains(body, absent) {
+					t.Errorf("packet carries uncited content %q", absent)
+				}
+			}
+		})
+	}
+}
+
+func TestPacketMilestoneNAWithoutItems(t *testing.T) {
+	for _, body := range []string{
+		"N/A - the plan lives in the root",
+		"N/A - the plan lives in the root\n\n```text\n- **M1** (fenced example)\n```",
+	} {
+		t.Run(body, func(t *testing.T) {
+			design := packetFixture(t)
+			rewriteFixtureFile(t, design, "BUILD/core.md",
+				"- **M0** (walking skeleton). Core's slice: the advance path only.\n- **M1** (deal lifecycle). Core's slice: the win path, the lose path, and the policy\n  rows held to the oracle. Both paths persist inside one write transaction.", body)
+			packets, g := ProjectPackets(design, "M1", "M1-S1")
+			wantErr(t, g, "BUILD/core.md declares no Build plan section")
+			if packets != nil {
+				t.Fatal("packets returned despite a waived plan without milestone items")
+			}
+		})
+	}
+}
+
 func TestPacketCarriesSharedFixtureObligations(t *testing.T) {
 	design := packetFixture(t)
 	packets, g := ProjectPackets(design, "M1", "")
