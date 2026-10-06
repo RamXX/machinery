@@ -7,8 +7,8 @@ type: feature
 labels: [traceability, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:c324814170a71cf869713783f731ee09ae9c1f97908f681dd104aab59008730f"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:b2b60faf5233a60d02e30ee139d396e463e52c6d7d7eba95fe6bf4e655bee548"
 was_blocked_by: [MAC-zti7]
 ---
 
@@ -34,7 +34,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Design and build the revision-impact report per the 6 ACs, with sanitized synthetic fixtures. Evidence: No revision-impact code anywhere: grep for 'revision-impact' and 'revision impact' across cmd, internal, docs, skills and CHANGELOG finds nothing. Notes: Listed blockedBy MAC-zti7 (readiness report) is a soft conceptual dependency (shared evidence-limits vocabulary), not shared code; it can start on the public traceability model alone. Treat as soft, not a hard blocker. Its blocks on MAC-b27n and MAC-f15w are likewise soft.
 
 ## History
 - 2026-09-24T21:33:57Z dep_added: blocked_by MAC-zti7
