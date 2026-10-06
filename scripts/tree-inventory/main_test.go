@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -11,6 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/RamXX/machinery/internal/dirscan"
 )
 
 type recordingDirectoryReader struct {
@@ -259,6 +262,20 @@ func blindNativeWitness(t *testing.T) {
 	nativeWitness = func(*os.File, os.FileInfo) (string, error) { return "blind", nil }
 }
 
+func TestInventoryRefusesUnavailableMutationWitness(t *testing.T) {
+	want := errors.New("mutation channel unavailable")
+	prior := newInventoryMutationChannel
+	t.Cleanup(func() { newInventoryMutationChannel = prior })
+	newInventoryMutationChannel = func() (*dirscan.MutationChannel, error) { return nil, want }
+	root := t.TempDir()
+	if _, err := inventory(t.Context(), []string{root}, nil, testOptions()); !errors.Is(err, want) {
+		t.Fatalf("unavailable inventory witness accepted: %v", err)
+	}
+	if _, err := snapshotTree(t.Context(), root, testSnapshotOptions()); !errors.Is(err, want) {
+		t.Fatalf("unavailable snapshot witness accepted: %v", err)
+	}
+}
+
 func TestSnapshotRejectsRestoredContentABAWithBlindStamp(t *testing.T) {
 	blindNativeWitness(t)
 	root := t.TempDir()
@@ -474,7 +491,7 @@ func TestSnapshotRejectsLateRewriteOfPreviouslyHashedFile(t *testing.T) {
 		}
 		return os.Chtimes(earlyPath, earlyInfo.ModTime(), earlyInfo.ModTime())
 	}
-	if _, err := snapshotTree(t.Context(), root, testSnapshotOptions()); err == nil || !strings.Contains(err.Error(), "between bounded content passes") {
+	if _, err := snapshotTree(t.Context(), root, testSnapshotOptions()); err == nil || !strings.Contains(err.Error(), "snapshot file a-early changed") {
 		t.Fatalf("late same-size rewrite of previously hashed file was accepted: %v", err)
 	}
 }

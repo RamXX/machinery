@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RamXX/machinery/internal/dirscan"
 	"github.com/RamXX/machinery/internal/filelock"
 	"github.com/RamXX/machinery/internal/portablepath"
 	machversion "github.com/RamXX/machinery/internal/version"
@@ -430,7 +431,7 @@ func readPluginCacheBoundedPath(directory string) ([]os.DirEntry, error) {
 	return entries, errors.Join(readErr, closeErr)
 }
 
-func pluginInstalled(home string) (bool, error) {
+func pluginInstalled(home string) (installed bool, retErr error) {
 	cache := filepath.Join(home, "plugins", "cache")
 	cacheInfo, err := installDiscoveryLstat(cache)
 	if err != nil {
@@ -442,7 +443,13 @@ func pluginInstalled(home string) (bool, error) {
 	if cacheInfo.Mode()&os.ModeSymlink != 0 || !cacheInfo.IsDir() {
 		return false, fmt.Errorf("plugin cache %s is not a real directory", cache)
 	}
-	initialTopology, err := capturePluginCacheTopology(cache)
+	channel, err := newTopologyMutationChannel()
+	if err != nil {
+		return false, fmt.Errorf("plugin cache topology has no reliable change witness: %w", err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	watches := map[string]*dirscan.MutationWatch{}
+	initialTopology, err := capturePluginCacheTopologyWatched(cache, nil, channel, watches)
 	if err != nil {
 		return false, fmt.Errorf("snapshot plugin cache topology %s: %w", cache, err)
 	}
@@ -520,7 +527,7 @@ func pluginInstalled(home string) (bool, error) {
 		return false, fmt.Errorf("validate cached machinery plugin %s: %w", found, err)
 	}
 	cachedPluginBeforeFinalTopology(cache)
-	finalTopology, err := capturePluginCacheTopology(cache)
+	finalTopology, err := capturePluginCacheTopologyWatched(cache, nil, channel, watches)
 	if err != nil {
 		return false, fmt.Errorf("revalidate plugin cache topology %s: %w", cache, err)
 	}
@@ -529,6 +536,9 @@ func pluginInstalled(home string) (bool, error) {
 	}
 	if err := validateCachedPluginSuccessWitness(found, cache, validatedInventory, finalTopology); err != nil {
 		return false, fmt.Errorf("validate cached machinery plugin success witness %s: %w", found, err)
+	}
+	if err := validateTopologyMutationWatches(watches); err != nil {
+		return false, err
 	}
 	return true, nil
 }
@@ -549,7 +559,19 @@ func capturePluginCacheTopology(cache string) (snapshot pluginCacheTopology, ret
 	return capturePluginCacheTopologyWithHook(cache, nil)
 }
 
+var newTopologyMutationChannel = dirscan.NewMutationChannel
+
 func capturePluginCacheTopologyWithHook(cache string, afterDirectory func(int, string)) (snapshot pluginCacheTopology, retErr error) {
+	channel, err := newTopologyMutationChannel()
+	if err != nil {
+		return snapshot, fmt.Errorf("plugin cache topology has no reliable change witness: %w", err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	watches := map[string]*dirscan.MutationWatch{}
+	return capturePluginCacheTopologyWatched(cache, afterDirectory, channel, watches)
+}
+
+func capturePluginCacheTopologyWatched(cache string, afterDirectory func(int, string), channel *dirscan.MutationChannel, watches map[string]*dirscan.MutationWatch) (snapshot pluginCacheTopology, retErr error) {
 	parent := filepath.Dir(cache)
 	parentInfo, err := installDiscoveryLstat(parent)
 	if err != nil {
@@ -566,6 +588,18 @@ func capturePluginCacheTopologyWithHook(cache string, afterDirectory func(int, s
 	retainedParentInfo, err := parentRoot.Stat(".")
 	if err != nil || !sameInstallTopologyEntry(parentInfo, retainedParentInfo) {
 		return snapshot, errors.Join(fmt.Errorf("plugin cache parent %s changed while being retained", parent), err)
+	}
+
+	if _, armed := watches[".."]; !armed {
+		parentDir, err := parentRoot.Open(".")
+		if err != nil {
+			return snapshot, err
+		}
+		parentWatch, watchErr := channel.Watch(parentDir)
+		if err := errors.Join(watchErr, parentDir.Close()); err != nil {
+			return snapshot, fmt.Errorf("watch plugin cache topology parent: %w", err)
+		}
+		watches[".."] = parentWatch
 	}
 
 	cacheName := filepath.Base(cache)
@@ -587,11 +621,11 @@ func capturePluginCacheTopologyWithHook(cache string, afterDirectory func(int, s
 	}
 
 	first := map[string]pluginCacheTopologyEntry{}
-	if err := walkPluginCacheTopology(cacheRoot, ".", 0, 1, first, afterDirectory); err != nil {
+	if err := walkPluginCacheTopologyWatched(cacheRoot, ".", 0, 1, first, afterDirectory, channel, watches); err != nil {
 		return snapshot, err
 	}
 	second := map[string]pluginCacheTopologyEntry{}
-	if err := walkPluginCacheTopology(cacheRoot, ".", 0, 2, second, afterDirectory); err != nil {
+	if err := walkPluginCacheTopologyWatched(cacheRoot, ".", 0, 2, second, afterDirectory, channel, watches); err != nil {
 		return snapshot, err
 	}
 	if err := comparePluginCacheTopologyEntries(first, second); err != nil {
@@ -609,10 +643,35 @@ func capturePluginCacheTopologyWithHook(cache string, afterDirectory func(int, s
 	if cacheErr != nil || !sameInstallTopologyEntry(cacheInfo, currentCacheInfo) {
 		return snapshot, errors.Join(fmt.Errorf("plugin cache %s changed while being snapshotted", cache), cacheErr)
 	}
+	if err := validateTopologyMutationWatches(watches); err != nil {
+		return snapshot, err
+	}
 	return pluginCacheTopology{parentInfo: retainedParentInfo, parentChangeID: installFileChangeID(retainedParentInfo), entries: second}, nil
 }
 
-func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, inventory map[string]pluginCacheTopologyEntry, afterDirectory func(int, string)) error {
+func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, inventory map[string]pluginCacheTopologyEntry, afterDirectory func(int, string)) (retErr error) {
+	channel, err := newTopologyMutationChannel()
+	if err != nil {
+		return fmt.Errorf("plugin cache topology has no reliable change witness: %w", err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	watches := map[string]*dirscan.MutationWatch{}
+	if err := walkPluginCacheTopologyWatched(root, directory, depth, pass, inventory, afterDirectory, channel, watches); err != nil {
+		return err
+	}
+	return validateTopologyMutationWatches(watches)
+}
+
+func validateTopologyMutationWatches(watches map[string]*dirscan.MutationWatch) error {
+	for directory, watch := range watches {
+		if watch.Mutated() {
+			return fmt.Errorf("plugin cache topology member %s changed during enumeration: %w", directory, dirscan.ErrChanged)
+		}
+	}
+	return nil
+}
+
+func walkPluginCacheTopologyWatched(root *os.Root, directory string, depth, pass int, inventory map[string]pluginCacheTopologyEntry, afterDirectory func(int, string), channel *dirscan.MutationChannel, watches map[string]*dirscan.MutationWatch) error {
 	if err := validateInstallTraversalDepth(depth, directory); err != nil {
 		return err
 	}
@@ -629,6 +688,13 @@ func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, i
 	dir, err := root.Open(directory)
 	if err != nil {
 		return fmt.Errorf("retain plugin cache topology member %s: %w", directory, err)
+	}
+	if _, armed := watches[directory]; !armed {
+		watch, err := channel.Watch(dir)
+		if err != nil {
+			return errors.Join(fmt.Errorf("watch plugin cache topology member %s: %w", directory, err), dir.Close())
+		}
+		watches[directory] = watch
 	}
 	openedInfo, statErr := dir.Stat()
 	entries, readErr := readInstallDirBounded(dir, pluginCacheMaxEntries-len(inventory)-1, "plugin cache topology")
@@ -660,7 +726,7 @@ func walkPluginCacheTopology(root *os.Root, directory string, depth, pass int, i
 			return fmt.Errorf("plugin cache topology member %s is not a real directory", path)
 		}
 		if childDepth < 3 {
-			if err := walkPluginCacheTopology(root, path, childDepth, pass, inventory, afterDirectory); err != nil {
+			if err := walkPluginCacheTopologyWatched(root, path, childDepth, pass, inventory, afterDirectory, channel, watches); err != nil {
 				return err
 			}
 			continue

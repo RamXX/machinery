@@ -340,6 +340,17 @@ func TestWalkBoundedRejectsOuterWindowABAWithBlindStamp(t *testing.T) {
 	}
 }
 
+func TestWalkBoundedRefusesWithoutOuterMutationWitness(t *testing.T) {
+	want := errors.New("mutation channel unavailable")
+	prior := newWalkMutationChannel
+	t.Cleanup(func() { newWalkMutationChannel = prior })
+	newWalkMutationChannel = func() (*MutationChannel, error) { return nil, want }
+	err := WalkBounded(t.TempDir(), WalkLimits{MaxEntries: 10, MaxDepth: 2}, func(string, os.DirEntry, error) error { return nil })
+	if !errors.Is(err, want) || !strings.Contains(err.Error(), "no reliable change witness") {
+		t.Fatalf("unavailable outer witness accepted: %v", err)
+	}
+}
+
 // TestReadRefusesWithoutMutationWitness pins the fail-closed direction: a
 // host that cannot arm the kernel mutation-event channel has no
 // granularity-independent witness left, so the enumeration is refused with a

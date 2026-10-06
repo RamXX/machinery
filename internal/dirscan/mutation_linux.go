@@ -3,6 +3,7 @@
 package dirscan
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
@@ -27,7 +28,9 @@ var inotifyInit = syscall.InotifyInit1
 var inotifyAddWatch = syscall.InotifyAddWatch
 
 func newMutationChannel() (*mutationChannel, error) {
-	fd, err := inotifyInit(syscall.IN_NONBLOCK | syscall.IN_CLOEXEC)
+	fd, err := retryMutationResource(func() (int, error) {
+		return inotifyInit(syscall.IN_NONBLOCK | syscall.IN_CLOEXEC)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("open directory mutation channel: %w", err)
 	}
@@ -36,11 +39,31 @@ func newMutationChannel() (*mutationChannel, error) {
 
 func (c *mutationChannel) watch(dir *os.File) (mutationWatchID, error) {
 	descriptor := fmt.Sprintf("/proc/self/fd/%d", dir.Fd())
-	id, err := inotifyAddWatch(c.fd, descriptor, watchedEvents)
+	id, err := retryMutationResource(func() (int, error) {
+		return inotifyAddWatch(c.fd, descriptor, watchedEvents)
+	})
 	if err != nil {
 		return 0, fmt.Errorf("watch directory for mutation events: %w", err)
 	}
 	return int32(id), nil
+}
+
+// Resource pressure can clear when another traversal releases its channel.
+// Retry only exhaustion, retaining the errno when the bounded wait runs out.
+func retryMutationResource(operation func() (int, error)) (int, error) {
+	for attempt := 0; ; attempt++ {
+		value, err := operation()
+		if !errors.Is(err, syscall.EMFILE) && !errors.Is(err, syscall.ENOSPC) {
+			return value, err
+		}
+		if attempt == readAttempts-1 {
+			if errors.Is(err, syscall.EMFILE) {
+				return value, fmt.Errorf("inotify instance or process file descriptor limit exhausted after %d attempts; raise fs.inotify.max_user_instances or RLIMIT_NOFILE: %w", readAttempts, err)
+			}
+			return value, fmt.Errorf("inotify watch limit exhausted after %d attempts; raise fs.inotify.max_user_watches: %w", readAttempts, err)
+		}
+		retryDelay(attempt)
+	}
 }
 
 // drain reads every queued record. A queue overflow carries no usable watch

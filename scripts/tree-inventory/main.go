@@ -16,6 +16,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/RamXX/machinery/internal/dirscan"
 )
 
 const readDirPage = 256
@@ -45,6 +47,7 @@ type inventoryState struct {
 	paths       []string
 	records     []inventoryRecord
 	directories map[string]string
+	witness     *inventoryMutationWitness
 }
 
 var nativeWitness = platformNativeWitness
@@ -181,27 +184,69 @@ func inventory(ctx context.Context, roots, literals []string, options inventoryO
 	return result.paths, err
 }
 
-func exactInventory(ctx context.Context, roots, literals []string, options inventoryOptions) (inventoryResult, error) {
-	first, err := inventoryPass(ctx, roots, literals, options)
+var newInventoryMutationChannel = dirscan.NewMutationChannel
+
+type inventoryMutationWitness struct {
+	channel *dirscan.MutationChannel
+	watches map[string]*dirscan.MutationWatch
+}
+
+func (w *inventoryMutationWitness) watch(path string, file *os.File) (*dirscan.MutationWatch, error) {
+	if watch, ok := w.watches[path]; ok {
+		return watch, nil
+	}
+	watch, err := w.channel.Watch(file)
+	if err != nil {
+		return nil, fmt.Errorf("inventory %s has no reliable change witness: %w", path, err)
+	}
+	w.watches[path] = watch
+	return watch, nil
+}
+
+func (w *inventoryMutationWitness) validate() error {
+	for path, watch := range w.watches {
+		if watch.Mutated() {
+			return fmt.Errorf("inventory changed between bounded passes at %s (kernel mutation events observed)", path)
+		}
+	}
+	return nil
+}
+
+func exactInventory(ctx context.Context, roots, literals []string, options inventoryOptions) (ret inventoryResult, retErr error) {
+	channel, err := newInventoryMutationChannel()
+	if err != nil {
+		return ret, fmt.Errorf("inventory has no reliable change witness: %w", err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	witness := &inventoryMutationWitness{channel: channel, watches: map[string]*dirscan.MutationWatch{}}
+	return exactInventoryWatched(ctx, roots, literals, options, witness)
+}
+
+func exactInventoryWatched(ctx context.Context, roots, literals []string, options inventoryOptions, witness *inventoryMutationWitness) (inventoryResult, error) {
+	first, err := inventoryPass(ctx, roots, literals, options, witness)
 	if err != nil {
 		return inventoryResult{}, err
 	}
 	inventoryBetweenPasses()
-	second, err := inventoryPass(ctx, roots, literals, options)
+	second, err := inventoryPass(ctx, roots, literals, options, witness)
 	if err != nil {
 		return inventoryResult{}, err
 	}
 	if err := compareInventoryResults(first, second); err != nil {
 		return inventoryResult{}, err
 	}
+	if err := witness.validate(); err != nil {
+		return inventoryResult{}, err
+	}
 	return first, nil
 }
 
-func inventoryPass(ctx context.Context, roots, literals []string, options inventoryOptions) (inventoryResult, error) {
+func inventoryPass(ctx context.Context, roots, literals []string, options inventoryOptions, witness *inventoryMutationWitness) (inventoryResult, error) {
 	if options.maxEntries <= 0 || options.maxDepth < 0 || options.maxBytes <= 0 {
 		return inventoryResult{}, fmt.Errorf("inventory limits must be positive (depth may be zero)")
 	}
 	state := &inventoryState{
+		witness:     witness,
 		options:     options,
 		paths:       make([]string, 0, min(options.maxEntries, readDirPage)),
 		records:     make([]inventoryRecord, 0, min(options.maxEntries, readDirPage)),
@@ -285,6 +330,10 @@ func (state *inventoryState) walkDirectory(ctx context.Context, root *os.Root, r
 	opened, err := dir.Stat()
 	if err != nil || !stableInfo(before, opened) {
 		return errors.Join(err, fmt.Errorf("inventory directory %s changed while opening", display))
+	}
+	_, err = state.witness.watch(display, dir)
+	if err != nil {
+		return err
 	}
 	initialNative, err := nativeWitness(dir, opened)
 	if err != nil {
@@ -496,7 +545,13 @@ func readAmbientFileExact(path string, limit int64) (ret []byte, retErr error) {
 }
 
 func snapshotTree(ctx context.Context, rootName string, options snapshotOptions) (ret []string, retErr error) {
-	initial, err := exactInventory(ctx, []string{rootName}, nil, options.inventory)
+	channel, err := newInventoryMutationChannel()
+	if err != nil {
+		return nil, fmt.Errorf("snapshot has no reliable change witness: %w", err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	witness := &inventoryMutationWitness{channel: channel, watches: map[string]*dirscan.MutationWatch{}}
+	initial, err := exactInventoryWatched(ctx, []string{rootName}, nil, options.inventory, witness)
 	if err != nil {
 		return nil, err
 	}
@@ -537,18 +592,18 @@ func snapshotTree(ctx context.Context, rootName string, options snapshotOptions)
 			return nil, fmt.Errorf("snapshot exclusion %s does not identify an inventoried entry", excluded)
 		}
 	}
-	first, err := snapshotContentPass(ctx, root, displayRoot, initial.records, options)
+	first, err := snapshotContentPass(ctx, root, displayRoot, initial.records, options, witness)
 	if err != nil {
 		return nil, err
 	}
-	second, err := snapshotContentPass(ctx, root, displayRoot, initial.records, options)
+	second, err := snapshotContentPass(ctx, root, displayRoot, initial.records, options, witness)
 	if err != nil {
 		return nil, err
 	}
 	if err := compareSnapshotPasses(first, second); err != nil {
 		return nil, err
 	}
-	final, err := exactInventory(ctx, []string{rootName}, nil, options.inventory)
+	final, err := exactInventoryWatched(ctx, []string{rootName}, nil, options.inventory, witness)
 	if err != nil {
 		return nil, err
 	}
@@ -558,7 +613,7 @@ func snapshotTree(ctx context.Context, rootName string, options snapshotOptions)
 	return first.lines, nil
 }
 
-func snapshotContentPass(ctx context.Context, root *os.Root, displayRoot string, records []inventoryRecord, options snapshotOptions) (snapshotPassResult, error) {
+func snapshotContentPass(ctx context.Context, root *os.Root, displayRoot string, records []inventoryRecord, options snapshotOptions, witness *inventoryMutationWitness) (snapshotPassResult, error) {
 	result := snapshotPassResult{
 		lines: make([]string, 0, len(records)),
 		files: make([]snapshotFileRecord, 0, len(records)),
@@ -582,7 +637,7 @@ func snapshotContentPass(ctx context.Context, root *os.Root, displayRoot string,
 		var line string
 		switch {
 		case record.info.Mode().IsRegular():
-			digest, witness, err := hashSnapshotFile(ctx, root, rel, record.info)
+			digest, witness, err := hashSnapshotFile(ctx, root, rel, record.info, witness, record.path)
 			if err != nil {
 				return snapshotPassResult{}, err
 			}
@@ -635,7 +690,7 @@ func compareSnapshotPasses(first, second snapshotPassResult) error {
 	return nil
 }
 
-func hashSnapshotFile(ctx context.Context, root *os.Root, rel string, expected os.FileInfo) (digest [sha256.Size]byte, witness string, retErr error) {
+func hashSnapshotFile(ctx context.Context, root *os.Root, rel string, expected os.FileInfo, mutation *inventoryMutationWitness, display string) (digest [sha256.Size]byte, witness string, retErr error) {
 	before, err := root.Lstat(rel)
 	if err != nil || !stableInfo(expected, before) || !before.Mode().IsRegular() {
 		return digest, "", errors.Join(err, fmt.Errorf("snapshot file %s changed before hashing", rel))
@@ -648,6 +703,10 @@ func hashSnapshotFile(ctx context.Context, root *os.Root, rel string, expected o
 	opened, err := file.Stat()
 	if err != nil || !stableInfo(before, opened) {
 		return digest, "", errors.Join(err, fmt.Errorf("snapshot file %s changed while opening", rel))
+	}
+	watch, err := mutation.watch(display, file)
+	if err != nil {
+		return digest, "", err
 	}
 	initialNative, err := nativeWitness(file, opened)
 	if err != nil {
@@ -676,7 +735,7 @@ func hashSnapshotFile(ctx context.Context, root *os.Root, rel string, expected o
 	if statErr == nil {
 		finalNative, err = nativeWitness(file, after)
 	}
-	if joined := errors.Join(statErr, liveErr, err); joined != nil || !stableInfo(opened, after) || !stableInfo(after, live) || finalNative != initialNative || !bytes.Equal(first.Sum(nil), second.Sum(nil)) {
+	if joined := errors.Join(statErr, liveErr, err); joined != nil || !stableInfo(opened, after) || !stableInfo(after, live) || finalNative != initialNative || !bytes.Equal(first.Sum(nil), second.Sum(nil)) || watch.Mutated() {
 		return digest, "", errors.Join(joined, fmt.Errorf("snapshot file %s changed while hashing", rel))
 	}
 	copy(digest[:], first.Sum(nil))

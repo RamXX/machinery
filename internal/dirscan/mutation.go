@@ -36,8 +36,8 @@ type MutationChannel struct {
 	mutated map[mutationWatchID]bool
 }
 
-// MutationWatch is one directory's view of a MutationChannel. It stays valid
-// until the channel is closed.
+// MutationWatch is one filesystem entry's view of a MutationChannel. It stays
+// valid until the channel is closed.
 type MutationWatch struct {
 	channel *MutationChannel
 	id      mutationWatchID
@@ -56,9 +56,9 @@ func NewMutationChannel() (*MutationChannel, error) {
 	return &MutationChannel{impl: impl, mutated: map[mutationWatchID]bool{}}, nil
 }
 
-// Watch arms the channel for one already-opened directory. The watch is
-// established through the caller's descriptor, never through a path, so it
-// cannot resolve to a different directory than the one being enumerated.
+// Watch arms the channel for one already-opened directory or regular file.
+// The watch is established through the caller's descriptor, never through a
+// path, so it cannot resolve to a different entry than the one being observed.
 func (c *MutationChannel) Watch(dir *os.File) (*MutationWatch, error) {
 	if c == nil {
 		return nil, fmt.Errorf("directory mutation channel is not open")

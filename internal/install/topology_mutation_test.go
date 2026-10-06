@@ -1,10 +1,13 @@
 package install
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/RamXX/machinery/internal/dirscan"
 )
 
 func TestPluginCacheTopologyRejectsBlindStampABA(t *testing.T) {
@@ -43,6 +46,16 @@ func TestPluginCacheTopologyRejectsBlindStampABA(t *testing.T) {
 	}
 	if err == nil || !strings.Contains(err.Error(), "topology") {
 		t.Fatalf("behind-cursor topology ABA accepted: %v", err)
+	}
+}
+
+func TestPluginCacheTopologyRefusesUnavailableMutationWitness(t *testing.T) {
+	want := errors.New("mutation channel unavailable")
+	prior := newTopologyMutationChannel
+	t.Cleanup(func() { newTopologyMutationChannel = prior })
+	newTopologyMutationChannel = func() (*dirscan.MutationChannel, error) { return nil, want }
+	if _, err := capturePluginCacheTopology(t.TempDir()); !errors.Is(err, want) {
+		t.Fatalf("unavailable topology witness accepted: %v", err)
 	}
 }
 

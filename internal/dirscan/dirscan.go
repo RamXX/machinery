@@ -31,6 +31,7 @@ type directoryReader interface {
 }
 
 var afterEnumeration = func(string) {}
+var newWalkMutationChannel = NewMutationChannel
 
 type directoryState struct {
 	info     os.FileInfo
@@ -250,7 +251,7 @@ func Walk(base string, maxEntries int, fn fs.WalkDirFunc) error {
 // WalkBounded visits one real tree without following symlinks. Both ceilings
 // apply to the complete traversal; the root is not included in MaxEntries and
 // has depth zero.
-func WalkBounded(base string, limits WalkLimits, fn fs.WalkDirFunc) error {
+func WalkBounded(base string, limits WalkLimits, fn fs.WalkDirFunc) (retErr error) {
 	if limits.MaxEntries < 0 {
 		return fmt.Errorf("tree entry limit must be non-negative")
 	}
@@ -270,6 +271,12 @@ func WalkBounded(base string, limits WalkLimits, fn fs.WalkDirFunc) error {
 		}
 		return err
 	}
+	channel, err := newWalkMutationChannel()
+	if err != nil {
+		return fmt.Errorf("tree %s has no reliable change witness: %w", base, err)
+	}
+	defer func() { retErr = errors.Join(retErr, channel.Close()) }()
+	watches := map[string]*MutationWatch{}
 	seen := 0
 	var walk func(string, int) error
 	walk = func(dir string, depth int) (retErr error) {
@@ -282,6 +289,11 @@ func WalkBounded(base string, limits WalkLimits, fn fs.WalkDirFunc) error {
 			return err
 		}
 		defer func() { retErr = errors.Join(retErr, authority.Close()) }()
+		watch, err := channel.Watch(authority)
+		if err != nil {
+			return fmt.Errorf("directory %s has no reliable change witness: %w", dir, err)
+		}
+		watches[dir] = watch
 		initial, err := captureDirectoryState(authority)
 		if err != nil {
 			return err
@@ -329,11 +341,21 @@ func WalkBounded(base string, limits WalkLimits, fn fs.WalkDirFunc) error {
 		if err != nil || !stableInfo(initial.info, after) {
 			return errors.Join(err, fmt.Errorf("directory %s changed while walking", dir))
 		}
+		if watch.Mutated() {
+			return fmt.Errorf("directory %s changed while walking: %w", dir, ErrChanged)
+		}
 		return nil
 	}
 	err = walk(base, 0)
 	if errors.Is(err, fs.SkipAll) {
 		return nil
+	}
+	if err == nil {
+		for dir, watch := range watches {
+			if watch.Mutated() {
+				return fmt.Errorf("directory %s changed while walking: %w", dir, ErrChanged)
+			}
+		}
 	}
 	return err
 }
