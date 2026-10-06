@@ -8,8 +8,9 @@ labels: [composition, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:4ee504de6459c09b49d4baa0232453769dc59b60702d88e4e80de23e75cdb04a"
-blocked_by: [MAC-zti7, MAC-q1kf]
+content_hash: "sha256:f5c534653aa49529e10959f6c5fdd7c651a06a222ba0297a29660f1b8b6ce08f"
+blocked_by: [MAC-zti7]
+was_blocked_by: [MAC-q1kf]
 ---
 
 ## Description
@@ -38,8 +39,10 @@ Acceptance criteria:
 ## History
 - 2026-09-24T21:33:58Z dep_added: blocked_by MAC-zti7
 - 2026-09-24T21:33:58Z dep_added: blocked_by MAC-q1kf
+- 2026-10-06T04:03:39Z dep_removed: was_blocked_by MAC-q1kf
 
 ## Links
-- Blocked by: [[MAC-zti7]], [[MAC-q1kf]]
+- Blocked by: [[MAC-zti7]]
+- Was blocked by: [[MAC-q1kf]]
 
 ## Comments
