@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-func nativeWitness(_ *os.File, info os.FileInfo) (string, error) {
+func platformNativeWitness(_ *os.File, info os.FileInfo) (string, error) {
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok || stat == nil {
 		return "", fmt.Errorf("filesystem entry lacks native Unix identity")

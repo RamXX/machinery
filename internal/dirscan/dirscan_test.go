@@ -309,6 +309,37 @@ func TestReadCatchesABAWithABlindChangeStamp(t *testing.T) {
 	}
 }
 
+func TestWalkBoundedRejectsOuterWindowABAWithBlindStamp(t *testing.T) {
+	prior := changeWitness
+	t.Cleanup(func() { changeWitness = prior })
+	changeWitness = func(*os.File, os.FileInfo) (string, error) { return "blind", nil }
+	dir := t.TempDir()
+	path := filepath.Join(dir, "stable")
+	parked := filepath.Join(dir, "parked")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	initial, err := os.Stat(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = WalkBounded(dir, WalkLimits{MaxEntries: 10, MaxDepth: 2}, func(name string, _ os.DirEntry, err error) error {
+		if err != nil || name != path {
+			return err
+		}
+		if err := os.Rename(path, parked); err != nil {
+			return err
+		}
+		if err := os.Rename(parked, path); err != nil {
+			return err
+		}
+		return os.Chtimes(dir, initial.ModTime(), initial.ModTime())
+	})
+	if !errors.Is(err, ErrChanged) {
+		t.Fatalf("outer window ABA accepted: %v", err)
+	}
+}
+
 // TestReadRefusesWithoutMutationWitness pins the fail-closed direction: a
 // host that cannot arm the kernel mutation-event channel has no
 // granularity-independent witness left, so the enumeration is refused with a

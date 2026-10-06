@@ -8,7 +8,7 @@ import (
 	"syscall"
 )
 
-func nativeWitness(file *os.File, _ os.FileInfo) (string, error) {
+func platformNativeWitness(file *os.File, _ os.FileInfo) (string, error) {
 	if file == nil {
 		return "", fmt.Errorf("native Windows witness requires an opened entry")
 	}

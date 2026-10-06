@@ -209,6 +209,7 @@ func TestInventoryRejectsContinuousDirectoryGrowth(t *testing.T) {
 }
 
 func TestInventoryRejectsSameDirectoryABADespiteRestoredMtime(t *testing.T) {
+	blindNativeWitness(t)
 	root := t.TempDir()
 	path := filepath.Join(root, "entry")
 	parked := filepath.Join(root, "parked")
@@ -248,6 +249,44 @@ func TestInventoryRejectsSameDirectoryABADespiteRestoredMtime(t *testing.T) {
 	}
 	if _, err := inventory(t.Context(), []string{root}, nil, testOptions()); err == nil || !strings.Contains(err.Error(), "between bounded passes") {
 		t.Fatalf("same-directory ABA with restored mtime was accepted: %v", err)
+	}
+}
+
+func blindNativeWitness(t *testing.T) {
+	t.Helper()
+	prior := nativeWitness
+	t.Cleanup(func() { nativeWitness = prior })
+	nativeWitness = func(*os.File, os.FileInfo) (string, error) { return "blind", nil }
+}
+
+func TestSnapshotRejectsRestoredContentABAWithBlindStamp(t *testing.T) {
+	blindNativeWitness(t)
+	root := t.TempDir()
+	path := filepath.Join(root, "file")
+	if err := os.WriteFile(path, []byte("before"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prior := snapshotFilePoint
+	t.Cleanup(func() { snapshotFilePoint = prior })
+	snapshotFilePoint = func(rel, phase string) error {
+		if rel != "file" || phase != "after-first-hash" {
+			return nil
+		}
+		snapshotFilePoint = func(string, string) error { return nil }
+		if err := os.WriteFile(path, []byte("after!"), 0o600); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte("before"), 0o600); err != nil {
+			return err
+		}
+		return os.Chtimes(path, info.ModTime(), info.ModTime())
+	}
+	if _, err := snapshotTree(t.Context(), root, testSnapshotOptions()); err == nil || !strings.Contains(err.Error(), "changed while hashing") {
+		t.Fatalf("restored content ABA accepted: %v", err)
 	}
 }
 

@@ -1179,7 +1179,9 @@ func revalidateCachedPluginInventoryMetadata(root *os.Root, inventory map[string
 	return nil
 }
 
-func installFileChangeID(info os.FileInfo) string {
+var installFileChangeID = nativeInstallFileChangeID
+
+func nativeInstallFileChangeID(info os.FileInfo) string {
 	if info == nil || info.Sys() == nil {
 		return ""
 	}

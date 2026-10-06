@@ -47,6 +47,8 @@ type inventoryState struct {
 	directories map[string]string
 }
 
+var nativeWitness = platformNativeWitness
+
 var inventoryAfterEnumeration = func(string) {}
 var inventoryBetweenPasses = func() {}
 var snapshotFilePoint = func(string, string) error { return nil }

@@ -23,8 +23,11 @@ type mutationChannel struct {
 const watchedEvents = syscall.IN_MODIFY | syscall.IN_CREATE | syscall.IN_DELETE |
 	syscall.IN_MOVED_FROM | syscall.IN_MOVED_TO | syscall.IN_MOVE_SELF | syscall.IN_DELETE_SELF
 
+var inotifyInit = syscall.InotifyInit1
+var inotifyAddWatch = syscall.InotifyAddWatch
+
 func newMutationChannel() (*mutationChannel, error) {
-	fd, err := syscall.InotifyInit1(syscall.IN_NONBLOCK | syscall.IN_CLOEXEC)
+	fd, err := inotifyInit(syscall.IN_NONBLOCK | syscall.IN_CLOEXEC)
 	if err != nil {
 		return nil, fmt.Errorf("open directory mutation channel: %w", err)
 	}
@@ -33,7 +36,7 @@ func newMutationChannel() (*mutationChannel, error) {
 
 func (c *mutationChannel) watch(dir *os.File) (mutationWatchID, error) {
 	descriptor := fmt.Sprintf("/proc/self/fd/%d", dir.Fd())
-	id, err := syscall.InotifyAddWatch(c.fd, descriptor, watchedEvents)
+	id, err := inotifyAddWatch(c.fd, descriptor, watchedEvents)
 	if err != nil {
 		return 0, fmt.Errorf("watch directory for mutation events: %w", err)
 	}
