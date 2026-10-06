@@ -7,8 +7,8 @@ type: bug
 labels: [governance, hook, claude-code, stop]
 created_at: 2026-10-03T19:42:12Z
 created_by: ramirosalas
-updated_at: 2026-10-03T19:42:12Z
-content_hash: "sha256:ed2857fa132558709e8d422dd5b64cbe0f2854e4bf9dcb4f2b3fe6852c5cafbb"
+updated_at: 2026-10-06T04:03:49Z
+content_hash: "sha256:1d315856fff407827c72f5fdef5090e08ffded15020c089c4291fc46860b8c42"
 ---
 
 ## Description
@@ -46,7 +46,7 @@ On one host the installed plugin shim `hooks/machinery-hook.sh` (cache copy, v0.
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Return no-block (defer) on Stop/SubagentStop with background tasks, leaving pending tokens and touched flags untouched; tests per ACs; document in README/skill hook contract. Evidence: internal/hook/hook.go:1260-1261 and :1269-1270 still return decision block when in.BackgroundTasks > 0 (pending tokens and touched design/impl cases). No deferral path; CHANGELOG 0.11.0 hook work covers crash recovery only (348a0109), not background-task deferral. stop_hook_active is only used at hook.go:1420 for message wording. Notes: Real consumer pain (up to 9 forced turns per wake-up) but fail-closed is preserved by deferral design. Check interaction with the 0.11.0 --landing and crash-recovery changes when implementing.
 
 ## History
 
