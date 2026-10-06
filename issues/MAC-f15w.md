@@ -7,8 +7,8 @@ type: task
 labels: [review-protocol, docs, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:651b09538c85c75e6ecc356bfcc5c6b621999a672f6db6ce526f7cfda1a20890"
+updated_at: 2026-10-06T04:03:51Z
+content_hash: "sha256:9ef65a62fc26b6ff26abecc9159c4f3d5a389a71ad1bf9aecfc726e32e81265e"
 blocked_by: [MAC-kyh6]
 was_blocked_by: [MAC-94n5, MAC-q1kf]
 ---
@@ -38,7 +38,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Write the documented contract (skill reference plus docs) with sanitized positive/negative fixtures as listed in the ACs. Evidence: No prerequisite-review contract exists: docs/consistency-layer-proposal.md section 7 (line ~706) keeps failure-trace review outside the rule layer; no skill reference or doc for it in CHANGELOG through 0.11.0 (0.11.0 added threat-modeling.md and verification-cadence.md only). Notes: Needs the entry 10 failure-trace format that MAC-kyh6 defines. Revision-impact (q1kf) and supersession residuals (94n5) are linked outputs, not prerequisites; the contract can reference them later.
 
 ## History
 - 2026-09-24T21:33:58Z dep_added: blocked_by MAC-kyh6
