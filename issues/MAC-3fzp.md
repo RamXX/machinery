@@ -7,8 +7,8 @@ type: feature
 labels: [gy, carriers, consistency-layer, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:b3892677eaa08d46e4ccb6ddd061676a1715646ae931e8df079b1265c10bc305"
+updated_at: 2026-10-06T04:03:49Z
+content_hash: "sha256:e85d150e18d3029aa9c2e351967cf6317dbd02a3db9aefbe109ba275d09db7d1"
 ---
 
 ## Description
@@ -36,7 +36,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Under --impl resolve each CARRIES{kind:target} to a code site with Gt's whole-token, comment-stripped rules scoped by the owning component, per-kind resolvers, and emit a finding; tests and examples. Evidence: Design-side half shipped in 0.10.0 (rules/consistency/carriers.dl, finding_effect_uncarried and finding_carrier_misplaced, CHANGELOG lines 411-415). grep for carrier_unimplemented across repo returns nothing: no --impl resolution of CARRIES targets to code sites. Notes: Per-kind resolvers (column in migration, outbox emission, sink, signal, action) are the bulk of the work; consider starting with column and action kinds.
 
 ## History
 
