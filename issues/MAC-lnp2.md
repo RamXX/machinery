@@ -7,8 +7,8 @@ type: epic
 labels: [human-surface, h2-origin]
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-09-30T23:26:44Z
-content_hash: "sha256:aca6d48b3884d2bf36308443651cb82f5f7f00f514a03800bc2a6c1ca927ebf9"
+updated_at: 2026-10-06T04:03:55Z
+content_hash: "sha256:5d7b49395a56e0212691ba0a069ce1fecee9ae3e5118bcc36d46a2feaf907bd5"
 ---
 
 ## Description
@@ -39,6 +39,7 @@ BOUNDARY (owner): this work must not hinder current H2 development. H2 keeps run
 
 ## Notes
 Related prior work: MAC-6ylh (Gu-surfaces, design/surfaces.yaml) is the act-to-surface ledger this epic extends; its gate and docs (docs/target-surfaces.md) are present in the tree while the issue still reads in_progress. Captured 2026-09-30 from the H2 conductor; H2 pins machinery v0.10.1 and is unaffected until it adopts a release.
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Epic stays open until its children land; the children split cleanly into a core (m7bh, 5n2i, o493, q24l, xj6q, s3b7) and a docs-only item (pm5s). Evidence: No screen-contract, walkthrough or persona-provisioning feature exists: a repo-wide grep for screen-contract, screens.yaml and persona walkthrough finds nothing outside the backlog. Gu-surfaces (MAC-6ylh, closed) ships in internal/gates/surface.go and targetsurface.go, and CHANGELOG 0.11.0 has no human-surface entry. Notes: Still makes sense: origin is a real consumer defect set (H2) that every gate passed. Children: m7bh, 5n2i, o493, pm5s, q24l, s3b7, xj6q. Priority P1 is high for an epic whose children are all opt-in by artifact presence and not hurting an existing consumer; P2 is defensible, but I keep P1 because H2 asked for it. Note NEXT says H2 uses its own conventions meanwhile.
 
 ## History
 
