@@ -1,15 +1,17 @@
 ---
 id: MAC-y5ho
 title: "assuranceflow: writer.lock mkdir returns EINVAL under host load in TestRegisterConflictingWriters"
-status: open
+status: closed
 priority: 3
 type: bug
 labels: [flaky-under-load, assuranceflow]
 created_at: 2026-09-08T08:21:09Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:53Z
-content_hash: "sha256:f18adb2d63fd5d5533425660e1bd3681e8f01450dd2e35ce3f4b09abb67fb122"
+updated_at: 2026-10-06T05:53:40Z
+content_hash: "sha256:ca131f0da09c428b1a559815f05d652f2217fc9f98d44790d7f9d8d6c4b09044"
 related: [MAC-qo6n]
+closed_at: 2026-10-06T05:53:40Z
+close_reason: "Fixed in 0.11.1 (a9b8ce58 RED, 69250f77 GREEN): writer acquisition retries after a staging identity change."
 ---
 
 ## Description
@@ -41,7 +43,7 @@ Triage 2026-09-24: still valid, unexplained. EINVAL maps to CUSTODY_ERROR at int
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Reproduce under load with -count=20, capture path and errno at the mkdir, then fix path construction or prove a macOS tmpfs artifact and harden the test. Evidence: Verified at HEAD 8c620d8f (v0.11.0). EINVAL still maps to CUSTODY_ERROR at internal/tdd/registration_store.go:567-569 (acquire path, 'acquiring store writer'); only related commit is 65183fc1 (teardown ordering), no commit mentions EINVAL; no reproduction or hardening since the 09-24 triage. Notes: Sibling race MAC-1jhn is closed (e2db8e49). Re-measure on the quiet lane MAC-qo6n defines but that is not a technical prerequisite.
 
 ## History
-
+- 2026-10-06T05:53:40Z status: open -> closed
 
 ## Links
 - Related: [[MAC-qo6n]]
