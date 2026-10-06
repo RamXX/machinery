@@ -1,5 +1,5 @@
 ---- MODULE Payment ----
-\* machinery-version: v0.10.3
+\* machinery-version: v0.11.0
 EXTENDS Naturals
 
 \* Generated from Payment.machine.json by machinery tla. Control-flow model.

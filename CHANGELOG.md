@@ -6,6 +6,18 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-05
+
+**Why this release.** Two lessons from heavy use, encoded in the process every adopter inherits.
+First, verification code passed a large tamper suite while still accepting revoked records,
+self-countersignatures, delimiter-injected fields, recomputed unsigned digests, silently omitted
+inputs, and a "not verified" result that exited 0, because every test imagined one attacker,
+criteria stated only what should pass, correctness meant agreeing with a reference, and gaps were
+closed as "documented". 0.11.0 makes design and TDD start from a standard adversary set and
+refuses those closures. Second, a full evidence ceremony on every landing cost the most and found
+the least; 0.11.0 moves that evidence to a periodic checkpoint and stops the hook from blocking on
+checkpoint-only staleness, while import boundaries, DRIFT, and design lint still block.
+
 ### Added
 
 - **Threat ledger and Gz-threat.** `design/threats.yaml` classifies every model entity or
@@ -76,6 +88,19 @@ under their version heading when a release is cut.
 - Machines that already use the tags `accepting`, `unchecked`, or `omitted` with another meaning
   must rename them; a `tags` value that is not a string or list of non-empty strings is now a
   lint error.
+
+**Generated output.** The oracle, TLA+, Alloy, checker-projection, and packet generators now emit
+the `v0.11.0` machinery stamp. Committed example artifacts and the golden corpus are regenerated;
+apart from the go-crm changes above, only version stamps and the corresponding oracle hash pins
+change. To refresh a design's stamps, run `machinery oracle <design>/machines`,
+`machinery verify-formal <design> --gen-only`, and `machinery project <design>` where checker
+projections are present.
+
+**Consumer-corpus diff.** Run with `make consumer-diff` (0.10.3 against this candidate, no allow
+file) over five consumer designs: 0 new blocking findings, 0 new warnings, and 0 resolved findings
+in every design. The only differences are audit notes: Gz-threat 15 to 107 per design (231 in
+total), Gb-plan 0 to 21 (42), and Ga-accept 0 to 6 (19). The verdict change is Gz going from
+absent to ok.
 
 **Proof scope.** Gz, and the Gb/Ga threat rules in enforce mode, prove more than before: a
 classified subject's adversary coverage, its threat invariants' presence and carriers, and the

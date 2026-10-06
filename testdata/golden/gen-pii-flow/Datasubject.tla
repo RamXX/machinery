@@ -1,5 +1,5 @@
 ---- MODULE Datasubject ----
-\* machinery-version: v0.10.3
+\* machinery-version: v0.11.0
 EXTENDS Naturals
 
 \* Generated from DataSubject.machine.json by machinery tla. Control-flow model.
