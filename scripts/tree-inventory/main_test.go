@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -524,5 +525,65 @@ func TestSnapshotHonorsExpiredDeadline(t *testing.T) {
 	cancel()
 	if _, err := snapshotTree(ctx, t.TempDir(), testSnapshotOptions()); err == nil || !strings.Contains(err.Error(), "timed out") {
 		t.Fatalf("expired snapshot deadline was ignored: %v", err)
+	}
+}
+
+func TestSnapshotIgnoresPrunedDirectoryChangesDuringHashing(t *testing.T) {
+	root := t.TempDir()
+	cache := filepath.Join(root, ".codebase-memory")
+	if err := os.Mkdir(cache, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "included"), []byte("content"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	options := testSnapshotOptions()
+	options.inventory.prune[".codebase-memory"] = true
+	prior := snapshotFilePoint
+	t.Cleanup(func() { snapshotFilePoint = prior })
+	snapshotFilePoint = func(rel, phase string) error {
+		if rel == "included" && phase == "after-first-hash" {
+			return os.WriteFile(filepath.Join(cache, "new-entry"), []byte("index"), 0o600)
+		}
+		return nil
+	}
+	got, err := snapshotTree(t.Context(), root, options)
+	if err != nil {
+		t.Fatalf("pruned cache churn blocked snapshot: %v", err)
+	}
+	if len(got) != 1 || strings.Contains(strings.Join(got, "\n"), ".codebase-memory") {
+		t.Fatalf("pruned cache retained in snapshot: %q", got)
+	}
+}
+
+func TestPreflightRenderFailurePreservesSnapshotDiagnostic(t *testing.T) {
+	body, err := os.ReadFile("../preflight-fast.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, step, found := strings.Cut(string(body), "# 7. Modelith render freshness")
+	if !found {
+		t.Fatal("missing render gate")
+	}
+	step, _, _ = strings.Cut(step, "# 8. build")
+	_, step, found = strings.Cut(step, "say ")
+	if !found {
+		t.Fatal("missing render gate announcement")
+	}
+	step = "say " + step
+	for _, diagnostic := range []string{
+		"tree-inventory: snapshot files exceed 134217728-byte aggregate limit",
+		"tree-inventory: snapshot inventory changed while hashing",
+	} {
+		script := "say() { :; }; fail() { echo \"preflight FAILED: $1\" >&2; exit 1; }; make() { echo \"$DIAGNOSTIC\" >&2; return 1; };\n" + step
+		cmd := exec.CommandContext(t.Context(), "bash", "-c", script)
+		cmd.Env = append(os.Environ(), "DIAGNOSTIC="+diagnostic)
+		output, err := cmd.CombinedOutput()
+		if err == nil || !strings.Contains(string(output), diagnostic) {
+			t.Fatalf("diagnostic lost: %v\n%s", err, output)
+		}
+		if strings.Contains(string(output), "renders are stale") {
+			t.Fatalf("snapshot failure misreported as stale renders:\n%s", output)
+		}
 	}
 }
