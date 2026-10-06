@@ -366,16 +366,18 @@ func (state *inventoryState) walkDirectory(ctx context.Context, root *os.Root, r
 			return fmt.Errorf("inventory exceeds %d-level depth limit at %s", state.options.maxDepth, filepath.Join(display, child.Name()))
 		}
 		childRel := filepath.Join(rel, child.Name())
+		if state.options.prune[filepath.ToSlash(childRel)] {
+			continue
+		}
 		childDisplay := filepath.Join(display, child.Name())
 		info, err := root.Lstat(childRel)
 		if err != nil {
 			return err
 		}
-		pruned := state.options.prune[filepath.ToSlash(childRel)]
-		if err := state.visit(childDisplay, !pruned && state.matches(childDisplay, info), info); err != nil {
+		if err := state.visit(childDisplay, state.matches(childDisplay, info), info); err != nil {
 			return err
 		}
-		if info.IsDir() && info.Mode()&os.ModeSymlink == 0 && !pruned {
+		if info.IsDir() && info.Mode()&os.ModeSymlink == 0 {
 			if err := state.walkDirectory(ctx, root, childRel, childDisplay, depth+1); err != nil {
 				return err
 			}

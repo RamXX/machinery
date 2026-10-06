@@ -153,7 +153,7 @@ reject_matches "em dash found in the doc surface (house style forbids it)" \
 
 # 7. Modelith render freshness (ci: modelith-render job) -------------------
 say "Modelith render freshness (pinned engine + mechanical house style)"
-make modelith-render-check || fail "committed Modelith renders are stale or the pinned engine is unavailable"
+make modelith-render-check || fail "Modelith render check failed; see diagnostics above for snapshot, engine, or freshness errors"
 
 # 8. build (ci: build + gates jobs) ----------------------------------------
 say "build .bin/machinery"
