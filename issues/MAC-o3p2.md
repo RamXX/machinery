@@ -2,14 +2,14 @@
 id: MAC-o3p2
 title: "Derive membership/mandatory from bounded cardinality; annotation fields become optional and cross-checked"
 status: open
-priority: 2
+priority: 3
 type: feature
 labels: [modelith, relational, alloy, simplification]
 parent: MAC-0p5d
 created_at: 2026-09-25T20:11:08Z
 created_by: ramirosalas
-updated_at: 2026-09-25T20:11:08Z
-content_hash: "sha256:13a40268986fa54f310834fcb219db161db6c4084f959e9e451adb8500aa1f2c"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:3cf4e97422ac6f3f5785bbaf08423e414d69037e7e661c4780580f60b2bce8c2"
 blocked_by: [MAC-g7d4]
 ---
 
@@ -33,7 +33,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Normalize cardinality to (lo,hi), make membership/mandatory optional and cross-checked, drop the wording, regenerate/verify-formal. Evidence: Annotation-only membership still in force: internal/alloy/alloy.go:468 and isolation.go:148 still say Modelith cardinality 'cannot express' membership; hasRelationship exact-string checks remain (alloy.go:220). Notes: Pure simplification. Dependency on g7d4 is real (pin 0.5 and loud refusal define which forms are legal). Also should coordinate with gscc on cardinality vocabulary.
 
 ## History
 - 2026-09-25T20:11:08Z dep_added: blocked_by MAC-g7d4
