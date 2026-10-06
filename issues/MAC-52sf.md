@@ -7,8 +7,8 @@ type: feature
 labels: [gates, process, security]
 created_at: 2026-10-05T23:50:58Z
 created_by: ramirosalas
-updated_at: 2026-10-05T23:50:58Z
-content_hash: "sha256:c9ab4154b0b8ba65ce060f4fef49e54938cf5edd9270452272a7f8257427477d"
+updated_at: 2026-10-06T02:47:15Z
+content_hash: "sha256:7ff7e12c6405fa885e4800d3b48f92d729b587c0b2f2f5417f2133442a0a3184"
 ---
 
 ## Description
@@ -30,3 +30,10 @@ Encode adversary classification (design/threats.yaml, Gz-threat), threat invaria
 
 
 ## Comments
+
+### 2026-10-06T02:47:15Z ramirosalas
+Acceptance evidence (story/MAC-52sf at 4c04cc0b, release: prepare machinery 0.11.0):
+- make preflight-fast green on the release commit (lint, vet, gofmt, docs gate, modelith renders, 8 example gate suites, golden corpus, gate-experiment suite).
+- go test ./... (60m timeout): all packages pass except internal/install TestBootstrapReceiptCLI, which fails identically on unchanged main v0.10.3 (filed MAC-nvbd); TestInstallAndDoctorTargetAll failed once on a Java provisioning deadline under load and passes in isolation.
+- E2E: examples/go-crm runs Gz in enforce mode, platform-green with --impl; real-binary probes refuse a missing negative test and a "documented" closure with the expected reasons; C-SESS-11/12 fail when the signature check is mutated away; --landing is green while a checkpoint run reports stale attestations.
+- Consumer-corpus diff (0.10.3 vs candidate, five consumer designs): 0 new blocking, 0 new warnings, 0 resolved; audit notes only.
