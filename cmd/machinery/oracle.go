@@ -474,6 +474,12 @@ func staleOwnedOracles(dir string, keep map[string][]byte) (stale []artifactset.
 			return nil, err
 		}
 		if owned {
+			source := strings.TrimSuffix(name, ".oracle.md") + ".machine.json"
+			if _, err := root.Lstat(source); err == nil {
+				continue
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return nil, fmt.Errorf("inspect source owner of stale oracle %s: %w", name, err)
+			}
 			stale = append(stale, condition)
 		}
 	}
