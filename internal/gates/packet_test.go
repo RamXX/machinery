@@ -141,7 +141,7 @@ func TestPacketMilestoneAfterNAPreamble(t *testing.T) {
 				t.Fatalf("milestone citation after N/A preamble failed: %q", g.Errs)
 			}
 			body := string(packetByID(t, packets, "M1-S1").Body)
-			want := "### milestone:BUILD/core.md (BUILD/core.md:29-30)\n\n" +
+			want := "### milestone:BUILD/core.md (BUILD/core.md:29-30)\n\n<!-- begin milestone:BUILD/core.md -->\n" +
 				"- **M1** (deal lifecycle). Core's slice: the win path, the lose path, and the policy\n" +
 				"  rows held to the oracle. Both paths persist inside one write transaction."
 			if !strings.Contains(body, want) {

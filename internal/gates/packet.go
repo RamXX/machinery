@@ -617,10 +617,10 @@ func planBlocksOf(f *packetFile, marker *regexp.Regexp) (map[int]*planBlock, boo
 		return nil, false
 	}
 	body := strings.Join(f.masked[start+1:end], "\n")
-	if first := firstNonBlankLine(body); strings.HasPrefix(strings.ToUpper(first), "N/A") {
+	matches := marker.FindAllStringSubmatchIndex(body, -1)
+	if first := firstNonBlankLine(body); len(matches) == 0 && strings.HasPrefix(strings.ToUpper(first), "N/A") {
 		return nil, false
 	}
-	matches := marker.FindAllStringSubmatchIndex(body, -1)
 	headings := headingOffsets(body)
 	blocks := map[int]*planBlock{}
 	for i, m := range matches {
