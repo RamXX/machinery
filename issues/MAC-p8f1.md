@@ -7,8 +7,8 @@ type: feature
 labels: [consistency-layer, authz, gy-rules, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:a95f8ea9253ffa59632a02070dc8eacb552b9a1ad42299afe86b02b674ecbe4f"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:8a96465f232de9e00916b15a47a76ed662638149932ad1d6c7fd5e3d0932136b"
 blocks: [MAC-qa6n]
 ---
 
@@ -34,7 +34,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add the closed capability declaration artifact, project it as a defining relation, extend authz.dl to resolve operation and resource scope, ship fixtures, Souffle parity, migration diagnostics and CHANGELOG notes. Evidence: rules/consistency/authz.dl still has `capability(C) :- c4_element(C, _, _).` and finding_authz_unknown_capability resolves only against it; no operation or resource scope in any relation. docs/external-checkers.md:180 lists only admission(subject, capability) and no_authorization(subject). schemas/projection-v2.schema.json:1345-1358 carries a bare capability string. CHANGELOG 0.11.0 has no capability declaration list. Notes: Blocks MAC-qa6n (real: capability-keyed grants need this list). Breaking for designs naming C4 element ids, so needs the Gy baseline migration path as written.
 
 ## History
 - 2026-09-24T21:33:57Z dep_added: blocks MAC-qa6n
