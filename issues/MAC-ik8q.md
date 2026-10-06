@@ -7,8 +7,8 @@ type: feature
 labels: [experiments, evidence, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:391c7365afd4bf98cdc78a15abc7fc134b6312676a4a603e31ea37bce449a000"
+updated_at: 2026-10-06T04:03:51Z
+content_hash: "sha256:e5fd677c8edd9ab1252fead77ee681f4aabbcab29647dc31adb104818ef526c5"
 blocked_by: [MAC-zti7]
 ---
 
@@ -32,7 +32,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Design and implement the experiment lane bound to readiness-inventory assumptions with the not-runnable-without-owner-authority state. Evidence: No experiment lane in code or CHANGELOG through 0.11.0; docs/consistency-layer-proposal.md section 7 leaves experiments unmodelled. Readiness report (MAC-zti7) is still open. Notes: Real dependency: an experiment binds one assumption from the readiness inventory. Large and speculative; keep low.
 
 ## History
 - 2026-09-24T21:33:57Z dep_added: blocked_by MAC-zti7
