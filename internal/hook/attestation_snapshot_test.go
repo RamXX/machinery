@@ -44,24 +44,16 @@ func (w *hookReviewWriter) beforeAttestationFinalization(snapshot *gates.Snapsho
 		w.t.Fatalf("hook wrote output before finalization: %q", w.String())
 	}
 	w.run = run
-	if w.scenario.Empty {
-		if len(run) != 0 {
-			w.t.Fatalf("empty selection supplied gates: %+v", run)
-		}
-	} else if !w.scenario.Plan && !w.scenario.Semantic {
-		found := false
-		for _, g := range run {
-			if strings.HasPrefix(g.Title, "Gv-attest") {
-				found = true
-				if len(g.Errs) != 0 || !strings.Contains(strings.Join(g.Notes, "\n"), "current implementation review pending final snapshot release") {
-					w.t.Fatalf("C valid provisional v2 control unavailable; mutation NOT YET EXERCISED: errors=%v notes=%v", g.Errs, g.Notes)
-				}
-				hookReviewNoCurrent(w.t, g)
-			}
-		}
-		if !found {
-			w.t.Fatal("current fixture did not reach Gv")
-		}
+	// Amended (B5, landing stop). Original line:
+	//     if !found { w.t.Fatal("current fixture did not reach Gv") }
+	// Reason: the stop hook runs the landing selection, and Gv is a
+	// checkpoint-only gate, so a stop never reaches it; attestation custody
+	// is exercised by `machinery check` at the checkpoint. What this still
+	// protects: the finalization callback fires exactly once, before any
+	// output, for every scenario, and the stop supplies no Gv result at all
+	// (every fixture selects only gv, so the landing selection is empty).
+	if len(run) != 0 {
+		w.t.Fatalf("landing stop supplied gates for a gv-only selection: %+v", run)
 	}
 	switch w.scenario.Fault {
 	case "original":
@@ -195,7 +187,26 @@ func hookReviewExercise(t *testing.T, scenario hookReviewScenario, temporary str
 	if err != nil {
 		t.Fatal(err)
 	}
-	if scenario.Fault != "none" {
+	// Amended (B5, landing stop). Original line:
+	//     if scenario.Fault != "none" {
+	// Reason: the "original" fault mutates the implementation after the
+	// snapshot, and only Gv's attestation subject held the implementation in
+	// custody for a gv-only selection. Gv is checkpoint-only, so a landing
+	// stop takes no implementation custody and that mutation is no stop-time
+	// finding; the checkpoint run holds it. What this still protects: a
+	// design-snapshot custody fault ("cleanup") emits exactly one block and
+	// retains the ledger under every policy, and an "original" fault neither
+	// blocks nor reports a checkpoint-only result.
+	if scenario.Fault == "original" {
+		if runErr != nil || state.design {
+			t.Fatalf("landing stop took implementation custody for checkpoint-only Gv: messages=%+v state=%+v err=%v", messages, state, runErr)
+		}
+		for _, m := range messages {
+			if m.Decision == "block" || strings.Contains(m.Reason+m.SystemMessage, "Gv-attest") {
+				t.Fatalf("landing stop reported checkpoint-only Gv custody: %+v", m)
+			}
+		}
+	} else if scenario.Fault != "none" {
 		if len(messages) != 1 || messages[0].Decision != "block" || !state.design {
 			t.Fatalf("custody must emit exactly one block and retain ledger even with relaxed/wave policy: messages=%+v state=%+v err=%v", messages, state, runErr)
 		}
@@ -227,27 +238,21 @@ func hookReviewExercise(t *testing.T, scenario hookReviewScenario, temporary str
 				t.Fatalf("no-fault configured outcome blocked: %+v", m)
 			}
 		}
-		retain := scenario.Semantic && scenario.Strict && scenario.Wave
-		if state.design != retain {
-			t.Fatalf("no-fault ledger state=%+v want retained=%t", state, retain)
+		// Amended (B5, landing stop). Original lines:
+		//     retain := scenario.Semantic && scenario.Strict && scenario.Wave
+		//     if !found { t.Fatal("current Gv result absent") }
+		//     t.Fatalf("semantic warning/wave control lost its existing report: %+v", messages)
+		// Reason: Gv is checkpoint-only and never runs at a landing stop, so
+		// an invented or stale attestation row is no stop-time finding: there
+		// is no Gv result, no semantic warning, and nothing for a wave to
+		// defer. What this still protects: a no-fault stop never blocks,
+		// clears the obligation, and emits no checkpoint-only report.
+		if state.design {
+			t.Fatalf("no-fault ledger state=%+v want cleared", state)
 		}
-		if !scenario.Plan && !scenario.Empty && !scenario.Semantic {
-			found := false
-			for _, g := range w.run {
-				if strings.HasPrefix(g.Title, "Gv-attest") {
-					found = true
-					if g.Counts["current implementation reviews"] != 1 || !strings.Contains(strings.Join(g.Notes, "\n"), hookReviewLimits) {
-						t.Fatalf("hook returned before finalized current finding/limits: %+v", g)
-					}
-				}
-			}
-			if !found {
-				t.Fatal("current Gv result absent")
-			}
-		}
-		if scenario.Semantic {
-			if len(messages) != 1 || messages[0].SystemMessage == "" {
-				t.Fatalf("semantic warning/wave control lost its existing report: %+v", messages)
+		for _, m := range messages {
+			if strings.Contains(m.Reason+m.SystemMessage, "Gv-attest") {
+				t.Fatalf("landing stop reported checkpoint-only Gv: %+v", m)
 			}
 		}
 	}
@@ -353,7 +358,13 @@ func TestAttestationDHookCompatibility(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if state.design != (s.Semantic && s.Strict && s.Wave) {
+			// Amended (B5, landing stop). Original line:
+			//     if state.design != (s.Semantic && s.Strict && s.Wave) {
+			// Reason: Gv is checkpoint-only, so the semantic attestation
+			// finding no longer exists at stop time and the wave has nothing
+			// to defer. What this still protects: the stop never blocks and
+			// the ledger is cleared under every attestation policy.
+			if state.design {
 				t.Fatalf("baseline ledger policy changed: %+v", state)
 			}
 		})

@@ -3785,8 +3785,8 @@ func TestSelectGatesActivatesGaOnAcceptanceArtifacts(t *testing.T) {
 
 // The stop-time selection matches `machinery check`'s default activation for
 // Gv: no evidence file, no gate; a committed attestations.yaml, gate. The
-// stop hook is where staleness must surface, because the turn that edited a
-// covered artifact is the turn that invalidated the judgment over it.
+// selection matches the CLI; stop() then drops Gv as checkpoint-only (see
+// TestStrictStopIgnoresCheckpointOnlyFindings).
 func TestSelectGatesActivatesGvOnAttestationEvidence(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "ARCHITECTURE.md"), "# A\n")

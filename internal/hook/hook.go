@@ -1294,6 +1294,18 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		}
 		selWarn += mix
 	}
+	// The stop hook is a landing gate, never the checkpoint gate. Between
+	// checkpoints the main line is expected to be stale for attestation,
+	// acceptance records, and external-checker evidence, so the checkpoint-
+	// only gates never run at turn end, in strict mode too. They are dropped
+	// from the selection here as well as by RunOptions.Landing below, so no
+	// checkpoint-only custody work (the attestation subject capture) runs at
+	// stop time and a selection naming only them is the empty decision.
+	// Import boundaries, generated-artifact DRIFT, and every design lint
+	// still run. See docs/threat-driven-verification.md.
+	for _, gate := range gates.CheckpointOnlyGates {
+		delete(sel.Run, gate)
+	}
 	if len(sel.Run) == 0 {
 		if observer, ok := w.(interface {
 			beforeAttestationFinalization(*gates.Snapshot, []*gates.Gate)
@@ -1320,9 +1332,10 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	var buf bytes.Buffer
 	blocking, drift, g4Blocking := 0, 0, 0
 	// A stop-time run binds no commit: the working tree is mid-change and the
-	// commit under review does not exist yet, so Ga states that non-check
-	// rather than guessing. CI passes --commit and stays the outer wall.
-	run := snapshot.RunSelected(implDir, sel, gates.RunOptions{})
+	// commit under review does not exist yet. It is the landing selection:
+	// stale external-checker evidence is a note, not DRIFT, and the
+	// checkpoint run (machinery check without --landing) stays the outer wall.
+	run := snapshot.RunSelected(implDir, sel, gates.RunOptions{Landing: true})
 	// a ratchet recording only Gy/Gl debt carries no G4 snapshot and arms nothing
 	armed := gates.RatchetArmsImports(sourceDesignDir)
 	left, waveStale, waveActive := waveSentinel(sourceDesignDir)
@@ -1788,6 +1801,11 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 		// exactly the drift that survives a review
 		run["ge"] = true
 	}
+	// Ga and Gv activate here exactly as in the CLI default suite, so the
+	// selection stays one truth; both are checkpoint-only, and stop() drops
+	// them (the landing selection). Between checkpoints acceptance records
+	// and attestation rows are expected to be stale; `machinery check`
+	// without --landing is where they gate.
 	if gates.AcceptanceActive(designDir) {
 		// the acceptance directory, or a milestone marked closed: either is a
 		// claim that a milestone was discharged, and the claim is checkable
@@ -1795,9 +1813,7 @@ func selectGatesCheckedInSnapshot(snapshot *gates.Snapshot, designDir string, cf
 	}
 	if gates.AttestationActive(designDir) {
 		// committed attestation evidence is checkable from the design tree
-		// alone, and its whole value is freshness: an artifact edited this
-		// turn invalidates the judgment recorded over it, so the stop hook is
-		// exactly where that must surface
+		// alone; its value is freshness, judged at the checkpoint
 		run["gv"] = true
 	}
 	if gates.HasCheckers(designDir) {
