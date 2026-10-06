@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -92,19 +93,36 @@ func TestFieldSIGKILLMidToolCallDoesNotWedgeNextSession(t *testing.T) {
 	root := greenFieldRoot(t)
 	cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestFieldSIGKILLMidToolCallDoesNotWedgeNextSession$")
 	cmd.Env = append(os.Environ(), "MACHINERY_FIELD_KILLED_HOST=1", "MACHINERY_FIELD_KILLED_ROOT="+root)
-	var stdout bytes.Buffer
-	cmd.Stdout = &stdout
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(60 * time.Second)
-	for !strings.Contains(stdout.String(), "ARMED") {
-		if time.Now().After(deadline) {
-			_ = cmd.Process.Kill()
-			t.Fatalf("host child never armed its tool call: %q", stdout.String())
+	armed := make(chan bool, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			if strings.Contains(scanner.Text(), "ARMED") {
+				armed <- true
+				return
+			}
 		}
-		time.Sleep(20 * time.Millisecond)
+		armed <- false
+	}()
+	select {
+	case ok := <-armed:
+		if !ok {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+			t.Fatal("host child exited before arming its tool call")
+		}
+	case <-time.After(60 * time.Second):
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatal("host child never armed its tool call")
 	}
 	if err := cmd.Process.Kill(); err != nil { // SIGKILL on Unix
 		t.Fatal(err)

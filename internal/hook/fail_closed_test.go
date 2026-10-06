@@ -463,3 +463,20 @@ func TestBoundaryRefusesNonCanonicalRoutingFields(t *testing.T) {
 	}
 	requireLive(t, root, 1, "no non-canonical payload marked the victim's token")
 }
+
+// Review R4: expansions that split the binary or the subcommand into pieces.
+func TestOperatorGuardFlattensSplitExpansions(t *testing.T) {
+	root := greenFieldRoot(t)
+	for _, command := range []string{
+		`machinery ho$'o'k`,
+		`machinery ho$()ok`,
+		`machinery ho${x}ok`,
+		`ma$()chinery ho$()ok`,
+		`ma${x}chinery ho${y}ok <<<x`,
+	} {
+		pre := Input{SessionID: "agent", ToolUseID: "g-" + command, Cwd: root, HookEventName: "PreToolUse", ToolName: "Bash", ToolInput: toolInput{Command: command}}
+		if out := runEvent(t, root, pre); !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Fatalf("split expansion was allowed: %q -> %s", command, out)
+		}
+	}
+}

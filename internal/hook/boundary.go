@@ -405,6 +405,15 @@ func canonicalShellWords(folded string) []string {
 // expansion, globs, and ANSI-C quoting.
 var ambiguousShellExpansion = regexp.MustCompile("[$`{}*?\\[\\]]")
 
+// shellExpansionChars are deleted for the flattened reading of an ambiguous
+// command.
+var shellExpansionChars = strings.NewReplacer("$", "", "{", "", "}", "", "(", "", ")", "", "`", "", "*", "", "?", "", "[", "", "]", "")
+
+// shellExpansionConstructs are whole expansions (parameter, command, and
+// arithmetic substitution) deleted for the reading in which they expand to
+// nothing.
+var shellExpansionConstructs = regexp.MustCompile("\\$\\{[^}]*\\}|\\$\\([^)]*\\)|`[^`]*`|\\$[a-z_][a-z0-9_]*|\\$[0-9@*#?$!-]")
+
 // hookWord matches hook as a whole word, including inside a brace list.
 var hookWord = regexp.MustCompile(`(^|[^a-z0-9_-])hook([^a-z0-9_-]|$)`)
 
@@ -415,8 +424,20 @@ var hookWord = regexp.MustCompile(`(^|[^a-z0-9_-])hook([^a-z0-9_-]|$)`)
 // nothing it needs when a rare harmless command is refused.
 func invokesMachineryHook(folded string) bool {
 	words := canonicalShellWords(folded)
-	if ambiguousShellExpansion.MatchString(folded) && hookWord.MatchString(shellJoiners.Replace(folded)) {
-		return true // fail closed: an expansion may name the binary
+	if ambiguousShellExpansion.MatchString(folded) {
+		// fail closed: an expansion may assemble the binary or the
+		// subcommand from pieces, so read the command with every quoting and
+		// expansion character deleted as well
+		joined := shellJoiners.Replace(folded)
+		for _, reading := range []string{
+			joined,
+			shellExpansionChars.Replace(joined),
+			shellExpansionConstructs.ReplaceAllString(joined, ""),
+		} {
+			if hookWord.MatchString(reading) || strings.Contains(reading, "hook") && strings.Contains(reading, "machin") {
+				return true
+			}
+		}
 	}
 	seenBinary := false
 	for _, word := range words {
