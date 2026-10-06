@@ -305,7 +305,7 @@ A person who authenticates to the CRM and performs actions. A `User` holds a sin
 **Actions**
 
 - `register` - actor `Admin`; preserves username-unique, password-hashed - Create a new `User` with a role and an initial password.
-- `login` - actor `User`; preserves disabled-cannot-auth - Authenticate and open a `Session`.
+- `login` - actor `User`; preserves disabled-cannot-auth, session-token-authentic, session-token-fields-unambiguous, session-fails-closed - Authenticate and open a `Session`.
 - `logout` - actor `User` - Close the current `Session`.
 - `changePassword` - actor `User`; preserves password-hashed - Replace the stored password hash.
 - `disable` - actor `Admin` - Mark a `User` Disabled.
@@ -319,6 +319,9 @@ A person who authenticates to the CRM and performs actions. A `User` holds a sin
 - **disabled-cannot-auth** - A `User` whose status is Disabled cannot establish a `Session`.
 - **single-team** - A `User` belongs to at most one `Team`.
 - **manager-has-team** - A `User` with role Manager belongs to exactly one `Team`; team scope is a Manager's entire write authority, so a teamless Manager could not write even its own records.
+- **session-token-authentic** - A `Session` token resolves a `User` only when its signature verifies under the machine-local key over exactly the bytes it carries; an edited token is refused.
+- **session-token-fields-unambiguous** - A `Session` token's signed fields parse back exactly as they were signed; a field containing the delimiter cannot move bytes into another field and still verify.
+- **session-fails-closed** - A missing, unreadable, or expired `Session` token resolves no `User`; absence of the token never reads as an authenticated identity.
 
 ## Relationships
 

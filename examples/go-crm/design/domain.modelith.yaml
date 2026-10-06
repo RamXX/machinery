@@ -67,9 +67,12 @@ entities:
       - {id: disabled-cannot-auth, statement: "A `User` whose status is Disabled cannot establish a `Session`."}
       - {id: single-team, statement: "A `User` belongs to at most one `Team`."}
       - {id: manager-has-team, statement: "A `User` with role Manager belongs to exactly one `Team`; team scope is a Manager's entire write authority, so a teamless Manager could not write even its own records."}
+      - {id: session-token-authentic, statement: "A `Session` token resolves a `User` only when its signature verifies under the machine-local key over exactly the bytes it carries; an edited token is refused."}
+      - {id: session-token-fields-unambiguous, statement: "A `Session` token's signed fields parse back exactly as they were signed; a field containing the delimiter cannot move bytes into another field and still verify."}
+      - {id: session-fails-closed, statement: "A missing, unreadable, or expired `Session` token resolves no `User`; absence of the token never reads as an authenticated identity."}
     actions:
       - {name: register, actor: Admin, preserves: [username-unique, password-hashed], description: "Create a new `User` with a role and an initial password."}
-      - {name: login, actor: User, preserves: [disabled-cannot-auth], description: "Authenticate and open a `Session`."}
+      - {name: login, actor: User, preserves: [disabled-cannot-auth, session-token-authentic, session-token-fields-unambiguous, session-fails-closed], description: "Authenticate and open a `Session`."}
       - {name: logout, actor: User, description: "Close the current `Session`."}
       - {name: changePassword, actor: User, preserves: [password-hashed], description: "Replace the stored password hash."}
       - {name: disable, actor: Admin, description: "Mark a `User` Disabled."}

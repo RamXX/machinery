@@ -11,7 +11,7 @@ Session is not a Modelith entity; it is the operational credential (glossary + A
 |---|---|---|---|---|
 | `verifyCredentials` | actor | `(input{username,password}) -> User \| err{ErrBadCredentials,ErrDisabled,ErrLocked,ErrUnavailable}` | pre: username present. post: returns the User iff the argon2id hash matches; never returns User on bad credentials CARRIES{sink:repo} | C4 `crm.session -> crm.repo` ("Loads the user and verifies the password hash") |
 | `writeSessionFile` | actor | `(input{userId,expiresAt}) -> ok \| err` | post: HMAC-signed token written to `~/.crm/session` CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile` |
-| `readSessionFile` | actor | `() -> {userId,expiresAt} \| err{ErrNoSession,ErrExpired,ErrUnreadable}` | post: parsed token or typed error CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile` |
+| `readSessionFile` | actor | `() -> {userId,expiresAt} \| err{ErrNoSession,ErrExpired,ErrUnreadable}` | post: parsed token or typed error CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile`; inv `session-token-authentic`, `session-token-fields-unambiguous`, `session-fails-closed` (a token that fails its signature or field parse, or is absent or expired, yields a typed error and no identity) |
 | `loadUser` | actor | `(input{userId}) -> User \| err{ErrNotFound,ErrLocked,ErrUnavailable}` | post: returns the User with its current status CARRIES{sink:repo} | C4 `crm.session -> crm.repo` |
 | `clearSessionFile` | actor | `() -> ok \| err` | post: token removed/truncated (best-effort) CARRIES{sink:sessionfile} | C4 `crm.session -> crm.sessionfile` |
 | `guardUserDisabled` | guard | `(ctx,evt) -> bool` | true iff the verified user's status == Disabled (deny path) | inv `disabled-cannot-auth` |

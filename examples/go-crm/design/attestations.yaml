@@ -45,15 +45,15 @@ attestations:
   - claim: g3.guard-semantics
     kind: plan
     attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Every named guard was reviewed against its independent clauses, source-state structure, and invariant mapping.'
+    date: 2026-10-05
+    note: 'Every named guard was reviewed against its independent clauses, source-state structure, and invariant mapping. Re-reviewed 2026-10-05: Session.matrix.md maps readSessionFile to the threat invariants session-token-authentic, session-token-fields-unambiguous, and session-fails-closed; no guard, transition, or residual changed.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
       - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
+      - {path: machines/Session.matrix.md, hash: sha256:422e357ac89711b037edb993168d1b5721756227acb33f93c1a0ca5b3487e3d9}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
       - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
@@ -61,15 +61,15 @@ attestations:
   - claim: g3.invariant-enforcement
     kind: plan
     attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Every machine-carried invariant is bound to the guard, action, or actor unit that enforces it; non-machine carriers are explicit.'
+    date: 2026-10-05
+    note: 'Every machine-carried invariant is bound to the guard, action, or actor unit that enforces it; non-machine carriers are explicit. Re-reviewed 2026-10-05: Session.matrix.md maps readSessionFile to the threat invariants session-token-authentic, session-token-fields-unambiguous, and session-fails-closed; no guard, transition, or residual changed.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
       - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
+      - {path: machines/Session.matrix.md, hash: sha256:422e357ac89711b037edb993168d1b5721756227acb33f93c1a0ca5b3487e3d9}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
       - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
@@ -77,15 +77,15 @@ attestations:
   - claim: g3.residual-transitions
     kind: plan
     attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'Classified store and session failures retain bounded retry, rollback, and fail-closed residual transitions.'
+    date: 2026-10-05
+    note: 'Classified store and session failures retain bounded retry, rollback, and fail-closed residual transitions. Re-reviewed 2026-10-05: Session.matrix.md maps readSessionFile to the threat invariants session-token-authentic, session-token-fields-unambiguous, and session-fails-closed; no guard, transition, or residual changed.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
       - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
+      - {path: machines/Session.matrix.md, hash: sha256:422e357ac89711b037edb993168d1b5721756227acb33f93c1a0ca5b3487e3d9}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
       - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
@@ -93,15 +93,15 @@ attestations:
   - claim: g3.event-redelivery
     kind: plan
     attestor: Codex CRM design review
-    date: 2026-09-02
-    note: 'These invocation-local synchronous machines consume no external at-least-once event stream; retry replays are bounded per instance.'
+    date: 2026-10-05
+    note: 'These invocation-local synchronous machines consume no external at-least-once event stream; retry replays are bounded per instance. Re-reviewed 2026-10-05: Session.matrix.md maps readSessionFile to the threat invariants session-token-authentic, session-token-fields-unambiguous, and session-fails-closed; no guard, transition, or residual changed.'
     covers:
       - {path: machines/CommandExecution.machine.json, hash: sha256:57d6e7d914519f3ce9e89634d69c3d0358ddd4174c2ccff8d8c8532d9aa4fee4}
       - {path: machines/CommandExecution.matrix.md, hash: sha256:867dde7588f4f28bb2d3f2794ff722bc2f1597a704c1c3c095591486a120a6b9}
       - {path: machines/Deal.machine.json, hash: sha256:92afd62f460fb7179d5e4ed47fac546ac98a7148e9eb509b8240cdce04e910cf}
       - {path: machines/Deal.matrix.md, hash: sha256:0bcc84715397dffd3bbdf7cbf84b8fe0e9bba3c216205951736f58d5f3b7338d}
       - {path: machines/Session.machine.json, hash: sha256:063cd836fab74e4f8e072c62fd49bd03c53310a182fd548fbf5a7642b96031b6}
-      - {path: machines/Session.matrix.md, hash: sha256:659f582de0c658d080e730dad1ec4fb1b623e0c563ecbb995c95bc0a04c17880}
+      - {path: machines/Session.matrix.md, hash: sha256:422e357ac89711b037edb993168d1b5721756227acb33f93c1a0ca5b3487e3d9}
       - {path: machines/Task.machine.json, hash: sha256:ba243728cf359b02cc3d7cb0691eea2bd2b0a90a49c11a46846b820ac250d9b5}
       - {path: machines/Task.matrix.md, hash: sha256:ce1317ccd0a67c50d107fe27ced39dd64bcb9b485c2e693b87c6a2f8b809d3fa}
       - {path: machines/User.machine.json, hash: sha256:47082c5f9fd1144d47c9a6568441e3b489783a94c8d89725d0d5aab7ba5414c8}
@@ -109,8 +109,8 @@ attestations:
   - claim: gt.conformance-test-shape
     kind: current
     attestor: coordinator
-    date: 2026-09-23
-    note: 'Re-reviewed 2026-09-23 after the dependency bump of golang.org/x/crypto 0.56.0 to 0.57.0 and golang.org/x/sys 0.47.0 to 0.48.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change), and over the covered BUILD.md whose x/crypto pin was realigned to that authoritative go.mod (v0.56.0 to v0.57.0; pin text only, no design change). Scope unchanged from the 2026-09-09 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-23 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay.'
+    date: 2026-10-05
+    note: 'Re-reviewed 2026-09-23 after the dependency bump of golang.org/x/crypto 0.56.0 to 0.57.0 and golang.org/x/sys 0.47.0 to 0.48.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change), and over the covered BUILD.md whose x/crypto pin was realigned to that authoritative go.mod (v0.56.0 to v0.57.0; pin text only, no design change). Scope unchanged from the 2026-09-09 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-23 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay. Re-reviewed 2026-10-05 after the session contract suite gained C-SESS-11 (tampered token refused) and C-SESS-12 (delimiter-injected token refused) for the threat ledger; no conformance test changed and the testoracle scope is as reviewed above.'
     covers:
       - {path: BUILD.md, hash: sha256:02f11ecad138d967d6cf6a19cc400be360074c0b688be5a5b14024631a1bf8cf}
     implementation:
@@ -292,8 +292,8 @@ attestations:
           - path: internal/session/contract_test.go
             type: file
             mode: "0644"
-            size: 6020
-            hash: sha256:91b0154b6e6521bea6a06f1d128275aa2a8a4c7ce0a166748b7fa02ab39905b9
+            size: 8962
+            hash: sha256:108690758478c3e2e202af66b206b427a7076b100c209ad8ce3a1914583f4c9d
           - path: internal/session/machine.go
             type: file
             mode: "0644"
@@ -340,7 +340,7 @@ attestations:
             mode: "0644"
             size: 5813
             hash: sha256:7ddb253e6c4c2734885c69af4704df5c7350a5717ec60c5a5f454a7f3b898c53
-      hash: sha256:8692e702397051f24584342eb556ee34861f06898dcf533716ad8a8d9dbd91b2
+      hash: sha256:41eab61db84afd058581cefe48121bdcf714892394664de743ac20726eef01ba
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator

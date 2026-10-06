@@ -9,9 +9,13 @@ package session_test
 // so every C-SESS test is RED against the scaffolding.
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -176,5 +180,72 @@ func TestCSess10OnlyHashStored(t *testing.T) {
 	}
 	if strings.Contains(u.PasswordHash, "s3cr3t") {
 		t.Errorf("C-SESS-10: plaintext password must never be stored")
+	}
+}
+
+// signToken builds a token file body exactly as the session store does
+// (body "|" hex HMAC-SHA256 of body under the key), so a test can craft
+// the adversary's input instead of only replaying the store's own writes.
+func signToken(key []byte, body string) string {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(body))
+	return body + "|" + hex.EncodeToString(mac.Sum(nil))
+}
+
+// C-SESS-11 (threat: outsider_without_key, session-token-authentic): an
+// outsider edits the untrusted token file, extending its expiry while
+// keeping the old signature. Current must refuse it as unreadable, and the
+// untouched path (a fresh, unedited token) must still resolve.
+func TestCSess11TamperedTokenRefused(t *testing.T) {
+	s, f, path := newSess(t)
+	reg(t, s, f, "hal", "pw", model.RoleRep)
+	if _, err := s.Login("hal", "pw"); err != nil {
+		t.Fatalf("C-SESS-11: Login must succeed: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.SplitN(string(raw), "|", 3)
+	if len(parts) != 3 {
+		t.Fatalf("C-SESS-11: token shape changed: %q", raw)
+	}
+	tampered := parts[0] + "|" + strconv.FormatInt(time.Now().Add(1000*time.Hour).Unix(), 10) + "|" + parts[2]
+	if err := os.WriteFile(path, []byte(tampered), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Current(); !errors.Is(err, model.ErrUnreadable) {
+		t.Errorf("C-SESS-11: an edited token must be refused as unreadable, got %v", err)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if u, err := s.Current(); err != nil || u.Username != "hal" {
+		t.Errorf("C-SESS-11: the untouched token must still resolve hal: %v %q", err, u.Username)
+	}
+}
+
+// C-SESS-12 (threat: signed_field_injection,
+// session-token-fields-unambiguous): a token whose signed user field carries
+// the delimiter, so that its bytes would read as a different user id and a
+// far expiry, is signed with the real key and still refused; the same key
+// over a well-formed body resolves, so the refusal is the parse, not the key.
+func TestCSess12DelimiterInjectionRefused(t *testing.T) {
+	s, f, path := newSess(t)
+	u := reg(t, s, f, "ida", "pw", model.RoleRep)
+	exp := strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)
+	far := strconv.FormatInt(time.Now().Add(1000*time.Hour).Unix(), 10)
+	injected := signToken(testKey, u.ID+"|"+far+"|"+exp)
+	if err := os.WriteFile(path, []byte(injected), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Current(); !errors.Is(err, model.ErrUnreadable) {
+		t.Errorf("C-SESS-12: a delimiter-injected token must be refused as unreadable, got %v", err)
+	}
+	if err := os.WriteFile(path, []byte(signToken(testKey, u.ID+"|"+exp)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Current(); err != nil || got.Username != "ida" {
+		t.Errorf("C-SESS-12: a well-formed token under the same key must resolve ida: %v %q", err, got.Username)
 	}
 }

@@ -1,0 +1,42 @@
+# Adversary classification for the security-relevant subjects of the domain
+# model (see the machinery skill, references/threat-modeling.md). Held by
+# Gz-threat; the threat invariants are model invariants carried like any
+# other, and each negative test is a locked session contract test.
+mode: enforce
+enforced_since: 2026-10-05
+subjects:
+  - subject: User
+    kinds: [authenticates, hashes]
+    adversaries:
+      - adversary: outsider_without_key
+        invariant: session-token-authentic
+        negative_test: TestCSess11TamperedTokenRefused
+      - adversary: trusted_key_holder
+        not_applicable: "one trusted key with one role: the machine-local session key signs only session tokens; nothing is countersigned and no second key exists"
+      - adversary: unsigned_document_controller
+        not_applicable: "no check relies on an unsigned digest: the session token is signed end to end and the store carries no digest to recompute"
+      - adversary: valid_signature_wrong_meaning
+        invariant: session-active-user
+        negative_test: TestCSess08UserDisabledOnResume
+      - adversary: optional_input_omission
+        invariant: session-fails-closed
+        negative_test: TestCSess06NoToken
+      - adversary: duplicate_replay_reorder
+        accepted_risk:
+          owner: Example design owner
+          date: 2026-10-05
+          reason: "a session token is a bearer credential: a copy taken before logout stays valid until it expires; the store is a single local account"
+          visible_in: "Sessions.Current returns the Session with its ExpiresAt, so every caller sees the window in which a copied token is honored"
+      - adversary: signed_field_injection
+        invariant: session-token-fields-unambiguous
+        negative_test: TestCSess12DelimiterInjectionRefused
+      - adversary: cross_bundle_substitution
+        not_applicable: "nothing is bundled: a session token is one standalone file and no document is assembled from parts"
+not_security_relevant:
+  - subject: cli
+    reason: "orchestrates a command; the authentication and authorization decisions it relies on are the session and authz components'"
+verifiers:
+  - component: session
+    decides: "who the acting user is: login, password verification, and session token resolution"
+  - component: authz
+    decides: "allow or deny for every command, by role, ownership, and team"
