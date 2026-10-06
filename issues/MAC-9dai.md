@@ -7,8 +7,8 @@ type: epic
 labels: [e2e, dod, acceptance]
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:a97676aea92da62338292db581f68437825d90e8c49dd2868e5cb6017bd40967"
+updated_at: 2026-10-06T04:03:56Z
+content_hash: "sha256:1772a5cb9fe399b40a1649bd12e856b35bda27bc13bc5f17f00ac4e171425a52"
 related: [MAC-ui8a]
 ---
 
@@ -33,7 +33,7 @@ Phase 1 (declarative, deterministic gates) lands without the executable-assuranc
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Whole epic remains. Children: MAC-p3pj, MAC-lioz, MAC-4ah8, MAC-p46v, MAC-qax4. Phase 2 hooks to MAC-ui8a/MAC-u4oo. Evidence: Epic premise holds at 0.11.0: no E2E block grammar (grep 'E2E:' finds nothing in internal, skills, docs); build-md-template.md:242 still has only prose 'Demo:'; docs/external-checkers.md:110 says scenarios still reserved; Ga records review only. 0.11.0 'threat-driven verification' did not add e2e proof. Notes: Epic still makes sense and aligns with owner DoD direction (e2e proof). Suggested order: MAC-p3pj and MAC-lioz first (independent), then MAC-4ah8, MAC-p46v, MAC-qax4 last.
 
 ## History
 
