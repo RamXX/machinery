@@ -269,6 +269,40 @@ Format contract, held deterministically by Gb-plan:
 - A milestone that has been accepted carries one status line in its block, `Status: closed`
   (`Status: open` is the default and may be written explicitly; any other value fails the gate).
   Closing a milestone takes committed acceptance evidence: see "Milestone acceptance" below.
+- A milestone is security-relevant when its block (full mode), its packet (pairwise), or one of
+  its shards (matrix) names, as a whole token, a subject `design/threats.yaml` classifies or one
+  of that subject's threat invariant ids (without a ledger: a candidate subject the model's own
+  wording marks as security-relevant). An `Entity.action` subject matches as the whole dotted
+  token; an entity matches as a whole, case-sensitive word. Every OPEN security-relevant
+  milestone carries, in that same text:
+  - Paired criteria: each property is a standalone `Accept:` line followed (next non-blank line)
+    by its `Refuse:` line. At least one pair; an `Accept:` without its `Refuse:`, or a `Refuse:`
+    without an `Accept:` before it, fails, and only positive criteria fail.
+  - A threat table: a Markdown table whose header has an `adversary` column and a `negative test`
+    column (an `accepted risk` column, and a `subject` column when the milestone names several
+    subjects, are optional). One row per adversary row of every subject the milestone names,
+    except `not_applicable` rows; each row names the locked negative test `threats.yaml` binds,
+    or, for an accepted risk, its owner. A cell that reads "documented", or that only claims
+    agreement with a reference, fails in every mode.
+  - One standalone, non-empty `Pass-wrongly:` line answering "what would make this pass
+    wrongly?" (the third RED quality check, section 11).
+  With `mode: enforce` in the ledger these are ERRORs; without a ledger, or with `mode: audit`,
+  they are `audit:` notes. A closed milestone is history and is not checked.
+
+  ```markdown
+  **M2 - Session lifecycle.**
+  Accept: a valid credential opens an active session.
+  Refuse: a forged credential is refused with "credential signature invalid".
+
+  | adversary | negative test | accepted risk |
+  |---|---|---|
+  | outsider_without_key | SESS-forged-credential-refused | - |
+  | trusted_key_holder | SESS-wrong-role-key-refused | - |
+  | duplicate_replay_reorder | - | Product owner, 2026-10-05 |
+
+  Pass-wrongly: a check that accepts any well-formed token passes every positive test.
+  DoD: ORACLESET{machines/Session.oracle.md} green.
+  ```
 - The whole section may be waived only with the literal `N/A - <reason>` (case-sensitive) as its
   first non-blank line; any other N/A shape fails loudly instead of waiving.
 - Every Gb scan runs on fence-masked text (the Mode-line sniff included): fenced code blocks are
@@ -283,7 +317,10 @@ Every milestone in this plan is discharged the same way, held by Ga-accept:
   `REJECTED`), `dod_ids` (the exact, duplicate-free set of committed oracle ids this milestone's
   DoD line cites; no omissions and no unrelated ids), `attestations`
   (what the review checked by judgment; required for an ACCEPTED verdict), `findings` (may be
-  empty), `reviewer`, and `date` (YYYY-MM-DD).
+  empty), `reviewer`, and `date` (YYYY-MM-DD). A security-relevant milestone's review also records
+  `threat_review` (one row per threat-table adversary: `adversary`, `subject`, `probe`,
+  `expected_reason`, `observed_reason`, the two reasons equal; a non-zero exit is not a reason)
+  and may record `reopened_limits` (earlier documented limits the change widens).
 - When the DoD requires a complete oracle table, cite it compactly as
   `ORACLESET{machines/<Machine>.oracle.md}`, `ORACLESET{formal/Policy.oracle.md}`, or
   `ORACLESET{formal/Isolation.oracle.md}`. The evidence still enumerates every expanded stable id.
@@ -338,7 +375,8 @@ tools (including how to run `machinery oracle` and `machinery check`).
    derivation rule is unchanged (tests come from sections 6 and 7 and the oracles, never from
    implementation intentions), and the gate runs in steps 1 and 3 are what separate the phases in
    place of context isolation.
-3. RED exit gate, all four deterministic checks required before anything locks:
+3. RED exit gate, all four deterministic checks plus the pass-wrongly check required before
+   anything locks:
    a. Coverage of the spec: every oracle row's stable id appears whole-token somewhere in the
       suite (Gt-tests holds this deterministically in the step-b check run; a missing id is a
       missing test), every guard-conjunction
@@ -357,6 +395,11 @@ tools (including how to run `machinery oracle` and `machinery check`).
       project runs (format check, lint, license or copyright headers, encoding and naming rules).
       A locked file has no legal remedy for a gate it fails later, because nobody is allowed to
       touch it; the only time to satisfy those gates is before the lock.
+   e. What would make this pass wrongly? answered on the milestone's `Pass-wrongly:` line (the
+      third RED quality check, after "is every row covered?" and "is it red for the right
+      reason?"). For a security-relevant milestone the threat table names one negative test per
+      adversary; tamper tests target the untrusted artifact being checked, not only the trusted
+      inputs, and every tamper test also asserts that each untouched check still passes.
    Together these are the guarantee: the spec is gate-checked, the suite's coverage of the spec is
    id-checked, the suite's own skeleton respects the architecture, and the files are already clean
    under the project's own gates, so the implementer has no correct move except delivering the

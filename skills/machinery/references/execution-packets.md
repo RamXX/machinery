@@ -97,10 +97,47 @@ Each packet is narrow, self-contained Markdown with these sections:
 4. `Behavior and oracles`: states, transitions, guards, refusal behavior,
    oracle paths and exact stable ids.
 5. `TDD and implementation`: test order, locked tests, files to create/change,
-   APIs, algorithms, and commands.
+   APIs, algorithms, and commands. For a security-relevant milestone it also
+   carries the threat table and the `Pass-wrongly:` line.
 6. `Risks and recovery`: faults, bounds, rollback, crash recovery, and residual
    risks.
 7. `Acceptance`: executable DoD, evidence to capture, and the acceptance file.
+   For a security-relevant milestone it carries the `Accept:`/`Refuse:` pairs.
+
+A milestone is security-relevant when its packet (or, in matrix mode, one of
+its shards) names a subject `design/threats.yaml` classifies, or one of its
+threat invariant ids, as a whole token. Gb-plan then holds, in that packet or
+shard: paired criteria (each `Accept:` line directly followed by its `Refuse:`
+line), a threat table with an `adversary` and a `negative test` column and one
+row per ledger adversary that is not `not_applicable`, and one non-empty
+`Pass-wrongly:` line. See section 9 of
+[build-md-template.md](build-md-template.md).
+
+```markdown
+## TDD and implementation
+
+RED: write the locked tests below first; GREEN: implement `internal/session`.
+
+| adversary | negative test | accepted risk |
+|---|---|---|
+| outsider_without_key | SESS-forged-credential-refused | - |
+| trusted_key_holder | SESS-wrong-role-key-refused | - |
+| duplicate_replay_reorder | - | Product owner, 2026-10-05 |
+
+Each tamper test edits the untrusted session file, not only the trusted key
+set, and asserts every untouched check still passes.
+
+Pass-wrongly: a check that accepts any well-formed token passes every positive test.
+
+## Acceptance
+
+Accept: a valid credential opens an active session.
+Refuse: a forged credential is refused with "credential signature invalid".
+Accept: an expired session is reported expired by `session status`.
+Refuse: an expired session never authorizes a command.
+
+Evidence: `acceptance/M2.yaml` with one `threat_review` row per table row.
+```
 
 Copy the necessary rows into the packet and hold copied tables with
 `machinery:embed`; do not tell the executor to read the root, architecture,

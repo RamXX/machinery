@@ -153,7 +153,24 @@ attestations:
 findings: []
 reviewer: milestone acceptance review, conductor + owner sign-off
 date: 2026-09-03
+threat_review:            # optional; required for a security-relevant milestone
+  - adversary: outsider_without_key
+    subject: Session
+    probe: "forged credential file passed to the real CLI"
+    expected_reason: "credential signature invalid"
+    observed_reason: "credential signature invalid"
+reopened_limits: []       # optional; earlier documented limits this change widens
 ```
+
+For a security-relevant milestone (its block, packet, or shard names a subject
+`threats.yaml` classifies, or one of its threat invariants), the review writes
+its own threat table first, probes each row with a real process, and records
+one `threat_review` row per ledger adversary row that is not `not_applicable`.
+Each row carries exactly `adversary`, `subject`, `probe`, `expected_reason`,
+and `observed_reason`; the two reasons must be equal, and a reason that only
+reports an exit status is refused: a non-zero exit is not a reason. Ga enforces
+this for ACCEPTED files dated on or after the ledger's `enforced_since` when the
+ledger is in `mode: enforce`, and reports it as `audit:` notes otherwise.
 
 Only then set `Status: closed` in the root milestone manifest. Run
 `machinery check <design>` from the evidence-bearing checkout; Machinery proves
