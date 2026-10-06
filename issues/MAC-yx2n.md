@@ -7,8 +7,8 @@ type: feature
 labels: [ga, accept, diagnostics, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:07d5e332001a727f6fdd9272f86c9d36caa0ed5bd38ddee74eee43955db64a58"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:acfccbb1f247e42d1a75aeca4f4474789fb3d5fe8d92b962d8e6a8253dd25cbb"
 ---
 
 ## Description
@@ -31,7 +31,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Either add machinery lint-acceptance (exact line/column and rule, id-prefix diagnostics, exit 0 on clean) or map the YAML error to the offending line; add tests for ACs 1-4 including a block-scalar note. Evidence: Verified at HEAD 8c620d8f (v0.11.0). internal/gates/accept.go:614-624 parseAcceptance calls ir.LoadYAML (internal/ir/yaml.go:21) and reports 'invalid YAML: '+err verbatim, so the parser's sequence-start line is still surfaced; no lint-acceptance command exists (grep of cmd and docs finds none). Block scalars are already parseable by the YAML library but this is not documented or tested. Notes: Small, independent. Check whether the yaml error already carries the true line; the H2 report says it names the sequence start, unverified here.
 
 ## History
 
