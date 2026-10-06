@@ -560,7 +560,10 @@ async function v2Lane(config = {}) {
     location: { directory: "/project", project: { directory: "/parent" } },
     options: { runner: fakeRunner(config, calls) },
     tool: { hook: async (name, fn) => { hooks[name] = fn } },
-    session: { synthetic: async (input) => { warnings.push(input) } },
+    session: {
+      get: async ({ sessionID }) => ({ location: { directory: sessionID === "other-project" ? "/other" : "/project" } }),
+      synthetic: async (input) => { warnings.push(input) },
+    },
     event: { subscribe: async function* (options) {
       signal = options.signal
       signal.addEventListener("abort", () => wake?.(), { once: true })
@@ -608,14 +611,17 @@ test("V2 translates native tools, completions, and error deduplication", async (
       assert.equal(pair[0].payload.tool_input.command, input.command ?? input.patchText ?? "")
       assert.equal(pair[0].payload.tool_input.file_path, input.path ?? "")
     }
-    for (const first of ["reply", "after"]) {
+    for (const first of ["reply", "after", "concurrent"]) {
       const event = v2Tool("shell", { command: "pwd" }, first)
       await lane.hooks["execute.before"](event)
       await lane.event({ type: "permission.asked", data: { id: first, sessionID: event.sessionID, source: { type: "tool", id: event.id, messageID: event.messageID } } })
       const reply = () => lane.event({ type: "permission.replied", data: { requestID: first, sessionID: event.sessionID, reply: "reject" } })
       const after = () => lane.hooks["execute.after"]({ ...event, status: "error", error: { message: "permission rejected" } })
-      await (first === "reply" ? reply() : after())
-      await (first === "reply" ? after() : reply())
+      if (first === "concurrent") await Promise.all([reply(), after()])
+      else {
+        await (first === "reply" ? reply() : after())
+        await (first === "reply" ? after() : reply())
+      }
       assert.equal(lane.calls.filter(({ payload }) => payload.tool_use_id === first && payload.hook_event_name === "PostToolUseFailure").length, 1)
     }
   } finally { await lane.cleanup() }
@@ -660,5 +666,17 @@ test("V2 Stop denial is visible as a synthetic session message", async () => {
     await lane.event({ type: "session.execution.succeeded", data: { sessionID: "session-v2" } })
     assert.equal(lane.warnings.length, 1)
     assert.match(JSON.stringify(lane.warnings[0]), /red Stop/)
+  } finally { await lane.cleanup() }
+})
+
+
+test("V2 locationless session events do not run governance in another project", async () => {
+  const lane = await v2Lane()
+  try {
+    await lane.event({ type: "session.execution.succeeded", data: { sessionID: "other-project" } })
+    assert.equal(lane.calls.length, 0, "a global session event must be resolved to its own location")
+    await lane.event({ type: "session.execution.succeeded", data: { sessionID: "session-v2" } })
+    assert.equal(lane.calls.length, 1)
+    assert.equal(lane.calls[0].root, "/project")
   } finally { await lane.cleanup() }
 })
