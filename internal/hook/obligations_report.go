@@ -91,6 +91,17 @@ func reportProjectObligations(w io.Writer, dir string) bool {
 			if cfg.Impl != "" {
 				check += " --impl " + shellQuote(filepath.Join(root, filepath.FromSlash(cfg.Impl)))
 			}
+			narrowed, err := narrowedRoutes(root, record.routes, want, cfg)
+			if err != nil {
+				healthy = false
+				lines = append(lines, line{label, fmt.Sprintf("  ERROR    governance hook obligation for %s has an unreadable route snapshot: %v", label, err)})
+				continue
+			}
+			if len(narrowed) > 0 {
+				lines = append(lines, line{label, fmt.Sprintf("  present  governance hook obligation for %s was armed under a routing configuration that checked more than the current %s (%s); Stops run the gates under the current one but keep the obligation armed. If an operator made this change deliberately, accept it: machinery hook-state release --root %s --routes",
+					label, ConfigName, strings.Join(narrowed, "; "), shellQuote(root))})
+				continue
+			}
 			lines = append(lines, line{label, fmt.Sprintf("  present  governance hook obligation for %s was armed under %d routing configuration(s) that differ from the current %s; the next Stop in the project re-runs the gates under the current configuration (to see the result now: %s)",
 				label, foreign, ConfigName, check)})
 		}

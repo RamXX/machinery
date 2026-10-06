@@ -25,9 +25,30 @@ const releaseTokenPrefixMin = 12
 // release is journaled (time, operator, host, process, root, tokens) in the
 // store's handoff journal next to the independent initialization marker
 // before the ledger changes.
-func ReleaseState(w io.Writer, root string, tokens []string, orphaned bool) (retErr error) {
-	if orphaned == (len(tokens) > 0) {
-		return fmt.Errorf("name exactly one of --orphaned or one or more --token values")
+func ReleaseState(w io.Writer, root string, tokens []string, orphaned bool) error {
+	return ReleaseStateWith(w, root, ReleaseOptions{Tokens: tokens, Orphaned: orphaned})
+}
+
+// ReleaseOptions selects what a release removes. Tokens and Orphaned are
+// exclusive; Routes may accompany either or stand alone.
+type ReleaseOptions struct {
+	Tokens   []string
+	Orphaned bool
+	// Routes forgets the routing configurations the obligation was armed
+	// under, accepting the current .machinery.json as the one the next Stop
+	// runs the gates under, even where it narrows what they check. The
+	// obligation itself stays armed.
+	Routes bool
+}
+
+// ReleaseStateWith is ReleaseState with every selector.
+func ReleaseStateWith(w io.Writer, root string, opts ReleaseOptions) (retErr error) {
+	tokens, orphaned := opts.Tokens, opts.Orphaned
+	if orphaned && len(tokens) > 0 {
+		return fmt.Errorf("name --orphaned or --token values, not both")
+	}
+	if !orphaned && len(tokens) == 0 && !opts.Routes {
+		return fmt.Errorf("name --orphaned, one or more --token values, or --routes")
 	}
 	root, err := canonicalHookRoot(root)
 	if err != nil {
@@ -63,12 +84,15 @@ func ReleaseState(w io.Writer, root string, tokens []string, orphaned bool) (ret
 	if err != nil {
 		return err
 	}
-	selected, err := selectReleasedTokens(record.pending, tokens, orphaned)
-	if err != nil {
-		return err
+	var selected []string
+	if orphaned || len(tokens) > 0 {
+		if selected, err = selectReleasedTokens(record.pending, tokens, orphaned); err != nil {
+			return err
+		}
 	}
-	if len(selected) == 0 {
-		_, err := fmt.Fprintf(w, "No in-flight tool tokens are recorded for %s; nothing to release.\n", root)
+	routes := opts.Routes && len(record.routes) > 0
+	if len(selected) == 0 && !routes {
+		_, err := fmt.Fprintf(w, "No in-flight tool tokens or recorded routes match for %s; nothing to release.\n", root)
 		return err
 	}
 	// The journal is shared with adoption and guarded by the marker lock.
@@ -78,7 +102,7 @@ func ReleaseState(w io.Writer, root string, tokens []string, orphaned bool) (ret
 	if err != nil {
 		return err
 	}
-	journalErr := journalRelease(marker, root, record, selected)
+	journalErr := journalRelease(marker, root, record, selected, routes)
 	if err := errors.Join(journalErr, markerLock.Release()); err != nil {
 		return err
 	}
@@ -87,11 +111,18 @@ func ReleaseState(w io.Writer, root string, tokens []string, orphaned bool) (ret
 		for _, token := range selected {
 			removed = r.removePending(token) || removed
 		}
+		if routes {
+			removed = removed || len(r.routes) > 0
+			r.routes = nil
+		}
 		return removed
 	}); err != nil {
 		return err
 	}
 	fmt.Fprintf(w, "Released %d in-flight tool token(s) for %s; recorded in %s.\n", len(selected), root, marker+".handoffs")
+	if routes {
+		fmt.Fprintf(w, "  forgot %d recorded routing configuration(s); the next Stop runs the gates under the current %s\n", len(record.routes), ConfigName)
+	}
 	for _, token := range selected {
 		owner := "owner unrecorded (written before owners were recorded)"
 		if o := record.pendingOwners[token]; o.known() {
@@ -141,7 +172,7 @@ func selectReleasedTokens(pending, named []string, all bool) ([]string, error) {
 	return selected, nil
 }
 
-func journalRelease(marker, root string, record hookStateRecord, selected []string) error {
+func journalRelease(marker, root string, record hookStateRecord, selected []string, routes bool) error {
 	journal := marker + ".handoffs"
 	prior, err := readBoundedHookFile(journal, "hook state handoff journal", 1<<20)
 	if err != nil {
@@ -165,6 +196,7 @@ func journalRelease(marker, root string, record hookStateRecord, selected []stri
 		"event":     "release",
 		"root":      root,
 		"tokens":    selected,
+		"routes":    forgottenRoutes(record, routes),
 		"owners":    owners,
 		"revision":  strconv.FormatUint(record.revision, 10),
 		"design":    record.design,
@@ -197,4 +229,11 @@ func agentEnvironment() []string {
 		}
 	}
 	return found
+}
+
+func forgottenRoutes(record hookStateRecord, routes bool) []string {
+	if !routes {
+		return []string{}
+	}
+	return append([]string{}, record.routes...)
 }

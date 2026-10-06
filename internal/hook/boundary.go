@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Boundary events are host notices that a lane or a whole session can no
@@ -171,4 +172,74 @@ func orphanedTokenNote(root string, orphaned []string, plain bool) string {
 		return fmt.Sprintf("machinery: an earlier or parallel session left %d unfinished tool operation(s); the design checks rerun at every turn end until they finish or an operator releases them with '%s'.", len(orphaned), releaseCommand(root))
 	}
 	return fmt.Sprintf("machinery: %d tool operation(s) armed by another or an ended session never reported completion (%s). They do not block this session, but the project gate obligation stays armed and the gates run again at every Stop until they complete or an operator releases them. If no agent session in this project is still running a tool, run: %s", len(orphaned), shortTokens(orphaned), releaseCommand(root))
+}
+
+// narrowedRoutes compares the current configuration with every earlier route
+// the ledger records whose snapshot is still readable, and names each way the
+// current one checks less: another design or implementation tree, the
+// implementation tree dropped, strict mode dropped, or staged gates removed.
+// A route whose snapshot retention already reclaimed cannot be compared.
+func narrowedRoutes(root string, routes []string, current string, cfg Config) ([]string, error) {
+	paths, err := routeStatePaths(root)
+	if err != nil {
+		return nil, err
+	}
+	recorded := map[string]bool{}
+	for _, route := range routes {
+		if route != current {
+			recorded[route] = true
+		}
+	}
+	seen := map[string]bool{}
+	var narrowed []string
+	add := func(reason string) {
+		if !seen[reason] {
+			seen[reason] = true
+			narrowed = append(narrowed, reason)
+		}
+	}
+	for _, path := range paths {
+		raw, err := readRouteStateFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if raw == nil || !recorded[routeSnapshotDigest(raw)] {
+			continue
+		}
+		earlier, err := decodeConfig(raw)
+		if err != nil {
+			return nil, fmt.Errorf("route snapshot %s is corrupt: %w", path, err)
+		}
+		if earlier.Design == "" {
+			earlier.Design = "design"
+		}
+		if earlier.Design != cfg.Design {
+			add(fmt.Sprintf("design directory %q is now %q", earlier.Design, cfg.Design))
+		}
+		switch {
+		case earlier.Impl != "" && cfg.Impl == "":
+			add(fmt.Sprintf("implementation tree %q is no longer checked", earlier.Impl))
+		case earlier.Impl != "" && earlier.Impl != cfg.Impl:
+			add(fmt.Sprintf("implementation tree %q is now %q", earlier.Impl, cfg.Impl))
+		}
+		if earlier.Strict && !cfg.Strict {
+			add("strict mode was switched off")
+		}
+		if cfg.Gates != "" {
+			now := map[string]bool{}
+			for _, gate := range strings.Split(strings.ToLower(cfg.Gates), ",") {
+				now[strings.TrimSpace(gate)] = true
+			}
+			if earlier.Gates == "" {
+				add("the progressive gate selection became the staged list " + cfg.Gates)
+			} else {
+				for _, gate := range strings.Split(strings.ToLower(earlier.Gates), ",") {
+					if gate = strings.TrimSpace(gate); gate != "" && !now[gate] {
+						add("staged gate " + gate + " was removed")
+					}
+				}
+			}
+		}
+	}
+	return narrowed, nil
 }

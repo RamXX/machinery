@@ -1281,6 +1281,7 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot read its touched-file state; refusing to end the turn without running the required checks: " + stateErr.Error()})
 	}
 	routeNote := ""
+	var narrowed []string
 	if len(state.routes) > 0 {
 		routeBody, err := routeSnapshotBody(cfg)
 		if err != nil {
@@ -1295,6 +1296,11 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		}
 		if changed > 0 {
 			routeNote = fmt.Sprintf("machinery: this project's gate obligation was armed under %d routing configuration(s) that differ from the one in force now; it was re-evaluated by running the gates under the current configuration.", changed)
+			narrowing, err := narrowedRoutes(root, state.routes, want, cfg)
+			if err != nil {
+				return emitJSON(w, stopOut{Decision: "block", Reason: "machinery governance cannot compare the dirty obligation's earlier routing configuration with the current one: " + err.Error()})
+			}
+			narrowed = narrowing
 		}
 	}
 	own, orphaned := partitionPending(state, in)
@@ -1325,8 +1331,19 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 	// the obligation. While another session's token remains, that token's
 	// mutation may not be finished, so the obligation stays armed and the
 	// gates run again at the next Stop.
+	//
+	// A configuration that narrows what the gates check compared with the
+	// one the obligation was armed under (another design or implementation
+	// tree, strict mode dropped, staged gates removed) is applied to this
+	// run, but never discharges the obligation: the touched tree may be
+	// exactly what the narrowed configuration no longer checks. An operator
+	// accepts the change with 'hook-state release --routes', which is
+	// journaled.
+	if len(narrowed) > 0 {
+		orphanNote = strings.TrimSpace(orphanNote + "\n" + fmt.Sprintf("machinery: %s changed since this obligation was armed in a way that narrows what the gates check (%s); the gates ran under the current configuration, but the obligation stays armed. If an operator made this change deliberately, accept it with: machinery hook-state release --root %s --routes", ConfigName, strings.Join(narrowed, "; "), shellQuote(root)))
+	}
 	discharge := func(revision uint64) error {
-		if len(orphaned) > 0 {
+		if len(orphaned) > 0 || len(narrowed) > 0 {
 			return nil
 		}
 		return clearCheckedState(root, in.SessionID, revision)
@@ -1411,6 +1428,18 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 		}
 		if err := errors.Join(snapshot.CheckUnchanged(), snapshot.Release()); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery design changed while the empty gate decision was being derived; retry the stop: " + err.Error()})
+		}
+		if routeNote != "" {
+			// An obligation armed under another route is discharged only by
+			// running gates. A changed configuration that selects no
+			// stop-time gate would otherwise clear it unchecked, so it stays
+			// armed until a configuration that selects gates runs them.
+			msg := notes(selWarn)
+			if msg != "" {
+				msg += "\n"
+			}
+			msg += "machinery: the current configuration selects no stop-time gate, so the obligation armed under the earlier configuration is retained rather than cleared unchecked. Restore a gate selection in " + ConfigName + " or run 'machinery check " + design + "'."
+			return emitJSON(w, stopOut{SystemMessage: msg})
 		}
 		if err := discharge(state.revision); err != nil {
 			return emitJSON(w, stopOut{Decision: "block", Reason: "machinery gates could not durably clear the hook state ledger: " + err.Error()})

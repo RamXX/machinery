@@ -35,8 +35,13 @@ under their version heading when a release is cut.
   forever.** A Stop with a usable `.machinery.json` now runs the gates under the configuration in
   force and names the route change in its message, instead of blocking with "dirty obligation
   was armed under a different routing configuration" after a plugin or binary upgrade or an
-  operator edit. When no usable configuration exists (both markers gone, or hooks switched off
-  while work is outstanding) the recorded route still decides and a Stop still blocks.
+  operator edit. A configuration that narrows what the gates check compared with the recorded
+  route (another design or implementation tree, the implementation tree dropped, strict mode
+  dropped, staged gates removed, or no stop-time gate selected at all) still runs whatever gates
+  it selects, but never discharges the obligation until an operator accepts the change with the
+  journaled `machinery hook-state release --root <root> --routes`. When no usable configuration
+  exists (both markers gone, or hooks switched off while work is outstanding) the recorded route
+  still decides and a Stop still blocks.
 - **Hook: Codex payloads carrying `turn_id`** are accepted instead of failing as an unknown
   field.
 - **`machinery doctor` never prescribes a command that is guaranteed to refuse.** For a store
@@ -45,8 +50,9 @@ under their version heading when a release is cut.
 
 ### Added
 
-- **`machinery hook-state release --root <root> (--token <id>... | --orphaned)`**, the audited
-  operator recovery for tokens no session can complete. It removes only the named tokens (a full
+- **`machinery hook-state release --root <root> (--token <id>... | --orphaned) [--routes]`**, the
+  audited operator recovery for tokens no session can complete; `--routes` accepts a deliberate
+  configuration change that narrows what the gates check. It removes only the named tokens (a full
   id or a unique prefix of at least 12 hex characters), keeps the design/impl obligation armed so
   the next Stop still runs the gates, and journals time, operator, uid, host, process, root,
   tokens and their owning sessions in the store's handoff journal before the ledger changes.
@@ -73,11 +79,15 @@ keep that property and narrow two fail-closed behaviours that had become permane
 - **Release** is an operator command an agent could also run through its shell. It cannot skip a
   gate: it removes tokens, not obligations, and every use is journaled with the environment that
   ran it (`CLAUDECODE`, `CODEX_*`, `OPENCODE` markers are recorded).
-- **Route re-evaluation** trusts the current operator-owned `.machinery.json`. An agent edit of
-  that file is still denied for file tools and for shell commands that name it; a configuration
-  changed by an obfuscated shell command would now be applied at the next Stop instead of
-  wedging it, and the Stop message names the route change. CI's `machinery check` remains the
-  backstop for a weakened configuration.
+- **Route re-evaluation** runs the gates under the current operator-owned `.machinery.json`. A
+  change that only widens or renames routing (strict switched on, a gate added, the dialog
+  register) is discharged by a green run. A change that narrows what the gates check is never
+  discharged on its own: the obligation stays armed until an operator runs the journaled
+  `release --routes`, so a weakened configuration (for example one edited by an obfuscated shell
+  command, which file-tool and named-path guards would otherwise deny) cannot silently clear a
+  touched tree. Narrowing is judged against the route snapshots still on disk (the newest 8 per
+  project); a route whose snapshot retention already reclaimed is re-evaluated under the current
+  configuration alone, and CI's `machinery check` remains the backstop.
 - **Store identity.** Ignoring the device number means a different store that reuses the same
   inode number on another filesystem and carries the matching 32-byte generation would be
   accepted; forging the generation already requires reading the marker. An inode change is

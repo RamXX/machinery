@@ -24,7 +24,7 @@ func newHookStateCmd() *cobra.Command {
 
 	var releaseRoot string
 	var tokens []string
-	var orphaned bool
+	var orphaned, routes bool
 	release := &cobra.Command{
 		Use:   "release",
 		Short: "Release in-flight tool tokens no session can complete; the gate obligation stays armed",
@@ -32,19 +32,21 @@ func newHookStateCmd() *cobra.Command {
 			"mid tool call, a plugin disabled between PreToolUse and PostToolUse, a ledger written by an older\n" +
 			"release). The project's design/impl gate obligation stays armed, so the next Stop still runs the\n" +
 			"gates. Every release is journaled with time, operator, host, and the released tokens.\n" +
-			"Use --orphaned only when no agent session in the project is running a tool.",
+			"Use --orphaned only when no agent session in the project is running a tool. --routes accepts a\n" +
+			"deliberate operator change to .machinery.json that narrows what the gates check.",
 		Args: cobra.NoArgs,
 	}
 	release.Flags().StringVar(&releaseRoot, "root", "", "project root whose tokens are released")
 	release.Flags().StringArrayVar(&tokens, "token", nil, "release one token, named in full or by a unique prefix of at least 12 hex characters (repeatable)")
 	release.Flags().BoolVar(&orphaned, "orphaned", false, "release every in-flight token recorded for the project")
+	release.Flags().BoolVar(&routes, "routes", false, "forget the routing configurations the obligation was armed under, accepting the current .machinery.json even where it narrows what the gates check")
 	_ = release.MarkFlagRequired("root")
 	release.MarkFlagsMutuallyExclusive("token", "orphaned")
-	release.MarkFlagsOneRequired("token", "orphaned")
+	release.MarkFlagsOneRequired("token", "orphaned", "routes")
 	release.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
 		output := trackCommandOutput()
 		defer func() { retErr = output.join(retErr) }()
-		return hook.ReleaseState(output.stdout, releaseRoot, tokens, orphaned)
+		return hook.ReleaseStateWith(output.stdout, releaseRoot, hook.ReleaseOptions{Tokens: tokens, Orphaned: orphaned, Routes: routes})
 	}
 	command.AddCommand(release)
 	return command
