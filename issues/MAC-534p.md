@@ -2,13 +2,13 @@
 id: MAC-534p
 title: "Possibility properties: refute AG EF claims and trap SCCs structurally on the guard-erased machine graph"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [formal, g3, lint, liveness]
 created_at: 2026-09-24T21:27:28Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:27:28Z
-content_hash: "sha256:d845dbfb64f8aa668932f339bc82d7142f8284e5c5301e5275d0234eff5c3df9"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:130cfac25053397d36f1eef9c059dc84ff2c450ccb00e84732577c7ebb8ff5cc"
 blocks: [MAC-2f7g]
 ---
 
@@ -32,7 +32,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add default structural check that every reachable state reaches a final state on the guard-erased graph (perpetual envelope exempt), a declared possibility claim form, honest 'structurally possible' wording, tests incl. compound/parallel states. Evidence: No trap-SCC or possibility check exists: grep for scc/trap/possibility in internal/lint and internal/tla finds nothing; lint dead-end and reachability checks remain as described; CHANGELOG through 0.11.0 has no entry. Notes: Soundness design (refutation-only) is sound. Blocks MAC-2f7g (possibility routing). Priority P1 seems high for a new capability; P2 suggested because no consumer is blocked.
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-2f7g
