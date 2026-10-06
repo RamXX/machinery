@@ -8,9 +8,8 @@ labels: [traceability, h2-lessons, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
 updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:d3ed9fa67c0124a4fc663ca0fab297c07fcde6fc96300855e5e1c2cc9c02b3a1"
+content_hash: "sha256:b167ffece55e4f46cb04ee8332c9a78726a8d7d3134b6ec5a9d073ecf9318ec6"
 blocked_by: [MAC-zti7]
-blocks: [MAC-f15w]
 ---
 
 ## Description
@@ -42,9 +41,9 @@ Acceptance criteria:
 - 2026-09-24T21:33:58Z dep_added: blocks MAC-b27n
 - 2026-09-24T21:33:58Z dep_added: blocks MAC-f15w
 - 2026-10-06T04:03:39Z dep_removed: no_longer_blocks MAC-b27n
+- 2026-10-06T04:03:39Z dep_removed: no_longer_blocks MAC-f15w
 
 ## Links
-- Blocks: [[MAC-f15w]]
 - Blocked by: [[MAC-zti7]]
 
 ## Comments
