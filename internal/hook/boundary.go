@@ -54,37 +54,102 @@ func decodeBoundaryInput(raw []byte) (boundaryInput, bool, error) {
 	if scanErr != nil {
 		return boundaryInput{}, true, scanErr
 	}
-	var batch boundaryInput
-	if event == "PostToolBatch" {
-		var calls []struct {
-			ToolUseID string `json:"tool_use_id"`
-		}
-		if rawCalls, ok := fields["tool_calls"]; ok {
-			if err := json.Unmarshal(rawCalls, &calls); err != nil {
-				return boundaryInput{}, true, fmt.Errorf("PostToolBatch tool_calls must be an array of tool calls: %w", err)
-			}
-		}
-		for _, call := range calls {
-			if strings.TrimSpace(call.ToolUseID) != "" {
-				batch.batchToolUseIDs = append(batch.batchToolUseIDs, call.ToolUseID)
-			}
-		}
-	}
-	in := Input{HookEventName: event}
-	for key, target := range map[string]*string{"session_id": &in.SessionID, "agent_id": &in.AgentID, "cwd": &in.Cwd} {
+	// The routing fields go through the enforcing decoder itself, so a
+	// boundary reads exactly the session, agent, and cwd values that
+	// PreToolUse recorded its owners from. Every routing value must be a
+	// canonical non-null JSON string.
+	routing := map[string]json.RawMessage{}
+	for _, key := range []string{"hook_event_name", "session_id", "agent_id", "cwd"} {
 		value, ok := fields[key]
-		if !ok || bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+		if !ok {
 			continue
 		}
-		if err := json.Unmarshal(value, target); err != nil {
-			return boundaryInput{}, true, fmt.Errorf("boundary event field %q must be a string", key)
+		if err := requireJSONString(key, value); err != nil {
+			return boundaryInput{}, true, err
 		}
+		routing[key] = value
+	}
+	routingRaw, err := json.Marshal(routing)
+	if err != nil {
+		return boundaryInput{}, true, err
+	}
+	in, err := decodeInput(bytes.NewReader(routingRaw))
+	if err != nil {
+		return boundaryInput{}, true, err
+	}
+	if in.HookEventName != event {
+		return boundaryInput{}, true, fmt.Errorf("boundary event name did not survive canonical decoding")
 	}
 	if strings.TrimSpace(in.SessionID) == "" {
 		return boundaryInput{}, true, fmt.Errorf("boundary event %s has no session_id; it cannot be bound to the tokens it would close", event)
 	}
-	batch.Input = in
+	if _, present := fields["agent_id"]; present && strings.TrimSpace(in.AgentID) == "" {
+		return boundaryInput{}, true, fmt.Errorf("boundary event %s carries an empty agent_id; refusing to read it as the main thread", event)
+	}
+	batch := boundaryInput{Input: in}
+	if event == "PostToolBatch" {
+		ids, err := decodeBatchToolUseIDs(fields["tool_calls"])
+		if err != nil {
+			return boundaryInput{}, true, err
+		}
+		batch.batchToolUseIDs = ids
+	} else if _, present := fields["tool_calls"]; present {
+		return boundaryInput{}, true, fmt.Errorf("boundary event %s must not carry tool_calls", event)
+	}
 	return batch, true, nil
+}
+
+// requireJSONString accepts only a JSON string token, never null, a number,
+// or a container, so no decoder can read a different value from it.
+func requireJSONString(key string, raw json.RawMessage) error {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || trimmed[0] != '"' {
+		return fmt.Errorf("hook-event key %q must be a JSON string", key)
+	}
+	var value string
+	if err := json.Unmarshal(trimmed, &value); err != nil {
+		return fmt.Errorf("hook-event key %q must be a JSON string: %w", key, err)
+	}
+	return nil
+}
+
+// decodeBatchToolUseIDs reads a PostToolBatch call list strictly: an array of
+// objects, each scanned like the event itself (no duplicate keys, no
+// case-folded alias of tool_use_id), each with exactly one non-empty string
+// tool_use_id. A missing list closes nothing; anything else is refused.
+func decodeBatchToolUseIDs(raw json.RawMessage) ([]string, error) {
+	if raw == nil {
+		return nil, nil
+	}
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || trimmed[0] != '[' {
+		return nil, fmt.Errorf("PostToolBatch tool_calls must be an array of tool calls")
+	}
+	var calls []json.RawMessage
+	if err := json.Unmarshal(trimmed, &calls); err != nil {
+		return nil, fmt.Errorf("PostToolBatch tool_calls must be an array of tool calls: %w", err)
+	}
+	ids := make([]string, 0, len(calls))
+	for i, call := range calls {
+		fields, err := scanJSONObject(call, []string{"tool_use_id"})
+		if err != nil {
+			return nil, fmt.Errorf("PostToolBatch tool_calls[%d]: %w", i, err)
+		}
+		value, ok := fields["tool_use_id"]
+		if !ok {
+			return nil, fmt.Errorf("PostToolBatch tool_calls[%d] has no tool_use_id", i)
+		}
+		if err := requireJSONString("tool_use_id", value); err != nil {
+			return nil, fmt.Errorf("PostToolBatch tool_calls[%d]: %w", i, err)
+		}
+		var id string
+		_ = json.Unmarshal(value, &id)
+		if strings.TrimSpace(id) == "" {
+			return nil, fmt.Errorf("PostToolBatch tool_calls[%d] has an empty tool_use_id", i)
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
 
 // boundaryCloses reports whether a boundary event of in proves that the token
@@ -322,8 +387,8 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 }
 
 // shellJoiners are the characters a shell removes while joining one word
-// (quotes and backslash escapes): 'mach''inery', "ho"ok and machin\ery all
-// run machinery. Deleting them first reads words the way the shell does.
+// (quotes and backslash escapes): two quoted halves of a name, or a name with
+// a backslash inside it, both run machinery. Deleting them first reads words the way the shell does.
 var shellJoiners = strings.NewReplacer(`"`, "", `'`, "", `\`, "")
 
 // shellWordSeparators split words where the shell does.
@@ -424,6 +489,12 @@ var boundaryRoutingKeys = []string{"hook_event_name", "session_id", "agent_id", 
 // trailing content, so the boundary decision and the strict decoder can never
 // see different values for the same field.
 func scanHookObject(raw []byte) (map[string]json.RawMessage, error) {
+	return scanJSONObject(raw, boundaryRoutingKeys)
+}
+
+// scanJSONObject is scanHookObject's reader with the routing keys whose
+// case-folded aliases it refuses.
+func scanJSONObject(raw []byte, routingKeys []string) (map[string]json.RawMessage, error) {
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	start, err := dec.Token()
 	if err != nil {
@@ -445,7 +516,7 @@ func scanHookObject(raw []byte) (map[string]json.RawMessage, error) {
 		if _, dup := fields[key]; dup {
 			return nil, fmt.Errorf("duplicate hook-event key %q", key)
 		}
-		for _, routing := range boundaryRoutingKeys {
+		for _, routing := range routingKeys {
 			if key != routing && strings.EqualFold(key, routing) {
 				return nil, fmt.Errorf("hook-event key %q is a case variant of %q", key, routing)
 			}

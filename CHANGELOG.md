@@ -8,7 +8,7 @@ under their version heading when a release is cut.
 
 ### Fixed
 
-- **Hook: a state store on a reattached block volume no longer bricks every event (MAC-xqu7).**
+- **Hook: a state store on a reattached block volume no longer bricks every event.**
   A Linux block volume that is detached and reattached (a Kubernetes persistent volume
   rescheduled to another node, a cloud data volume moved between VMs) keeps the store
   directory's inode but gets a new device number, and every SessionStart, PreToolUse and Stop
@@ -16,7 +16,7 @@ under their version heading when a release is cut.
   store identity now ignores the device number on every Unix, as it already did on macOS; the
   inode, any native generation or birth time both identity records carry, and the random store
   generation in the independent marker still detect a replaced store.
-- **Hook: a stranded in-flight tool token no longer blocks every later Stop (MAC-ntvm).** A
+- **Hook: a stranded in-flight tool token no longer blocks every later Stop.** A
   PreToolUse token whose PostToolUse never arrives (host SIGKILLed mid tool call, Esc while a
   tool runs, a permission dialog denied by hand, the plugin disabled and re-enabled) used to
   block every Stop in the repository forever. Each token now records the session and lane

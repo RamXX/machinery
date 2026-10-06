@@ -433,3 +433,33 @@ func TestEndedSubagentLaneTokenWithholdsMainThreadDischarge(t *testing.T) {
 	}
 	requireArmed(t, root, 1, "an ended subagent-lane token withholds discharge")
 }
+
+// Every field a boundary decision reads is validated through the enforcing
+// decoder and refused when non-canonical.
+func TestBoundaryRefusesNonCanonicalRoutingFields(t *testing.T) {
+	root := greenFieldRoot(t)
+	armShell(t, root, "victim", "toolu_v")
+	cwd := `"` + filepath.ToSlash(root) + `"`
+	for _, raw := range []string{
+		`{"hook_event_name":"SessionEnd","session_id":null,"cwd":` + cwd + `}`,
+		`{"hook_event_name":"SessionEnd","session_id":"  ","cwd":` + cwd + `}`,
+		`{"hook_event_name":"UserPromptSubmit","session_id":"victim","agent_id":7,"cwd":` + cwd + `}`,
+		`{"hook_event_name":"UserPromptSubmit","session_id":"victim","agent_id":"","cwd":` + cwd + `}`,
+		`{"hook_event_name":"UserPromptSubmit","session_id":"victim","agent_id":null,"cwd":` + cwd + `}`,
+		`{"hook_event_name":"SessionEnd","session_id":"victim","cwd":["/"]}`,
+		`{"hook_event_name":"SessionEnd","session_id":"victim","cwd":` + cwd + `,"tool_calls":[]}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":{"tool_use_id":"toolu_v"}}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":[{"tool_name":"Bash"}]}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":[{"tool_use_id":"x","tool_use_id":"toolu_v"}]}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":[{"tool_use_id":"x","Tool_Use_Id":"toolu_v"}]}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":[{"tool_use_id":5}]}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":[{"tool_use_id":""}]}`,
+		`{"hook_event_name":"PostToolBatch","session_id":"victim","cwd":` + cwd + `,"tool_calls":["toolu_v"]}`,
+	} {
+		var out bytes.Buffer
+		if err := Run(strings.NewReader(raw), &out, root); err == nil {
+			t.Fatalf("non-canonical boundary payload was routed: %s -> %s", raw, out.String())
+		}
+	}
+	requireLive(t, root, 1, "no non-canonical payload marked the victim's token")
+}
