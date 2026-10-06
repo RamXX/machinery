@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:119d554415f601c583571dcfc03b63317836ffd705483ea106a8332ad85c39f8"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:b9eaf6683845ca34b1c2267e160c04ddb066cca88b11093ffa0db7a92557e2df"
 blocks: [MAC-sd7g, MAC-wbxq, MAC-vx24]
 was_blocked_by: [MAC-cn7q, MAC-bz1y]
 ---
@@ -88,7 +88,7 @@ status: new
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement the Git 2.55.0 runtime closure, GateExecution/RunOptions fields and scoped Ga helpers per the approved contract, with native two-platform tests. Evidence: Verified at HEAD 8c620d8f (v0.11.0). No GateExecution, OpenGit, runGitExactWithExecution or ExecutionRequired anywhere (grep over all Go files); internal/runtimeclosure has go/python/typescript/elixir/java but no git.go; internal/gates/accept.go still runs git through the ordinary wrappers. Notes: No blockers (cn7q and bz1y closed). First link of chain pe9v -> wbxq/sd7g -> sqpt -> rau8 -> u4oo. Consider whether 0.11.0's moved acceptance freshness (hook no longer blocks, runs at checkpoint) changes scope; core AC unchanged.
 
 ## History
 - 2026-09-06T09:10:04Z dep_added: blocked_by MAC-cn7q
