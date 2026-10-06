@@ -7,8 +7,8 @@ type: bug
 labels: [hook, governance, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:49Z
-content_hash: "sha256:85b5adf32e1af85bb72df5cbe2a3243a029c1a61f1195cc33d6c758d8adbee45"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:6eac6da724f4ff017d5278d1fe0612bbdcb69454001fed2f2c1877ec23de5c07"
 related: [MAC-s2qw]
 ---
 
@@ -38,7 +38,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Scope the fingerprint to design sources honoring .machineryignore or declared transient paths; admit kill/stop verbs on snapshot-changed failure; retry with backoff; document logging outside the tree. Evidence: internal/hook/hook.go:804-855 withRoutingSnapshot still acquires gates.AcquireSnapshot(designDir) around every routed event and returns snapshot.CheckUnchanged() (line 849); no transient-path tolerance, process-control exemption or retry; CHANGELOG 0.9.0 to 0.11.0 has no entry on concurrent writers. 0.11.0 hook crash recovery does not address it. Notes: Agent-seat deadlock needing human rescue; fail-closed gate with no escape for process control. Related MAC-s2qw (hook-state seat handoff, P1).
 
 ## History
 
