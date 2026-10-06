@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:05:11Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:55Z
-content_hash: "sha256:619c3fa64300f7272c85577e13e99ee8965a116a8ca4798bca0ed91b932f079e"
+updated_at: 2026-10-06T04:04:16Z
+content_hash: "sha256:7c093751f1f7ef7440444ac1804b90159ca274edf2bad4e302c445ee9afbf0a2"
 blocked_by: [MAC-rau8]
 blocks: [MAC-5ft8, MAC-1u2v, MAC-vx24]
 was_blocked_by: [MAC-2n83, MAC-62s6]
@@ -98,6 +98,7 @@ status: new
 ## Notes
 Triage 2026-09-24: absorbs the only unique remnant of closed MAC-vx24: update consumer guidance (agents/machinery-build-writer.md, SKILL.md, build-md-template) for replayable negative test assurance.
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add `machinery tdd` subcommands, `check --store --assurance strict` and `--complete` routed through assuranceflow.Run, and the hook assurance fields and frozen-byte pre-write protection. Evidence: CHANGELOG 0.7.0 says the assurance substrate ships with no CLI/gate consumer. Greps of *.go find no CheckTDDAssurance, GateExecution, TDDStatus, assurance_store or strict-check. internal/assuranceflow holds only register.go. internal/tdd has no execute.go, replay.go or evidence.go, and has CheckExecutor only as a type in types.go. cmd/machinery has no tdd command. Only assurance_docs tests mention assurance. internal/hook has no assurance_store or assurance_required fields. Notes: This is the story that gives consumers any CLI surface for assurance (MAC-tk0i, closed, recorded the gap). It collides with 0.11.0 hook work (--landing, crash recovery), so the hook ACs must be re-based on current internal/hook. Blocks 5ft8 and 1u2v. MAC-2n83 and MAC-62s6 blockers are already removed.
+0.11.0: the stop hook now runs the landing selection (checkpoint-only gates gv and ga are skipped) and recovers crashed hook-state temps. Rebase this issue's hook acceptance criteria on that: strict assurance belongs to the checkpoint run of machinery check, not the per-turn hook.
 
 ## History
 - 2026-09-06T09:10:10Z dep_added: blocked_by MAC-rau8
