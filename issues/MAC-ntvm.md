@@ -7,8 +7,8 @@ type: bug
 labels: [hook, governance, crash-safety, h2-origin]
 created_at: 2026-10-06T15:31:42Z
 created_by: ramirosalas
-updated_at: 2026-10-06T15:31:42Z
-content_hash: "sha256:4c2ad0406be9ea2c57341131b369d4854e94c6786f4b38511e9408ff5bffb82b"
+updated_at: 2026-10-06T16:07:35Z
+content_hash: "sha256:3d811828926f7454ab875170a337ae375f70f945b1ab3a29b1f9c87819539cab"
 related: [MAC-xqu7]
 ---
 
@@ -42,7 +42,7 @@ Usable, with a sharp edge: any crash, kill or eviction during a tool call perman
 
 
 ## Notes
-
+Second field case 2026-10-06 (owner laptop, macOS, machinery v0.11.1, plugin re-enabled after being disabled): the H2 project ledger (revision 1159) holds 13 pending tokens from earlier sessions AND two route bindings (1dee6b9c..., b38873d4...). Every Stop in the repo now blocks with 'dirty obligation was armed under a different routing configuration; refusing to clear it using fallback or changed configuration'. Cause chain: plugin disable/enable cycles and binary upgrades leave PreToolUse tokens without PostToolUse, and a route recorded under an older binary/config can never match again. Needs the same operator recovery (audited release/rebind that keeps the obligation armed and re-runs the gates under the current route). Also: toggling the plugin off mid-project should not strand tokens silently; doctor should report stranded tokens and foreign routes per project.
 
 ## History
 
