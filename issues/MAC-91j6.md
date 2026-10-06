@@ -7,8 +7,8 @@ type: feature
 labels: [check, gates, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:09efb2804e5150bcf5ed0b16c1c4105d548de54dd51233cc79484fdcadbb90a4"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:a3402129a141120e9d72244be4739d6929c576c9527d7d6cb3a0c082e1f3062d"
 ---
 
 ## Description
@@ -34,7 +34,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add --milestone scope to --complete as specified in the ACs. Evidence: cmd/machinery/check.go:33 defines --complete with no --milestone flag; internal/gates/complete.go:61-79 requires every declared milestone closed. 0.11.0 --landing (check.go:32) skips checkpoint gates but is a different question and is refused with --complete (check.go:51). Notes: Partly relieved by --landing in 0.11.0 for per-landing runs, but a seal-level check that can be green is still absent.
 
 ## History
 
