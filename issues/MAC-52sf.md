@@ -4,10 +4,10 @@ title: "Threat-driven TDD and shift-right verification (process change A1-A9, B1
 status: closed
 priority: 1
 type: feature
-labels: [gates, process, security, delivered]
+labels: [gates, process, security, delivered, accepted]
 created_at: 2026-10-05T23:50:58Z
 created_by: ramirosalas
-updated_at: 2026-10-06T02:47:19Z
+updated_at: 2026-10-06T02:47:21Z
 content_hash: "sha256:3400ee92e9b810ee921847a6bf8e1a3f57fb6bcaa3eabce1bca1d27e45eee4c3"
 assignee: ramirosalas
 closed_at: 2026-10-06T02:47:19Z
