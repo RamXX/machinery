@@ -2,14 +2,14 @@
 id: MAC-snrm
 title: "Design file size gate at the packet budget (64 KiB) with ratchet baseline for existing oversized files"
 status: open
-priority: 1
+priority: 2
 type: feature
 labels: [context-budget, gates]
 parent: MAC-syos
 created_at: 2026-09-25T19:39:57Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:39:57Z
-content_hash: "sha256:e42ab06ad4fc234957fbdc01b442350392163e948aac12ef673f5df380dcd421"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:91cf1dd3e63021cc2fc1e964d4dfcdca4fe2515cb773459de130fa817d7204a3"
 blocked_by: [MAC-w44m]
 blocks: [MAC-7y8d]
 ---
@@ -30,7 +30,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add shared budget constant, size gate with ratchet baseline created by machinery baseline, CHANGELOG note. Evidence: No design file size gate exists. internal/gates/buildplan_test.go:480 shows a 65536-byte maximum for packets only; no shared constant used for design files and no ratchet baseline. Notes: Dependency on w44m is real for AC3 (docset shards and INDEX files) but the gate for single files could ship first; keep blocker, or split AC3.
 
 ## History
 - 2026-09-25T19:39:57Z dep_added: blocked_by MAC-w44m
