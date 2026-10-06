@@ -1252,7 +1252,8 @@ or plugins. Details, including the `.machinery.json` reference and the exact sen
 the [Claude Code plugin guide](docs/claude-plugin.md).
 
 Hook design snapshots exclude paths declared in `<design>/.machineryignore`; the ignore file
-and transaction guards stay protected. Put logs and caches outside the design tree, or declare them there.
+and transaction guards stay protected. Put logs and caches outside the design tree, or
+declare them there.
 Unignored changes still fail closed and name the changing path. Standalone `kill`, `pkill`,
 and `killall` commands can stop a writer even when the design inventory is unstable; commands
 with shell expansion, redirection, or chaining use normal governance.
@@ -1268,7 +1269,7 @@ filesystem identity checks. A different directory inode still fails closed.
 handoff, inspect the store and diagnosis, then run `machinery hook-state adopt --root <root>`.
 Adoption validates the recorded identity, ledgers and route snapshots, journals the prior
 and adopted binding beside the loss sentinel, and reports retained obligations without
-clearing them. It refuses replaced directories and interrupted or corrupt entries. If the
+clearing them, including valid legacy ledgers without a root line. It refuses replaced directories and interrupted or corrupt entries. If the
 original store was quarantined, use `machinery hook-state adopt --root <root> --from <path>`
 to restore that same recorded directory and ledger. Keep the loss sentinel in place; this
 command updates it after restoration. A lost ledger cannot be reset to empty by adoption.

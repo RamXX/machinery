@@ -105,6 +105,11 @@ func AdoptState(w io.Writer, root, from string) (retErr error) {
 		}
 		projectLocks = append(projectLocks, lock)
 	}
+	requestedScope, err := filelock.ScopeIdentity(root)
+	if err != nil {
+		return err
+	}
+	requestedName := stateFileName(requestedScope)
 	var requested bool
 	var summary bytes.Buffer
 	for _, entry := range entries {
@@ -123,14 +128,23 @@ func AdoptState(w io.Writer, root, from string) (retErr error) {
 			if err != nil {
 				return err
 			}
-			scope, scopeErr := filelock.ScopeIdentity(record.root)
-			if record.root == "" || scopeErr != nil || stateFileName(scope) != name {
-				return fmt.Errorf("ledger %s lacks its canonical root binding", name)
+			if record.root != "" {
+				scope, scopeErr := filelock.ScopeIdentity(record.root)
+				if scopeErr != nil || stateFileName(scope) != name {
+					return fmt.Errorf("ledger %s lacks its canonical root binding", name)
+				}
 			}
-			if record.root == root {
+			label := record.root
+			if name == requestedName {
 				requested = true
+				if label == "" {
+					label = root + " (legacy)"
+				}
 			}
-			fmt.Fprintf(&summary, "  retained %s: design=%t impl=%t pending=%d routes=%d\n", record.root, record.design, record.impl, len(record.pending), len(record.routes))
+			if label == "" {
+				label = "ledger " + name + " (root unrecorded)"
+			}
+			fmt.Fprintf(&summary, "  retained %s: design=%t impl=%t pending=%d routes=%d\n", label, record.design, record.impl, len(record.pending), len(record.routes))
 		case strings.Contains(name, ".state.route-") && strings.HasSuffix(name, ".json"):
 			base, suffix, ok := strings.Cut(name, ".state.route-")
 			if !ok || !validHookHexDigest(base) || !validHookHexDigest(strings.TrimSuffix(suffix, ".json")) {
