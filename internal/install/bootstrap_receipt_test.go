@@ -20,6 +20,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -838,6 +839,30 @@ func bootstrapStandaloneReceiptCases(t *testing.T, release *bootstrapRelease) {
 	}
 }
 
+func bootstrapObserveUpdate(t *testing.T, operation func() error, progress func() string) error {
+	t.Helper()
+	deadline := time.AfterFunc(90*time.Second, func() { panic("real parent Update exceeded 90-second operation bound") })
+	defer deadline.Stop()
+	started := time.Now()
+	err := operation()
+	t.Logf("real parent Update elapsed=%s progress=%s err=%v", time.Since(started), progress(), err)
+	return err
+}
+
+func TestBootstrapParentUpdateAllowsSlowProgress(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		completed := false
+		err := bootstrapObserveUpdate(t, func() error {
+			time.Sleep(91 * time.Second)
+			completed = true
+			return nil
+		}, func() string { return fmt.Sprintf("completed=%t", completed) })
+		if err != nil || !completed {
+			t.Fatalf("slow update did not return: completed=%t err=%v", completed, err)
+		}
+	})
+}
+
 func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected map[string]string, absent, fault bool) {
 	t.Helper()
 	f := bootstrapSeed(t, release)
@@ -968,10 +993,12 @@ func bootstrapFinalizationCase(t *testing.T, release *bootstrapRelease, expected
 		}
 		return nil
 	}
-	// Bound the real in-process parent too; no replacement runner is supplied.
-	deadline := time.AfterFunc(90*time.Second, func() { panic("real parent Update exceeded 90-second operation bound") })
-	defer deadline.Stop()
-	_, updateErr := Update(opts)
+	updateErr := bootstrapObserveUpdate(t, func() error {
+		_, err := Update(opts)
+		return err
+	}, func() string {
+		return fmt.Sprintf("children=%d/%d publications=%d desired_ready=%t output=%q", completed, children, publications, desiredReady, output.String())
+	})
 	if !desiredReady {
 		t.Error("independent complete desired receipt was not established after final child")
 	}
