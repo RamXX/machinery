@@ -1,14 +1,16 @@
 ---
 id: MAC-iku6
 title: "verify-formal: the Alloy jar download has no retry; one connection reset failed the formal workflow on the 0.8.0 release commit"
-status: open
+status: closed
 priority: 2
 type: bug
 labels: [ci, formal, reliability]
 created_at: 2026-09-10T17:32:53Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:51Z
-content_hash: "sha256:536c435819713fd58991923ff40b2791bcf7867a5b05814edc1eda706030d92f"
+updated_at: 2026-10-06T05:53:39Z
+content_hash: "sha256:ec6349b080b493142064522b0f57acc1906d67b7c7917e807e32819edd23303c"
+closed_at: 2026-10-06T05:53:39Z
+close_reason: "Fixed in 0.11.1 (85234fd9 RED, 1a73d21e GREEN): pinned jar downloads retry transient failures up to three times with backoff, checksum verified."
 ---
 
 ## Description
@@ -25,7 +27,7 @@ Triage 2026-09-24: valid. Single attempt in internal/formal/formal.go fetchJarCo
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add bounded retry with backoff on transient errors (reset, EOF, 5xx), re-verify checksum per attempt, report attempt count, unit test with a flaky server; same path covers TLC jar. Evidence: internal/formal/formal.go:427 fetchJarContext does a single http.DefaultClient.Do (line ~494) with no retry; only retry text is the checksum-mismatch message at :458. Triage note in the issue is confirmed. CHANGELOG has no jar-fetch retry. Notes: Release-path CI flake (hit on the 0.8.0 release commit); small, self-contained.
 
 ## History
-
+- 2026-10-06T05:53:39Z status: open -> closed
 
 ## Links
 
