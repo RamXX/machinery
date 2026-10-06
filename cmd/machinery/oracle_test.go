@@ -224,6 +224,56 @@ func TestOracleSingleFileMode(t *testing.T) {
 	}
 }
 
+func TestOracleNamedFilesPreserveExistingSiblingOracles(t *testing.T) {
+	for _, multiple := range []bool{false, true} {
+		t.Run(fmt.Sprintf("multiple=%t", multiple), func(t *testing.T) {
+			_, errB, codes := withCapturedIO(t)
+			design := t.TempDir()
+			machines := filepath.Join(design, "machines")
+			if err := os.MkdirAll(machines, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			alpha := writeMachine(t, machines, "Alpha.machine.json", validMachineA)
+			beta := writeMachine(t, machines, "Beta.machine.json", validMachineB)
+			gamma := writeMachine(t, machines, "Gamma.machine.json", strings.ReplaceAll(validMachineA, "alpha", "gamma"))
+			writeMachine(t, machines, "Delta.machine.json", strings.ReplaceAll(validMachineB, "beta", "delta"))
+			if err := capturedOracleRun(machines, false, ""); err != nil {
+				t.Fatalf("initial generation: %v (%s)", err, errB.String())
+			}
+			before := map[string][]byte{}
+			for _, name := range []string{"Alpha.oracle.md", "Gamma.oracle.md", "Delta.oracle.md"} {
+				body, err := os.ReadFile(filepath.Join(machines, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				before[name] = body
+			}
+			if err := os.Remove(beta); err != nil {
+				t.Fatal(err)
+			}
+			selected := []string{alpha}
+			if multiple {
+				selected = append(selected, gamma)
+			}
+			if err := oracleRunFilesForTest(selected); err != nil {
+				t.Fatalf("named-file generation: %v (%s)", err, errB.String())
+			}
+			for _, name := range []string{"Alpha.oracle.md", "Gamma.oracle.md", "Delta.oracle.md"} {
+				body, err := os.ReadFile(filepath.Join(machines, name))
+				if err != nil || !bytes.Equal(body, before[name]) {
+					t.Fatalf("existing oracle %s changed: %v", name, err)
+				}
+			}
+			if _, err := os.Lstat(filepath.Join(machines, "Beta.oracle.md")); !os.IsNotExist(err) {
+				t.Fatalf("orphaned generated oracle retained: %v", err)
+			}
+			if len(*codes) != 0 {
+				t.Fatalf("successful generation emitted exit codes %v", *codes)
+			}
+		})
+	}
+}
+
 func TestOracleSingleFileReservesSiblingTags(t *testing.T) {
 	// S12: a per-file run must not silently mint a stable-id tag a directory
 	// sibling already owns; both ids share the derived tag here.
