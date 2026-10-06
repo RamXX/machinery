@@ -60,7 +60,19 @@ findings:                        # may be empty; the key is required
   - retry backoff is fixed, not exponential; tracked as a follow-up, not blocking
 reviewer: milestone acceptance review, conductor + owner sign-off
 date: 2026-08-27
+threat_review:                   # optional; the threat-first review of a security-relevant milestone
+  - adversary: outsider_without_key
+    subject: Payment
+    probe: "forged capture token passed to the real CLI"
+    expected_reason: "capture token signature invalid"
+    observed_reason: "capture token signature invalid"
+reopened_limits: []              # optional; earlier documented limits this change widens
 ```
+
+`threat_review` and `reopened_limits` are optional keys. Each `threat_review` row carries exactly
+`adversary` (one of the standard adversaries in `docs/threat-driven-verification.md`), `subject`,
+`probe`, `expected_reason`, and `observed_reason`, all non-empty; `reopened_limits` is a list of
+strings. A malformed row is an ERROR in every mode.
 
 One file per milestone, and no round numbers: git history is the record of prior attempts. A
 `README.md` or `index.md` in the directory is human navigation and is exempt; anything else in
@@ -100,6 +112,16 @@ things, the way forcing `gp`, `gi`, or `gn` is.
   checked on every acceptance file whose milestone the plan declares, whatever that milestone's
   status: an OPEN milestone's evidence names a reviewed commit exactly as a closed one does, and a
   sha this repository does not hold names no tree in either state.
+- **A security-relevant milestone was reviewed threat first.** A milestone is security-relevant
+  when its block (full mode), its packet (pairwise), or one of its shards (matrix) names a subject
+  the threat ledger `design/threats.yaml` classifies, or one of its threat invariants, as a whole
+  token; without a ledger, a subject the model's wording marks as a candidate. With a ledger in
+  `mode: enforce`, an ACCEPTED file dated on or after `enforced_since` must carry one
+  `threat_review` row per ledger adversary row (except `not_applicable` ones) of every subject the
+  milestone names, with the same `adversary` and `subject`, and `expected_reason` equal to
+  `observed_reason`. A reason that only reports an exit status (`exit 1`, `non-zero exit`,
+  `failed`) is an ERROR: a non-zero exit is not a reason. Without a ledger, or with `mode: audit`,
+  the same findings are `audit:` notes. A file dated before `enforced_since` is history.
 - **Milestone numbers are unambiguous.** Evidence is keyed by number alone. Root `BUILD.md` is the
   sole plan and acceptance authority; bounded `BUILD/*.md` execution packets cannot declare
   milestones, so a packet cannot silently introduce a second acceptance target.

@@ -57,7 +57,8 @@
   checked: 1 milestones, 58 obligations owed, 58 obligations claimed, 2 slices, M1-S1 39613/90000 bytes, M1-S2 16272/60000 bytes
   ok
 == Ga-accept  milestone acceptance evidence ==
-  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
+  note   audit: acceptance/M3.yaml: milestone M3 names security-relevant subject(s) User but records no threat_review; the independent review writes its own threat table first, probes each row with a real process, and records the probe with its expected and observed failure reason
+  checked: 1 plan documents, 6 declared milestones, 6 closed milestones, 6 acceptance files, 289 DoD ids bound, 7 DoD oracle sets bound, 1 security-relevant acceptances, 6 closed milestones with accepted evidence, 6 commit bindings verified, commit under review derived from git HEAD of the repository holding the design; evidence commit bound by ancestry
   ok
 == Gv-attest  attestation evidence ==
   note   Historical acceptance-file judgment only; Gv does not execute Ga ancestry validation or establish current implementation approval.

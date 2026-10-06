@@ -104,12 +104,16 @@ var (
 	acceptanceKeys = map[string]bool{
 		"milestone": true, "commit": true, "verdict": true, "dod_ids": true,
 		"attestations": true, "findings": true, "reviewer": true, "date": true,
-		"_comment": true,
+		"threat_review": true, "reopened_limits": true, "_comment": true,
 	}
 	// acceptanceRequired is every field the evidence must carry, in schema
 	// order. findings is required but may be empty: an empty list says the
 	// reviewer found nothing, an absent key says nobody looked.
 	acceptanceRequired = []string{"milestone", "commit", "verdict", "dod_ids", "attestations", "findings", "reviewer", "date"}
+	// acceptanceOptional is the threat-first review's record: what each
+	// adversary probe expected and observed, and the earlier documented limits
+	// the change widens (docs/threat-driven-verification.md).
+	acceptanceOptional = []string{"threat_review", "reopened_limits"}
 )
 
 // HasAcceptanceDir reports whether the design carries the acceptance
@@ -155,6 +159,10 @@ type acceptRecord struct {
 	findings     []string
 	reviewer     string
 	date         string
+	// threatReview and reopenedLimits are the optional threat-first review
+	// record; checkThreatReviews holds the first against the ledger.
+	threatReview   []threatReviewRow
+	reopenedLimits []string
 }
 
 // CheckAcceptance implements Ga-accept. commit is an optional repository-
@@ -227,6 +235,7 @@ func checkAcceptanceWithGit(design, gitDesign, commit string, requireCommit bool
 		bindable = append(bindable, num)
 		checkDoDCoverage(g, design, rec, ref, ids)
 	}
+	checkThreatReviews(g, design, records, byNum)
 	closedSet := make(map[int]bool, len(closed))
 	for _, num := range closed {
 		closedSet[num] = true
@@ -620,7 +629,7 @@ func parseAcceptance(g *Gate, design, path, label string, fileNum int) *acceptRe
 	}
 	for _, k := range root.Keys() {
 		if !acceptanceKeys[k] {
-			g.Errs = append(g.Errs, fmt.Sprintf("%s: unknown key %s (the evidence fields are %s)", label, ir.Repr(k), strings.Join(acceptanceRequired, ", ")))
+			g.Errs = append(g.Errs, fmt.Sprintf("%s: unknown key %s (the evidence fields are %s; optional: %s)", label, ir.Repr(k), strings.Join(acceptanceRequired, ", "), strings.Join(acceptanceOptional, ", ")))
 		}
 	}
 	var missing []string
@@ -643,7 +652,9 @@ func parseAcceptance(g *Gate, design, path, label string, fileNum int) *acceptRe
 		dodIDs:       acceptStringList(g, label, root, "dod_ids"),
 		attestations: acceptStringList(g, label, root, "attestations"),
 		findings:     acceptStringList(g, label, root, "findings"),
+		threatReview: acceptThreatReview(g, label, root),
 	}
+	rec.reopenedLimits = acceptStringList(g, label, root, "reopened_limits")
 	ok := true
 	num, numOK := acceptInt(root, "milestone")
 	switch {
