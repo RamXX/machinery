@@ -7,8 +7,8 @@ type: feature
 labels: [packet, gw, gv, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:52Z
-content_hash: "sha256:a8163533c2a81bd4e92d2c1f4c46486311e30894419173fc8729c5059c9343f2"
+updated_at: 2026-10-06T04:04:16Z
+content_hash: "sha256:08550ee4b2b7525f403fdd1ea0a1e92e75b4057bfb4825153449a07c68886f4c"
 related: [MAC-036o, MAC-d0bw, MAC-syos]
 ---
 
@@ -40,6 +40,7 @@ Acceptance criteria:
 
 ## Notes
 Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Add per-slice headroom warning band and a fixed-overhead report line to Gw-packet; confirm whether --landing fully covers the design-only reading (likely close the (c) part). Evidence: (c) is largely superseded by 0.11.0: `machinery check --landing` (cmd/machinery/check.go:32, internal/gates/suite.go:291,556) skips gv, so a design lane no longer reads GV_IMPL_REQUIRED (internal/gates/attest.go:341) as blocking. (a) and (b) not done: internal/gates/packet.go has no headroom, warning-band or fixed-overhead reporting; CHANGELOG has none. Notes: Related MAC-036o, MAC-d0bw, MAC-syos (packet budget family). Slice-budget warning is useful insurance for H2-style 159-byte headroom; impact modest.
+0.11.0: part (c), the design-only reading of GV_IMPL_REQUIRED, is largely covered by machinery check --landing (gv skipped). Remaining: the headroom warning band and the fixed-overhead line.
 
 ## History
 
