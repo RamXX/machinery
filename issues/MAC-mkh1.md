@@ -7,8 +7,8 @@ type: feature
 labels: [attest, ux, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:37161c8b763d4590eb2e94c97ad8e4d9f1f780957bd7b2ea8f2a3ace40522090"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:d42ce999f7b58defa5737a4e60ee0e09b8666d768d276b90db5c0d22a6310815"
 related: [MAC-zlbk]
 ---
 
@@ -34,7 +34,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add --merge-into with in-place row replace or append, byte-preserving elsewhere, atomic write, fail on malformed target. Evidence: cmd/machinery/attest.go flags (lines ~93-99) have no --merge-into; help text line 87 still says 'merge the row into attestations.yaml. Generation never writes that file.' No later commit adds it. Notes: Related MAC-zlbk (--rejudge) touches the same command; sequence them together but no hard dependency. Note the design stance 'generation never writes that file' must be amended deliberately.
 
 ## History
 
