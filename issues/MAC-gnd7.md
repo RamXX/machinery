@@ -7,8 +7,8 @@ type: feature
 labels: [relational, formal, h2-ask, unapproved-scope, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:e68308ff9358413e141b7e6e419f308710eff19924e42169381e395e5fcdf0ed"
+updated_at: 2026-10-06T04:03:51Z
+content_hash: "sha256:f2df5360171a33a6b9736ef610119667bb216ff7743508b8efcb27d32b6716bb"
 ---
 
 ## Description
@@ -32,7 +32,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add optional scope: on unique rows, compile to Alloy fact and oracle, diagnostics, byte-identical unscoped output, docs/CHANGELOG. Evidence: internal/alloy/integrity.go:129 integrityUniqueKeys is still {entity, attribute, invariant}; no scope key. CHANGELOG through 0.11.0 has no scoped unique. Notes: Issue itself says unapproved feature scope until authorized; keep P3 until owner approves.
 
 ## History
 
