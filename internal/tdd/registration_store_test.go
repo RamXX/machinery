@@ -608,3 +608,32 @@ func TestCommitRegistrationFailureModes(t *testing.T) {
 		t.Fatal("failed commits left transaction staging behind")
 	}
 }
+
+func TestStoreWriterConcurrentNamespaceTeardown(t *testing.T) {
+	store := filepath.Join(t.TempDir(), "store")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	outcomes := make(chan error, 4)
+	for range 4 {
+		go func() {
+			for range 200 {
+				writer, err := acquireStoreWriter(ctx, store)
+				if err != nil {
+					outcomes <- err
+					return
+				}
+				if err := writer.release(); err != nil {
+					outcomes <- err
+					return
+				}
+			}
+			outcomes <- nil
+		}()
+	}
+	for range 4 {
+		if err := <-outcomes; err != nil {
+			t.Error(err)
+			cancel()
+		}
+	}
+}
