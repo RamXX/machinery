@@ -7,8 +7,8 @@ type: feature
 labels: [attest, gv, ux, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:50Z
-content_hash: "sha256:6ea64e979b7c429e05b044f926f1a58d81f9cd616ba6569484ee96f9e80b3dd5"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:0268aa99796e03eb8cc8846fcf884a6800b683f53b9aeb5bbaf3672433a30be5"
 related: [MAC-6mzy, MAC-mkh1, MAC-nf0m]
 ---
 
@@ -37,7 +37,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add attest --rejudge <claim> --note (in-place refresh of cover hashes plus one dated line, idempotent same-day), a duplicate RE-JUDGED lint, and section-scoped covers. Evidence: Verified at HEAD 8c620d8f (v0.11.0). cmd/machinery/attest.go:92-99 still lists only --claims --design --impl --claim --kind --attestor --date --note; grep for rejudge/RE-JUDGED finds nothing in cmd, internal or skills (only test fixtures in example_attestation_migration_test.go). CHANGELOG 0.11.0 does not add it. Commit f2f9410a only re-pinned go-crm dates by hand. Notes: Section-scoped covers overlap MAC-nf0m (derived per-claim scope) and MAC-6mzy; consider splitting the section-scope AC out so --rejudge can ship alone. Related MAC-mkh1 (--merge-into) is a natural companion, not a prerequisite.
 
 ## History
 
