@@ -15,14 +15,20 @@ func TestBackgroundStopDefersWithoutChangingLedger(t *testing.T) {
 			t.Run(event+"/pending="+map[bool]string{true: "yes", false: "no"}[pending], func(t *testing.T) {
 				isolateHookState(t)
 				root := managedRoot(t)
+				writeFile(t, filepath.Join(root, ConfigName), `{"design":"design","impl":"src"}`+"\n")
 				pre := editEvent("PreToolUse", "Write", "deferred", filepath.Join(root, "design", "notes.txt"))
 				pre.ToolUseID = "deferred-operation"
 				runEvent(t, root, pre)
+				writeFile(t, filepath.Join(root, "src", "main.go"), "package main\n")
 				impl := editEvent("PostToolUse", "Write", "deferred", filepath.Join(root, "src", "main.go"))
 				runEvent(t, root, impl)
 				if !pending {
 					pre.HookEventName = "PostToolUse"
 					runEvent(t, root, pre)
+				}
+				state, stateErr := readStateRecord(root, "deferred")
+				if stateErr != nil || !state.design || !state.impl || len(state.routes) == 0 {
+					t.Fatalf("fixture did not record both touch classes and route bindings: %+v %v", state, stateErr)
 				}
 				ledger := statePath(root, "deferred")
 				before, err := os.ReadFile(ledger)
