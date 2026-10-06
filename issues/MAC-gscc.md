@@ -1,15 +1,17 @@
 ---
 id: MAC-gscc
 title: "1.0 projection rejects Modelith's valid n:n cardinality (accepts non-Modelith n:m)"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [modelith, projection, gk]
 parent: MAC-0p5d
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:57Z
-content_hash: "sha256:835e56f220b16f2c3c7972975eb0398fdf594d4294dd75d034bedb46979e9020"
+updated_at: 2026-10-06T05:53:39Z
+content_hash: "sha256:b4b534ecfa63947da8dd2754fd9f73ffdd59d2cd83509a9ba0a59a93ed4f05c7"
+closed_at: 2026-10-06T05:53:39Z
+close_reason: "Fixed in 0.11.1 (fba13568 RED, 6485c630 GREEN): the 1.0 projection normalizes Modelith n:n to n:m."
 ---
 
 ## Description
@@ -32,6 +34,7 @@ Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Accept n:n in v1 (map 
 ## History
 - 2026-09-25T20:11:08Z dep_added: blocks MAC-g7d4
 - 2026-10-06T04:03:39Z dep_removed: no_longer_blocks MAC-g7d4
+- 2026-10-06T05:53:39Z status: open -> closed
 
 ## Links
 - Parent: [[MAC-0p5d]]
