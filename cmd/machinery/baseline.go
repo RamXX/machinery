@@ -19,8 +19,8 @@ import (
 
 func newBaselineCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "baseline <design-dir> --impl <dir> [--gate g4,gy,gl] [--grow]",
-		Short: "Record the adoption debt snapshot in design/ratchet.json (G4 boundary edges; Gy-rules and Gl-ledger findings on request)",
+		Use:   "baseline <design-dir> --impl <dir> [--gate g4,gy,gl,gz] [--grow]",
+		Short: "Record the adoption debt snapshot in design/ratchet.json (G4 boundary edges; Gy-rules, Gl-ledger, and Gz-threat findings on request)",
 		Long: `Scan the implementation exactly as G4-import does, print the baseline: rules
 that would tolerate today's violating edges (paste them into the Architecture
 Contract's dependency_rules after review), and write design/ratchet.json, the
@@ -33,7 +33,9 @@ are proposed. Review ratchet changes before adopting them as accepted debt.
 Rerun after burning down debt to tighten the ratchet.
 
 --gate selects what is recorded: g4 (the default, as above), gy (the Gy-rules
-findings) and gl (the Gl-ledger undeclared-fact warnings), comma separated.
+findings), gl (the Gl-ledger undeclared-fact warnings), and gz (the Gz-threat
+candidates design/threats.yaml does not classify, each with a hash of its
+model definition), comma separated.
 --impl is required only with g4; for gy it adds the implementation's oracle
 bindings, exactly as machinery check --impl does. A recorded Gy/Gl finding
 reports as a baselined NOTE and never blocks; a new one reports as before; a
@@ -41,15 +43,18 @@ recorded one that disappears is a resolved NOTE. The first gy (or gl) run
 records every current finding; later runs keep only recorded findings still
 observed, so that part of the ratchet only shrinks, unless --grow accepts the
 new ones as debt. Gy refuses to record while the design has projection
-errors: a row the rules cannot read is a broken design, not debt. A run
-rewrites only the sections it records and keeps the others.`,
+errors: a row the rules cannot read is a broken design, not debt. Gz refuses
+the same way while design/threats.yaml does not parse or resolve against the
+model, and a recorded Gz candidate whose model definition changed is a
+finding again. A run rewrites only the sections it records and keeps the
+others.`,
 		Args: cobra.ExactArgs(1),
 	}
 	var implDir, date, gateList string
 	var grow bool
 	c.Flags().StringVar(&implDir, "impl", "", "implementation directory to scan (required with g4)")
-	c.Flags().StringVar(&gateList, "gate", "g4", "comma list of the debt to record: g4 (boundary edges), gy (Gy-rules findings), gl (Gl-ledger undeclared-fact warnings)")
-	c.Flags().BoolVar(&grow, "grow", false, "gy/gl: also record findings that are new since the last baseline (otherwise the recorded set only shrinks)")
+	c.Flags().StringVar(&gateList, "gate", "g4", "comma list of the debt to record: g4 (boundary edges), gy (Gy-rules findings), gl (Gl-ledger undeclared-fact warnings), gz (Gz-threat unclassified candidates)")
+	c.Flags().BoolVar(&grow, "grow", false, "gy/gl/gz: also record findings that are new since the last baseline (otherwise the recorded set only shrinks)")
 	c.Flags().StringVar(&date, "date", "", "stamp for the snapshot and rule comments (YYYY-MM-DD; otherwise SOURCE_DATE_EPOCH or an existing ratchet date is required)")
 	c.RunE = func(cmd *cobra.Command, args []string) (retErr error) {
 		output := trackCommandOutput()
@@ -65,8 +70,8 @@ rewrites only the sections it records and keeps the others.`,
 			fmt.Fprintf(stderrW, "machinery_baseline: %s\n", err)
 			return commandExitBecause(1, err)
 		}
-		if grow && !sel.gy && !sel.gl {
-			fmt.Fprintln(stderrW, "machinery_baseline: --grow applies to --gate gy and gl; a g4 rerun always re-snapshots the observed edges")
+		if grow && !sel.gy && !sel.gl && !sel.gz {
+			fmt.Fprintln(stderrW, "machinery_baseline: --grow applies to --gate gy, gl, and gz; a g4 rerun always re-snapshots the observed edges")
 			return commandExit(1)
 		}
 		if sel.g4 && implDir == "" {
@@ -96,10 +101,10 @@ rewrites only the sections it records and keeps the others.`,
 			return err
 		}
 		// the recorded sections this run does not rewrite are kept; a run
-		// that records gy or gl must be able to read them
+		// that records gy, gl, or gz must be able to read them
 		prior, priorErr := gates.LoadRatchet(sourceDesign)
-		if priorErr != nil && (sel.gy || sel.gl) {
-			return fmt.Errorf("machinery_baseline: %w; fix or remove it before recording consistency debt", snapshot.LogicalError(priorErr))
+		if priorErr != nil && (sel.gy || sel.gl || sel.gz) {
+			return fmt.Errorf("machinery_baseline: %w; fix or remove it before recording consistency or threat debt", snapshot.LogicalError(priorErr))
 		}
 		var ratchet *gates.Ratchet
 		if sel.g4 {
@@ -110,10 +115,10 @@ rewrites only the sections it records and keeps the others.`,
 			printEdgeBaseline(stdoutW, rep, date)
 			ratchet = rep.Ratchet
 			if prior != nil {
-				ratchet.Rules, ratchet.Undeclared = prior.Rules, prior.Undeclared
+				ratchet.Rules, ratchet.Undeclared, ratchet.Threats = prior.Rules, prior.Undeclared, prior.Threats
 			}
 		} else if prior != nil {
-			// the date is the G4 snapshot's; a gy/gl-only run keeps it
+			// the date is the G4 snapshot's; a gy/gl/gz-only run keeps it
 			ratchet = prior
 		} else {
 			ratchet = &gates.Ratchet{Date: date}
@@ -124,6 +129,16 @@ rewrites only the sections it records and keeps the others.`,
 			if err != nil {
 				return fmt.Errorf("machinery_baseline: %w", snapshot.LogicalError(err))
 			}
+		}
+		if sel.gz {
+			// recorded after Gy/Gl so a refusal there leaves threat_debt as it was
+			rec, err := gates.RecordThreatDebt(sourceDesign, ratchet, grow)
+			if err != nil {
+				return fmt.Errorf("machinery_baseline: %w", snapshot.LogicalError(err))
+			}
+			recs = append(recs, rec)
+		}
+		if len(recs) > 0 {
 			if sel.g4 {
 				fmt.Fprintln(stdoutW)
 			}
@@ -151,7 +166,7 @@ rewrites only the sections it records and keeps the others.`,
 			fmt.Fprintln(stdoutW, "rerunning baseline rewrites ratchet.json and may accept newly added offender files, even when no new dependency rules are proposed. Review ratchet changes before adopting them as accepted debt.")
 			fmt.Fprintln(stdoutW, "armed: G4 now fails when a baselined edge gains a new offender file, and the machinery plugin blocks import findings at turn end")
 		}
-		if len(recs) > 0 {
+		if sel.gy || sel.gl {
 			occurrences := 0
 			for _, u := range ratchet.Undeclared {
 				occurrences += u.Count
@@ -159,13 +174,17 @@ rewrites only the sections it records and keeps the others.`,
 			fmt.Fprintf(stdoutW, "\nwrote %s/%s: %d Gy-rules finding(s), %d Gl-ledger undeclared-fact warning(s) baselined\n", design, gates.RatchetFile, len(ratchet.Rules), occurrences)
 			fmt.Fprintln(stdoutW, "armed: a baselined finding reports as a note and never blocks; a new one reports as before; rerun this command after fixing findings to shrink the ratchet (it grows only with --grow)")
 		}
+		if sel.gz {
+			fmt.Fprintf(stdoutW, "\nwrote %s/%s: %d Gz-threat candidate(s) baselined\n", design, gates.RatchetFile, len(ratchet.Threats))
+			fmt.Fprintln(stdoutW, "armed: a baselined candidate reports as a note while its model definition is unchanged; a new or changed candidate is a finding (an error under mode: enforce); rerun this command after classifying candidates to shrink the ratchet (it grows only with --grow)")
+		}
 		return nil
 	}
 	return c
 }
 
 // baselineSelection is what one baseline run records.
-type baselineSelection struct{ g4, gy, gl bool }
+type baselineSelection struct{ g4, gy, gl, gz bool }
 
 func parseBaselineGates(list string) (baselineSelection, error) {
 	var sel baselineSelection
@@ -177,22 +196,27 @@ func parseBaselineGates(list string) (baselineSelection, error) {
 			sel.gy = true
 		case "gl":
 			sel.gl = true
+		case "gz":
+			sel.gz = true
 		case "":
 			return sel, fmt.Errorf("--gate %q contains an empty gate name", list)
 		default:
-			return sel, fmt.Errorf("--gate %q: baseline records g4, gy and gl only, not %q", list, strings.TrimSpace(tok))
+			return sel, fmt.Errorf("--gate %q: baseline records g4, gy, gl, and gz only, not %q", list, strings.TrimSpace(tok))
 		}
 	}
 	return sel, nil
 }
 
-// printConsistencyBaseline reports what a gy/gl run recorded, per gate.
+// printConsistencyBaseline reports what a gy/gl/gz run recorded, per gate.
 func printConsistencyBaseline(w io.Writer, recs []gates.DebtRecord) {
 	fmt.Fprintln(w, "== baseline  consistency debt snapshot ==")
 	for _, r := range recs {
 		what := "finding(s)"
-		if r.Gate == "Gl-ledger" {
+		switch r.Gate {
+		case "Gl-ledger":
 			what = "undeclared-fact warning(s)"
+		case "Gz-threat":
+			what = "unclassified candidate(s)"
 		}
 		line := fmt.Sprintf("  %s: %d %s observed; %d recorded", r.Gate, r.Observed, what, r.Recorded)
 		if r.First {

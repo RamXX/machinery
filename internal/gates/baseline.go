@@ -31,13 +31,14 @@ const RatchetFile = "ratchet.json"
 // Ratchet is the committed set-based snapshot: the offender files of every
 // baselined (tolerated-violation) edge at the moment the baseline was taken,
 // and, when recorded, the adoption debt of the consistency layer (Gy-rules
-// findings and Gl-ledger undeclared-fact warnings).
+// findings and Gl-ledger undeclared-fact warnings), and the unclassified
+// Gz-threat candidates of the threat ledger's migration.
 //
 // Each section is optional in the file and nil when absent, which is not the
 // same as empty: a nil Edges means G4 was never baselined (G4 treats the
-// ratchet as absent), and a nil Rules or Undeclared means that gate's debt was
-// never recorded (the next `machinery baseline --gate gy|gl` records every
-// current finding). An empty, present section is a recorded baseline with no
+// ratchet as absent), and a nil Rules, Undeclared, or Threats means that gate's
+// debt was never recorded (the next `machinery baseline --gate gy|gl|gz`
+// records every current finding). An empty, present section is a recorded baseline with no
 // debt left, which a later baseline grows only with --grow.
 type Ratchet struct {
 	Date  string              `json:"date"`
@@ -46,12 +47,15 @@ type Ratchet struct {
 	Rules []RuleDebt `json:"-"`
 	// Undeclared is the baselined Gl-ledger undeclared-fact warnings.
 	Undeclared []UndeclaredDebt `json:"-"`
+	// Threats is the baselined Gz-threat candidates, one per subject.
+	Threats []ThreatDebt `json:"-"`
 }
 
 // Ratchet section names in ratchet.json.
 const (
 	ratchetRulesKey      = "rule_findings"
 	ratchetUndeclaredKey = "undeclared_facts"
+	ratchetThreatKey     = "threat_debt"
 )
 
 // RuleDebt is one baselined Gy-rules finding, keyed by the rule's output
@@ -165,8 +169,18 @@ func decodeRatchet(raw []byte) (*Ratchet, error) {
 				return nil, fmt.Errorf("%s: %w", ratchetUndeclaredKey, err)
 			}
 			r.Undeclared = undeclared
+		case ratchetThreatKey:
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				return nil, err
+			}
+			threats, err := decodeThreatDebt(raw)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", ratchetThreatKey, err)
+			}
+			r.Threats = threats
 		default:
-			return nil, fmt.Errorf("unknown root key %q (supported: date, edges, %s, %s)", key, ratchetRulesKey, ratchetUndeclaredKey)
+			return nil, fmt.Errorf("unknown root key %q (supported: date, edges, %s, %s, %s)", key, ratchetRulesKey, ratchetUndeclaredKey, ratchetThreatKey)
 		}
 	}
 	if _, err := dec.Token(); err != nil {
@@ -175,9 +189,9 @@ func decodeRatchet(raw []byte) (*Ratchet, error) {
 	if !seen["date"] {
 		return nil, fmt.Errorf("missing required root key %q", "date")
 	}
-	// edges is required unless the file records consistency debt instead: a
-	// ratchet with no section at all records nothing
-	if !seen["edges"] && !seen[ratchetRulesKey] && !seen[ratchetUndeclaredKey] {
+	// edges is required unless the file records consistency or threat debt
+	// instead: a ratchet with no section at all records nothing
+	if !seen["edges"] && !seen[ratchetRulesKey] && !seen[ratchetUndeclaredKey] && !seen[ratchetThreatKey] {
 		return nil, fmt.Errorf("missing required root key %q", "edges")
 	}
 	var trailing any
@@ -317,7 +331,7 @@ func decodeStrictArray(raw []byte, into any) error {
 // RatchetArmsImports reports whether the design's ratchet arms import
 // blocking at turn end: the file exists and records a G4 edges section (an
 // unreadable or malformed file arms it too, failing closed). A ratchet that
-// records only Gy/Gl debt carries no G4 snapshot and arms nothing.
+// records only Gy/Gl/Gz debt carries no G4 snapshot and arms nothing.
 func RatchetArmsImports(design string) bool {
 	if fi, err := os.Stat(filepath.Join(design, RatchetFile)); err != nil || fi.IsDir() {
 		return false
@@ -359,6 +373,7 @@ func RenderRatchet(r *Ratchet) ([]byte, error) {
 		Edges      *map[string][]string `json:"edges,omitempty"`
 		Rules      *[]RuleDebt          `json:"rule_findings,omitempty"`
 		Undeclared *[]UndeclaredDebt    `json:"undeclared_facts,omitempty"`
+		Threats    *[]ThreatDebt        `json:"threat_debt,omitempty"`
 	}{Date: r.Date}
 	if r.Edges != nil {
 		out.Edges = &r.Edges
@@ -370,6 +385,10 @@ func RenderRatchet(r *Ratchet) ([]byte, error) {
 	if r.Undeclared != nil {
 		sort.Slice(r.Undeclared, func(i, j int) bool { return r.Undeclared[i].key() < r.Undeclared[j].key() })
 		out.Undeclared = &r.Undeclared
+	}
+	if r.Threats != nil {
+		sort.Slice(r.Threats, func(i, j int) bool { return r.Threats[i].Subject < r.Threats[j].Subject })
+		out.Threats = &r.Threats
 	}
 	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {

@@ -5,6 +5,11 @@
   note   relational layers not opted in: policy, integrity, isolation
   checked: 18 invariants declared, 16 preserves references, 12 carried by preserves, 1 carried by a machine unit, 5 waived with reason
   ok
+== Gz-threat  adversary classification ==
+  note   audit: Portfolio.accept looks security-relevant ("approve" in action description) and is not classified in design/threats.yaml; list it under subjects with its adversary rows, under not_security_relevant with a reason, or under waivers with an owner, date, and reason
+  note   audit: set mode: enforce and enforced_since in design/threats.yaml to make these blocking; see docs/threat-driven-verification.md
+  checked: 1 candidates detected, 10 workspace.dsl elements scanned
+  ok
 == G2-c4  Architecture Contract ==
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)
   note   assert: no dependency assertions; negative reachability claims live only in prose (mechanism unused)

@@ -1142,7 +1142,7 @@ func TestSelectGatesProgressiveOptional(t *testing.T) {
 }
 
 // The stop hook mirrors the CLI default suite for every checkable-from-design
-// gate: gc arms on the domain model, gd on machines, gk on the external-
+// gate: gc and gz arm on the domain model, gd on machines, gk on the external-
 // checker layer. Omitting gk once let checker DRIFT (a stale committed
 // projection after a mid-session model edit) pass the turn end green while
 // the CLI reported it and exited 1.
@@ -1172,7 +1172,7 @@ func TestSelectGatesArmsConsistencyRules(t *testing.T) {
 func TestSelectGatesArmsCarrierIdciteCheckers(t *testing.T) {
 	dir := t.TempDir()
 	sel, _ := selectGates(dir, Config{})
-	for _, g := range []string{"gc", "gd", "gk"} {
+	for _, g := range []string{"gc", "gz", "gd", "gk"} {
 		if sel.Run[g] {
 			t.Errorf("%s must not run before its artifact exists: %v", g, sel.Run)
 		}
@@ -1181,7 +1181,7 @@ func TestSelectGatesArmsCarrierIdciteCheckers(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "machines", "Order.machine.json"), "{}\n")
 	writeFile(t, filepath.Join(dir, "checkers", "pii.checker.yaml"), "checker_version: 1\n")
 	sel, _ = selectGates(dir, Config{})
-	for _, g := range []string{"gc", "gd", "gk"} {
+	for _, g := range []string{"gc", "gz", "gd", "gk"} {
 		if !sel.Run[g] {
 			t.Errorf("%s must run once its artifact exists (CLI parity): %v", g, sel.Run)
 		}

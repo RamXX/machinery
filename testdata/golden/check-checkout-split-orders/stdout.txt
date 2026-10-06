@@ -5,6 +5,9 @@
   note   relational layers not opted in: policy, integrity, isolation
   checked: 2 invariants declared, 2 preserves references, 2 carried by preserves
   ok
+== Gz-threat  adversary classification ==
+  checked: 5 workspace.dsl elements scanned
+  ok
 == G2-c4  Architecture Contract ==
   note   exposes: declared by no boundary; G4 constrains imports at boundary granularity only (mechanism unused)
   note   baseline: no rules; the ratchet holds no tolerated debt (mechanism unused)

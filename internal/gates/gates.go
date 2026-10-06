@@ -614,11 +614,14 @@ func dslElementsOf(text string) map[string]dslEl {
 					tags[strings.TrimSpace(t)] = true
 				}
 			}
-			display := name
+			display, description := name, ""
 			if len(args) > 0 {
 				display = args[0]
 			}
-			els[name] = dslEl{Kind: kind, Tags: tags, Display: display}
+			if len(args) > 1 {
+				description = args[1]
+			}
+			els[name] = dslEl{Kind: kind, Tags: tags, Display: display, Description: description}
 			if strings.HasSuffix(strings.TrimSpace(line), "{") {
 				stack = append(stack, openEl{name: name, depth: depth})
 			}
@@ -642,9 +645,10 @@ func dslElementsOf(text string) map[string]dslEl {
 }
 
 type dslEl struct {
-	Kind    string
-	Tags    map[string]bool
-	Display string
+	Kind        string
+	Tags        map[string]bool
+	Display     string
+	Description string // the second quoted argument, "" when absent
 }
 
 func quoteStrings(s string) []string {
