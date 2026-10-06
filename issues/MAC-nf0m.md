@@ -7,8 +7,8 @@ type: feature
 labels: [gv, attest, h2]
 created_at: 2026-09-25T19:38:38Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:38:38Z
-content_hash: "sha256:c42a80c5b9767d21fb4c4a6dd5c018af27cbad2f284196b18465edee4b088554"
+updated_at: 2026-10-06T04:03:52Z
+content_hash: "sha256:37d7d58e90ff36f06bca8ee6b6dbfd0ac3456c19f4ec7d79ef79094d5afc3168"
 blocked_by: [MAC-6mzy]
 related: [MAC-zlbk]
 ---
@@ -32,7 +32,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement closed per-claim-kind derivation rules evaluated by machinery, gate recomputation, and docs on proof scope. Evidence: No derived per-claim scope in internal/gates/attest.go or CHANGELOG through 0.11.0; current rows still bind the full root. Prerequisite MAC-6mzy (git-tracked inventory, exclusion list, compact manifest) is still open. Notes: Real dependency: builds on the committed exclusion list and manifest from MAC-6mzy. Addresses re-attestation ritual cost; related MAC-zlbk. Note the risk: scope derivation is a soundness-sensitive design change, so the unknown-kind-to-full-root rule must hold.
 
 ## History
 - 2026-09-25T19:38:38Z dep_added: blocked_by MAC-6mzy
