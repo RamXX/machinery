@@ -1261,9 +1261,20 @@ with shell expansion, redirection, or chaining use normal governance.
 The per-user hook store binds its private directory's native identity and a random store
 generation to an independent `~/.machinery-hook-state-<key>.initialized` loss sentinel.
 Project ledgers are keyed by canonical root and shared across agent sessions and hosts.
-On Darwin the stable witness is the inode; OS-volatile device and stat generation fields
-are excluded, including when reading older bindings. Other platforms retain their native
-filesystem identity checks. A different directory inode still fails closed.
+On every Unix the stable witness is the inode: the device number is excluded, because macOS
+renumbers volumes and Linux renumbers a reattached block volume (a Kubernetes persistent
+volume rescheduled to another node). A different directory inode still fails closed; after
+verifying a store that was moved or restored to another filesystem, run
+`machinery hook-state adopt --root <root> --rebind-identity`, which requires the store
+generation to match the sentinel and prints the old and new identity.
+
+Each in-flight tool token records the session and lane that armed it. Only that session's
+Stop waits for it; another or an ended session's token is reported as orphaned and keeps the
+project obligation armed, so the gates run at every Stop until it completes or an operator
+runs `machinery hook-state release --root <root> --orphaned` (journaled; obligations stay
+armed). Interrupts, denied calls, and session ends close their own lane's tokens through
+non-blocking boundary hooks. `machinery doctor` lists stranded tokens and obligations armed
+under a different routing configuration per project, with the exact recovery.
 
 `machinery doctor` checks the same binding as the hook. Stop hook callers before an operator
 handoff, inspect the store and diagnosis, then run `machinery hook-state adopt --root <root>`.

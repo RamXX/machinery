@@ -61,8 +61,15 @@ must never silently remove governance.
 |---|---|
 | SessionStart | Injects the governance contract into context: design dir, staged gates, the read-only artifact list, and `design/STATE.md` (the session ledger) when present. Every session in the repo knows the rules, whether or not the skill ever triggers. |
 | PreToolUse | Denies file or shell operations that name generated artifacts: `<design>/**/*.oracle.md`, `<design>/formal/*.tla`, `*.cfg` and `*.als`, `<design>/packs/**` (generated packs), `<design>/pack/**` (the frozen pack a child was built against), `<design>/ratchet.json` (the baseline snapshot), and `.machinery.json` itself (an agent edit there could switch governance off or reroute the gates; a human maintains it). Also denies creating or editing the wave sentinel `.machinery-wave` anywhere in the repository. Before an allowed operation starts, it durably records an exact `tool_use_id` token and the immutable session route. Shell commands conservatively arm both the design and configured implementation obligations because their dynamically computed targets cannot be reconstructed from command text. The refusal names the regeneration command. |
-| PostToolUse / PostToolUseFailure | Durably closes only the matching `tool_use_id` while retaining the project-wide design or implementation obligation. Success and failure are both terminal tool events; neither runs gates mid-edit. A missing terminal event leaves the token in flight and Stop cannot discharge it. |
-| Stop / SubagentStop | Refuses to discharge while an exact tool token or host-reported background task remains. A matching tree hash does not prove the operation is finished. Only the matching PostToolUse or PostToolUseFailure event closes the token; a repeated Stop cannot remove it. A live background task also prevents gate discharge. Otherwise, if the project touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. The exact canonical wave sentinel content `open` defers red gates as a message while retaining the obligation; deleting it closes the wave, and malformed sentinel state gates normally with a diagnostic. No clock, mtime, or host identity participates in that decision. |
+| PostToolUse / PostToolUseFailure | Durably closes only the matching `tool_use_id` while retaining the project-wide design or implementation obligation. Success and failure are both terminal tool events; neither runs gates mid-edit. A missing terminal event leaves the token in flight until a boundary event of its lane, a completion, or an operator release closes it. |
+| UserPromptSubmit / PostToolBatch / Interrupt / SessionEnd | Non-blocking boundary notices, wired through `machinery-hook.sh boundary`. Hosts send no PostToolUse or PostToolUseFailure for a cancelled or manually denied call and no Stop after an interrupt, so these events close the tokens of the lane (main thread, or one subagent) or the session that can no longer complete them: the next prompt or a Codex `Interrupt` closes the main lane's tokens, a resolved `PostToolBatch` closes its own lane's, `SessionEnd` closes the whole session's. They never close another session's token or a token with no recorded owner, never discharge an obligation, and never block: a missing or failing binary exits 0. Claude Code ignores `Interrupt` and Codex ignores `PostToolBatch`. |
+| Stop / SubagentStop | Refuses to discharge while one of this session's own tool tokens or a host-reported background task remains. A matching tree hash does not prove the operation is finished. Only the matching PostToolUse or PostToolUseFailure event, or a boundary event of the lane that armed it, closes the token; a repeated Stop cannot remove it. A token armed by another or an ended session is reported as orphaned with its recovery command instead: it does not block this Stop, the gates run, and the obligation stays armed (a green Stop does not clear it) until the token completes or an operator releases it. A live background task also prevents gate discharge. With a usable `.machinery.json`, an obligation armed under a different routing configuration is re-evaluated by running the gates under the current one, and the Stop names the change; with no usable configuration the recorded route decides. Otherwise, if the project touched anything watched, runs `machinery check` (in-process; same suite semantics as the CLI). DRIFT findings block the stop with the gate output as the reason; the model fixes and the check re-runs. G4 import-boundary findings block only when they are ARMED: `<design>/ratchet.json` exists, written by `machinery baseline`. Before that snapshot exists, import findings warn with the arming instruction instead of blocking, because blocking a session on pre-existing boundary debt it did not create invites the model to "fix" the debt by adding allow rules, which is silent amnesty. Plain ERRORs only warn, because a half-built design is a normal interrogation state. The exact canonical wave sentinel content `open` defers red gates as a message while retaining the obligation; deleting it closes the wave, and malformed sentinel state gates normally with a diagnostic. No clock, mtime, or host identity participates in that decision. |
+
+The wave sentinel matters most right after a crash. An orphaned token keeps the project obligation
+armed, so every Stop in the repository runs the full stop-time gate suite until the token is
+released. A repository that intentionally runs red between checkpoints is then blocked at every
+turn end unless the operator opens a wave (`.machinery-wave` containing `open`) or releases the
+orphaned tokens with `machinery hook-state release --root <root> --orphaned`.
 
 The durable store records its own first initialization in a private home-rooted location outside the
 configuration and state parent. Its first creation is safe and silent. If the state parent later
@@ -238,6 +245,50 @@ root from this version on, so a binary older than this one reads such a ledger a
 fails closed on it: a downgrade that meets a newer ledger blocks until the affected `<digest>.state`
 files are removed. Remove those files, never the store directory, whose initialization marker is what
 tells a first run from a lost store.
+
+### Stranded tokens, route changes, and store identity
+
+Each in-flight token records the session and the lane that armed it, as one-way digests (the ledger
+never stores a raw session or agent id). Tokens written by 0.11.1 and earlier carry no owner and are
+always treated as orphaned. `machinery doctor` lists, per project, the tokens no completion is known
+for and any obligation armed under a routing configuration that differs from the current
+`.machinery.json`, each with its exact recovery:
+
+```bash
+machinery hook-state release --root <root> --orphaned        # every token of the project
+machinery hook-state release --root <root> --token <12+ hex>  # one token (repeatable)
+```
+
+Release removes tokens, never obligations: the design/impl obligation stays armed and the next Stop
+runs the gates before anything clears. Each release is journaled before the ledger changes, in the
+handoff journal next to the independent marker (`~/.machinery-hook-state-<key>.initialized.handoffs`),
+with time, operator, uid, host, process ids, the released tokens and their owning sessions, and any
+agent-host environment markers. Use `--orphaned` only when no agent session in the project is running
+a tool; a live token released by mistake does not skip a gate, because its own PostToolUse re-arms
+the obligation.
+
+The store's identity is its directory inode plus the random 32-byte generation bound into the
+independent marker. The device number is ignored on every Unix, because macOS renumbers volumes and
+Linux renumbers a block volume that is detached and reattached (a Kubernetes persistent volume
+rescheduled to another node). An inode change means the store was moved or restored to another
+filesystem: the hook refuses it, and after verifying the store an operator runs
+`machinery hook-state adopt --root <root> --rebind-identity`, which requires the generation to match
+the marker and prints the old and new identity. Doctor names that command only when it can succeed.
+
+Threat-model trade-offs, stated plainly:
+
+- A Stop may run the gates while another live session's tool call is still writing. That session's
+  own PostToolUse re-arms the obligation and its own Stop re-runs the gates; if that host is killed
+  after writing and before PostToolUse, only later Stops in the project (which keep running while
+  its token stays) and CI cover the write.
+- Boundary events come from the host and cannot be sent by an agent. An agent can run `release`
+  through its shell, which cannot skip a gate and is journaled with the environment that ran it.
+- Route re-evaluation trusts the current operator-owned `.machinery.json`. File-tool edits of it and
+  shell commands that name it are denied; a configuration changed by an obfuscated shell command
+  takes effect at the next Stop, whose message names the route change. CI is the backstop.
+- A different store that reuses the same inode number on another filesystem and carries the
+  matching generation would be accepted; forging the generation already requires reading the
+  marker.
 
 Hooks load at session start: after installing or upgrading the plugin, restart the Claude Code
 session in the project.

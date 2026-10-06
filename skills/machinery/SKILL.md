@@ -42,8 +42,11 @@ policy itself. Log outside the design tree or declare transient paths. Standalon
 
 The per-user durable store binds a native directory identity and random generation
 to an independent `~/.machinery-hook-state-<key>.initialized` loss sentinel. Project
-ledgers bind canonical roots, not agent seats. Darwin uses the inode without volatile
-device or stat generation fields; other platforms retain native filesystem identity.
+ledgers bind canonical roots, not agent seats. Unix identity is the inode without the
+volatile device number; an inode change needs `adopt --rebind-identity` after operator
+verification. Only the session that armed an in-flight tool token waits for it; other
+sessions' stranded tokens keep the obligation armed until
+`machinery hook-state release --root <root> --orphaned`, which never clears obligations.
 `machinery doctor` validates this binding. For an operator-inspected handoff, stop
 hook callers and run `machinery hook-state adopt --root <root>`. It validates the
 store, journals the handoff, and preserves and reports outstanding obligations.

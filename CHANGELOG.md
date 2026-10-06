@@ -6,6 +6,99 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Hook: a state store on a reattached block volume no longer bricks every event (MAC-xqu7).**
+  A Linux block volume that is detached and reattached (a Kubernetes persistent volume
+  rescheduled to another node, a cloud data volume moved between VMs) keeps the store
+  directory's inode but gets a new device number, and every SessionStart, PreToolUse and Stop
+  failed with "changed native identity" while `hook-state adopt` refused the same way. The
+  store identity now ignores the device number on every Unix, as it already did on macOS; the
+  inode, any native generation or birth time both identity records carry, and the random store
+  generation in the independent marker still detect a replaced store.
+- **Hook: a stranded in-flight tool token no longer blocks every later Stop (MAC-ntvm).** A
+  PreToolUse token whose PostToolUse never arrives (host SIGKILLed mid tool call, Esc while a
+  tool runs, a permission dialog denied by hand, the plugin disabled and re-enabled) used to
+  block every Stop in the repository forever. Each token now records the session and lane
+  (main thread or subagent) that armed it, as one-way digests. A Stop is blocked only by its own
+  session's unfinished calls; another or an ended session's token is reported as orphaned with
+  its recovery command, does not block, and keeps the project's design/impl obligation armed,
+  so the gates run at every Stop until it completes or is released.
+- **Hook: interrupts, denials and session ends close their tokens.** Claude Code sends no
+  PostToolUse or PostToolUseFailure for a cancelled or manually denied call and no Stop after
+  an interrupt. The plugin now also listens to `UserPromptSubmit` and `PostToolBatch` (Claude
+  Code), `Interrupt` (Codex) and `SessionEnd` (both). These boundary notices close exactly the
+  tokens of the lane or session that can no longer complete them, never another session's or an
+  owner-less one, and never discharge an obligation. They cannot block: a missing or failing
+  binary on a boundary event exits 0 and leaves the token for Stop and doctor to report.
+- **Hook: an obligation armed under an older routing configuration is re-evaluated, not refused
+  forever.** A Stop with a usable `.machinery.json` now runs the gates under the configuration in
+  force and names the route change in its message, instead of blocking with "dirty obligation
+  was armed under a different routing configuration" after a plugin or binary upgrade or an
+  operator edit. When no usable configuration exists (both markers gone, or hooks switched off
+  while work is outstanding) the recorded route still decides and a Stop still blocks.
+- **Hook: Codex payloads carrying `turn_id`** are accepted instead of failing as an unknown
+  field.
+- **`machinery doctor` never prescribes a command that is guaranteed to refuse.** For a store
+  whose binding no longer validates it asks adoption's own decision and names the one recovery
+  that can succeed.
+
+### Added
+
+- **`machinery hook-state release --root <root> (--token <id>... | --orphaned)`**, the audited
+  operator recovery for tokens no session can complete. It removes only the named tokens (a full
+  id or a unique prefix of at least 12 hex characters), keeps the design/impl obligation armed so
+  the next Stop still runs the gates, and journals time, operator, uid, host, process, root,
+  tokens and their owning sessions in the store's handoff journal before the ledger changes.
+- **`machinery hook-state adopt --rebind-identity`** accepts a verified store whose native
+  directory identity changed (moved or restored to another filesystem) when its generation
+  matches the independent initialization marker, and prints the old and new identity.
+- **`machinery doctor` reports, per project, stranded tool tokens and obligations armed under a
+  different routing configuration**, each with the exact recovery command. Neither fails doctor;
+  an unreadable project ledger does.
+
+### Security and threat model
+
+The hook's job is that no governed change ends a turn without the gates running. These fixes
+keep that property and narrow two fail-closed behaviours that had become permanent lockouts:
+
+- **Orphaned tokens.** An orphaned token never discharges anything: the obligation stays armed,
+  red gates still block, and a green Stop does not clear the ledger while the token remains. The
+  residual is that a Stop may run the gates while another live session's tool call is still
+  writing; that session's own PostToolUse re-arms the obligation and its own Stop re-runs the
+  gates. If that other host is killed after writing and before PostToolUse, the write is covered
+  only by later Stops in the project (which keep running while the token stays) and by CI.
+- **Boundary events** are host-originated; an agent cannot send one. They remove a token the same
+  way a PostToolUseFailure does and leave the obligation armed.
+- **Release** is an operator command an agent could also run through its shell. It cannot skip a
+  gate: it removes tokens, not obligations, and every use is journaled with the environment that
+  ran it (`CLAUDECODE`, `CODEX_*`, `OPENCODE` markers are recorded).
+- **Route re-evaluation** trusts the current operator-owned `.machinery.json`. An agent edit of
+  that file is still denied for file tools and for shell commands that name it; a configuration
+  changed by an obfuscated shell command would now be applied at the next Stop instead of
+  wedging it, and the Stop message names the route change. CI's `machinery check` remains the
+  backstop for a weakened configuration.
+- **Store identity.** Ignoring the device number means a different store that reuses the same
+  inode number on another filesystem and carries the matching 32-byte generation would be
+  accepted; forging the generation already requires reading the marker. An inode change is
+  accepted only through an explicit `adopt --rebind-identity` after operator verification.
+
+### Compatibility and migration
+
+- **Ledger format.** New pending lines carry `owner <session> <lane>` digests. A binary older
+  than this release reads such a ledger as noncanonical and fails closed, as it did for the
+  earlier project-root line: do not downgrade with obligations outstanding, or remove the
+  affected `<digest>.state` files (never the store directory) after a downgrade. Ledgers written by
+  0.11.1 and earlier are read unchanged; their owner-less tokens count as orphaned and need one
+  `machinery hook-state release --root <root> --orphaned`, which `machinery doctor` names.
+- **Plugin hooks.** `hooks/hooks.json` gains `UserPromptSubmit`, `PostToolBatch`, `Interrupt` and
+  `SessionEnd` entries that call the shim with `boundary`. Claude Code ignores `Interrupt`
+  (Codex-only) and Codex ignores `PostToolBatch`; `claude plugin validate` reports the former as
+  a warning. Run `machinery update`, then `/reload-plugins` or restart the session.
+- **Stop messages.** A Stop that previously blocked with "in-flight tool operation(s)" because of
+  another session's token, or with "different routing configuration", now runs the gates and
+  reports instead. Tests or tooling that matched those blocks for foreign sessions need updating.
+
 ## [0.11.1] - 2026-10-06
 
 **Why this release.** A corrective batch: every open bug in the backlog, fixed together. The
