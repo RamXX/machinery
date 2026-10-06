@@ -2,14 +2,14 @@
 id: MAC-r3b0
 title: "Project Modelith derived entities/attributes; WRITES to derived is a finding; derived entities need no placement row"
 status: open
-priority: 2
+priority: 3
 type: feature
 labels: [modelith, projection, simplification]
 parent: MAC-0p5d
 created_at: 2026-09-25T20:11:08Z
 created_by: ramirosalas
-updated_at: 2026-09-25T20:11:08Z
-content_hash: "sha256:c525817c292ed45c291be12580ce175e8d556be089cdbd18041bb5d5b5e8424c"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:06c50831ff19626c69f53f07e72409fadaa73e9a4d098026356c8d9e6e6d1c5a"
 blocked_by: [MAC-g7d4]
 ---
 
@@ -29,7 +29,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Project derived entities/attributes in v2, make WRITES to a derived fact a finding, auto-waive placement rows for derived entities, document derived: waiver split. Evidence: No attr_derived or entity_derived facts anywhere in code or schemas (grep). Placement check in internal/gates/gates.go:~2242 still requires a row per entity. Notes: Adds new fact relations and a rule; affects projection schema/Datalog parity, so more than cosmetic simplification.
 
 ## History
 - 2026-09-25T20:11:08Z dep_added: blocked_by MAC-g7d4
