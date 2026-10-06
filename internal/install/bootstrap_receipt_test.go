@@ -468,18 +468,26 @@ func bootstrapAssertConvergence(t *testing.T, f bootstrapInstall, release *boots
 	}
 }
 
-func bootstrapRollbackContext(t *testing.T) (context.Context, context.CancelFunc) {
-	t.Helper()
-	return context.WithTimeout(context.Background(), 30*time.Second)
+func bootstrapRollbackContext(deadline time.Time) (context.Context, context.CancelFunc) {
+	// Keep the package deadline, while allowing Update's own operation
+	// budgets to finish the intended failure and transaction rollback.
+	if !deadline.IsZero() {
+		return context.WithDeadline(context.Background(), deadline)
+	}
+	return context.WithCancel(context.Background())
 }
 
 func TestBootstrapRollbackAllowsSlowProgress(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		ctx, cancel := bootstrapRollbackContext(t)
+		ctx, cancel := bootstrapRollbackContext(time.Now().Add(time.Minute))
 		defer cancel()
 		time.Sleep(31 * time.Second)
 		if err := ctx.Err(); err != nil {
 			t.Fatalf("test cancelled update before installer rollback: %v", err)
+		}
+		time.Sleep(30 * time.Second)
+		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			t.Fatalf("package deadline was not retained: %v", ctx.Err())
 		}
 	})
 }
@@ -564,7 +572,8 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				before := bootstrapState(t, f)
 				release.broken.Store(true)
 				defer release.broken.Store(false)
-				ctx, cancel := bootstrapRollbackContext(t)
+				deadline, _ := t.Deadline()
+				ctx, cancel := bootstrapRollbackContext(deadline)
 				defer cancel()
 				cmd := exec.CommandContext(ctx, f.binary, f.args(bootstrap)...)
 				cmd.Dir, cmd.Env = f.root, f.env
