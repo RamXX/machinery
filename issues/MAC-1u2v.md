@@ -8,8 +8,8 @@ labels: [integration]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:07:16Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:45Z
-content_hash: "sha256:036638900541b138a2277e9874f4a47dbff489d0b10754e3e1f085be1519914a"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:18c125a14793e61c3922a7194177cddf37077c26e4e0d6e4834a135c8e673f3b"
 blocked_by: [MAC-u4oo]
 blocks: [MAC-vx24, MAC-ou97]
 was_blocked_by: [MAC-al5u]
@@ -88,7 +88,7 @@ status: new
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Author the four-language end-to-end tests after the CLI exists; body still cites pvg/nd/MAC-l7m0 hold language and consumes scripts/assurance-examples.sh (not required: its al5u edge was already removed). Evidence: Verified at HEAD 8c620d8f (v0.11.0). No machinery tdd command is registered (cmd/machinery has no tdd.go; CHANGELOG 0.7.0 'no CLI surface yet'; docs/test-assurance-contract.md:9,22 state the CLI is target only). internal/assuranceflow holds only register.go (no run.go), scripts/assurance-examples.sh does not exist, examples/go-crm/design/assurance/ does not exist. assurance_standalone_e2e_test.go and testdata/assurance-standalone do not exist; no testdata/integration-lanes/assurance-standalone.json. Notes: Needs rewrite of context (Dagger lanes, tiered preflight 0ee03664). Real dep is the CLI (u4oo).
 
 ## History
 - 2026-09-06T09:10:13Z dep_added: blocked_by MAC-al5u
