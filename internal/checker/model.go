@@ -197,9 +197,12 @@ func parseModel(path string, data []byte) (*Model, error) {
 				return nil, fmt.Errorf("%s: entity %q relationships[%d].entity must be non-empty", path, ename, i)
 			}
 			switch cardinality {
+			case "n:n":
+				// Preserve the 1.0 schema's many-to-many representation.
+				cardinality = "n:m"
 			case "1:1", "1:n", "n:1", "n:m":
 			default:
-				return nil, fmt.Errorf("%s: entity %q relationships[%d] has unsupported cardinality %q", path, ename, i, cardinality)
+				return nil, fmt.Errorf("%s: entity %q relationships[%d] has unsupported cardinality %q; use the v2 projection's relational relationships layer for other Modelith-valid cardinalities", path, ename, i, cardinality)
 			}
 			name := ro.GetString("role")
 			if name == "" {

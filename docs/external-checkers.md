@@ -128,8 +128,13 @@ for coverage: a manifest's `coverage.claim` globs over the short, human invarian
 matches `priv-consent-required`), while evidence `coverage` rows reference the full `stable_id` the
 projection assigns it (`inv:priv-consent-required`), never the bare id.
 
-Two more things v1 is upfront about:
+Three more things v1 is upfront about:
 
+- Modelith's `n:n` cardinality is emitted as `n:m`, including in relationship stable ids,
+  to preserve the 1.0 schema and existing adapter compatibility. Existing `n:m` inputs remain
+  accepted. Other Modelith-valid cardinalities, including bounded forms, require the v2
+  projection's relational `relationships` layer; use a manifest naming a layer beyond the
+  1.0 three without including `model`, `invariants`, or `relationships` from the v1 model block.
 - An invariant's `text` field is Modelith's invariant `statement`, verbatim.
 - `polarity` (positive / negative) is reserved on the invariant shape and always absent in v1:
   Modelith does not yet carry polarity, so there is nothing to project.
