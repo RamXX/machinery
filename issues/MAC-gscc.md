@@ -8,8 +8,8 @@ labels: [modelith, projection, gk]
 parent: MAC-0p5d
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
-updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:b596466f87d4c3254334c3fa28f17242af4f8341a6728bede5ac4e0f5bece339"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:835e56f220b16f2c3c7972975eb0398fdf594d4294dd75d034bedb46979e9020"
 ---
 
 ## Description
@@ -27,7 +27,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Accept n:n in v1 (map to n:m or extend enum), reject bounded forms naming v2 projection, regression test through project and check --gate gk with a real n:n model. Evidence: internal/checker/model.go:199-203 still accepts only 1:1,1:n,n:1,n:m and schemas/projection.schema.json:83 enum unchanged; v2 reader (internal/gates/projection_readers.go:281-285) projects n:n but v1 path refuses, as projection_readers_test.go:139 comments. Alloy isolation.go:212 accepts n:n. No CHANGELOG entry. Notes: Consumers with valid Modelith n:n models cannot run project/Gk: blocks a valid input. Hence P1; not P0 since v2 path works.
 
 ## History
 - 2026-09-25T20:11:08Z dep_added: blocks MAC-g7d4
