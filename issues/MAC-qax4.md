@@ -2,14 +2,14 @@
 id: MAC-qax4
 title: "Docs: e2e proof is the definition of done; hard TDD is a rigor option"
 status: open
-priority: 1
+priority: 2
 type: task
 labels: [e2e, docs, dod]
 parent: MAC-9dai
 created_at: 2026-09-25T19:53:32Z
 created_by: ramirosalas
-updated_at: 2026-09-25T19:53:32Z
-content_hash: "sha256:fcb017b21832d9582a22e73097eeeb5d9e21b966a87fe7f88fdfee23ef331cb3"
+updated_at: 2026-10-06T04:03:56Z
+content_hash: "sha256:e5ce568fd27e28c224fa4c7ac8dcc461cb66af0126cd3157e1c5b9cae4d1f8d4"
 blocked_by: [MAC-p3pj, MAC-lioz, MAC-4ah8]
 ---
 
@@ -30,7 +30,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Rewrite README, acceptance-gate, test-assurance-contract, SKILL, build-md-template and build-writer to name e2e proof as done. Evidence: Docs still headline hard TDD and oracle coverage; no e2e DoD text. Depends on gates that do not exist (p3pj, lioz, 4ah8 all unimplemented). Notes: Blockers are real: docs must describe shipped behavior. Do last in the epic.
 
 ## History
 - 2026-09-25T19:53:33Z dep_added: blocked_by MAC-p3pj
