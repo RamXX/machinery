@@ -91,3 +91,27 @@ func TestRoutingSnapshotGuardsIgnorePolicy(t *testing.T) {
 		t.Fatalf("ignore policy change escaped snapshot: %v", err)
 	}
 }
+
+func TestRoutingSnapshotOmitsLargeIgnoredLog(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	design := filepath.Join(root, "design")
+	writeFile(t, filepath.Join(design, ".machineryignore"), "logs/\n")
+	if err := os.Mkdir(filepath.Join(design, "logs"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	log, err := os.Create(filepath.Join(design, "logs", "run.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := log.Truncate(2 << 30); err != nil {
+		t.Fatal(err)
+	}
+	if err := log.Close(); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, _ := Load(root)
+	if err := withRoutingSnapshot(root, cfg, func(Config) error { return nil }); err != nil {
+		t.Fatalf("ignored log metadata blocked routing: %v", err)
+	}
+}
