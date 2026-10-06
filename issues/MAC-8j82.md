@@ -1,14 +1,16 @@
 ---
 id: MAC-8j82
 title: "oracle: single-file mode deletes every sibling oracle (sequential, no concurrency needed); per-file publications also share one sentinel"
-status: open
+status: closed
 priority: 0
 type: bug
 labels: [oracle, publication, concurrency, h2]
 created_at: 2026-09-10T07:50:17Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:50Z
-content_hash: "sha256:ec50151519d1198a6d69feb3eac1aa1258c9030334e1c0f8511535fe13129aeb"
+updated_at: 2026-10-06T05:53:38Z
+content_hash: "sha256:65051583d8310b28ddb9d0a8b20888d8cc3e1aa28300fb2856d45f43530db5d3"
+closed_at: 2026-10-06T05:53:38Z
+close_reason: "Fixed in 0.11.1 (9ae02d4f RED, 40cb4fb1 GREEN): oracle deletes only generated oracles whose source machine is gone; reproduced and verified with the real binary on a copied example (5 of 5 oracles preserved)."
 ---
 
 ## Description
@@ -25,7 +27,7 @@ Triage 2026-09-24: reproduced WITHOUT concurrency. One sequential `machinery ora
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: In per-file mode only stale-delete generated oracles whose source machine is absent; add regression test with a pre-existing sibling oracle; then consider a directory publication lock for concurrency. Evidence: Reproduced by reading code: cmd/machinery/oracle.go:403 calls staleOwnedOracles(artifactDir, artifacts) where artifacts holds only the named files in per-file mode; staleOwnedOracles (oracle.go:450-481) marks every machinery-generated *.oracle.md not in keep as stale via canonicalOracleOwner (oracle.go:483) with no check that the source .machine.json is gone, so siblings are scheduled for ExpectAbsent deletion. TestOracleSingleFileMode (oracle_test.go:207) only asserts the sibling is not generated, never that an existing one survives. No fix in git log or CHANGELOG through 0.11.0. Notes: Silent data loss in a shipped command (triage already says P0). Root cause also explains H2 90 deleted oracles.
 
 ## History
-
+- 2026-10-06T05:53:38Z status: open -> closed
 
 ## Links
 
