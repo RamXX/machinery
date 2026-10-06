@@ -2,13 +2,13 @@
 id: MAC-0b1e
 title: "README residuals: isolation is not noninterference; possibility and statistical properties are not proven"
 status: open
-priority: 2
+priority: 3
 type: task
 labels: [docs, isolation]
 created_at: 2026-09-24T21:27:28Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:27:28Z
-content_hash: "sha256:0ed3de7d61956d174e5e0bf17d28419ad67356c86b749a163dc131fc41184b29"
+updated_at: 2026-10-06T04:03:49Z
+content_hash: "sha256:71f8d234e18b3b96f0637236a278bfda32ec1d7f78e205396ee8f6ca72352de7"
 related: [MAC-2f7g]
 ---
 
@@ -30,7 +30,7 @@ Acceptance criteria: the three bullets appear in README's residual list and the 
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add the three bullets to README residual list and docs/isolation-layer.md; align wording with property-class vocabulary if MAC-2f7g lands first. Evidence: README.md 'What machinery does not verify' (about lines 957-975) lists seven residuals; none mention noninterference, possibility or statistical properties (grep for noninterference/possibility/statistical/hyperprop in README.md and docs/isolation-layer.md returns nothing). Only the 0.11.0 threat-ledger residual was added. Notes: Pure docs, no dependency. Can ship now; vocabulary can be adjusted later. Priority P2 is high for a docs-only residual but the claim-honesty angle justifies P2-P3.
 
 ## History
 
