@@ -8,8 +8,8 @@ labels: [hard-tdd]
 parent: MAC-ui8a
 created_at: 2026-09-06T09:03:33Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:44Z
-content_hash: "sha256:bee6dab904a0659b6298e3e76adda8913de70c6682902165bb0d37a2e72b0db2"
+updated_at: 2026-10-06T04:03:54Z
+content_hash: "sha256:24afc6ff92a8bb1b56b5c987ec48c2c5d001a3113fc75a38cd2716ecd8b3f306"
 blocked_by: [MAC-sd7g]
 blocks: [MAC-rau8, MAC-vx24]
 was_blocked_by: [MAC-62s6]
@@ -91,7 +91,7 @@ status: new
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement tdd.Execute and Verify (RED with controls, unsafe variants, GREEN, independent replay), the provisional Candidate, and the replay lane. Evidence: CHANGELOG 0.7.0 says the assurance substrate ships with no CLI/gate consumer. Greps of *.go find no CheckTDDAssurance, GateExecution, TDDStatus, assurance_store or strict-check. internal/assuranceflow holds only register.go. internal/tdd has no execute.go, replay.go or evidence.go, and has CheckExecutor only as a type in types.go. internal/tdd/execute.go and replay.go are absent; internal/tdd has capture, store, status and registration_store only. Notes: MAC-62s6 (register) is closed and shipped in internal/assuranceflow/register.go, so that stale blocker is already removed. Real dependence on sd7g is the production CheckExecutor used in integration tests.
 
 ## History
 - 2026-09-06T09:10:07Z dep_added: blocked_by MAC-62s6
