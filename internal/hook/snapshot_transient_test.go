@@ -69,3 +69,25 @@ func TestProcessControlDoesNotReadChangingDesign(t *testing.T) {
 		}
 	}
 }
+
+func TestProcessControlRejectsShellEvaluation(t *testing.T) {
+	for _, command := range []string{"kill 123; echo write", "kill $(cat pid)", "kill 123 > design/BUILD.md", "pkill `echo worker`", "kill 123 && touch design/BUILD.md"} {
+		if processControl(Input{ToolName: "Bash", ToolInput: toolInput{Command: command}}) {
+			t.Fatalf("shell evaluation bypassed governance: %s", command)
+		}
+	}
+}
+
+func TestRoutingSnapshotGuardsIgnorePolicy(t *testing.T) {
+	isolateHookState(t)
+	root := managedRoot(t)
+	target := filepath.Join(root, "design", ".machineryignore")
+	if err := os.WriteFile(target, []byte("logs/\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, _ := Load(root)
+	err := withRoutingSnapshot(root, cfg, func(Config) error { return os.WriteFile(target, []byte("**\n"), 0600) })
+	if err == nil || !strings.Contains(err.Error(), ".machineryignore") {
+		t.Fatalf("ignore policy change escaped snapshot: %v", err)
+	}
+}
