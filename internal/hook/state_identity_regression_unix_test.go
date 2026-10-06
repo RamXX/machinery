@@ -4,8 +4,10 @@ package hook
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 )
@@ -47,5 +49,34 @@ func TestDarwinWitnessSurvivesVolatileStatFields(t *testing.T) {
 	}
 	if first != second {
 		t.Fatalf("OS-volatile stat fields changed witness: %s -> %s", first, second)
+	}
+}
+
+func TestDarwinLegacyStoreBindingSurvivesVolatileFields(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	isolateHookState(t)
+	root := managedRoot(t)
+	event := editEvent("PreToolUse", "Write", "seat", filepath.Join(root, "design", "BUILD.md"))
+	runEvent(t, root, event)
+	marker, err := stateInitializationMarkerPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, binding, err := readStateInitializationMarker(marker)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(binding.native, ":")
+	binding.native = "unix:ffff:" + parts[2] + ":gen:ffff"
+	if err := os.WriteFile(filepath.Join(stateDirPath(), stateDirectoryIdentityName), binding.identityBody(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(marker, binding.markerBody(), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if out := runEvent(t, root, event); out != "" {
+		t.Fatalf("legacy binding denied unchanged inode: %s", out)
 	}
 }
