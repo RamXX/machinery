@@ -8,8 +8,8 @@ labels: [story, human-surface, h2-origin]
 parent: MAC-lnp2
 created_at: 2026-09-30T23:26:33Z
 created_by: ramirosalas
-updated_at: 2026-09-30T23:26:33Z
-content_hash: "sha256:b1d7a4e6d358140c2813f9c61900f2e79ebb90aa08a2576e98fc628c59b5e3be"
+updated_at: 2026-10-06T04:03:55Z
+content_hash: "sha256:1fe07d5932801b8a983007776eaa2851b18d949c7dc97cace4bbd493a1520557"
 blocked_by: [MAC-m7bh, MAC-5n2i]
 ---
 
@@ -38,7 +38,7 @@ ACCEPTANCE CRITERIA
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add the walkthroughs schema, the five acceptance checks, separation of duties attestation, and template section 9 text, activated only when screen contracts exist. Evidence: Acceptance schema has no walkthroughs list; internal/gates/accept.go (Ga-accept) was last extended for 0.11.0 threat rules but has no human-act logic. Notes: Real dependencies: acts and element ids come from m7bh; the walkthrough evidence kind comes from 5n2i. Overlaps MAC-4ah8 (executed e2e evidence at Ga) in accept.go, so sequence the two or share the evidence-record design. P1 is generous; P2 would match its consumer-visible impact once opt-in.
 
 ## History
 - 2026-09-30T23:26:37Z dep_added: blocked_by MAC-m7bh
