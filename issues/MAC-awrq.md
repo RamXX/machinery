@@ -2,13 +2,13 @@
 id: MAC-awrq
 title: "install: fixed 90 s watchdog panic in bootstrap finalization tests under host load"
 status: open
-priority: 2
+priority: 3
 type: bug
 labels: [install, flaky-under-load, preflight]
 created_at: 2026-09-08T22:25:52Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:31:55Z
-content_hash: "sha256:42259df5ca345a412cb06992861cedb4062038301e9507b84a35f2cfeea97669"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:0a83196fb2cae19f9b899f1271b01bc959f9c7d5f3a84310ad5171acb3becb24"
 related: [MAC-qo6n]
 ---
 
@@ -36,6 +36,7 @@ Replace the panic watchdog with the Update's own deadline (or a t.Fatal after th
 
 ## Notes
 Triage 2026-09-24: valid. Watchdog unchanged at internal/install/bootstrap_receipt_test.go:972 (time.AfterFunc 90s panic). Do the t.Fatal/deadline fix first (independent, cheap); the quiet-lane move depends on MAC-qo6n.
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Replace the panic watchdog with t.Fatal after the operation returns (elapsed time and installer progress in the message) or the Update's own deadline; moving to a quiet lane is separate (MAC-qo6n). Evidence: internal/install/bootstrap_receipt_test.go:972 still has time.AfterFunc(90*time.Second, panic(...)); no commit changing it after 2026-09-08. Notes: The first half (t.Fatal/deadline) is independent; only the lane move depends on MAC-qo6n. No blockedBy set, relation is Related only, which is correct.
 
 ## History
 
