@@ -7,8 +7,8 @@ type: bug
 labels: [packet, gw, h2]
 created_at: 2026-09-10T19:13:53Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:33:46Z
-content_hash: "sha256:32904f0db4965798c91624b810cbc7982f88c30f0ab8c2035aca555e79181915"
+updated_at: 2026-10-06T04:03:51Z
+content_hash: "sha256:d885955d52496ee48ec76c0b76b506a372c701278fb90478809395b7e5c114e4"
 related: [MAC-n87x]
 ---
 
@@ -23,6 +23,7 @@ H2 shards (design/BUILD/core.md, trust.md, assess.md) open section 9 with 'N/A -
 
 ## Notes
 Triage 2026-09-24: valid (planBlocksOf short-circuits on N/A, packet.go ~619) but H2 worked around it with subsections.
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Treat an N/A preamble followed by milestone list items as a plan with items, or document that milestone:<shard> requires a non-N/A opening; add test. Evidence: internal/gates/packet.go:620-622 planBlocksOf returns (nil,false) when the first non-blank line starts with N/A, so milestone:<shard> cannot resolve list items after an N/A preamble; unchanged since triage. Notes: Related MAC-n87x (packet headroom); H2 has a workaround via subsections. Small fix.
 
 ## History
 
