@@ -1,15 +1,17 @@
 ---
 id: MAC-s2qw
 title: "Hook-state store: sanctioned agent-seat handoff, truthful refusal message, doctor sees the binding"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [hook, governance, doctor, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:53Z
-content_hash: "sha256:47d40e61329b533265d76af4184b8af66191d99ed2d004b4992647fd5b5e665c"
+updated_at: 2026-10-06T05:53:40Z
+content_hash: "sha256:1918c49062191c6055ed77d3eaba6237bf4ee8b190f756c31a5711761ba02a85"
 related: [MAC-bmlh]
+closed_at: 2026-10-06T05:53:40Z
+close_reason: "Fixed in 0.11.1 (bf3a973d RED, f0f074f4 GREEN, follow-ups through 3ddaa0f4): component-specific refusals, doctor checks the binding, Darwin volatility tolerated, machinery hook-state adopt."
 ---
 
 ## Description
@@ -54,7 +56,7 @@ Acceptance criteria:
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Name the mismatched component in each refusal; drop or classify OS-volatile fields (st_gen, dev) in the darwin witness; add a sanctioned adopt/transition command that journals the handoff, reports pending obligations and handles the loss sentinel; make doctor run the same binding check; document the identity model. Evidence: internal/hook/hook.go:2287, :2317, :2320 still emit 'refusing to accept a replacement store' for absent-identity, native-identity-mismatch and marker-mismatch alike. internal/hook/state_identity_unix.go:27 still binds Dev, Ino and Gen (st_gen) into the native witness. No hook-state adopt command exists (grep of cmd and internal finds none). CHANGELOG 0.11.0 'hook crash recovery' covers interrupted temp writes only, not seat handoff. Notes: Active availability defect consumers hit (governance hard-down on seat rotation); fail-closed direction must be preserved. P1 not P0 because a manual (lossy) remedy exists. Related MAC-bmlh is a separate defect, not a blocker.
 
 ## History
-
+- 2026-10-06T05:53:40Z status: open -> closed
 
 ## Links
 - Related: [[MAC-bmlh]]
