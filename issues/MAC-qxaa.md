@@ -1,15 +1,16 @@
 ---
 id: MAC-qxaa
 title: "Gt-tests credits oracle ids in suites that skip themselves; report them as UNRUN"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [gt, assurance, h2, from-next]
 created_at: 2026-09-24T21:32:50Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:52Z
-content_hash: "sha256:35a55d798db066f2f4dd2a9b8ed63bf730126769c9b346d61acfdf20cd1def38"
-blocks: [MAC-9azz]
+updated_at: 2026-10-06T05:53:39Z
+content_hash: "sha256:6ec77ef9416e3895ff8f431576eac0ee3bf79ea9cb6634b2e948bc2e512f6440"
+closed_at: 2026-10-06T05:53:39Z
+close_reason: "Fixed in 0.11.1 (df9d1da4 RED, 61a32111 GREEN): skipped bindings report UNRUN; opt-in out-of-band run records in design/assurance/test-runs.json stale on suite or source change. docs/gt-test-discovery.md."
 ---
 
 ## Description
@@ -42,8 +43,8 @@ Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Implement the skip voc
 
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocks MAC-9azz
+- 2026-10-06T05:53:39Z status: open -> closed
+- 2026-10-06T05:53:39Z dep_removed: no_longer_blocks MAC-9azz
 
 ## Links
-- Blocks: [[MAC-9azz]]
-
 ## Comments

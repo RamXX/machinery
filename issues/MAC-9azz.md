@@ -9,10 +9,9 @@ parent: MAC-cup9
 created_at: 2026-09-24T02:38:21Z
 created_by: ramirosalas
 updated_at: 2026-10-06T04:03:57Z
-content_hash: "sha256:10770bd0d1799670a13cfac8bddda4ed6cd3366fa389804b17faa47e0d21951e"
-blocked_by: [MAC-qxaa]
+content_hash: "sha256:ebb5a783fc9e281b98cad39b0119ba45b19be3a461e47b83f5a26525d7e471d4"
 blocks: [MAC-cup9]
-was_blocked_by: [MAC-va30]
+was_blocked_by: [MAC-va30, MAC-qxaa]
 ---
 
 ## Description
@@ -32,11 +31,11 @@ Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Whole story: table ora
 - 2026-09-24T21:33:56Z dep_added: blocked_by MAC-qxaa
 - 2026-10-06T04:03:34Z dep_added: blocks MAC-cup9
 - 2026-10-06T04:03:38Z dep_removed: was_blocked_by MAC-va30
+- 2026-10-06T05:53:39Z dep_removed: was_blocked_by MAC-qxaa
 
 ## Links
 - Parent: [[MAC-cup9]]
 - Blocks: [[MAC-cup9]]
-- Blocked by: [[MAC-qxaa]]
-- Was blocked by: [[MAC-va30]]
+- Was blocked by: [[MAC-va30]], [[MAC-qxaa]]
 
 ## Comments
