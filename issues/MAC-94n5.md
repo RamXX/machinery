@@ -7,8 +7,8 @@ type: feature
 labels: [consistency-layer, packets, supersession, from-next]
 created_at: 2026-09-24T21:32:34Z
 created_by: ramirosalas
-updated_at: 2026-09-24T21:32:34Z
-content_hash: "sha256:4171d8d63e30e959af68ddab01051476fe651d838f32e85b01e423c349b258bd"
+updated_at: 2026-10-06T04:03:50Z
+content_hash: "sha256:99455ae106e1cdaf2d0195511bcc3444de5925c1cf8611838bf93b679ab41932"
 related: [MAC-036o]
 ---
 
@@ -37,7 +37,7 @@ Acceptance criteria:
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: All four residuals: section:/file: citation coverage, active definition and constructor restrictions in packets with historical labeling, native-authority-stays-unresolved case, migration diagnostics, docs disclaimer. Evidence: rules/consistency/supersession.dl:55-57 joins superseded_in_packet only on packet_cites by type key; docs/consistency-layer-proposal.md:530-532 documents the section:/file: gap; no 'historical' labeling in internal/gates/packet.go; no migration diagnostics for multi-draft designs found in code or docs. Notes: Blocks MAC-f15w (kept). Related MAC-036o (row key addressing). Could be split into packet-content and diagnostics stories.
 
 ## History
 - 2026-09-24T21:33:58Z dep_added: blocks MAC-f15w
