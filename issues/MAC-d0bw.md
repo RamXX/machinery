@@ -1,15 +1,17 @@
 ---
 id: MAC-d0bw
 title: "packet: milestone:<shard> citation unresolvable when the shard's Build plan section opens with an N/A preamble"
-status: open
+status: closed
 priority: 3
 type: bug
 labels: [packet, gw, h2]
 created_at: 2026-09-10T19:13:53Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:51Z
-content_hash: "sha256:d885955d52496ee48ec76c0b76b506a372c701278fb90478809395b7e5c114e4"
+updated_at: 2026-10-06T05:53:39Z
+content_hash: "sha256:0cd7760255fe66bd84c6955cf188ae61106418bf8df24456b591b586fdbbe985"
 related: [MAC-n87x]
+closed_at: 2026-10-06T05:53:39Z
+close_reason: "Fixed in 0.11.1 (ff74d149 RED, ec650172 GREEN): milestone citations resolve after an N/A preamble."
 ---
 
 ## Description
@@ -26,7 +28,7 @@ Triage 2026-09-24: valid (planBlocksOf short-circuits on N/A, packet.go ~619) bu
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Treat an N/A preamble followed by milestone list items as a plan with items, or document that milestone:<shard> requires a non-N/A opening; add test. Evidence: internal/gates/packet.go:620-622 planBlocksOf returns (nil,false) when the first non-blank line starts with N/A, so milestone:<shard> cannot resolve list items after an N/A preamble; unchanged since triage. Notes: Related MAC-n87x (packet headroom); H2 has a workaround via subsections. Small fix.
 
 ## History
-
+- 2026-10-06T05:53:39Z status: open -> closed
 
 ## Links
 - Related: [[MAC-n87x]]
