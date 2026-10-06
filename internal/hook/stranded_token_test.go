@@ -90,7 +90,7 @@ func TestBoundaryClosesOnlyItsOwnLane(t *testing.T) {
 		t.Fatalf("prompt boundary: %s %v", out, err)
 	}
 	requireArmed(t, root, 2, "a main-lane prompt must keep the background subagent's and the other session's tokens")
-	batch := map[string]any{"hook_event_name": "PostToolBatch", "session_id": "s1", "agent_id": "background-agent", "cwd": root, "tool_calls": []any{}}
+	batch := map[string]any{"hook_event_name": "PostToolBatch", "session_id": "s1", "agent_id": "background-agent", "cwd": root, "tool_calls": []any{map[string]any{"tool_use_id": "toolu_sub"}, map[string]any{"tool_use_id": "toolu_main"}}}
 	if out, err := runHookPayload(t, root, batch); err != nil || out != "" {
 		t.Fatalf("batch boundary: %s %v", out, err)
 	}

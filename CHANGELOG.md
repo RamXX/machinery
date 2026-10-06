@@ -23,14 +23,17 @@ under their version heading when a release is cut.
   (main thread or subagent) that armed it, as one-way digests. A Stop is blocked only by its own
   session's unfinished calls; another or an ended session's token is reported as orphaned with
   its recovery command, does not block, and keeps the project's design/impl obligation armed,
-  so the gates run at every Stop until it completes or is released.
+  so the gates run at every Stop until it completes or is released. A token with no recorded
+  owner (written by 0.11.1 or earlier, or armed by an event without a session id) cannot be
+  proven foreign, so it still blocks every Stop, and the block names the operator recovery.
 - **Hook: interrupts, denials and session ends close their tokens.** Claude Code sends no
   PostToolUse or PostToolUseFailure for a cancelled or manually denied call and no Stop after
   an interrupt. The plugin now also listens to `UserPromptSubmit` and `PostToolBatch` (Claude
-  Code), `Interrupt` (Codex) and `SessionEnd` (both). These boundary notices close exactly the
-  tokens of the lane or session that can no longer complete them, never another session's or an
-  owner-less one, and never discharge an obligation. They cannot block: a missing or failing
-  binary on a boundary event exits 0 and leaves the token for Stop and doctor to report.
+  Code), `Interrupt` (Codex) and `SessionEnd` (both). These boundary notices close the tokens of
+  the lane or session that can no longer complete them (a `PostToolBatch` only the exact calls it
+  lists), never another session's or an owner-less one, and never discharge an obligation. They
+  never block a prompt: a missing or failing binary on a boundary event exits 0 and closes
+  nothing, so the token keeps blocking its own session's Stop.
 - **Hook: an obligation armed under an older routing configuration is re-evaluated, not refused
   forever.** A Stop with a usable `.machinery.json` now runs the gates under the configuration in
   force and names the route change in its message, instead of blocking with "dirty obligation
@@ -74,11 +77,20 @@ keep that property and narrow two fail-closed behaviours that had become permane
   writing; that session's own PostToolUse re-arms the obligation and its own Stop re-runs the
   gates. If that other host is killed after writing and before PostToolUse, the write is covered
   only by later Stops in the project (which keep running while the token stays) and by CI.
-- **Boundary events** are host-originated; an agent cannot send one. They remove a token the same
-  way a PostToolUseFailure does and leave the obligation armed.
-- **Release** is an operator command an agent could also run through its shell. It cannot skip a
-  gate: it removes tokens, not obligations, and every use is journaled with the environment that
-  ran it (`CLAUDECODE`, `CODEX_*`, `OPENCODE` markers are recorded).
+- **Boundary events** are host-originated. PreToolUse denies agent shell commands that invoke
+  `machinery hook` or `machinery hook-state`, and file or shell access to the hook store and its
+  marker. A boundary removes a token the same way a PostToolUseFailure does and leaves the
+  obligation armed; an unclassifiable token is never closed by one.
+- **Release and adopt are operator-only.** Besides the PreToolUse denial, `hook-state release` and
+  `hook-state adopt` refuse to run when an agent host's session markers are in the environment
+  (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`, `AI_AGENT`, `CODEX_THREAD_ID`, `CODEX_SANDBOX`,
+  `OPENCODE`, and related) or stdin is not an interactive terminal. Release removes tokens or
+  route identities, never the obligation, and every use is journaled. Residual: an agent that
+  assembles the command dynamically, scrubs its environment and fakes a terminal evades these
+  guards, and even then only tokens go; the gates still run before anything clears.
+- **Fail closed on unknown state.** Owner-less tokens block every Stop; a Stop without a session id
+  treats every token as its own; a recorded route whose snapshot is gone counts as narrowing;
+  any error reading the ledger, a route snapshot, or the store binding blocks.
 - **Route re-evaluation** runs the gates under the current operator-owned `.machinery.json`. A
   change that only widens or renames routing (strict switched on, a gate added, the dialog
   register) is discharged by a green run. A change that narrows what the gates check is never
@@ -99,8 +111,10 @@ keep that property and narrow two fail-closed behaviours that had become permane
   than this release reads such a ledger as noncanonical and fails closed, as it did for the
   earlier project-root line: do not downgrade with obligations outstanding, or remove the
   affected `<digest>.state` files (never the store directory) after a downgrade. Ledgers written by
-  0.11.1 and earlier are read unchanged; their owner-less tokens count as orphaned and need one
-  `machinery hook-state release --root <root> --orphaned`, which `machinery doctor` names.
+  0.11.1 and earlier are read unchanged; their owner-less tokens block every Stop until the
+  operator runs `machinery hook-state release --root <root> --orphaned` once from their own
+  terminal (the Stop message and `machinery doctor` both name it). An obligation armed under an
+  earlier route whose snapshot is gone needs `--routes` as well.
 - **Plugin hooks.** `hooks/hooks.json` gains `UserPromptSubmit`, `PostToolBatch`, `Interrupt` and
   `SessionEnd` entries that call the shim with `boundary`. Claude Code ignores `Interrupt`
   (Codex-only) and Codex ignores `PostToolBatch`; `claude plugin validate` reports the former as

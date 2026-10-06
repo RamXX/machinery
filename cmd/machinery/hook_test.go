@@ -114,3 +114,18 @@ func TestHookStateAdoptOffersRebindIdentity(t *testing.T) {
 		t.Fatalf("adopt must offer --rebind-identity: %v", err)
 	}
 }
+
+func TestHookStateRefusesInsideAnAgentSession(t *testing.T) {
+	t.Setenv("CLAUDECODE", "1")
+	for _, args := range [][]string{
+		{"release", "--root", t.TempDir(), "--orphaned"},
+		{"adopt", "--root", t.TempDir(), "--rebind-identity"},
+	} {
+		cmd := newHookStateCmd()
+		cmd.SetArgs(args)
+		err := executeCapturedCommand(cmd)
+		if err == nil || !strings.Contains(err.Error(), "operator command") {
+			t.Fatalf("hook-state %v ran inside an agent session: %v", args, err)
+		}
+	}
+}

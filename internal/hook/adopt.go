@@ -61,6 +61,9 @@ func adoptionRefusal(stored stateDirectoryBinding, native string, marker stateDi
 
 // AdoptStateWith is AdoptState with explicit operator acknowledgements.
 func AdoptStateWith(w io.Writer, root, from string, opts AdoptOptions) (retErr error) {
+	if err := operatorGate(); err != nil {
+		return err
+	}
 	root, err := canonicalHookRoot(root)
 	if err != nil {
 		return err

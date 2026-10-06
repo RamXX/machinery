@@ -958,6 +958,11 @@ func pre(w io.Writer, root string, cfg Config, in Input) error {
 	// and letting os.Stat/os.ReadFile find it under the canonical spelling.
 	// On a case-sensitive filesystem the folded deny over-covers only
 	// near-case variants of reserved names, which no legitimate edit uses.
+	for _, edited := range editedPaths(in) {
+		if reason := operatorOnlyCommand(strings.ToLower(filepath.ToSlash(resolveEventPath(in.Cwd, edited)))); reason != "" {
+			return deny(reason)
+		}
+	}
 	for _, deleted := range deletedPaths(in) {
 		rel := relToRoot(root, resolveEventPath(in.Cwd, deleted))
 		if strings.EqualFold(rel, ConfigName) || strings.EqualFold(rel, conventionalMarker) {
@@ -1013,6 +1018,9 @@ func shellProtectedMutation(root string, cfg Config, command string) (string, er
 		if strings.Contains(folded, reserved) {
 			return reserved + " is protected machinery governance state; shell commands may not reference it because command text cannot prove read-only intent or a confined target", nil
 		}
+	}
+	if reason := operatorOnlyCommand(folded); reason != "" {
+		return reason, nil
 	}
 	for _, marker := range []string{"ratchet.json", ".oracle.md", ".tla", ".cfg", ".als", "/packs/", "/pack/"} {
 		if strings.Contains(folded, marker) {
@@ -1303,13 +1311,20 @@ func stop(w io.Writer, root string, cfg Config, in Input, warn string) (retErr e
 			narrowed = narrowing
 		}
 	}
-	own, orphaned := partitionPending(state, in)
+	own, unclassified, orphaned := partitionPending(state, in)
 	if len(own) > 0 {
 		// A matching tree hash only says that no governed bytes have changed
 		// yet. It cannot prove that a writer is finished. Only an exact
 		// PostToolUse or PostToolUseFailure event, or a boundary event of the
 		// lane that armed it, removes this session's armed token.
 		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) whose PostToolUse completion or host denial was not durably recorded; refusing to discharge or clear the project gate obligation while a mutation may still be running", len(own))})
+	}
+	if len(unclassified) > 0 {
+		// A token with no recorded owner (written before owners were recorded,
+		// or armed by an event without a session id) cannot be proven to
+		// belong to another session, so it blocks like an own token until an
+		// operator releases it.
+		return emitJSON(w, stopOut{Decision: "block", Reason: fmt.Sprintf("machinery governance has %d in-flight tool operation(s) with no recorded owning session (%s); they cannot be proven finished or foreign, so the project gate obligation cannot be discharged. If no agent session in this project is running a tool, the operator runs in their own terminal: %s", len(unclassified), shortTokens(unclassified), releaseCommand(root))})
 	}
 	orphanNote := ""
 	if len(orphaned) > 0 {
@@ -3651,7 +3666,13 @@ func hookLaneDigest(sessionID, agentID string) string {
 	return hookOwnerDigest("machinery-hook-lane", sessionID, agentID)
 }
 
+// ownerOf binds a token to the event's session and lane. An event without a
+// session id yields no owner: such a token is unclassifiable and blocks every
+// Stop until an operator releases it.
 func ownerOf(in Input) pendingOwner {
+	if strings.TrimSpace(in.SessionID) == "" {
+		return pendingOwner{}
+	}
 	return pendingOwner{session: hookSessionDigest(in.SessionID), lane: hookLaneDigest(in.SessionID, in.AgentID)}
 }
 

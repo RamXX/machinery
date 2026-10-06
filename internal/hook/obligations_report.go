@@ -57,12 +57,14 @@ func reportProjectObligations(w io.Writer, dir string) bool {
 			if root != "" {
 				command = releaseCommand(root)
 			}
-			detail := ""
 			if unowned > 0 {
-				detail = fmt.Sprintf(", %d recorded before tokens named their session", unowned)
+				lines = append(lines, line{label, fmt.Sprintf("  present  governance hook obligation for %s holds %d in-flight tool token(s) with no recorded owning session (%s); they block every Stop in the project. If no agent session in the project is running a tool, release them from your own terminal: %s",
+					label, unowned, shortTokens(record.pending), command)})
 			}
-			lines = append(lines, line{label, fmt.Sprintf("  present  governance hook obligation for %s holds %d in-flight tool token(s)%s (%s). Only the session that armed a token waits for it; every other Stop runs the gates and keeps the obligation armed. If no agent session in the project is running a tool, release them: %s",
-				label, len(record.pending), detail, shortTokens(record.pending), command)})
+			if owned := len(record.pending) - unowned; owned > 0 {
+				lines = append(lines, line{label, fmt.Sprintf("  present  governance hook obligation for %s holds %d in-flight tool token(s) owned by agent sessions. Only the session that armed a token waits for it; every other Stop runs the gates and keeps the obligation armed. If no agent session in the project is running a tool, release them from your own terminal: %s",
+					label, owned, command)})
+			}
 		}
 		if root == "" || len(record.routes) == 0 {
 			continue

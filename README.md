@@ -1269,7 +1269,8 @@ verifying a store that was moved or restored to another filesystem, run
 generation to match the sentinel and prints the old and new identity.
 
 Each in-flight tool token records the session and lane that armed it. Only that session's
-Stop waits for it; another or an ended session's token is reported as orphaned and keeps the
+Stop waits for it (a token with no recorded owner blocks every Stop); another or an ended
+session's token is reported as orphaned and keeps the
 project obligation armed, so the gates run at every Stop until it completes or an operator
 runs `machinery hook-state release --root <root> --orphaned` (journaled; obligations stay
 armed). Interrupts, denied calls, and session ends close their own lane's tokens through

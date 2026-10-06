@@ -43,6 +43,9 @@ type ReleaseOptions struct {
 
 // ReleaseStateWith is ReleaseState with every selector.
 func ReleaseStateWith(w io.Writer, root string, opts ReleaseOptions) (retErr error) {
+	if err := operatorGate(); err != nil {
+		return err
+	}
 	tokens, orphaned := opts.Tokens, opts.Orphaned
 	if orphaned && len(tokens) > 0 {
 		return fmt.Errorf("name --orphaned or --token values, not both")

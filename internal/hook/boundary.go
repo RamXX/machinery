@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -34,14 +35,36 @@ var boundaryEvents = map[string]bool{
 // does not use: a new host field must never turn an interrupt notice into a
 // stranded token. A payload that is not a boundary event is left to the
 // strict decoder.
-func decodeBoundaryInput(raw []byte) (Input, bool, error) {
+type boundaryInput struct {
+	Input
+	// batchToolUseIDs are the exact calls a PostToolBatch reports resolved.
+	batchToolUseIDs []string
+}
+
+func decodeBoundaryInput(raw []byte) (boundaryInput, bool, error) {
 	event := boundaryEventName(raw)
 	if !boundaryEvents[event] {
-		return Input{}, false, nil
+		return boundaryInput{}, false, nil
 	}
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
-		return Input{}, true, err
+		return boundaryInput{}, true, err
+	}
+	var batch boundaryInput
+	if event == "PostToolBatch" {
+		var calls []struct {
+			ToolUseID string `json:"tool_use_id"`
+		}
+		if rawCalls, ok := fields["tool_calls"]; ok {
+			if err := json.Unmarshal(rawCalls, &calls); err != nil {
+				return boundaryInput{}, true, fmt.Errorf("PostToolBatch tool_calls must be an array of tool calls: %w", err)
+			}
+		}
+		for _, call := range calls {
+			if strings.TrimSpace(call.ToolUseID) != "" {
+				batch.batchToolUseIDs = append(batch.batchToolUseIDs, call.ToolUseID)
+			}
+		}
 	}
 	in := Input{HookEventName: event}
 	for key, target := range map[string]*string{"session_id": &in.SessionID, "agent_id": &in.AgentID, "cwd": &in.Cwd} {
@@ -50,13 +73,14 @@ func decodeBoundaryInput(raw []byte) (Input, bool, error) {
 			continue
 		}
 		if err := json.Unmarshal(value, target); err != nil {
-			return Input{}, true, fmt.Errorf("boundary event field %q must be a string", key)
+			return boundaryInput{}, true, fmt.Errorf("boundary event field %q must be a string", key)
 		}
 	}
-	if in.SessionID == "" {
-		return Input{}, true, fmt.Errorf("boundary event %s has no session_id; it cannot be bound to the tokens it would close", event)
+	if strings.TrimSpace(in.SessionID) == "" {
+		return boundaryInput{}, true, fmt.Errorf("boundary event %s has no session_id; it cannot be bound to the tokens it would close", event)
 	}
-	return in, true, nil
+	batch.Input = in
+	return batch, true, nil
 }
 
 // boundaryEventName reads only the event name; anything unreadable is not a
@@ -74,17 +98,30 @@ func boundaryEventName(raw []byte) string {
 // boundaryCloses reports whether a boundary event of in proves that the token
 // owned by owner can no longer complete. Tokens without a recorded owner are
 // never closed here: nothing proves which session they belong to.
-func boundaryCloses(in Input, owner pendingOwner) bool {
+func boundaryCloses(in boundaryInput, token string, owner pendingOwner) bool {
 	if !owner.known() {
 		return false
 	}
-	if in.HookEventName == "SessionEnd" {
+	switch in.HookEventName {
+	case "SessionEnd":
 		return owner.session == hookSessionDigest(in.SessionID)
+	case "PostToolBatch":
+		// Only the exact calls the host reports resolved, in this lane.
+		if owner.lane != hookLaneDigest(in.SessionID, in.AgentID) {
+			return false
+		}
+		for _, id := range in.batchToolUseIDs {
+			if expected, err := toolOperationToken(Input{SessionID: in.SessionID, ToolUseID: id}); err == nil && expected == token {
+				return true
+			}
+		}
+		return false
+	default:
+		return owner.lane == hookLaneDigest(in.SessionID, in.AgentID)
 	}
-	return owner.lane == hookLaneDigest(in.SessionID, in.AgentID)
 }
 
-func runBoundary(in Input, root string) (retErr error) {
+func runBoundary(in boundaryInput, root string) (retErr error) {
 	if root == "" {
 		root = os.Getenv("CLAUDE_PROJECT_DIR")
 	}
@@ -118,7 +155,7 @@ func runBoundary(in Input, root string) (retErr error) {
 	err = mutateStateLocked(stateFile, root, false, func(record *hookStateRecord) bool {
 		closed := false
 		for _, token := range append([]string(nil), record.pending...) {
-			if boundaryCloses(in, record.pendingOwners[token]) {
+			if boundaryCloses(in, token, record.pendingOwners[token]) {
 				closed = record.removePending(token) || closed
 			}
 		}
@@ -131,20 +168,30 @@ func runBoundary(in Input, root string) (retErr error) {
 }
 
 // partitionPending splits a ledger's in-flight tokens into those owned by the
-// session of in, which still block its Stop, and orphaned tokens armed by
-// another session or recorded before owners were (those carry no owner).
-// The Stop of one session cannot complete another session's tool call, so an
-// orphaned token never blocks it; it keeps the project obligation armed.
-func partitionPending(record hookStateRecord, in Input) (own, orphaned []string) {
+// session of in, which block its Stop; unclassified tokens with no recorded
+// owner, which block every Stop because nothing proves whose they are; and
+// orphaned tokens armed by another identified session. The Stop of one
+// session cannot complete another session's tool call, so an orphaned token
+// never blocks it; it keeps the project obligation armed. A Stop without a
+// session id cannot tell its own tokens from anyone's, so every token blocks
+// it.
+func partitionPending(record hookStateRecord, in Input) (own, unclassified, orphaned []string) {
+	if strings.TrimSpace(in.SessionID) == "" {
+		return append([]string(nil), record.pending...), nil, nil
+	}
 	session := hookSessionDigest(in.SessionID)
 	for _, token := range record.pending {
-		if owner := record.pendingOwners[token]; owner.known() && owner.session == session {
+		owner := record.pendingOwners[token]
+		switch {
+		case !owner.known():
+			unclassified = append(unclassified, token)
+		case owner.session == session:
 			own = append(own, token)
-		} else {
+		default:
 			orphaned = append(orphaned, token)
 		}
 	}
-	return own, orphaned
+	return own, unclassified, orphaned
 }
 
 func shortTokens(tokens []string) string {
@@ -198,6 +245,7 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 			narrowed = append(narrowed, reason)
 		}
 	}
+	compared := map[string]bool{}
 	for _, path := range paths {
 		raw, err := readRouteStateFile(path)
 		if err != nil {
@@ -206,6 +254,7 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 		if raw == nil || !recorded[routeSnapshotDigest(raw)] {
 			continue
 		}
+		compared[routeSnapshotDigest(raw)] = true
 		earlier, err := decodeConfig(raw)
 		if err != nil {
 			return nil, fmt.Errorf("route snapshot %s is corrupt: %w", path, err)
@@ -241,5 +290,39 @@ func narrowedRoutes(root string, routes []string, current string, cfg Config) ([
 			}
 		}
 	}
+	// A recorded route whose snapshot is gone (retention, a session that
+	// re-armed under a newer route, a ledger from an older binary) cannot be
+	// compared; unknown is treated as narrowing, so it never discharges
+	// without an operator acceptance.
+	unknown := 0
+	for route := range recorded {
+		if !compared[route] {
+			unknown++
+		}
+	}
+	if unknown > 0 {
+		add(fmt.Sprintf("%d earlier routing configuration(s) can no longer be compared because their snapshots are gone", unknown))
+	}
 	return narrowed, nil
+}
+
+// machineryHookInvocation matches a shell command that pipes an event into
+// the hook itself, which would let an agent speak for its own host.
+var machineryHookInvocation = regexp.MustCompile(`(^|[^a-z0-9_.-])machinery(\.exe)?["']?\s+hook(\s|$|["';|&)])`)
+
+// operatorOnlyCommand names why a shell command or file edit may not run from
+// a governed agent session: the durable hook store, its operator commands, and
+// the hook entry point are operator and host surfaces. Like the wave sentinel,
+// this is a literal guard; command text assembled dynamically can evade it,
+// which the operator gate on hook-state itself and CI's machinery check back.
+func operatorOnlyCommand(folded string) string {
+	switch {
+	case strings.Contains(folded, "machinery-hook-state"):
+		return "the machinery hook state store and its initialization marker are governance evidence; agent tools may not read, write, or move them. An operator inspects them with 'machinery doctor'."
+	case strings.Contains(folded, "hook-state"):
+		return "'machinery hook-state' (adopt, release) is an operator command; it may not run from an agent session. Ask the human operator to run it in their own terminal."
+	case machineryHookInvocation.MatchString(folded):
+		return "'machinery hook' is the host's hook entry point; an agent may not send hook events on its own behalf."
+	}
+	return ""
 }

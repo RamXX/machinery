@@ -219,10 +219,11 @@ func TestFieldLegacyLedgerWithForeignRoutesAndTokensDoesNotWedge(t *testing.T) {
 	if err := os.WriteFile(statePath(canonical, ""), []byte(ledger.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// Owner-less tokens cannot be proven foreign, so the Stop fails closed,
+	// but it names the audited operator recovery instead of wedging silently.
 	out := stopOutput(t, root, "laptop-session")
-	requireNotWedged(t, out, "legacy laptop ledger")
-	if strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "--orphaned") || !strings.Contains(out, "re-evaluated") {
-		t.Fatalf("legacy ledger was not re-evaluated and reported: %s", out)
+	if !strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "no recorded owning session") || !strings.Contains(out, "hook-state release") || !strings.Contains(out, "--orphaned") {
+		t.Fatalf("legacy ledger must block with its recovery named: %s", out)
 	}
 	state, err := readStateRecord(root, "inspector")
 	if err != nil || !state.design || !state.impl || len(state.pending) != 13 {
@@ -231,16 +232,22 @@ func TestFieldLegacyLedgerWithForeignRoutesAndTokensDoesNotWedge(t *testing.T) {
 }
 
 // Field case (d), mid-call variant: the operator edits .machinery.json while
-// a tool runs. Its completion must still close the token.
+// a tool runs. Its completion must still close the token, and the Stop must
+// not wedge.
 func TestFieldRouteChangeDuringToolCallStillCompletes(t *testing.T) {
 	root := greenFieldRoot(t)
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"design"}`)
 	armShell(t, root, "mid-call", "toolu_running")
 	writeFile(t, filepath.Join(root, ConfigName), `{"design":"design","dialog":"plain"}`)
 	completeShell(t, root, "mid-call", "toolu_running")
+	// The completion closed the token. The earlier route's snapshot was
+	// replaced by the completion's, so the change cannot be compared: the
+	// gates run, nothing blocks, and the obligation waits for an operator
+	// acceptance instead of being cleared on an unknown comparison.
 	out := stopOutput(t, root, "mid-call")
 	requireNotWedged(t, out, "route change during a tool call")
-	if state, err := readStateRecord(root, "mid-call"); err != nil || state.design || state.impl {
-		t.Fatalf("green gates under the current route must discharge: %+v %v out=%s", state, err, out)
+	if strings.Contains(out, `"decision":"block"`) || !strings.Contains(out, "--routes") {
+		t.Fatalf("an uncomparable route change must run the gates and name the acceptance: %s", out)
 	}
+	requireArmed(t, root, 0, "uncomparable route change")
 }

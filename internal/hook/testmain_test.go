@@ -31,6 +31,9 @@ var hookTestPreSandboxTempDir string
 // block every shell and write tool on the machine. Test state belongs to the
 // test binary, never to the user running it.
 func TestMain(m *testing.M) {
+	// The suite runs under agent hosts and without a terminal; the operator
+	// gate itself is exercised by TestOperatorGate*.
+	operatorGate = func() error { return nil }
 	if inherited := os.Getenv(hookTestControlRootEnv); inherited != "" {
 		hookTestControlRoot = inherited
 		hookTestPreSandboxTempDir = filepath.Clean(os.TempDir())
