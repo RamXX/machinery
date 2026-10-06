@@ -1252,7 +1252,7 @@ or plugins. Details, including the `.machinery.json` reference and the exact sen
 the [Claude Code plugin guide](docs/claude-plugin.md).
 
 Hook design snapshots exclude paths declared in `<design>/.machineryignore`; the ignore file
-itself stays guarded. Put logs and caches outside the design tree, or declare them there.
+and transaction guards stay protected. Put logs and caches outside the design tree, or declare them there.
 Unignored changes still fail closed and name the changing path. Standalone `kill`, `pkill`,
 and `killall` commands can stop a writer even when the design inventory is unstable; commands
 with shell expansion, redirection, or chaining use normal governance.

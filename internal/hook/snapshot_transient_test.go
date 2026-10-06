@@ -115,3 +115,19 @@ func TestRoutingSnapshotOmitsLargeIgnoredLog(t *testing.T) {
 		t.Fatalf("ignored log metadata blocked routing: %v", err)
 	}
 }
+
+func TestRoutingSnapshotRetainsIgnoredTransactionGuards(t *testing.T) {
+	for _, rel := range []string{".machinery-artifact-set.journal", "formal/.machinery-formal-transaction.jsonl", ".machinery/checker-project-transaction.json"} {
+		t.Run(rel, func(t *testing.T) {
+			isolateHookState(t)
+			root := managedRoot(t)
+			writeFile(t, filepath.Join(root, "design", ".machineryignore"), "**\n")
+			writeFile(t, filepath.Join(root, "design", filepath.FromSlash(rel)), "unfinished\n")
+			cfg, _, _ := Load(root)
+			err := withRoutingSnapshot(root, cfg, func(Config) error { return nil })
+			if err == nil || !strings.Contains(err.Error(), "interrupted Machinery publication") {
+				t.Fatalf("ignore policy bypassed transaction guard: %v", err)
+			}
+		})
+	}
+}

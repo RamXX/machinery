@@ -481,7 +481,7 @@ func acquire(designRoot string, reader bool, skip func(string) bool) (*Lock, err
 		}
 	}
 	if reader {
-		if journal, err := findInterruptedJournal(root); err != nil {
+		if journal, err := findInterruptedJournalFiltered(root, skip); err != nil {
 			return nil, errors.Join(err, lock.Release())
 		} else if journal != "" {
 			if journal == publishSentinel {
@@ -506,7 +506,11 @@ func acquire(designRoot string, reader bool, skip func(string) bool) (*Lock, err
 }
 
 func findInterruptedJournal(root string) (string, error) {
-	found, err := collectInterruptedJournalPaths(root)
+	return findInterruptedJournalFiltered(root, nil)
+}
+
+func findInterruptedJournalFiltered(root string, skip func(string) bool) (string, error) {
+	found, err := collectInterruptedJournalPathsFiltered(root, skip)
 	if err != nil {
 		return "", err
 	}
@@ -520,6 +524,10 @@ func findInterruptedJournal(root string) (string, error) {
 // no-follow capability and reports every interrupted-publication journal
 // location, in deterministic sorted order. It never mutates anything.
 func collectInterruptedJournalPaths(root string) ([]string, error) {
+	return collectInterruptedJournalPathsFiltered(root, nil)
+}
+
+func collectInterruptedJournalPathsFiltered(root string, skip func(string) bool) ([]string, error) {
 	before, err := os.Lstat(root)
 	if err != nil {
 		return nil, err
@@ -558,6 +566,9 @@ func collectInterruptedJournalPaths(root string) ([]string, error) {
 			if dir != "." {
 				rel = filepath.Join(dir, entry.Name())
 			}
+			if skip != nil && skip(filepath.ToSlash(rel)) && !interruptedJournalRel(filepath.ToSlash(rel)) && !journalParent(filepath.ToSlash(rel)) {
+				continue
+			}
 			info, err := capability.Lstat(rel)
 			if err != nil {
 				return err
@@ -581,6 +592,17 @@ func collectInterruptedJournalPaths(root string) ([]string, error) {
 	}
 	sort.Strings(found)
 	return found, nil
+}
+
+// Known transaction directories remain inspected even when their generated
+// contents are ignored. Ordinary transient subtrees need no journal inventory.
+func journalParent(rel string) bool {
+	switch rel {
+	case "machines", "formal", "packs", ".machinery":
+		return true
+	default:
+		return false
+	}
 }
 
 func interruptedJournalRel(rel string) bool {
