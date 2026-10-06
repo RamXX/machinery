@@ -43,7 +43,10 @@
   checked: 8 rule files evaluated, 1332 facts
   ok
 == Gb-plan  build plan structure ==
-  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 14 skeleton citations
+  note   audit: BUILD.md: milestone M3 (User + Session slice (auth lifecycle)) names security-relevant subject(s) User but states no paired acceptance criteria; write each property as an 'Accept:' line directly followed by the 'Refuse:' line naming what must be refused
+  note   audit: BUILD.md: milestone M3 (User + Session slice (auth lifecycle)) names security-relevant subject(s) User but carries no threat table; add a Markdown table with an 'adversary' column and a 'negative test' column (an 'accepted risk' column is optional), one row per adversary the ledger does not mark not_applicable
+  note   audit: BUILD.md: milestone M3 (User + Session slice (auth lifecycle)) has no Pass-wrongly: line; answer "what would make this pass wrongly?" on one standalone 'Pass-wrongly: <answer>' line
+  checked: 12 template sections present, 1 gates-disclaimer verbatim, 1 data dictionary unique, 1 plans, 6 milestones, 6 DoD-bearing milestones, 1 skeleton NFR lines, 14 skeleton citations, 1 security-relevant milestones
   ok
 == Gv-attest  attestation evidence ==
   warn   gt.conformance-test-shape: plan only; current implementation review missing
