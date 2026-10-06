@@ -9,8 +9,9 @@ parent: MAC-cup9
 created_at: 2026-09-24T02:38:21Z
 created_by: ramirosalas
 updated_at: 2026-09-24T02:38:21Z
-content_hash: "sha256:3e8baf2decf2f8f401e637324b6d6f814a8c2dcedb16cfe430ac3251ac9742de"
+content_hash: "sha256:696bf838bdf464f55cbda2fbe001f9df772794fbbf30d3eeee5f5796a56e100c"
 blocked_by: [MAC-va30, MAC-qxaa]
+blocks: [MAC-cup9]
 ---
 
 ## Description
@@ -28,9 +29,11 @@ First story of MAC-cup9; blocks the rest. A non-machine unit (a parser, a hasher
 ## History
 - 2026-09-24T21:33:56Z dep_added: blocked_by MAC-va30
 - 2026-09-24T21:33:56Z dep_added: blocked_by MAC-qxaa
+- 2026-10-06T04:03:34Z dep_added: blocks MAC-cup9
 
 ## Links
 - Parent: [[MAC-cup9]]
+- Blocks: [[MAC-cup9]]
 - Blocked by: [[MAC-va30]], [[MAC-qxaa]]
 
 ## Comments
