@@ -1,15 +1,17 @@
 ---
 id: MAC-bmlh
 title: "Hook design-snapshot check deadlocks the seat when a process writes into the governed tree"
-status: open
+status: closed
 priority: 1
 type: bug
 labels: [hook, governance, h2, from-next]
 created_at: 2026-09-24T21:32:49Z
 created_by: ramirosalas
-updated_at: 2026-10-06T04:03:50Z
-content_hash: "sha256:6eac6da724f4ff017d5278d1fe0612bbdcb69454001fed2f2c1877ec23de5c07"
+updated_at: 2026-10-06T05:53:40Z
+content_hash: "sha256:025ef1ac89788e0cd8581b7421f2a8a4df4f2e0e564150953c803834ce73d286"
 related: [MAC-s2qw]
+closed_at: 2026-10-06T05:53:40Z
+close_reason: "Fixed in 0.11.1 (cc1081d1 RED, 74646c9e GREEN, 96672924/8111ecdc): design/.machineryignore excludes declared paths from hook snapshots; standalone kill/pkill/killall admitted."
 ---
 
 ## Description
@@ -41,7 +43,7 @@ Acceptance criteria:
 Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Scope the fingerprint to design sources honoring .machineryignore or declared transient paths; admit kill/stop verbs on snapshot-changed failure; retry with backoff; document logging outside the tree. Evidence: internal/hook/hook.go:804-855 withRoutingSnapshot still acquires gates.AcquireSnapshot(designDir) around every routed event and returns snapshot.CheckUnchanged() (line 849); no transient-path tolerance, process-control exemption or retry; CHANGELOG 0.9.0 to 0.11.0 has no entry on concurrent writers. 0.11.0 hook crash recovery does not address it. Notes: Agent-seat deadlock needing human rescue; fail-closed gate with no escape for process control. Related MAC-s2qw (hook-state seat handoff, P1).
 
 ## History
-
+- 2026-10-06T05:53:40Z status: open -> closed
 
 ## Links
 - Related: [[MAC-s2qw]]
