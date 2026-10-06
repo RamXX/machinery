@@ -2,13 +2,13 @@
 id: MAC-0p5d
 title: "Adopt Modelith 0.5.0 and simplify with its new features"
 status: open
-priority: 1
+priority: 2
 type: epic
 labels: [modelith, dependencies]
 created_at: 2026-09-25T20:11:07Z
 created_by: ramirosalas
-updated_at: 2026-09-25T20:11:07Z
-content_hash: "sha256:51f6f1a98281f108a270d39e5f1fecf961df1cff4131f1a69c301d0157e2f386"
+updated_at: 2026-10-06T04:03:57Z
+content_hash: "sha256:1279e0c1448d1ff73f20c53295a860ff63f5a4280fca29710baf222ec2a2485b"
 related: [MAC-syos]
 ---
 
@@ -30,7 +30,7 @@ Order: n:n bug, then the pin bump with loud refusal of unsupported forms, then s
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: partial. Remaining: Children remaining: gscc (n:n), g7d4 (loud refusal and breaking notes, e2e proof), o3p2, r3b0; bounded contexts via MAC-p88c. Epic still makes sense; its description of 'machinery pins v0.4.0' is stale. Evidence: Pin bump to v0.5.0 landed in 2bd125b0 (Makefile:18, cmd/machinery/diag.go:30, scripts/modelith-render.sh:8, .dagger/main.go:441,616, README, brownfield guide; examples re-rendered); CHANGELOG 0.11.0 lines 116,130 note pin. n:n (MAC-gscc) still open: internal/checker/model.go:199-203. No loud refusal of imports/qualified refs found. Notes: Children: MAC-gscc, MAC-g7d4, MAC-o3p2, MAC-r3b0 (and p88c/p46v are blocked by g7d4 but belong to other epics). Update epic description to note pin done.
 
 ## History
 
