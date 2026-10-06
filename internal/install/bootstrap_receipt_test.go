@@ -468,6 +468,22 @@ func bootstrapAssertConvergence(t *testing.T, f bootstrapInstall, release *boots
 	}
 }
 
+func bootstrapRollbackContext(t *testing.T) (context.Context, context.CancelFunc) {
+	t.Helper()
+	return context.WithTimeout(context.Background(), 30*time.Second)
+}
+
+func TestBootstrapRollbackAllowsSlowProgress(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx, cancel := bootstrapRollbackContext(t)
+		defer cancel()
+		time.Sleep(31 * time.Second)
+		if err := ctx.Err(); err != nil {
+			t.Fatalf("test cancelled update before installer rollback: %v", err)
+		}
+	})
+}
+
 func TestBootstrapReceiptCLI(t *testing.T) {
 	release := bootstrapReleaseFixture(t)
 	repo, err := filepath.Abs("../..")
@@ -548,7 +564,7 @@ func TestBootstrapReceiptCLI(t *testing.T) {
 				before := bootstrapState(t, f)
 				release.broken.Store(true)
 				defer release.broken.Store(false)
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				ctx, cancel := bootstrapRollbackContext(t)
 				defer cancel()
 				cmd := exec.CommandContext(ctx, f.binary, f.args(bootstrap)...)
 				cmd.Dir, cmd.Env = f.root, f.env
