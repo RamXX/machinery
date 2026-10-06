@@ -181,18 +181,28 @@ func runBoundary(in boundaryInput, root string) (retErr error) {
 // it.
 //
 // A token a boundary event marked ended stops blocking its owning session's
-// Stop, which may then discharge; for every other session it is orphaned.
+// main-thread Stop, which may then discharge; for a subagent Stop of that
+// session and for every other session it is orphaned (never blocks, always
+// withholds discharge). The rule rests on the host's Stop contract, not on
+// any guard against forged boundary events.
 func partitionPending(record hookStateRecord, in Input) (own, unclassified, orphaned []string) {
 	if strings.TrimSpace(in.SessionID) == "" {
 		return append([]string(nil), record.pending...), nil, nil
 	}
 	session := hookSessionDigest(in.SessionID)
+	mainLaneStop := in.HookEventName == "Stop" && in.AgentID == ""
 	for _, token := range record.pending {
 		owner := record.pendingOwners[token]
 		switch {
 		case !owner.known():
 			unclassified = append(unclassified, token)
+		case owner.session == session && owner.ended && mainLaneStop:
+			// the owner's main-thread Stop: its host has finished every
+			// foreground call of the session, so the ended call is done
 		case owner.session == session && owner.ended:
+			// a subagent Stop of the owning session cannot vouch for the main
+			// lane or a sibling lane; the ended token withholds discharge
+			orphaned = append(orphaned, token)
 		case owner.session == session:
 			own = append(own, token)
 		default:

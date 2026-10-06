@@ -286,3 +286,27 @@ func TestCompletionClosesItsTokenAfterTheDesignTreeMoved(t *testing.T) {
 		t.Fatalf("own completed call still blocks: %s", out)
 	}
 }
+
+// Review finding N1/N2 impact: a boundary event forged for the agent's own
+// session (through any shell spelling a text guard misses) must not let a
+// SubagentStop discharge while the main lane's call may still be writing.
+// Only the owner's main-thread Stop, which the host fires after every
+// foreground call has resolved, may discharge over an ended token.
+func TestForgedOwnSessionEndLetsOnlyTheMainThreadStopDischarge(t *testing.T) {
+	root := greenFieldRoot(t)
+	armShell(t, root, "s", "toolu_main_writer")
+	if out, err := runHookPayload(t, root, map[string]any{"hook_event_name": "SessionEnd", "session_id": "s", "cwd": root}); err != nil || out != "" {
+		t.Fatalf("%s %v", out, err)
+	}
+	sub := runEvent(t, root, Input{SessionID: "s", AgentID: "worker", Cwd: root, HookEventName: "SubagentStop"})
+	if strings.Contains(sub, `"decision":"block"`) {
+		t.Fatalf("an ended token must not block: %s", sub)
+	}
+	requireArmed(t, root, 1, "a subagent Stop cannot discharge over the main lane's ended token")
+	if out := stopOutput(t, root, "s"); out != "" {
+		t.Fatalf("main-thread Stop: %s", out)
+	}
+	if state, err := readStateRecord(root, "s"); err != nil || state.design {
+		t.Fatalf("main-thread Stop must discharge after green gates: %+v %v", state, err)
+	}
+}
