@@ -57,7 +57,11 @@ const (
 	// golang.org/x/crypto (0.55.0 to 0.56.0, then 0.56.0 to 0.57.0) staled the
 	// pin text BUILD.md quotes from the authoritative impl/go.mod, forcing a
 	// re-review of the corrected document and of the bumped implementation root.
-	crmBumpDate        = "2026-09-23"
+	crmBumpDate = "2026-09-23"
+	// crmThreatDate is the go-crm re-review after its threat ledger added
+	// threat invariants to the Session matrix and two negative tests to
+	// the session contract suite (the four g3 rows and the current gt row).
+	crmThreatDate      = "2026-10-05"
 	crmBumpPrefix      = "Re-reviewed 2026-09-23 over the corrected BUILD"
 	portfolioRenewal   = "Renews the 2026-09-02 Codex deterministic design review"
 	nextGateAttestor   = "Codex lane/next-gates"
@@ -173,13 +177,15 @@ func expectedMigration() map[string][]migratedRow {
 	// real current review over examples/go-crm/impl; the zero-context row is a
 	// re-reviewed plan over the corrected BUILD.md; historical acceptance
 	// stays historical with original provenance.
+	// The g3 rows and the gt row were re-judged on crmThreatDate when the
+	// threat ledger changed Session.matrix.md and the session suite.
 	goCrm := planRows(g2Claims, nextGateAttestor, nextGateDate, []string{"ARCHITECTURE.md"})
 	for i := range goCrm {
 		goCrm[i].note = legacyCRMReview
 	}
-	goCrm = append(goCrm, planRows(g3Claims, origCodexCRM, "2026-09-02", crmMachines)...)
+	goCrm = append(goCrm, planRows(g3Claims, origCodexCRM, crmThreatDate, crmMachines)...)
 	goCrm = append(goCrm,
-		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmBumpDate, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmThreatDate, covers: []string{"BUILD.md"}},
 		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: coordinator, date: crmBumpDate, note: crmBumpPrefix, covers: []string{"BUILD.md"}},
 		migratedRow{claim: "ga.review-quality", kind: "historical", attestor: origAccept, date: "2026-09-03", covers: acceptance},
 	)
