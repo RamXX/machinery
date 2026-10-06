@@ -27,6 +27,16 @@ person/date. Keep capability disposition in `legacy/surface.yaml`; this corpus
 classification is the intent layer that tells the conductor how to interpret
 the evidence behind those rows.
 
+## Excavation also asks what an adversary would do
+
+Recording what the code does captures behavior, not its threat posture. For
+every area that verifies, authenticates, signs, hashes, approves, admits input,
+or gates a decision, the excavation also records the adversary classification
+of each such entity or action in `design/threats.yaml`, or an explicit waiver
+signed by the owner (`owner`, `date`, `reason`). Existing tests that only
+assume an outsider who edits bytes are evidence of that one adversary, not of
+the set. See [threat-modeling.md](threat-modeling.md).
+
 ## Conversation boundary
 
 Do not ask the user about gates or classifications as internal jargon. Explain

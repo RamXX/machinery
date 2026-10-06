@@ -874,7 +874,8 @@ func validateCachedMachineryPlugin(root string, validatedInventory *map[string]c
 	for _, relative := range []string{
 		"references/archaeology-classification.md", "references/build-md-template.md", "references/c4-standalone.md",
 		"references/execution-packets.md", "references/rebuild-guide.md", "references/surface-ledger.md",
-		"references/target-surfaces.md", "references/verification-evidence.md", "references/xstate-format.md",
+		"references/target-surfaces.md", "references/threat-modeling.md", "references/verification-cadence.md",
+		"references/verification-evidence.md", "references/xstate-format.md",
 		"tools/README.md", "tools/tlc.sh", "tools/verify_formal.sh",
 	} {
 		if _, err := readCachedPluginFileRoot(retained, filepath.Join("skills", "machinery", relative), 4<<20); err != nil {
@@ -959,7 +960,8 @@ func validateCachedPluginInventoryWithHook(root *os.Root, afterMember func(strin
 	for _, rel := range []string{
 		"references/archaeology-classification.md", "references/build-md-template.md", "references/c4-standalone.md",
 		"references/execution-packets.md", "references/rebuild-guide.md", "references/surface-ledger.md",
-		"references/target-surfaces.md", "references/verification-evidence.md", "references/xstate-format.md",
+		"references/target-surfaces.md", "references/threat-modeling.md", "references/verification-cadence.md",
+		"references/verification-evidence.md", "references/xstate-format.md",
 		"tools/README.md", "tools/tlc.sh", "tools/verify_formal.sh",
 	} {
 		expected[filepath.Join("skills", "machinery", filepath.FromSlash(rel))] = true

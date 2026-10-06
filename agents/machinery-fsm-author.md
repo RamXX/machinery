@@ -92,6 +92,14 @@ target entity lifecycles with temporary legacy states.
 6. **Enforce invariants as guards.** Every Modelith invariant must be enforced by a guard or made
    structurally impossible by the state graph. If neither, record it as a hole in the failure catalog.
 
+6a. **Fail closed.** A component that reports a verdict or an exit status reports success only when
+   every applicable check passed. Tag its success state `accepting` and every state in which a check
+   has not run, or a needed input was absent, `unchecked` or `omitted`. No transition of any kind may
+   lead from an `unchecked` or `omitted` state into `accepting`, and `accepting` is never initial;
+   the lint fails both. Threat invariants from `design/threats.yaml` (when present) are invariants
+   like any other: guard them or make them structurally impossible, and give each its refusal
+   transition so the negative test has an oracle row to key on.
+
 7. **Type the context from Modelith attributes.** The `context` shape references the entity attributes;
    do not invent a parallel schema.
 

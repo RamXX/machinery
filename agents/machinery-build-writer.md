@@ -50,13 +50,16 @@ constraint the conductor passes in its prompt.
     tenant-scoping decision table. Section 7 requires the tenant oracle conformance test against the
     pure link-authorization function; `impl/internal/authz/tenant_oracle_test.go` is the reference
     shape.
+- `design/threats.yaml` when the design has one: the adversary classification of every
+  security-relevant subject, its threat invariants, negative tests, accepted risks, and verifiers.
 - The target language(s).
 - The `machinery` CLI on PATH (installed by the one-line installer, or built from this repository
   with `make build` and invoked as `.bin/machinery`).
 
 Read all of them in full. Read the `machinery` skill's `references/build-md-template.md`. For
-manifest mode also read `references/execution-packets.md`; those two references are the complete
-output contract.
+manifest mode also read `references/execution-packets.md`. When the design has security-relevant
+subjects, also read `references/threat-modeling.md`; to plan execution, read
+`references/verification-cadence.md`. Those references are the complete output contract.
 
 ## Method
 
@@ -88,6 +91,15 @@ output contract.
    side-effect contracts as integration or property tests against the real dependency or a
    contract-tested fake, never derived from transition tests), plus contract tests per boundary and
    property tests per invariant.
+6a. **Encode security-relevant work as threats, not only outcomes.** A milestone that names a
+   classified subject or one of its threat invariants is security-relevant. For it, "encode the
+   deliverable" means: every property written as an `Accept:` line followed by its `Refuse:` line
+   (never positive criteria alone); a threat table in the RED section with one row per adversary row
+   of each subject the milestone names, each mapped to its locked negative test or its owner-signed
+   accepted risk from `threats.yaml`; and one `Pass-wrongly:` line answering what would make this
+   pass wrongly. Tamper tests target the untrusted artifact being checked and assert that every
+   untouched check still passes. A security property is never satisfied by agreement with a
+   reference implementation alone, and a gap is never closed as "documented".
 7. **Write the state-migration section** (template section 8): for every machine whose placement row
    says its state is persisted, the migration protocol for future state changes (mapping table from
    old persisted values to new states, or a drain rule), or the explicit statement "no persisted
@@ -122,17 +134,24 @@ output contract.
     (b) `machinery check --impl` green over the scaffolding and stubs, (c) the suite red on
     assertions, not on its own compile errors, (d) the new files born clean under the project's
     own formatter and linters, with the RED commit green under every non-test gate the project
-    enforces. Only then do the tests lock. Frozen test identity is defined by exact bytes and file inventory.
-    Any amendment requires explicit owner authorization, a new evidence revision, and replay
-    of RED and all applicable gates before the revised tests lock. Neither formatting nor token
-    equality authorizes an editing exemption.
-    A gate demanding a locked-file change is a RED-phase defect requiring a design round-trip;
-    the original evidence revision remains immutable. The implementer makes
+    enforces, and (e) the milestone's `Pass-wrongly:` question answered with a refusing test for
+    security-relevant work. Only then do the tests lock. Frozen test identity is defined by exact
+    bytes and file inventory. When a decided behavior changes, the change that alters it amends the
+    locked test in place. Such an amendment must be explicit, is a new evidence revision, and replays
+    RED and every applicable gate before the amended test locks again: its header quotes the original
+    line, gives the reason, and says what the test still protects, and a byte or behavior proof backs
+    it. Weakening is never allowed; tightening always is; only an undecided contract stops the work.
+    Neither formatting nor token equality authorizes an editing exemption. The implementer makes
     them pass without editing them; GREEN is accepted only with the locked tests AND
     `machinery check --impl` green together. Include the fallback for runtimes without subagents:
     the same agent runs RED then GREEN sequentially, and the two gate runs are what separate the
     phases in place of fresh context. Generated tests live apart from hand-written ones; a wrong
     test is a design defect that sends the work back to the design, not a test to "adjust."
+
+12. **Plan the verification cadence** from `references/verification-cadence.md`: per-change
+    tests of the changed units, light landings (`machinery check --landing` at most), and a
+    checkpoint about every eight landings and at every milestone that runs the full suites,
+    re-attests once, and runs the full `machinery check`.
 
 ## Output
 
@@ -173,9 +192,13 @@ says rather than re-reading for them here.
 - For an isolated pack child, the `Neighbor stand-ins and test environment` section covers every
   neighboring boundary with a stand-in held to the neighbor-contract oracle (stable-id keyed), and
   the environment recipe is self-contained.
+- Every security-relevant milestone carries paired `Accept:`/`Refuse:` criteria, a threat table
+  covering each classified adversary row, and a `Pass-wrongly:` line (Gb-plan holds the structure;
+  whether the negative tests really target the untrusted artifact is your judgment).
 - The hard-TDD protocol is stated and unambiguous, including the gate anchors: check-green before
-  test derivation, the four-part RED exit gate (stable-id coverage, `machinery check --impl`
-  green, red-on-assertions, born clean under the project's own format and lint gates), the GREEN
+  test derivation, the RED exit gate (stable-id coverage, `machinery check --impl`
+  green, red-on-assertions, born clean under the project's own format and lint gates, and the
+  answered `Pass-wrongly:` question for security-relevant work), the GREEN
   bar of tests plus gate together, and the sequential fallback for runtimes that cannot spawn a
   fresh-context test-writer.
 

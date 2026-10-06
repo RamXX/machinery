@@ -190,12 +190,13 @@ design; the tool's contribution is the oracle and its stable ids.
    living in PR prose. Summarize the round in the PR as before. An unadjudicated red test is a question, not a gate. A file only
    locks once it is born clean under this project's own formatter and linters and the commit
    carrying it is green under every non-test gate the project enforces.
-   Frozen test identity is defined by exact bytes and file inventory.
-   Any amendment requires explicit owner authorization, a new evidence revision, and replay
-   of RED and all applicable gates before the revised tests lock. Neither formatting nor token
-   equality authorizes an editing exemption.
-   A gate demanding a locked-file change requires an explicit amendment through this process;
-   the original evidence revision remains immutable.
+   Frozen test identity is defined by exact bytes and file inventory. When a decided
+   behavior changes, the change that alters it amends the locked test in place. Such an
+   amendment must be explicit, is a new evidence revision, and replays RED and every
+   applicable gate before the amended test locks again: its header quotes the original line,
+   gives the reason, and says what the test still protects, and a byte or behavior proof backs
+   it. Weakening is never allowed; tightening always is. Only an undecided contract stops the
+   work. Neither formatting nor token equality authorizes an editing exemption.
 
 This is the one place this guide deliberately extends SKILL.md: the hard-TDD handoff
 describes greenfield, where every oracle row is normative from birth. On brownfield, rows
@@ -261,6 +262,30 @@ machinery check design --impl . --warnings-as-errors             # green: the de
 
 The burn-down loop is the G4 one: fix findings in ordinary PRs, watch the resolved notes, and
 rerun `machinery baseline design --gate gy,gl --impl .` to shrink the ratchet in the same PR.
+
+### Adopting the threat ledger: audit, baseline, then enforce (gate gz)
+
+An existing design records what the code does; it does not yet say what an adversary would
+do. From 0.11.0 every default run includes **Gz-threat**, in audit mode until you opt in: it
+lists, as notes, each model entity or action that looks security-relevant (it verifies,
+authenticates, signs, hashes, approves, admits input, or gates a decision) and has no
+classification, plus each open security-relevant milestone missing paired `Accept:`/`Refuse:`
+criteria, a threat table, or a `Pass-wrongly:` line. Nothing blocks.
+
+1. Read the audit list and classify what you can in `design/threats.yaml` (the skill's
+   `references/threat-modeling.md` is the schema): each subject against the standard
+   adversary set, each adversary row a threat invariant with its locked negative test, an
+   owner-signed accepted risk visible in the component's output, or a reasoned
+   not-applicable. List false positives under `not_security_relevant` with a reason, and
+   declare every component that makes a security decision under `verifiers`.
+2. Set `mode: enforce` and `enforced_since: <today>`, then record the rest:
+   `machinery baseline design --gate gz --date <YYYY-MM-DD>`. Each unclassified subject is
+   stored in `ratchet.json` with a hash of its model definition. It prints as `baselined:`
+   until someone changes that entity, and then it blocks: the rules apply to new and changed
+   security-relevant entities, and the debt shrinks as the entities you touch get classified.
+3. From `enforced_since` on, an accepted security-relevant milestone's acceptance file carries
+   the reviewer's `threat_review` rows: one real-process probe per adversary row, with the
+   expected and observed failure reasons.
 
 ### Stage 5 (rare): sharding and recursion
 
@@ -353,6 +378,14 @@ jobs:
         with: { distribution: temurin, java-version: "21" }
       - run: machinery verify-formal design
 ```
+
+Split the run by cadence. Landings (every merge to main) may run
+`machinery check design --impl . --landing`, which skips the checkpoint-only gates
+(attestation and milestone acceptance) and reports stale external-checker evidence as a note.
+The checkpoint (about every eight landings, and at every milestone, release, and customer
+handoff) re-attests once, as its last content step, and then runs the full check without
+`--landing`. Between checkpoints, stale attestations and records on main are expected, not a
+defect.
 
 Rules of thumb: the `--gate` list is the single source of truth for your adoption stage;
 widen it in a PR so the whole team sees the ratchet click. Run `design-gates` on every PR

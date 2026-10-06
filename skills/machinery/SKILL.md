@@ -50,6 +50,8 @@ Agent Skills runtimes.
 | Formal, checker, attestation, acceptance, or import findings | [references/verification-evidence.md](references/verification-evidence.md) |
 | Small build handoff | [references/build-md-template.md](references/build-md-template.md) |
 | Large or small-model execution handoff | [references/execution-packets.md](references/execution-packets.md) |
+| Anything that verifies, authenticates, signs, hashes, approves, admits input, or gates a decision | [references/threat-modeling.md](references/threat-modeling.md) |
+| Planning execution, landing, checkpoints, locked-test amendments | [references/verification-cadence.md](references/verification-cadence.md) |
 | Existing-code intent | [references/archaeology-classification.md](references/archaeology-classification.md) |
 | Rebuild or hybrid migration | [references/rebuild-guide.md](references/rebuild-guide.md) |
 | Legacy capability inventory | [references/surface-ledger.md](references/surface-ledger.md) |
@@ -85,7 +87,16 @@ then happy and negative scenarios. Sweep ubiquitous, event-driven,
 state-driven, optional, and unwanted behavior. Every lifecycle has a status
 enum; every invariant has an owner and a carrier or reasoned waiver.
 
-Run `modelith lint` and `machinery check <design> --gate gc`. Do not advance on
+Model the adversaries as well as the users. Every entity or action that
+verifies, authenticates, signs, hashes, approves, admits input, or gates a
+decision is classified in `design/threats.yaml` against the whole standard
+adversary set, and each adversary row becomes a threat invariant carried like
+any other, an owner-signed accepted risk visible in the component's output, or
+a reasoned not-applicable. Brownfield excavation records the classification or
+an owner-signed waiver alongside the behavior. Read
+[references/threat-modeling.md](references/threat-modeling.md).
+
+Run `modelith lint` and `machinery check <design> --gate gc,gz`. Do not advance on
 errors or warnings.
 
 ### Architecture
@@ -133,13 +144,21 @@ unresolvable admission; Gx-trace reports a malformed row. A design with its own
 authorization notation generates these rows from its own reader (see the
 migration note below).
 
-Run `machinery check <design> --gate g2,gu` plus each artifact-activated gate,
+Every component that makes a security decision (verifiers, checkers, CLIs,
+gate scripts) is a modeled element under the import contract and a declared
+`verifiers` row in `threats.yaml`; none lives outside the model because it is a
+tool.
+
+Run `machinery check <design> --gate g2,gu,gz` plus each artifact-activated gate,
 and `machinery verify-c4 <design>`. Record the required attestation rows.
 
 ### Behavior
 
 Author one machine per lifecycle or operational envelope, its named-unit
-matrix, its oracle, and its formal semantics. Every dependency failure remains
+matrix, its oracle, and its formal semantics. A component that reports a
+verdict or exit status fails closed: tag its success state `accepting` and its
+not-yet-checked or input-absent states `unchecked` or `omitted`; the lint
+refuses any path from those into `accepting`. Every dependency failure remains
 a transition even when architecture mitigates it. Every fully guarded handler
 states refusal behavior; every resting state states ignored events.
 
@@ -295,6 +314,18 @@ dropped. The slice map is authored; the packets are generated and never edited.
 When slices share a fixture, declare that path on every consuming slice. Each
 packet then states the full set of suites that must run after the fixture changes.
 
+For security-relevant work, encoding the deliverable means a threat table plus
+paired criteria: each property is an `Accept:` line with its `Refuse:` line,
+the RED section carries one threat-table row per adversary mapped to a locked
+negative test or an owner-signed accepted risk, and one `Pass-wrongly:` line
+answers what would make the work pass wrongly. Agreement with a reference
+implementation never satisfies a security property on its own.
+
+Plan the execution cadence from
+[references/verification-cadence.md](references/verification-cadence.md):
+per-change tests of the changed units, light landings, and batched checkpoints
+that carry the full suites, re-attestation, and the design gates.
+
 Run the full `machinery check <design>` and, once code exists,
 `machinery check <design> --impl <dir>`. A green design is the RED precondition;
 the locked tests and the same check are the GREEN acceptance boundary.
@@ -319,6 +350,11 @@ surfaces ship and which are the target.
   establishes history, not current approval. A design with no implementation yet
   is plan-only: it warns that the current review is missing and still exits 0.
 - A milestone closes only with `acceptance/M<n>.yaml` bound to a reviewed commit.
+  The review of a security-relevant milestone starts from threats: its own
+  threat table first, a real-process probe per row, and the asserted failure
+  reason of every negative probe, recorded under `threat_review`.
+- Machinery is the checkpoint gate. A landing may run `machinery check <design>
+  --landing`; the checkpoint runs the full check after re-attestation.
 - If a design publication is interrupted, `machinery recover <design-dir>`
   reports it read-only: expected outputs with content and mode status, journal
   and residue locations, live-writer status, and the safe recovery decision.

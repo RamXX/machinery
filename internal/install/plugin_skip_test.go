@@ -694,6 +694,8 @@ func seedCachedMachineryPlugin(t *testing.T, claudeHome, marketplace string) str
 		filepath.Join("skills", "machinery", "references", "rebuild-guide.md"),
 		filepath.Join("skills", "machinery", "references", "surface-ledger.md"),
 		filepath.Join("skills", "machinery", "references", "target-surfaces.md"),
+		filepath.Join("skills", "machinery", "references", "threat-modeling.md"),
+		filepath.Join("skills", "machinery", "references", "verification-cadence.md"),
 		filepath.Join("skills", "machinery", "references", "verification-evidence.md"),
 		filepath.Join("skills", "machinery", "references", "xstate-format.md"),
 		filepath.Join("skills", "machinery", "tools", "README.md"),

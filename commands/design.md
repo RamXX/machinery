@@ -29,7 +29,13 @@ uses them first).
    (`design/surfaces.yaml`, held by Gu-surfaces) during Phase 2: walk each human persona's complete
    action list into named surfaces before Gate 2. To the user this is one conversation about what
    exists, what carries over, and where each person goes to do each thing.
-5. Treat the user's request below as the opening frame. If it is empty,
+5. Ask what an adversary would do, not only what users do. Whenever something
+   verifies, authenticates, signs, hashes, approves, admits input, or gates
+   a decision, the skill's threat-modeling reference applies: classify the
+   adversaries, and hand security-relevant work over as a threat table plus
+   paired accept/refuse criteria. Plan execution with the skill's
+   verification-cadence reference: light landings, batched checkpoints.
+6. Treat the user's request below as the opening frame. If it is empty,
    open by asking for the frame in plain language, for example: "What are
    we building, who uses it, and what should it be written in?"
 
