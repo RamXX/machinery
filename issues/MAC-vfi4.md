@@ -7,8 +7,8 @@ type: feature
 labels: [hard-tdd, gt, owner-request]
 created_at: 2026-09-28T15:49:09Z
 created_by: ramirosalas
-updated_at: 2026-09-28T15:49:09Z
-content_hash: "sha256:8adb1e78477f2444a0252170139debb23cd85caef85b6646047c65036507acae"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:77dbe365d45941e44c01d7b17a722591305ea7e1caad0c73f5bd8ecf52644b40"
 ---
 
 ## Description
@@ -56,7 +56,7 @@ A design can land a new machine whose oracle rows and falsifying clauses are owe
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Design the owed-by: M<n> oracle-binding status, Gt owed reporting and failure cases (milestone closed, owed row gains a test, unresolved id, growth without flag), Ga closure refusal, docs and migration for NIL's local list. Hard-TDD locked RED first. Evidence: grep for owed-by/owed_by finds only scripts/consumer-diff/report.go (unrelated). No Gt owed-by-milestone declaration in internal/gates; CHANGELOG 0.10.1-0.11.0 has none; Gt still fails on any unbound row (CHANGELOG ~1457). Notes: Consumer-blocking (NIL adoption, owner request 2026-09-28). Shares the oracle-binding model with MAC-qxaa and MAC-9azz; coordinate vocabulary but no hard dependency.
 
 ## History
 
