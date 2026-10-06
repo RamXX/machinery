@@ -7,8 +7,8 @@ type: task
 labels: [ci, dagger, release]
 created_at: 2026-09-10T14:34:57Z
 created_by: ramirosalas
-updated_at: 2026-09-10T16:40:13Z
-content_hash: "sha256:c545d9119e2aea9d6538951d797ef8dc5d70b69211d37901be1f8dbcdfa9306d"
+updated_at: 2026-10-06T04:03:53Z
+content_hash: "sha256:f7cc4b6182e9a27a095f8dd190ca05032612e62850289d611fbc14410021316f"
 related: [MAC-4cbc]
 ---
 
@@ -75,7 +75,7 @@ failure is most expensive.
 
 
 ## Notes
-
+Revalidated 2026-10-06 against v0.11.0: valid. Remaining: Add ReleaseBuild in the Dagger module, delegate release.yml build, prove byte-identical artifacts against a prior release commit before tagging, add a deliberate-ownership comment and update wiring guards. Evidence: Verified at HEAD 8c620d8f (v0.11.0). .github/workflows/release.yml still carries its own build/gate/manifest/publish definitions (checkout/setup-go/inline run steps, lines 43-388); no ReleaseBuild function exists anywhere in .dagger or the repo. CHANGELOG 0.11.0 does not list it. Notes: Issue itself says do it in the same pass as a real release, validated by comparing to the previous release's assets for that commit. Low urgency, fail-closed failure mode. Related MAC-4cbc is unrelated work, not a prerequisite.
 
 ## History
 
