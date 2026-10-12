@@ -6,6 +6,11 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Fixed
+
+- The datalog-parity container now uses digest-pinned Go 1.27.2, matching the module's
+  minimum version so the Soufflé comparison tests can run after the runtime pin update.
+
 ### Security
 
 - Pinned Go moves to 1.27.2, which fixes nine standard-library vulnerabilities (GO-2026-6603 and
