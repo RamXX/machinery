@@ -6,6 +6,12 @@ under their version heading when a release is cut.
 
 ## [Unreleased]
 
+### Security
+
+- Pinned Go moves to 1.27.2, which fixes nine standard-library vulnerabilities (GO-2026-6603 and
+  GO-2026-6604 among them) that the nightly and security `govulncheck` runs reported. The other
+  runtime pins follow their latest upstream releases: Node 26.11.1. CPython stays at 3.14.8 until the python:3.15.0 image is published.
+
 ## [0.11.2] - 2026-10-06
 
 **Why this release.** Two field lockouts in the governance hook, both found on 2026-10-06 in

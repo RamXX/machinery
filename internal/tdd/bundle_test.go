@@ -159,7 +159,7 @@ func captureManifest() Manifest {
 		Suites: []Suite{{
 			ID:              "s1",
 			Adapter:         protocol.AdapterGoTesting,
-			Runtime:         RuntimeRef{Profile: "go", Version: "go1.27.1", Platform: "darwin/arm64", Closure: fixtureClosure},
+			Runtime:         RuntimeRef{Profile: "go", Version: "go1.27.2", Platform: "darwin/arm64", Closure: fixtureClosure},
 			Root:            "tests",
 			Files:           []string{"tests/alpha_test.go"},
 			DependencyRoots: []string{"vendor-deps"},

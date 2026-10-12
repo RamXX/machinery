@@ -4,7 +4,7 @@ package adapters_test
 
 // Frozen RED native conformance suite for MAC-wi2u (go-testing/v1). Every
 // subject drives the REAL production chain — captured source bundle, pinned
-// Go 1.27.1 runtime closure validated under a live processscope scope, the
+// Go 1.27.2 runtime closure validated under a live processscope scope, the
 // byte-pinned helper transport materialized by the adapter, real `go test
 // -json -count=1 -shuffle=off` executions under custody, normalized
 // machinery.tdd.event/v1 accounting — plus the required contributor-lane

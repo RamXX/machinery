@@ -2,7 +2,7 @@ package runtimeclosure
 
 // The exact approved Go runtime closure of the first-release catalog
 // (docs/test-assurance-contract.md section 6): go-testing/v1 executes only
-// under Go 1.27.1 on the pinned native platforms darwin/arm64 and
+// under Go 1.27.2 on the pinned native platforms darwin/arm64 and
 // linux/amd64. OpenGo binds the complete GOROOT tree by exact bytes without
 // launching anything; Validate performs the runtime's own identity probes
 // (go version, go env GOROOT) under a live processscope scope; Close is the
@@ -33,7 +33,7 @@ const (
 	// GoProfile is the runtime profile identity of the Go toolchain closure.
 	GoProfile = "go"
 	// RequiredGoVersion is the exact first-release Go toolchain version.
-	RequiredGoVersion = "1.27.1"
+	RequiredGoVersion = "1.27.2"
 
 	goClosureDomain     = "machinery.runtime.go/v1"
 	goToolchainMaxBytes = int64(256 << 20)
@@ -54,7 +54,7 @@ type GoRequest struct {
 	ExpectedClosure string
 }
 
-// Go is the pinned Go 1.27.1 runtime handle implementing tdd.RuntimeHandle.
+// Go is the pinned Go 1.27.2 runtime handle implementing tdd.RuntimeHandle.
 type Go struct {
 	source      string // the caller-supplied or PATH-discovered launcher path
 	binPath     string // resolved absolute real path of bin/go

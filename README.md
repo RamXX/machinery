@@ -1038,7 +1038,7 @@ versions and release checks. Neither command installs anything.
   guarantees are not claimed: process custody, formal verification, and the assurance lanes are
   unix-only and refuse on Windows. Use Linux or macOS for the full toolchain.
 
-  **Build from source** (with [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.1). This is
+  **Build from source** (with [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.2). This is
   also how you run a change before it is released:
   ```bash
   go build -o machinery ./cmd/machinery    # then: machinery install --from .
@@ -1478,7 +1478,7 @@ job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted r
 Dagger CLI at the version `dagger.json` owns (v0.21.10), verified against a committed checksum.
 
 The module does not restate the runtime pins. Its base container is built from
-`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.1), Node (26.10.0) with TypeScript
+`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.2), Node (26.11.1) with TypeScript
 (7.0.2), CPython (3.14.8), and Elixir (1.20.4) on OTP (29.1.1) identities, shared with
 `make ci-linux`. The race sweep runs as an unprivileged user inside the container, because root
 bypasses permission bits and would turn the custody tests that assert an unwritable path is refused

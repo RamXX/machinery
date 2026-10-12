@@ -22,12 +22,12 @@ var indexFixtures = map[string]string{
 		"v1.21.0-rc.0 ccc 2026-09-01T00:00:00Z sha\n" +
 		"main ddd 2026-09-20T00:00:00Z sha\n",
 	"/github/elixir": `[{"tag_name":"v1.21.0-rc.0","prerelease":true},{"tag_name":"v1.20.4"},{"tag_name":"v1.19.6"},{"tag_name":"v1.22.0","draft":true}]`,
-	"/node":          `[{"version":"v26.10.0","lts":false},{"version":"v26.9.0","lts":false},{"version":"v24.12.0","lts":"Krypton"}]`,
+	"/node":          `[{"version":"v26.11.1","lts":false},{"version":"v26.9.0","lts":false},{"version":"v24.12.0","lts":"Krypton"}]`,
 	"/typescript":    `{"name":"typescript","version":"7.0.2"}`,
 	"/python":        `[{"name":"Python 3.14.8"},{"name":"Python 3.13.12"},{"name":"Python 3.14.10"},{"name":"Python 3.15.0rc2"}]`,
 	"/java/21":       `{"releases":["jdk-21.0.12.1+1","jdk-21.0.12+8","jdk-21.0.11+10"]}`,
 	"/java/info":     `{"available_lts_releases":[8,11,17,21,25],"most_recent_lts":25}`,
-	"/go":            `[{"version":"go1.27.1","stable":true},{"version":"go1.28rc1","stable":false},{"version":"go1.26.8","stable":true}]`,
+	"/go":            `[{"version":"go1.27.2","stable":true},{"version":"go1.28rc1","stable":false},{"version":"go1.26.8","stable":true}]`,
 }
 
 func fixtureServer(t *testing.T) (*httptest.Server, sources) {
@@ -83,11 +83,11 @@ func TestLatestParsersPickNewestRelease(t *testing.T) {
 	}{
 		{"elixir from GitHub skips drafts and prereleases", func() (string, error) { return latestElixir(ctx, f, src.ElixirReleases, "") }, "1.20.4"},
 		{"elixir builds list skips rc and branch builds", func() (string, error) { return latestElixirBuilds(ctx, f, src.ElixirBuilds) }, "1.20.4"},
-		{"node", func() (string, error) { return latestNode(ctx, f, src.NodeIndex) }, "26.10.0"},
+		{"node", func() (string, error) { return latestNode(ctx, f, src.NodeIndex) }, "26.11.1"},
 		{"typescript", func() (string, error) { return latestTypeScript(ctx, f, src.TypeScript) }, "7.0.2"},
 		{"python compares numerically and skips rc", func() (string, error) { return latestPython(ctx, f, src.PythonReleases) }, "3.14.10"},
 		{"java keeps the pin spelling", func() (string, error) { return latestJava(ctx, f, src.JavaReleases, 21) }, "21.0.12.1+1"},
-		{"go skips unstable", func() (string, error) { return latestGo(ctx, f, src.GoReleases) }, "1.27.1"},
+		{"go skips unstable", func() (string, error) { return latestGo(ctx, f, src.GoReleases) }, "1.27.2"},
 	}
 	for _, check := range checks {
 		got, err := check.got()
@@ -104,8 +104,8 @@ func TestFillLatestReportsDriftAndNewerLTS(t *testing.T) {
 	_, src := fixtureServer(t)
 	rows := []row{{Runtime: "Node", Pinned: "26.9.0"}, {Runtime: "Python", Pinned: "3.14.10"}, {Runtime: "Java", Pinned: runtimeclosure.PinnedJavaRuntimeVersion}}
 	notes := fillLatest(context.Background(), rows, testFetcher(), src)
-	if rows[0].Latest != "26.10.0" || rows[0].Status() != "drift" {
-		t.Errorf("Node row %+v is not drift against 26.10.0", rows[0])
+	if rows[0].Latest != "26.11.1" || rows[0].Status() != "drift" {
+		t.Errorf("Node row %+v is not drift against 26.11.1", rows[0])
 	}
 	if rows[1].Status() != "ok" {
 		t.Errorf("Python row %+v is not ok", rows[1])
@@ -170,7 +170,7 @@ func TestExtractVersionFromHostOutput(t *testing.T) {
 		"python":        {"Python", "Python 3.14.8\n", "3.14.8"},
 		"temurin":       {"Java", "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\n", "21.0.12.1+1"},
 		"other openjdk": {"Java", "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment Homebrew (build 21.0.12.1)\n", "21.0.12.1"},
-		"go":            {"Go", "go1.27.1\n", "1.27.1"},
+		"go":            {"Go", "go1.27.2\n", "1.27.2"},
 		"garbage":       {"Node", "command not found\n", ""},
 	}
 	for name, c := range cases {
@@ -185,7 +185,7 @@ func TestCompareVersions(t *testing.T) {
 		a, b string
 		want int
 	}{
-		{"29.1.1", "29.1", 1}, {"3.14.10", "3.14.8", 1}, {"26.9.0", "26.10.0", -1}, {"1.20.4", "1.20.4", 0},
+		{"29.1.1", "29.1", 1}, {"3.14.10", "3.14.8", 1}, {"26.9.0", "26.11.1", -1}, {"1.20.4", "1.20.4", 0},
 	} {
 		if got := compareVersions(c.a, c.b); got != c.want {
 			t.Errorf("compare(%s, %s) = %d, want %d", c.a, c.b, got, c.want)
@@ -244,9 +244,9 @@ func TestSingleFailedLookupIsNotOffline(t *testing.T) {
 
 func TestHostBehindIsReportedAndFailsOnlyUnderHostStrict(t *testing.T) {
 	rows := []row{
-		{Runtime: "Node", Pinned: "26.10.0", Host: "26.9.0", Latest: "26.10.0"},
+		{Runtime: "Node", Pinned: "26.11.1", Host: "26.9.0", Latest: "26.11.1"},
 		{Runtime: "Python", Pinned: "3.14.8", Host: "3.14.8", Latest: "3.14.8"},
-		{Runtime: "Go", Pinned: "1.27.1", Host: absent, Latest: "1.27.1"},
+		{Runtime: "Go", Pinned: "1.27.2", Host: absent, Latest: "1.27.2"},
 		{Runtime: "Java", Pinned: "21.0.12.1+1", Host: "21.0.12.1", Latest: "21.0.12.1+1"},
 	}
 	want := []string{"ok, host behind", "ok", "ok", "ok"}
@@ -264,7 +264,7 @@ func TestHostBehindIsReportedAndFailsOnlyUnderHostStrict(t *testing.T) {
 	if exitCode(rows, false, true) != 3 {
 		t.Error("host behind must exit 3 under -host-strict")
 	}
-	drift := append([]row{{Runtime: "Node", Pinned: "26.9.0", Host: "26.9.0", Latest: "26.10.0"}}, rows...)
+	drift := append([]row{{Runtime: "Node", Pinned: "26.9.0", Host: "26.9.0", Latest: "26.11.1"}}, rows...)
 	if exitCode(drift, false, true) != 1 {
 		t.Error("drift must take precedence over host mismatch")
 	}

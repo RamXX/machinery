@@ -24,7 +24,7 @@ func unitSuite() *tdd.Suite {
 	return &tdd.Suite{
 		ID:      "go-unit",
 		Adapter: AdapterGoTesting,
-		Runtime: tdd.RuntimeRef{Profile: "go", Version: "1.27.1", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("a", 64)},
+		Runtime: tdd.RuntimeRef{Profile: "go", Version: "1.27.2", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("a", 64)},
 		Root:    ".",
 		Files:   []string{"a_test.go"},
 		Tests: []tdd.Test{

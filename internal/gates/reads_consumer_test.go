@@ -72,7 +72,7 @@ func readsConsumerDesign(t *testing.T, rows string, matrices map[string]string) 
 		readsArmed + "Source: exhaustive markPaid fixture consumers.\n\n" + wiringHeader + rows +
 		"\n## Traceability\n\n| invariant | where |\n|---|---|\n| order-paid-final | `Order` guard |\n" + nfrStub
 	mustWrite(t, filepath.Join(design, "ARCHITECTURE.md"), arch)
-	mustWrite(t, filepath.Join(design, "BUILD.md"), "Mode: full\n\n## Toolchain\nGo 1.27.1.\n")
+	mustWrite(t, filepath.Join(design, "BUILD.md"), "Mode: full\n\n## Toolchain\nGo 1.27.2.\n")
 	return design
 }
 

@@ -115,7 +115,7 @@ func (p *flowProject) captureShape() tdd.Manifest {
 		SubjectEntries: []tdd.SubjectEntry{{Path: "app/src.txt", Kind: "file"}},
 		Suites: []tdd.Suite{{
 			ID: "s1", Adapter: protocol.AdapterGoTesting,
-			Runtime: tdd.RuntimeRef{Profile: "go", Version: "go1.27.1", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("c", 64)},
+			Runtime: tdd.RuntimeRef{Profile: "go", Version: "go1.27.2", Platform: "darwin/arm64", Closure: "sha256:" + strings.Repeat("c", 64)},
 			Root:    "app", Files: []string{"app/tests/alpha_test.go"},
 			Tests: []tdd.Test{{
 				ID: "t1", Native: tdd.NativeID{Package: "github.com/example/tests", Test: "TestAlphaRefusal"},
@@ -279,7 +279,7 @@ func flowManifestDoc(design, id string, revision int64, predecessor string, fina
 		"subject_entries": []any{map[string]any{"path": subject, "kind": "file"}},
 		"suites": []any{map[string]any{
 			"id": "s1", "adapter": protocol.AdapterGoTesting,
-			"runtime": map[string]any{"profile": "go", "version": "go1.27.1", "platform": "darwin/arm64", "closure": "sha256:" + strings.Repeat("c", 64)},
+			"runtime": map[string]any{"profile": "go", "version": "go1.27.2", "platform": "darwin/arm64", "closure": "sha256:" + strings.Repeat("c", 64)},
 			"root":    design, "files": []any{testFile}, "tests": tests, "environment": []any{}, "dependency_roots": []any{},
 		}},
 		"obligations": obls, "baseline": baseline, "variants": variants, "red_expectations": exps,

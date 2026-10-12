@@ -2,7 +2,7 @@
 
 package runtimeclosure
 
-// Frozen RED suite for MAC-wi2u: the pinned Go 1.27.1 runtime closure that
+// Frozen RED suite for MAC-wi2u: the pinned Go 1.27.2 runtime closure that
 // go-testing/v1 executes under. Positive subjects bind the real host
 // toolchain through native custody; negative subjects build small synthetic
 // roots so mutation is observable without ever touching the user's real
@@ -31,8 +31,8 @@ func TestGoClosurePinsExactCatalogIdentity(t *testing.T) {
 	if GoProfile != "go" {
 		t.Fatalf("go runtime profile identity is %q", GoProfile)
 	}
-	if RequiredGoVersion != "1.27.1" {
-		t.Fatalf("pinned go version is %q, want 1.27.1", RequiredGoVersion)
+	if RequiredGoVersion != "1.27.2" {
+		t.Fatalf("pinned go version is %q, want 1.27.2", RequiredGoVersion)
 	}
 	platform := runtime.GOOS + "/" + runtime.GOARCH
 	if !validGoPlatform(platform) {
@@ -183,7 +183,7 @@ func TestGoCloseDetectsPostVerificationMutation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("synthetic consistent root must open: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "VERSION"), []byte("go1.27.1-mutated\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "VERSION"), []byte("go1.27.2-mutated\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := handle.Close(); err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {
