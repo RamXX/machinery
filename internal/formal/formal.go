@@ -549,8 +549,13 @@ func fetchJarContext(ctx context.Context, dest, url, label, wantSHA string) (_ s
 		if downloadErr == nil {
 			break
 		}
-		if !retry || attempt == 3 || downloadCtx.Err() != nil {
+		if !retry || attempt == 3 {
 			return "", fmt.Errorf("fetching %s after %d attempts: %w", label, attempt, downloadErr)
+		}
+		// A cancellation that lands between the failed attempt and this
+		// check must surface as the cause, not the transient HTTP error.
+		if cerr := downloadCtx.Err(); cerr != nil {
+			return "", fmt.Errorf("fetching %s after %d attempts: %w", label, attempt, cerr)
 		}
 		timer := time.NewTimer(200 * time.Millisecond << (attempt - 1))
 		select {
