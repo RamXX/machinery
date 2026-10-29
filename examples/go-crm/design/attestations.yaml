@@ -112,7 +112,7 @@ attestations:
     date: 2026-10-29
     note: 'Re-reviewed 2026-09-23 after the dependency bump of golang.org/x/crypto 0.56.0 to 0.57.0 and golang.org/x/sys 0.47.0 to 0.48.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change), and over the covered BUILD.md whose x/crypto pin was realigned to that authoritative go.mod (v0.56.0 to v0.57.0; pin text only, no design change). Scope unchanged from the 2026-09-09 review: internal/testoracle loads all five committed oracle+machine pairs and matches an independent re-parse of the 197 committed transition rows; fired effects reconcile exit/transition/entry order and internal transitions; exact structural field membership, closed inventory/priority/invoke identities, and malformed-table rejection verified; go test ./... green over the full impl on 2026-09-23 (session, testoracle). Bounded: content-hash-bound scope review, not authenticated execution replay. Re-reviewed 2026-10-05 after the session contract suite gained C-SESS-11 (tampered token refused) and C-SESS-12 (delimiter-injected token refused) for the threat ledger; no conformance test changed and the testoracle scope is as reviewed above. Re-reviewed 2026-10-29 after the dependency bump of github.com/klauspost/compress 1.18.5 to 1.20.3 (security advisory, indirect), golang.org/x/crypto 0.57.0 to 0.58.0 and golang.org/x/sys 0.48.0 to 0.49.0 in examples/go-crm/impl (go.mod, go.sum only; no source or test change); go test ./... green over the full impl on 2026-10-29 (testoracle included).'
     covers:
-      - {path: BUILD.md, hash: sha256:02f11ecad138d967d6cf6a19cc400be360074c0b688be5a5b14024631a1bf8cf}
+      - {path: BUILD.md, hash: sha256:9404cd3f127b7d0e7f69a5ce748413072ed298cd458669a3572c0d302d72e8fb}
     implementation:
       root: ../impl
       policy: full-root-v1
@@ -344,10 +344,10 @@ attestations:
   - claim: g4.zero-context
     kind: plan
     attestor: coordinator
-    date: 2026-09-23
-    note: 'Re-reviewed 2026-09-23 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin realigned to impl/go.mod after the 0.56.0 to 0.57.0 bump); the only change since the 2026-09-09 review is dependency pin text, so the zero-context plan judgment stands over the corrected build document.'
+    date: 2026-10-29
+    note: 'Re-reviewed 2026-10-29 over the corrected BUILD (x/crypto pin realigned to impl/go.mod after the 0.57.0 to 0.58.0 bump; pin text only, no design change). Earlier review: Re-reviewed 2026-09-23 over the corrected BUILD (bounded parser-backed suite evidence, declared rebuild migration context, x/crypto pin realigned to impl/go.mod after the 0.56.0 to 0.57.0 bump); the only change since the 2026-09-09 review is dependency pin text, so the zero-context plan judgment stands over the corrected build document.'
     covers:
-      - {path: BUILD.md, hash: sha256:02f11ecad138d967d6cf6a19cc400be360074c0b688be5a5b14024631a1bf8cf}
+      - {path: BUILD.md, hash: sha256:9404cd3f127b7d0e7f69a5ce748413072ed298cd458669a3572c0d302d72e8fb}
   - claim: ga.review-quality
     kind: historical
     attestor: Codex release acceptance review

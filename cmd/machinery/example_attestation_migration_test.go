@@ -52,17 +52,20 @@ const (
 	// here, or the accepted MAC-lhu5 portfolio repair) and were therefore
 	// re-reviewed by the coordinator for this story.
 	reReviewPrefix = "Re-reviewed 2026-09-06 over the corrected BUILD"
-	// crmBumpDate/crmBumpPrefix pin the two go-crm rows covering BUILD.md.
+	// crmDepsDate/crmBumpPrefix pin the two go-crm rows covering BUILD.md.
 	// They moved off reviewDate when the dependabot bump of
 	// golang.org/x/crypto (0.55.0 to 0.56.0, then 0.56.0 to 0.57.0) staled the
 	// pin text BUILD.md quotes from the authoritative impl/go.mod, forcing a
 	// re-review of the corrected document and of the bumped implementation root.
-	crmBumpDate = "2026-09-23"
+	// The latest bump re-review (x/crypto 0.58.0, x/sys 0.49.0,
+	// klauspost/compress 1.20.3) is crmDepsDate: the current gt row and the
+	// BUILD.md plan row. The g3 rows keep crmThreatDate.
+	crmDepsDate = "2026-10-29"
 	// crmThreatDate is the go-crm re-review after its threat ledger added
 	// threat invariants to the Session matrix and two negative tests to
 	// the session contract suite (the four g3 rows and the current gt row).
 	crmThreatDate      = "2026-10-05"
-	crmBumpPrefix      = "Re-reviewed 2026-09-23 over the corrected BUILD"
+	crmBumpPrefix      = "Re-reviewed 2026-10-29 over the corrected BUILD"
 	portfolioRenewal   = "Renews the 2026-09-02 Codex deterministic design review"
 	nextGateAttestor   = "Codex lane/next-gates"
 	nextGateDate       = "2026-09-22"
@@ -185,8 +188,8 @@ func expectedMigration() map[string][]migratedRow {
 	}
 	goCrm = append(goCrm, planRows(g3Claims, origCodexCRM, crmThreatDate, crmMachines)...)
 	goCrm = append(goCrm,
-		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmThreatDate, covers: []string{"BUILD.md"}},
-		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: coordinator, date: crmBumpDate, note: crmBumpPrefix, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "gt.conformance-test-shape", kind: "current", attestor: coordinator, date: crmDepsDate, covers: []string{"BUILD.md"}},
+		migratedRow{claim: "g4.zero-context", kind: "plan", attestor: coordinator, date: crmDepsDate, note: crmBumpPrefix, covers: []string{"BUILD.md"}},
 		migratedRow{claim: "ga.review-quality", kind: "historical", attestor: origAccept, date: "2026-09-03", covers: acceptance},
 	)
 
