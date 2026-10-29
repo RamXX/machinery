@@ -547,6 +547,51 @@ func TestCommitRegistrationConcurrentWriters(t *testing.T) {
 	}
 }
 
+// A reader without the writer can straddle the writer's rename of head.json
+// and see STALE_INPUT. The stable read re-reads through that benign race, but
+// still blocks on persistent staleness and on any other failure.
+func TestReadHeadStable(t *testing.T) {
+	stale := fmt.Errorf("STALE_INPUT: head.json changed while reading")
+	corrupt := fmt.Errorf("INVALID_SCHEMA: head.json is not a regular file")
+	seq := func(errs ...error) (func(string) ([]byte, error), *int) {
+		calls := 0
+		return func(string) ([]byte, error) {
+			e := errs[calls]
+			calls++
+			if e != nil {
+				return nil, e
+			}
+			return []byte("head"), nil
+		}, &calls
+	}
+	for _, tc := range []struct {
+		name    string
+		errs    []error
+		wantErr error
+		calls   int
+	}{
+		{"clean read", []error{nil}, nil, 1},
+		{"one swap", []error{stale, nil}, nil, 2},
+		{"swaps up to the bound minus one", []error{stale, stale, nil}, nil, 3},
+		{"persistent staleness blocks", []error{stale, stale, stale}, stale, headReadAttempts},
+		{"other failures are not retried", []error{corrupt}, corrupt, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			read, calls := seq(tc.errs...)
+			raw, err := readHeadWith("head.json", read)
+			if err != tc.wantErr {
+				t.Fatalf("err = %v, want %v", err, tc.wantErr)
+			}
+			if err == nil && string(raw) != "head" {
+				t.Fatalf("raw = %q", raw)
+			}
+			if *calls != tc.calls {
+				t.Fatalf("reads = %d, want %d", *calls, tc.calls)
+			}
+		})
+	}
+}
+
 // AC4/AC5: a failed final revalidation (real mid-transaction source change)
 // aborts without advancing the head and leaves no staged successor archive;
 // precommit errors consume no revision.

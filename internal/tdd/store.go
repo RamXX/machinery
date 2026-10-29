@@ -649,6 +649,38 @@ func digestOfBytes(b []byte) string {
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
+// headReadAttempts bounds readHeadStable. Each swap consumes one generation
+// and needs the writer, so a reader that loses more than a couple of rounds
+// is not racing a transaction.
+const headReadAttempts = 3
+
+// readHeadStable reads head.json for a reader that holds no writer. The
+// writer advances the head by renaming a fully written file over it, so a
+// reader can straddle the swap and see the inode change (STALE_INPUT). That
+// is a benign race, not corruption: re-read and observe the new head. Any
+// other failure, and persistent staleness, still blocks.
+func readHeadStable(p string) ([]byte, error) {
+	return readHeadWith(p, func(p string) ([]byte, error) {
+		raw, _, err := readControlJSON(p)
+		return raw, err
+	})
+}
+
+func readHeadWith(p string, read func(string) ([]byte, error)) ([]byte, error) {
+	var err error
+	for i := 0; i < headReadAttempts; i++ {
+		var raw []byte
+		raw, err = read(p)
+		if err == nil {
+			return raw, nil
+		}
+		if !strings.HasPrefix(err.Error(), "STALE_INPUT:") {
+			return nil, err
+		}
+	}
+	return nil, err
+}
+
 // openStore opens and fully validates the store for reading. wantProject ""
 // skips the project comparison (export); otherwise a mismatch is blocking.
 func openStore(ctx context.Context, path, wantProject string) (*storeView, error) {
@@ -689,7 +721,7 @@ func openStore(ctx context.Context, path, wantProject string) (*storeView, error
 		dir.Close()
 		return nil, err
 	}
-	headRaw, _, err := readControlJSON(filepath.Join(path, storeLedger, "head.json"))
+	headRaw, err := readHeadStable(filepath.Join(path, storeLedger, "head.json"))
 	if err != nil {
 		dir.Close()
 		return nil, fmt.Errorf("HISTORY_UNAVAILABLE: %w", err)
