@@ -106,7 +106,7 @@ examples/pii-flow/
         generated/
           souffle-outputs.json           # the trace: every output relation Souffle derived (committed)
   souffle-image/
-    Dockerfile                           # the checker userspace: CPython 3.14.8 + Souffle 2.5, all inputs pinned
+    Dockerfile                           # the checker userspace: CPython 3.15.2 + Souffle 2.5, all inputs pinned
   checkers.local.example.yaml            # sample local registry
   README.md
 ```

@@ -1,7 +1,7 @@
 package adapters
 
 // RED contract for MAC-imtz (native subjects): the closed python-unittest/v1
-// adapter executes REAL Python suites — pinned CPython 3.14.8 in isolated
+// adapter executes REAL Python suites — pinned CPython 3.15.2 in isolated
 // mode, the embedded byte-pinned helper and bootstrap/harness, real stdlib
 // unittest lifecycle with full TestCase.id() reconciliation, processscope
 // custody, normalized machinery.tdd.event/v1 accounting — through the REAL
@@ -198,7 +198,7 @@ func pyConformanceSuite(t *testing.T, id string) tdd.Suite {
 
 // TestPythonAdapterExecutesRealUnittestSuiteNatively is the positive native
 // proof: the frozen fixture executes through the real stdlib unittest
-// lifecycle under CPython 3.14.8 isolated mode with the embedded harness;
+// lifecycle under CPython 3.15.2 isolated mode with the embedded harness;
 // the normalized event stream accounts every identity and every registered
 // assertion, including the async member.
 func TestPythonAdapterExecutesRealUnittestSuiteNatively(t *testing.T) {
@@ -389,7 +389,7 @@ func TestPythonAdapterRejectsStaleBytecode(t *testing.T) {
 		if err := os.MkdirAll(cache, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(cache, "conformance_test.cpython-314.pyc"), []byte("stale bytecode"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(cache, "conformance_test.cpython-315.pyc"), []byte("stale bytecode"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -399,7 +399,7 @@ func TestPythonAdapterRejectsStaleBytecode(t *testing.T) {
 	}
 	captured := map[string][]byte{
 		"conformance_test.py":                          pyAssetBytes(t, "conformance/conformance_test.py"),
-		"__pycache__/conformance_test.cpython-314.pyc": []byte("stale bytecode"),
+		"__pycache__/conformance_test.cpython-315.pyc": []byte("stale bytecode"),
 	}
 	_, err = pyRunCaptured(t, ctx, captured, pyConformanceSuite(t, "stale-pyc-captured"), nil)
 	if err == nil || !strings.Contains(err.Error(), "STALE_INPUT") {

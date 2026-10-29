@@ -15,8 +15,12 @@ under their version heading when a release is cut.
 
 - Pinned Go moves to 1.27.3, which fixes GO-2026-6809 (crypto/x509 distrust of compromised
   intermediate certificates) and, with 1.27.2, nine earlier standard-library vulnerabilities
-  (GO-2026-6603 and GO-2026-6604 among them) that the nightly and security `govulncheck` runs reported. The other
-  runtime pins follow their latest upstream releases: Node 26.11.1. CPython stays at 3.14.8 until the python:3.15.0 image is published.
+  (GO-2026-6603 and GO-2026-6604 among them) that the nightly and security `govulncheck` runs reported.
+- The other runtime pins follow their latest upstream releases: Erlang/OTP 29.1.2 (erts 17.1.1),
+  Node 26.13.0 and CPython 3.15.2 (the 3.14 line is retired). Temurin Java stays at 21.0.12.1.
+- `github.com/klauspost/compress` moves to v1.20.3 in the go-crm example, clearing the high-severity
+  s2 out-of-bounds write advisory (fixed in 1.18.7). `golang.org/x/sys` 0.49.0, `golang.org/x/crypto`
+  0.58.0 and `actions/upload-artifact` 7.0.2 / `download-artifact` 8.0.2 follow.
 
 ## [0.11.2] - 2026-10-06
 

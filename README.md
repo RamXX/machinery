@@ -1478,8 +1478,8 @@ job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted r
 Dagger CLI at the version `dagger.json` owns (v0.21.10), verified against a committed checksum.
 
 The module does not restate the runtime pins. Its base container is built from
-`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.3), Node (26.11.1) with TypeScript
-(7.0.2), CPython (3.14.8), and Elixir (1.20.4) on OTP (29.1.1) identities, shared with
+`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.3), Node (26.13.0) with TypeScript
+(7.0.2), CPython (3.15.2), and Elixir (1.20.4) on OTP (29.1.2) identities, shared with
 `make ci-linux`. The race sweep runs as an unprivileged user inside the container, because root
 bypasses permission bits and would turn the custody tests that assert an unwritable path is refused
 into silent passes. The wiring guards in `cmd/machinery/repository_contract_test.go` and

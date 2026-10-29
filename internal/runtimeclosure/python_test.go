@@ -2,7 +2,7 @@
 
 package runtimeclosure
 
-// RED contract for MAC-imtz: the pinned CPython 3.14.8 runtime closure.
+// RED contract for MAC-imtz: the pinned CPython 3.15.2 runtime closure.
 // Every subject needs the real GREEN handle; the RED stub fails each with
 // ErrPythonClosureNotImplemented instead of silently passing. No subject
 // launches an unowned subprocess.
@@ -146,7 +146,7 @@ func TestPythonClosureValidateProbesUnderCustody(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(shim, "bin"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(shim, "lib", "python3.14", "unittest"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(shim, "lib", "python3.15", "unittest"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	python := filepath.Join(shim, "bin", "python3")
@@ -190,11 +190,11 @@ func TestPythonClosureCloseIsPureRevalidation(t *testing.T) {
 	if err := os.WriteFile(bin, body, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	stdlib := filepath.Join(root, "lib", "python3.14", "unittest")
+	stdlib := filepath.Join(root, "lib", "python3.15", "unittest")
 	if err := os.MkdirAll(stdlib, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	realStdlib := filepath.Join(filepath.Dir(filepath.Dir(discovered)), "lib", "python3.14", "unittest")
+	realStdlib := filepath.Join(filepath.Dir(filepath.Dir(discovered)), "lib", "python3.15", "unittest")
 	if entries, readErr := os.ReadDir(realStdlib); readErr == nil {
 		for _, entry := range entries {
 			if entry.Type().IsRegular() {
