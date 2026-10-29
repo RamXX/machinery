@@ -939,7 +939,7 @@ func accountElixir(output string, r *suiteReceipt) error {
 // executeGoConformanceSuite executes the frozen go-testing/v1 conformance
 // fixture through the REAL production assurance chain: the frozen bytes are
 // captured into a private content-addressed store bundle, the pinned Go
-// 1.27.2 runtime closure is opened and validated under the lane's custody
+// 1.27.3 runtime closure is opened and validated under the lane's custody
 // scope, the closed adapter prepares the suite (verified materialization,
 // embedded byte-pinned helper transport, typed assertion call-site
 // validation, native build selection proof) and runs the exact native

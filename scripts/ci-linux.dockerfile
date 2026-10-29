@@ -2,7 +2,7 @@
 # tier in.
 #
 # Every runtime identity here mirrors .github/actions/assurance-runtimes, the
-# single owner of the hosted runtime pins: Go 1.27.2, Node 26.11.1 with
+# single owner of the hosted runtime pins: Go 1.27.3, Node 26.11.1 with
 # TypeScript 7.0.2, CPython 3.14.8, Elixir 1.20.4 on OTP 29.1.1. The required
 # lane re-verifies each identity against testdata/integration-lanes and fails
 # closed, so a drifted stage here fails loudly instead of producing evidence
@@ -12,7 +12,7 @@
 # without editing this file: scripts/ci-linux.sh forwards
 # MACHINERY_CI_LINUX_<STAGE>_IMAGE for every stage.
 
-ARG GO_IMAGE=golang:1.27.2-trixie
+ARG GO_IMAGE=golang:1.27.3-trixie
 ARG NODE_IMAGE=node:26.11.1-trixie-slim
 ARG PYTHON_IMAGE=python:3.14.8-slim-trixie
 ARG ELIXIR_IMAGE=hexpm/elixir:1.20.4-erlang-29.1.1-debian-trixie-20260918-slim

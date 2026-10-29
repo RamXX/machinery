@@ -194,7 +194,7 @@ func inventoryBaseManifest(t *testing.T, reviewDigest string) tdd.Manifest {
 		Suites: []tdd.Suite{{
 			ID:      "s1",
 			Adapter: protocol.AdapterGoTesting,
-			Runtime: tdd.RuntimeRef{Profile: "go", Version: "go1.27.2", Platform: "darwin/arm64", Closure: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
+			Runtime: tdd.RuntimeRef{Profile: "go", Version: "go1.27.3", Platform: "darwin/arm64", Closure: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},
 			Root:    ".", Files: []string{"tests/alpha_test.go"},
 			Tests: []tdd.Test{
 				{ID: "t1", Native: tdd.NativeID{Package: "github.com/example/tests", Test: "TestAlphaRefusal"}, Source: "tests/alpha_test.go", Role: protocol.RoleNegative, Assertions: []tdd.Assertion{newAssert("asr-1", 10)}},

@@ -1,4 +1,4 @@
-# runtime-pins.yml - weekly check that every pinned native runtime (OTP, erts,
+# runtime-pins.yml - daily check that every pinned native runtime (OTP, erts,
 # Elixir, Node, TypeScript, Python, Java, Go) is the latest upstream release.
 # Dependabot covers Go modules and actions; this covers the runtimes the
 # assurance lane and the formal engines pin. When a pin is behind, or an
@@ -8,7 +8,7 @@ name: runtime-pins
 
 on:
   schedule:
-    - cron: "0 6 * * 1"   # Mondays 06:00 UTC, alongside Dependabot
+    - cron: "0 6 * * *"   # 06:00 UTC daily, so a pin behind a security fix is reported within a day
   workflow_dispatch: {}
 
 concurrency:

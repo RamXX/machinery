@@ -10,7 +10,7 @@ frozen v1 file, fragment or test.
 `testdata/integration-lanes/assurance.schema.json` (hash-pinned in the runner)
 defines the closed assurance fragment schema `machinery.assurance.lane/v1`.
 `testdata/integration-lanes/assurance-runtime-pins.json` declares the exact
-first-release native catalog: go-testing/v1 Go 1.27.2; node-test-typescript/v1
+first-release native catalog: go-testing/v1 Go 1.27.3; node-test-typescript/v1
 Node 26.11.1 with TypeScript 7.0.2; python-unittest/v1 CPython 3.14.8;
 elixir-exunit/v1 Elixir 1.20.4 with Mix 1.20.4, OTP major 29 and ERTS 17.1
 (the OTP patch identity is bound through the runtime's own reported ERTS
@@ -37,7 +37,7 @@ then provisions:
 - The current GOOS/GOARCH pair is one of the pinned native platforms;
   anything else fails UNSUPPORTED_PLATFORM rather than degrading.
 - Every one of the four adapter runtimes is really present and its native
-  version identity matches the pin exactly: `go version` (go1.27.2), `node
+  version identity matches the pin exactly: `go version` (go1.27.3), `node
   --version` (v26.11.1), `tsc --version` (Version 7.0.2), `python3 --version`
   (Python 3.14.8), `elixir --version` (Elixir 1.20.4, Erlang/OTP 29,
   erts-17.1) and `mix --version` (Mix 1.20.4). Each receipt binds the

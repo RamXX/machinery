@@ -68,7 +68,7 @@ make ci-linux
 It runs the hosted `test` job (`go test -race -count=1 ./... -timeout=30m`) and
 the hosted `integration-required` job (`go run ./scripts/integration-lane --lane
 required`) inside a pinned 2-CPU `linux/amd64` container carrying the exact
-runtime identities `.github/actions/assurance-runtimes` installs: Go 1.27.2,
+runtime identities `.github/actions/assurance-runtimes` installs: Go 1.27.3,
 Node 26.11.1 with TypeScript 7.0.2, CPython 3.14.8, and Elixir 1.20.4 on OTP
 29.1.1. The lane re-verifies each identity and fails closed, so a drifted image
 stage is reported, never silently tolerated.
@@ -125,7 +125,7 @@ makes the native suites fail locally; that exits 0 by default, and
 `go run ./scripts/runtime-pins -host-strict` exits 3 on it. Elixir is looked
 up through the GitHub releases API (set `GITHUB_TOKEN` to avoid the
 unauthenticated rate limit) with builds.hex.pm as the fallback.
-`.github/workflows/runtime-pins.yml` runs it with `-strict` every Monday and
+`.github/workflows/runtime-pins.yml` runs it with `-strict` every day and
 opens or updates the issue "runtime pins behind upstream" with the table.
 Bumping a pin is a normal weekly chore, not a release event.
 

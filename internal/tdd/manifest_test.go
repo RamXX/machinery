@@ -130,7 +130,7 @@ func baseManifest(reviewDigest string) Manifest {
 		Suites: []Suite{{
 			ID:      "s1",
 			Adapter: protocol.AdapterGoTesting,
-			Runtime: RuntimeRef{Profile: "go", Version: "go1.27.2", Platform: "darwin/arm64", Closure: fixtureClosure},
+			Runtime: RuntimeRef{Profile: "go", Version: "go1.27.3", Platform: "darwin/arm64", Closure: fixtureClosure},
 			Root:    ".", Files: []string{"tests/alpha_test.go"},
 			Tests: []Test{
 				{ID: "t1", Native: NativeID{Package: "github.com/example/tests", Test: "TestAlphaRefusal"}, Source: "tests/alpha_test.go", Role: RoleNegative, Assertions: []Assertion{newAssert("asr-1", 10)}},

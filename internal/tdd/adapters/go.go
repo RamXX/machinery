@@ -4,7 +4,7 @@
 // transport from the owned assets directory, prepares captured Go suites
 // (verified bundle materialization, typed assertion call-site validation,
 // native build selection proof, exact frozen argv) and executes them under
-// processscope custody through the pinned Go 1.27.2 runtime closure,
+// processscope custody through the pinned Go 1.27.3 runtime closure,
 // normalizing native events to machinery.tdd.event/v1.
 package adapters
 
@@ -60,7 +60,7 @@ const (
 	// <module-path>/machinerycheck.
 	GoHelperDir = "machinerycheck"
 
-	goRequiredVersion = "1.27.2"
+	goRequiredVersion = "1.27.3"
 	goListTimeoutMS   = int64(120000)
 	goCompileTimeout  = int64(300000)
 )
@@ -125,7 +125,7 @@ type goPrepared struct {
 }
 
 // Prepare implements tdd.Adapter: it validates the closed request, opens and
-// validates the pinned Go 1.27.2 runtime closure under the live scope,
+// validates the pinned Go 1.27.3 runtime closure under the live scope,
 // materializes and re-verifies the captured source bundle plus the embedded
 // helper transport, validates every registered assertion as a typed helper
 // call at its exact frozen line, proves the build selection of every suite
