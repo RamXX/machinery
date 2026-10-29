@@ -579,8 +579,8 @@ func (s *scope) Close(ctx context.Context) (CleanupReport, error) {
 			case <-brokerExit.C:
 			}
 			if s.root.cmd != nil && s.root.cmd.Process != nil {
-				done := make(chan error, 1)
-				go func() { done <- s.root.cmd.Wait() }()
+				done := make(chan struct{})
+				go func() { _ = s.root.cmd.Wait(); close(done) }()
 				select {
 				case <-done:
 				case <-time.After(5 * time.Second):
@@ -754,8 +754,8 @@ func abortBootstrap(cmd *exec.Cmd, lw *os.File) {
 		lw.Close()
 	}
 	if cmd != nil && cmd.Process != nil {
-		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
+		done := make(chan struct{})
+		go func() { _ = cmd.Wait(); close(done) }()
 		select {
 		case <-done:
 			return

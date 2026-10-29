@@ -8,6 +8,7 @@ package tdd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -579,7 +580,7 @@ func TestReadHeadStable(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			read, calls := seq(tc.errs...)
 			raw, err := readHeadWith("head.json", read)
-			if err != tc.wantErr {
+			if !errors.Is(err, tc.wantErr) {
 				t.Fatalf("err = %v, want %v", err, tc.wantErr)
 			}
 			if err == nil && string(raw) != "head" {
