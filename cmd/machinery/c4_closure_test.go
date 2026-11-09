@@ -241,7 +241,7 @@ func TestVerifyStructurizrVersionRejectsSuccessfulWarningNoise(t *testing.T) {
 }
 
 func TestVerifyStructurizrVersionAcceptsOnlyOfficialFourLineIdentity(t *testing.T) {
-	canonical := "structurizr-cli: 2025.11.09\nstructurizr-java: 5.0.2\nJava: 21.0.12.1/Eclipse Adoptium (/fixture/java-home)\nOS: Mac OS X 26.7 (aarch64)\n"
+	canonical := "structurizr-cli: 2025.11.09\nstructurizr-java: 5.0.2\nJava: 21.0.13/Eclipse Adoptium (/fixture/java-home)\nOS: Mac OS X 26.7 (aarch64)\n"
 	if err := validateStructurizrVersionOutput(canonical, "2025.11.09"); err != nil {
 		t.Fatalf("official identity rejected: %v", err)
 	}

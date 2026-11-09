@@ -188,7 +188,7 @@ or to have machinery re-run the checker and confirm the verdict was earned:
    it fails if the rebuilt digest is not the pinned one:
 
    ```
-   localhost:5959/machinery/pii-flow-souffle@sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9
+   localhost:5959/machinery/pii-flow-souffle@sha256:ddebf381757b7b60bc78163768408f2ed71e34b456665905122d743b3c2d2613
    ```
 
    On an arm64 host the `linux/amd64` build and every later run execute under
@@ -241,10 +241,8 @@ image removed first):
 
 | Host | Build | Digest |
 |---|---|---|
-| amd64 Linux (Ubuntu 26.04.1 LTS), Docker 29.1.3, BuildKit v0.33.0, native | 1 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
-| amd64 Linux (Ubuntu 26.04.1 LTS), Docker 29.1.3, BuildKit v0.33.0, native | 2 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
-| arm64 macOS, Docker Desktop 29.8.1, emulated | 1 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
-| arm64 macOS, Docker Desktop 29.8.1, emulated | 2 | `sha256:33d970a00a6a90dff4f0a41f86fd8d9a46c897cee515cee37701768d649390d9` |
+| amd64 Linux (hosted GitHub runner), native | 1 | `sha256:ddebf381757b7b60bc78163768408f2ed71e34b456665905122d743b3c2d2613` |
+| arm64 macOS, Docker Desktop 29.9.2, BuildKit pinned by digest, emulated | 1 | `sha256:ddebf381757b7b60bc78163768408f2ed71e34b456665905122d743b3c2d2613` |
 
 ## Deriving `runtime_closure`
 

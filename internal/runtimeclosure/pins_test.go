@@ -12,8 +12,10 @@ import (
 // numeric major/feature/security constants, the archive table and the
 // repository's .java-runtime-pin file must all spell the same build.
 func TestJavaPinSpellingsAgree(t *testing.T) {
-	if want := fmt.Sprintf("%d.%d.%d.", RequiredJavaMajor, RequiredJavaFeature, RequiredJavaSecurity); !strings.HasPrefix(pinnedJavaVersion, want) {
-		t.Fatalf("pinnedJavaVersion %s does not start with the numeric pin %s", pinnedJavaVersion, want)
+	// A Temurin respin carries a fourth component (21.0.12.1); a plain
+	// security release does not (21.0.13).
+	if want := fmt.Sprintf("%d.%d.%d", RequiredJavaMajor, RequiredJavaFeature, RequiredJavaSecurity); pinnedJavaVersion != want && !strings.HasPrefix(pinnedJavaVersion, want+".") {
+		t.Fatalf("pinnedJavaVersion %s is not the numeric pin %s or one of its respins", pinnedJavaVersion, want)
 	}
 	assetVersion := strings.ReplaceAll(PinnedJavaRuntimeVersion, "+", "_")
 	assetPrefix := fmt.Sprintf("OpenJDK%dU-jdk_", RequiredJavaMajor)

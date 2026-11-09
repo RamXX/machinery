@@ -957,8 +957,8 @@ func TestRepositoryDeterminismSurfaceContracts(t *testing.T) {
 	javaPin := mustRepositoryFile(t, filepath.Join(root, ".java-runtime-pin"))
 	requireAll("Java runtime pin", javaPin,
 		"JAVA_RUNTIME_VERSION="+runtimeclosure.PinnedJavaRuntimeVersion,
-		"JAVA_RUNTIME_DARWIN_ARM64_SHA256=3623232f33a9c3baadf304480b2535f9a3cba8a58d42ecbb438ba267315d9998",
-		"JAVA_RUNTIME_LINUX_AMD64_SHA256=ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
+		"JAVA_RUNTIME_DARWIN_ARM64_SHA256=bf036b35b071bfb2f54f2c0af8ee8d88afa95ee6eb3dce02c0f94cfc2524d04a",
+		"JAVA_RUNTIME_LINUX_AMD64_SHA256=d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c",
 	)
 
 	release := mustRepositoryFile(t, filepath.Join(root, ".github", "workflows", "release.yml"))

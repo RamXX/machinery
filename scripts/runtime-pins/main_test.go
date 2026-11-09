@@ -25,7 +25,7 @@ var indexFixtures = map[string]string{
 	"/node":          `[{"version":"v26.11.1","lts":false},{"version":"v26.9.0","lts":false},{"version":"v24.12.0","lts":"Krypton"}]`,
 	"/typescript":    `{"name":"typescript","version":"7.0.2"}`,
 	"/python":        `[{"name":"Python 3.14.8"},{"name":"Python 3.13.12"},{"name":"Python 3.14.10"},{"name":"Python 3.15.0rc2"}]`,
-	"/java/21":       `{"releases":["jdk-21.0.12.1+1","jdk-21.0.12+8","jdk-21.0.11+10"]}`,
+	"/java/21":       `{"releases":["jdk-21.0.13+9","jdk-21.0.12+8","jdk-21.0.11+10"]}`,
 	"/java/info":     `{"available_lts_releases":[8,11,17,21,25],"most_recent_lts":25}`,
 	"/go":            `[{"version":"go1.27.3","stable":true},{"version":"go1.28rc1","stable":false},{"version":"go1.26.8","stable":true}]`,
 }
@@ -86,7 +86,7 @@ func TestLatestParsersPickNewestRelease(t *testing.T) {
 		{"node", func() (string, error) { return latestNode(ctx, f, src.NodeIndex) }, "26.11.1"},
 		{"typescript", func() (string, error) { return latestTypeScript(ctx, f, src.TypeScript) }, "7.0.2"},
 		{"python compares numerically and skips rc", func() (string, error) { return latestPython(ctx, f, src.PythonReleases) }, "3.14.10"},
-		{"java keeps the pin spelling", func() (string, error) { return latestJava(ctx, f, src.JavaReleases, 21) }, "21.0.12.1+1"},
+		{"java keeps the pin spelling", func() (string, error) { return latestJava(ctx, f, src.JavaReleases, 21) }, "21.0.13+9"},
 		{"go skips unstable", func() (string, error) { return latestGo(ctx, f, src.GoReleases) }, "1.27.3"},
 	}
 	for _, check := range checks {
@@ -168,8 +168,8 @@ func TestExtractVersionFromHostOutput(t *testing.T) {
 		"node":          {"Node", "v26.9.0\n", "26.9.0"},
 		"tsc":           {"TypeScript", "Version 7.0.2\n", "7.0.2"},
 		"python":        {"Python", "Python 3.14.8\n", "3.14.8"},
-		"temurin":       {"Java", "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\n", "21.0.12.1+1"},
-		"other openjdk": {"Java", "openjdk version \"21.0.12.1\" 2026-08-18\nOpenJDK Runtime Environment Homebrew (build 21.0.12.1)\n", "21.0.12.1"},
+		"temurin":       {"Java", "openjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\n", "21.0.13+9"},
+		"other openjdk": {"Java", "openjdk version \"21.0.13\" 2026-10-20\nOpenJDK Runtime Environment Homebrew (build 21.0.13)\n", "21.0.13"},
 		"go":            {"Go", "go1.27.3\n", "1.27.3"},
 		"garbage":       {"Node", "command not found\n", ""},
 	}
@@ -247,7 +247,7 @@ func TestHostBehindIsReportedAndFailsOnlyUnderHostStrict(t *testing.T) {
 		{Runtime: "Node", Pinned: "26.11.1", Host: "26.9.0", Latest: "26.11.1"},
 		{Runtime: "Python", Pinned: "3.14.8", Host: "3.14.8", Latest: "3.14.8"},
 		{Runtime: "Go", Pinned: "1.27.3", Host: absent, Latest: "1.27.3"},
-		{Runtime: "Java", Pinned: "21.0.12.1+1", Host: "21.0.12.1", Latest: "21.0.12.1+1"},
+		{Runtime: "Java", Pinned: "21.0.13+9", Host: "21.0.13", Latest: "21.0.13+9"},
 	}
 	want := []string{"ok, host behind", "ok", "ok", "ok"}
 	for i, r := range rows {

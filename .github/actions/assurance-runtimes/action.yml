@@ -6,7 +6,7 @@
 # a different set (or only Go from go.mod) cannot pass. go.mod is only the
 # module's floor; the catalog pin is exact.
 name: assurance runtimes
-description: Install Go 1.27.3, Node 26.13.0 with TypeScript 7.0.2, CPython 3.15.2, and Elixir 1.20.4 on OTP 29.1.2
+description: Install Go 1.27.3, Node 26.13.0 with TypeScript 7.0.2, CPython 3.15.2, and Elixir 1.20.5 on OTP 29.1.2
 runs:
   using: composite
   steps:
@@ -22,7 +22,7 @@ runs:
         python-version: 3.15.2
     - uses: erlef/setup-beam@ee09b1e59bb240681c382eb1f0abc6a04af72764 # v1.23.0
       with:
-        elixir-version: 1.20.4
+        elixir-version: 1.20.5
         otp-version: 29.1.2
     - name: Install the pinned TypeScript compiler
       run: npm install -g typescript@7.0.2

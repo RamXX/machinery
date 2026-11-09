@@ -61,7 +61,7 @@ func TestHashOpenFileTerminatesUnderContinuousAppender(t *testing.T) {
 func seedPublicationTree(t *testing.T, base string) (source, target string) {
 	t.Helper()
 	source = filepath.Join(".java-stage-123", "extracted")
-	target = filepath.Join("21.0.12.1_1", "test-platform")
+	target = filepath.Join("21.0.13_9", "test-platform")
 	writeStageFile(t, filepath.Join(base, source, "runtime", "lib", "modules"))
 	writeStageFile(t, filepath.Join(base, source, "runtime", ".machinery-java-receipt"))
 	return source, target

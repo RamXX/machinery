@@ -70,9 +70,9 @@ func TestOpenFormalJavaRejectsProbeOutputOverflow(t *testing.T) {
 	javaPath := filepath.Join(dir, "runtime", "bin", "java")
 	probe := "#!/bin/sh\njava_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\n" +
 		"echo \"    java.home = $java_home\" >&2\n" +
-		"echo '    java.runtime.version = 21.0.12.1+1-LTS' >&2\n" +
+		"echo '    java.runtime.version = 21.0.13+9-LTS' >&2\n" +
 		"echo '    java.vendor = Eclipse Adoptium' >&2\n" +
-		"echo '    java.version = 21.0.12.1' >&2\n" +
+		"echo '    java.version = 21.0.13' >&2\n" +
 		"echo '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n" +
 		"printf '%s' '" + strings.Repeat("x", formalOutputLimit+4096) + "' >&2\nexit 0\n"
 	writeJavaRuntime(t, javaPath, probe)

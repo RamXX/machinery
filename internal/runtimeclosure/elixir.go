@@ -23,7 +23,7 @@ import (
 
 // The exact approved Elixir closure of the first-release catalog
 // (docs/test-assurance-contract.md section 6): elixir-exunit/v1 executes
-// only under Elixir/ExUnit/Mix 1.20.4 with Erlang/OTP 29.1.2 (ERTS 17.1.1)
+// only under Elixir/ExUnit/Mix 1.20.5 with Erlang/OTP 29.1.2 (ERTS 17.1.1)
 // on the pinned native platforms darwin/arm64 and linux/amd64. OpenElixir
 // binds the complete closure by exact bytes without launching anything: the
 // elixir and mix launchers and the complete Elixir lib tree (ExUnit and Mix
@@ -38,7 +38,7 @@ const (
 	ElixirProfile = elixirRuntimeProfile
 	// RequiredElixirVersion is the exact first-release Elixir/Mix/ExUnit
 	// version.
-	RequiredElixirVersion = "1.20.4"
+	RequiredElixirVersion = "1.20.5"
 	// RequiredOTPVersion is the exact first-release OTP version.
 	RequiredOTPVersion = "29.1.2"
 	// RequiredErtsVersion is the exact first-release ERTS version.
@@ -78,7 +78,7 @@ type ElixirRequest struct {
 	ExpectedClosure string
 }
 
-// Elixir is the pinned Elixir 1.20.4 / OTP 29.1.2 (ERTS 17.1.1) runtime
+// Elixir is the pinned Elixir 1.20.5 / OTP 29.1.2 (ERTS 17.1.1) runtime
 // handle implementing tdd.RuntimeHandle. The retained handles cover the
 // Elixir runtime root (launchers plus lib tree) and the Erlang/OTP
 // installation root (launcher, ERTS and lib tree); the closure digest

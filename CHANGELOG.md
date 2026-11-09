@@ -8,8 +8,20 @@ under their version heading when a release is cut.
 
 ### Fixed
 
+- The pinned pii-flow checker image digest follows its Dockerfile again (CPython 3.15.2). The pin
+  had been left on the 3.14 build, so `design-engines` failed on every push to main from 2026-10-29
+  with a digest mismatch. The rebuilt digest is identical on hosted amd64 Linux and on emulated
+  arm64 macOS.
 - The datalog-parity container now uses digest-pinned Go 1.27.3, matching the module's
   minimum version so the Soufflé comparison tests can run after the runtime pin update.
+
+### Changed
+
+- Runtime pins follow their latest upstream releases: Elixir 1.20.5 (OTP 29.1.2 unchanged) and
+  Temurin Java 21.0.13+9, which ends the daily `runtime-pins` drift issue. Adoptium has not
+  published a Windows arm64 JDK for 21.0.13, so the Java pin table no longer carries
+  `windows/arm64`; Windows amd64 and the macOS and Linux platforms are unchanged.
+- Dependency updates: `github.com/spf13/pflag` 1.1.0 and `softprops/action-gh-release` 3.0.4.
 
 ### Security
 
@@ -17,7 +29,7 @@ under their version heading when a release is cut.
   intermediate certificates) and, with 1.27.2, nine earlier standard-library vulnerabilities
   (GO-2026-6603 and GO-2026-6604 among them) that the nightly and security `govulncheck` runs reported.
 - The other runtime pins follow their latest upstream releases: Erlang/OTP 29.1.2 (erts 17.1.1),
-  Node 26.13.0 and CPython 3.15.2 (the 3.14 line is retired). Temurin Java stays at 21.0.12.1.
+  Node 26.13.0 and CPython 3.15.2 (the 3.14 line is retired).
 - `github.com/klauspost/compress` moves to v1.20.3 in the go-crm example, clearing the high-severity
   s2 out-of-bounds write advisory (fixed in 1.18.7). `golang.org/x/sys` 0.49.0, `golang.org/x/crypto`
   0.58.0 and `actions/upload-artifact` 7.0.2 / `download-artifact` 8.0.2 follow.

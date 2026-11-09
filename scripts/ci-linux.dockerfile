@@ -3,7 +3,7 @@
 #
 # Every runtime identity here mirrors .github/actions/assurance-runtimes, the
 # single owner of the hosted runtime pins: Go 1.27.3, Node 26.13.0 with
-# TypeScript 7.0.2, CPython 3.15.2, Elixir 1.20.4 on OTP 29.1.2. The required
+# TypeScript 7.0.2, CPython 3.15.2, Elixir 1.20.5 on OTP 29.1.2. The required
 # lane re-verifies each identity against testdata/integration-lanes and fails
 # closed, so a drifted stage here fails loudly instead of producing evidence
 # that does not match hosted CI.
@@ -15,7 +15,7 @@
 ARG GO_IMAGE=golang:1.27.3-trixie
 ARG NODE_IMAGE=node:26.13.0-trixie-slim
 ARG PYTHON_IMAGE=python:3.15.2-slim-trixie
-ARG ELIXIR_IMAGE=hexpm/elixir:1.20.4-erlang-29.1.2-debian-trixie-20261027-slim
+ARG ELIXIR_IMAGE=hexpm/elixir:1.20.5-erlang-29.1.2-debian-trixie-20261027-slim
 ARG DOCKER_CLI_IMAGE=docker:29.7.2-cli
 
 FROM ${NODE_IMAGE} AS node
@@ -46,7 +46,7 @@ COPY --from=python /usr/local/lib/python3.15 /usr/local/lib/python3.15
 COPY --from=python /usr/local/lib/libpython3.15.so.1.0 /usr/local/lib/libpython3.15.so.1.0
 RUN ln -sf python3.15 /usr/local/bin/python3 && ldconfig
 
-# Elixir 1.20.4 on OTP 29.1.2, from the pinned upstream image.
+# Elixir 1.20.5 on OTP 29.1.2, from the pinned upstream image.
 COPY --from=elixir /usr/local/lib/erlang /usr/local/lib/erlang
 COPY --from=elixir /usr/local/lib/elixir /usr/local/lib/elixir
 RUN for tool in erl erlc escript elixir elixirc mix iex; do \

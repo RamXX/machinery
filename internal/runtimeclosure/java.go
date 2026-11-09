@@ -26,7 +26,7 @@ const (
 	JavaClosureSHAEnv          = "MACHINERY_JAVA_CLOSURE_SHA256"
 	RequiredJavaMajor          = 21
 	RequiredJavaFeature        = 0
-	RequiredJavaSecurity       = 12
+	RequiredJavaSecurity       = 13
 	RequiredJavaRelease        = PinnedJavaProbeVersion
 	CIJavaVendor               = "Eclipse Adoptium"
 	javaClosureMaxFiles        = 10_000
@@ -309,7 +309,7 @@ func validateJavaProperties(output string) (map[string]string, error) {
 	if len(parts) < 3 {
 		return nil, unsupportedJavaVersion(version)
 	}
-	want := []int{RequiredJavaMajor, RequiredJavaFeature, RequiredJavaSecurity, 1}
+	want := []int{RequiredJavaMajor, RequiredJavaFeature, RequiredJavaSecurity}
 	for i, expected := range want {
 		value, err := strconv.Atoi(parts[i])
 		if err != nil || value != expected {

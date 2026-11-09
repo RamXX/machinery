@@ -24,7 +24,7 @@ import (
 )
 
 func supportedJavaScript(engineBody string) string {
-	return "#!/bin/sh\nif [ \"$1\" = '-XshowSettings:properties' ]; then\n  java_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\n  echo \"    java.home = $java_home\" >&2\n  echo '    java.runtime.version = 21.0.12.1+1-LTS' >&2\n  echo '    java.vendor = Eclipse Adoptium' >&2\n  echo '    java.version = 21.0.12.1' >&2\n  echo '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n  exit 0\nfi\n" + engineBody
+	return "#!/bin/sh\nif [ \"$1\" = '-XshowSettings:properties' ]; then\n  java_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\n  echo \"    java.home = $java_home\" >&2\n  echo '    java.runtime.version = 21.0.13+9-LTS' >&2\n  echo '    java.vendor = Eclipse Adoptium' >&2\n  echo '    java.version = 21.0.13' >&2\n  echo '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n  exit 0\nfi\n" + engineBody
 }
 
 func TestOptionalFormalDiscoveryTreatsOnlyENOENTAsAbsent(t *testing.T) {
@@ -1228,7 +1228,7 @@ func TestRunTLCRejectsUnsupportedJavaPolicy(t *testing.T) {
 		name, vendor, version, want string
 	}{
 		{"wrong major", "Eclipse Adoptium", "17.0.12", "require exact pinned Temurin build"},
-		{"missing vendor", "", "21.0.12.1", "java.vendor"},
+		{"missing vendor", "", "21.0.13", "java.vendor"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -1240,7 +1240,7 @@ func TestRunTLCRejectsUnsupportedJavaPolicy(t *testing.T) {
 			t.Setenv("TLA_TOOLS_JAR", jar)
 			t.Setenv("TLA_TOOLS_JAR_SHA256", sha)
 			java := filepath.Join(dir, "bin", "java")
-			script := "#!/bin/sh\njava_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\necho \"    java.home = $java_home\" >&2\necho '    java.runtime.version = 21.0.12.1+1-LTS' >&2\necho '    java.vendor = " + tc.vendor + "' >&2\necho '    java.version = " + tc.version + "' >&2\necho '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n"
+			script := "#!/bin/sh\njava_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\necho \"    java.home = $java_home\" >&2\necho '    java.runtime.version = 21.0.13+9-LTS' >&2\necho '    java.vendor = " + tc.vendor + "' >&2\necho '    java.version = " + tc.version + "' >&2\necho '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n"
 			writeJavaRuntime(t, java, script)
 			t.Setenv("MACHINERY_JAVA", java)
 			if _, err := runTLC(filepath.Join(dir, "Toy.tla"), filepath.Join(dir, "Toy.cfg")); err == nil || !strings.Contains(err.Error(), tc.want) {

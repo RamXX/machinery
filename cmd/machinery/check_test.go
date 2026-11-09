@@ -591,7 +591,7 @@ func setSupportedJava(t *testing.T) string {
 		t.Fatal(err)
 	}
 	java := filepath.Join(root, "bin", "java")
-	body := "#!/bin/sh\nif [ \"$1\" = '-XshowSettings:properties' ]; then\n  java_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\n  echo \"    java.home = $java_home\" >&2\n  echo '    java.runtime.version = 21.0.12.1+1-LTS' >&2\n  echo '    java.vendor = Eclipse Adoptium' >&2\n  echo '    java.version = 21.0.12.1' >&2\n  echo '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n  exit 0\nfi\nexit 0\n"
+	body := "#!/bin/sh\nif [ \"$1\" = '-XshowSettings:properties' ]; then\n  java_home=$(CDPATH= cd -- \"$(dirname -- \"$0\")/..\" && pwd -P)\n  echo \"    java.home = $java_home\" >&2\n  echo '    java.runtime.version = 21.0.13+9-LTS' >&2\n  echo '    java.vendor = Eclipse Adoptium' >&2\n  echo '    java.version = 21.0.13' >&2\n  echo '    java.vm.name = OpenJDK 64-Bit Server VM' >&2\n  exit 0\nfi\nexit 0\n"
 	if err := os.WriteFile(java, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -621,7 +621,7 @@ func setStructurizrOverride(t *testing.T, launcher string) {
 const fakeStructurizrVersionBranch = `if [ "$1" = version ]; then
   echo 'structurizr-cli: 2025.11.09'
   echo 'structurizr-java: 5.0.2'
-  echo 'Java: 21.0.12.1/Eclipse Adoptium (/fixture/java-home)'
+  echo 'Java: 21.0.13/Eclipse Adoptium (/fixture/java-home)'
   echo 'OS: Fixture OS (fixture)'
   exit 0
 fi
@@ -735,7 +735,7 @@ func TestVerifyC4PinsVersionAndExportsPrivateSnapshot(t *testing.T) {
 	verifyC4AfterVersion = func(string) {}
 
 	mismatch := filepath.Join(t.TempDir(), "structurizr-cli")
-	mismatchScript := "#!/bin/sh\necho 'structurizr-cli: 0.0.1'\necho 'structurizr-java: 5.0.2'\necho 'Java: 21.0.12.1/Eclipse Adoptium (/fixture/java-home)'\necho 'OS: Fixture OS (fixture)'\n"
+	mismatchScript := "#!/bin/sh\necho 'structurizr-cli: 0.0.1'\necho 'structurizr-java: 5.0.2'\necho 'Java: 21.0.13/Eclipse Adoptium (/fixture/java-home)'\necho 'OS: Fixture OS (fixture)'\n"
 	if err := os.WriteFile(mismatch, []byte(mismatchScript), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -771,7 +771,7 @@ version=$(cat "$base/lib/version")
 if [ "$1" = version ]; then
   echo "structurizr-cli: $version"
   echo 'structurizr-java: 5.0.2'
-  echo 'Java: 21.0.12.1/Eclipse Adoptium (/fixture/java-home)'
+  echo 'Java: 21.0.13/Eclipse Adoptium (/fixture/java-home)'
   echo 'OS: Fixture OS (fixture)'
   exit 0
 fi
@@ -924,7 +924,7 @@ func TestVerifyC4RejectsSelfMutatingPinnedDistribution(t *testing.T) {
 		t.Fatal(err)
 	}
 	launcher := filepath.Join(distribution, "structurizr-cli")
-	script := "#!/bin/sh\nif [ \"$1\" = version ]; then\n  echo 'structurizr-cli: 2025.11.09'\n  echo 'structurizr-java: 5.0.2'\n  echo 'Java: 21.0.12.1/Eclipse Adoptium (/fixture/java-home)'\n  echo 'OS: Fixture OS (fixture)'\n  echo mutated > \"$(dirname \"$0\")/lib/state\"\nfi\n"
+	script := "#!/bin/sh\nif [ \"$1\" = version ]; then\n  echo 'structurizr-cli: 2025.11.09'\n  echo 'structurizr-java: 5.0.2'\n  echo 'Java: 21.0.13/Eclipse Adoptium (/fixture/java-home)'\n  echo 'OS: Fixture OS (fixture)'\n  echo mutated > \"$(dirname \"$0\")/lib/state\"\nfi\n"
 	if err := os.WriteFile(launcher, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

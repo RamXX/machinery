@@ -1046,7 +1046,7 @@ versions and release checks. Neither command installs anything.
 
 **Optional**
 
-- **[Java](https://adoptium.net/) 21.0.12.1+1**, only for `machinery verify-formal` and
+- **[Java](https://adoptium.net/) 21.0.13+9**, only for `machinery verify-formal` and
   `machinery verify-c4`. machinery accepts distributor-independent OpenJDK/HotSpot builds of this
   exact checksum-pinned Temurin build, fingerprints the complete runtime closure, and runs it in a
   minimal fixed environment. `verify-formal` runs [TLC](https://github.com/tlaplus/tlaplus) to
@@ -1064,7 +1064,7 @@ versions and release checks. Neither command installs anything.
   deterministic gate. With it you add the machine-checked proofs.
 - **[Structurizr CLI](https://github.com/structurizr/cli)**, only to export C4 diagrams from
   `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate
-  need no export). It needs the same Java 21.0.12.1+1 runtime. Download a
+  need no export). It needs the same Java 21.0.13+9 runtime. Download a
   [release zip](https://github.com/structurizr/cli/releases), unzip it, and add it to `PATH`
   (`structurizr.sh` on macOS and Linux, `structurizr.bat` on Windows), or run the
   [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`. The pure G2
@@ -1479,7 +1479,7 @@ Dagger CLI at the version `dagger.json` owns (v0.21.10), verified against a comm
 
 The module does not restate the runtime pins. Its base container is built from
 `scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.3), Node (26.13.0) with TypeScript
-(7.0.2), CPython (3.15.2), and Elixir (1.20.4) on OTP (29.1.2) identities, shared with
+(7.0.2), CPython (3.15.2), and Elixir (1.20.5) on OTP (29.1.2) identities, shared with
 `make ci-linux`. The race sweep runs as an unprivileged user inside the container, because root
 bypasses permission bits and would turn the custody tests that assert an unwritable path is refused
 into silent passes. The wiring guards in `cmd/machinery/repository_contract_test.go` and

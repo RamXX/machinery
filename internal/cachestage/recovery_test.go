@@ -270,7 +270,7 @@ func TestRecoverRemovesEveryOwnedStageAndPreservesNeighbors(t *testing.T) {
 	for _, stage := range []string{".java-stage-9", ".java-stage-4294967295"} {
 		writeStageFile(t, filepath.Join(base, stage, "extracted", "lib", "large"))
 	}
-	neighbor := filepath.Join(base, "21.0.12.1_1", "runtime")
+	neighbor := filepath.Join(base, "21.0.13_9", "runtime")
 	writeStageFile(t, neighbor)
 	if err := Recover(base, ".java-stage-"); err != nil {
 		t.Fatal(err)

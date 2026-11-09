@@ -165,7 +165,7 @@ brew install structurizr-cli   # macOS
 # Or: download from https://github.com/structurizr/cli/releases, add to PATH
 ```
 
-Requires the checksum-pinned Temurin Java 21.0.12.1+1 runtime.
+Requires the checksum-pinned Temurin Java 21.0.13+9 runtime.
 
 ## ARCHITECTURE.md must carry the Architecture Contract (v2)
 

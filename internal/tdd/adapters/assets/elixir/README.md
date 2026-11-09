@@ -6,7 +6,7 @@ the adapter ships lives here; nothing else may add files to this tree.
 
 | Path | Role | Entry point | Dependencies |
 |---|---|---|---|
-| `mix.exs` | frozen harness Mix project definition of every prepared suite (`machinery_assurance_harness`, no dependencies, no aliases, no project-supplied reporter/formatter hooks) | none | Elixir/Mix 1.20.4 standard libraries only |
+| `mix.exs` | frozen harness Mix project definition of every prepared suite (`machinery_assurance_harness`, no dependencies, no aliases, no project-supplied reporter/formatter hooks) | none | Elixir/Mix 1.20.5 standard libraries only |
 | `machinery/json.exs` | bounded JSON codec of the closed reporter vocabulary (byte-wise escaping of quote, backslash and C0 controls; hard cut bounds on every string) | `escape/2`, `kv/1`, `line/2` | none |
 | `machinery/reporter.exs` | embedded Machinery reporter: the named `Machinery.Assurance.Reporter` GenServer is simultaneously the sole ExUnit formatter (lifecycle casts from `ExUnit.Runner`) and the synchronous witness collector of the `machinery-check/v1` transport; appends one bounded JSON line per event to the private events file named by `MACHINERY_ASSURANCE_EVENTS`, terminated by the closed `machinery:reporter:end` sentinel after `suite_finished` (the reporter closes the stream in that cast and stays alive, so ExUnit's own `EventManager.stop/1` teardown stops it exactly once); reports the effective ExUnit options (`seed`, `max_cases`, `trace`, `timeout`, `max_failures`, `include`, `exclude`, `formatters`, `dry_run`, `repeat_until_failure`) from the runtime's own `{:suite_started, opts}` cast; classifies native outcomes (`passed`/`failed`/`skipped`/`excluded`/`invalid` + failure class with `ExUnit.AssertionError` distinguished from raises/throws/exits/timeouts) | `GenServer` callbacks | `ExUnit`, `Machinery.Assurance.JSON` |
 | `machinery/check.exs` | byte-pinned `machinery-check/v1` assertion helper / witness transport: `Machinery.Check.check/3` is a macro so the registered call site is the exact frozen test source line; the strictly-boolean condition is evaluated exactly once, every evaluation emits exactly one synchronous witness bound to the framework-owned context identity (module, describe, test, framework-recorded test pid), and a false condition raises a native `ExUnit.AssertionError` naming the frozen site after the witness is recorded | `Machinery.Check.check(ctx, assertion_id, condition)` | `ExUnit`, `Machinery.Assurance.Reporter` |
@@ -66,7 +66,7 @@ assertion RED.
 The frozen argv is `mix test --seed <adapter seed> --max-cases <adapter
 max_cases> --warnings-as-errors <declared files...>` run with a fresh
 private `MIX_BUILD_PATH`, private `MIX_HOME`/`HOME`/`TMPDIR`, an offline
-closed environment and the pinned Elixir 1.20.4 / OTP 29.1.2 (ERTS 17.1.1)
+closed environment and the pinned Elixir 1.20.5 / OTP 29.1.2 (ERTS 17.1.1)
 runtime closure on `PATH`. Reconciliation rejects any effective-option
 drift the reporter reports (filters, formatter replacement, truncation,
 re-run or dry-run modes).

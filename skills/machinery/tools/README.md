@@ -10,7 +10,7 @@ not a requirement.
 
 - `tlc.sh <spec.tla>` is a compatibility shim that resolves the containing design and delegates the
   complete owned suite to `machinery verify-formal`. This keeps pinned jars, full-suite generation,
-  the exact checksum-pinned Temurin Java 21.0.12.1+1 closure, scratch isolation, and process cleanup in one
+  the exact checksum-pinned Temurin Java 21.0.13+9 closure, scratch isolation, and process cleanup in one
   implementation.
 - `verify_formal.sh <design-dir>` regenerates the whole formal suite from source (via the
   `machinery` binary) into `design/formal/` and TLC-checks every owned `.tla`/`.cfg` pair. A pass
@@ -148,7 +148,7 @@ One line per subcommand:
 (`machinery help` and `machinery completion` are the standard cobra built-ins.)
 
 The binary is the whole generation and deterministic-gate toolchain: no interpreter or runtime
-dependencies. Checksum-pinned Temurin Java 21.0.12.1+1 is needed only for engine execution by `verify-formal`
+dependencies. Checksum-pinned Temurin Java 21.0.13+9 is needed only for engine execution by `verify-formal`
 (TLC and, when a
 relational annotation exists, Alloy) and the TLC shell wrappers.
 The binary provisions the committed archive trust roots. Explicit `MACHINERY_JAVA` and

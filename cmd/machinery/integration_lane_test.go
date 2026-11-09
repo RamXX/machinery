@@ -343,7 +343,7 @@ func TestIntegrationLaneFullPath(t *testing.T) {
 					t.Fatal(e)
 				}
 				if scenario == "wrong-java-pin" {
-					p = bytes.ReplaceAll(p, []byte("21.0.12.1+1"), []byte("99.0.0+1"))
+					p = bytes.ReplaceAll(p, []byte("21.0.13+9"), []byte("99.0.0+1"))
 				} else {
 					p = bytes.ReplaceAll(p, []byte("936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"), []byte(strings.Repeat("0", 64)))
 				}

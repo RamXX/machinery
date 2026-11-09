@@ -616,7 +616,8 @@ func validateStructurizrVersionOutput(output, want string) error {
 	if lines[1] != "structurizr-java: 5.0.2" {
 		return fmt.Errorf("structurizr-java version identity is not the supported canonical value")
 	}
-	javaPrefix := "Java: " + strings.TrimSuffix(runtimeclosure.PinnedJavaProbeVersion, "+1-LTS") + "/" + runtimeclosure.CIJavaVendor + " ("
+	javaVersion, _, _ := strings.Cut(runtimeclosure.PinnedJavaProbeVersion, "+")
+	javaPrefix := "Java: " + javaVersion + "/" + runtimeclosure.CIJavaVendor + " ("
 	if !strings.HasPrefix(lines[2], javaPrefix) || !strings.HasSuffix(lines[2], ")") {
 		return fmt.Errorf("structurizr Java identity is not the pinned canonical runtime")
 	}

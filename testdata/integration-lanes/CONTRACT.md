@@ -40,7 +40,7 @@ duplicate or invented identities. Go identity is the exact `go version` output;
 Node identity is exact `node --version`. Both bind the actual executable bytes.
 Docker identity is the immutable image followed by one space and the platform;
 its sha256 is the pinned OCI digest. Java identity is the pinned probe release
-21.0.12.1+1-LTS, with launcher sha256 plus independently checkable
+21.0.13+9-LTS, with launcher sha256 plus independently checkable
 `closure_sha256` and the platform pin's `archive_sha256`. TLC identity is v1.7.4,
 with the pinned jar sha256. Provisioned formal paths remain inspectable inside
 the selected private cache and are not the ambient Java/JAR.

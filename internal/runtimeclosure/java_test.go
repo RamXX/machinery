@@ -43,19 +43,19 @@ func TestEnvironmentDropsHostileAmbientJavaSettings(t *testing.T) {
 }
 
 func TestValidateJavaIdentityRequiresExactCIPolicy(t *testing.T) {
-	valid := "    java.home = /jdk\n    java.runtime.version = 21.0.12.1+1-LTS\n    java.vendor = Eclipse Adoptium\n    java.version = 21.0.12.1\n    java.vm.name = OpenJDK 64-Bit Server VM\n"
+	valid := "    java.home = /jdk\n    java.runtime.version = 21.0.13+9-LTS\n    java.vendor = Eclipse Adoptium\n    java.version = 21.0.13\n    java.vm.name = OpenJDK 64-Bit Server VM\n"
 	if err := ValidateJavaIdentity(valid); err != nil {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct {
 		name, output, want string
 	}{
-		{"wrong major", strings.Replace(valid, "java.version = 21.0.12.1", "java.version = 17.0.12.1", 1), "require exact pinned Temurin build"},
-		{"wrong security release", strings.Replace(valid, "java.version = 21.0.12.1", "java.version = 21.0.11.1", 1), "require exact pinned Temurin build"},
-		{"wrong build", strings.Replace(valid, "21.0.12.1+1-LTS", "21.0.12.1+2-LTS", 1), "exact pinned build"},
-		{"missing vendor", "java.home = /jdk\njava.runtime.version = 21.0.12.1+1-LTS\njava.version = 21.0.12.1\njava.vm.name = OpenJDK VM\n", "vendor"},
+		{"wrong major", strings.Replace(valid, "java.version = 21.0.13", "java.version = 17.0.12.1", 1), "require exact pinned Temurin build"},
+		{"wrong security release", strings.Replace(valid, "java.version = 21.0.13", "java.version = 21.0.11.1", 1), "require exact pinned Temurin build"},
+		{"wrong build", strings.Replace(valid, "21.0.13+9-LTS", "21.0.13+2-LTS", 1), "exact pinned build"},
+		{"missing vendor", "java.home = /jdk\njava.runtime.version = 21.0.13+9-LTS\njava.version = 21.0.13\njava.vm.name = OpenJDK VM\n", "vendor"},
 		{"wrong VM", strings.Replace(valid, "OpenJDK 64-Bit Server VM", "Example VM", 1), "exact pinned OpenJDK"},
-		{"duplicate version", valid + "java.version = 21.0.12.1\n", "more than once"},
+		{"duplicate version", valid + "java.version = 21.0.13\n", "more than once"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := ValidateJavaIdentity(tc.output); err == nil || !strings.Contains(err.Error(), tc.want) {
@@ -69,7 +69,7 @@ func TestValidateJavaIdentityRequiresExactCIPolicy(t *testing.T) {
 }
 
 func TestValidateJavaIdentityRejectsEveryNonCanonicalDiagnostic(t *testing.T) {
-	valid := "Property settings:\n    java.class.path =\n    java.home = /jdk\n    java.runtime.version = 21.0.12.1+1-LTS\n    java.vendor = Eclipse Adoptium\n    java.version = 21.0.12.1\n    java.vm.name = OpenJDK 64-Bit Server VM\n\nopenjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode, sharing)\n"
+	valid := "Property settings:\n    java.class.path =\n    java.home = /jdk\n    java.runtime.version = 21.0.13+9-LTS\n    java.vendor = Eclipse Adoptium\n    java.version = 21.0.13\n    java.vm.name = OpenJDK 64-Bit Server VM\n\nopenjdk version \"21.0.13\" 2026-10-20 LTS\nOpenJDK Runtime Environment Temurin-21.0.13+9 (build 21.0.13+9-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.13+9 (build 21.0.13+9-LTS, mixed mode, sharing)\n"
 	if err := ValidateJavaIdentity(valid); err != nil {
 		t.Fatalf("canonical pinned probe rejected: %v", err)
 	}
