@@ -1,0 +1,16 @@
+# trace passes on the shop fixture: code serves every action, tests claim every obligation or it is owed
+fixture shop
+exec mrun 0 gen
+exec mrun 0 trace
+stdout '== trace =='
+stdout 'checked: 2 code files, 1 test files, 4 act ids, 16 obligations'
+stdout '^passed$'
+stdout 'machinery trace: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# check runs the same stage
+exec mrun 0 check --stage trace
+stdout 'checked: 2 code files, 1 test files, 4 act ids, 16 obligations'
+
+# an argument is a usage error
+exec mrun 2 trace extra
+stderr 'usage: machinery trace takes no arguments'

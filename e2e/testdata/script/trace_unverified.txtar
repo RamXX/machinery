@@ -1,0 +1,71 @@
+# an obligation no test claims is an error unless it is owed; fv ids are exempt
+fixture shop
+cp orders_missing.sh.in e2e/orders.sh
+exec mrun 1 trace
+stdout 'ERROR  unverified: inv:terminal-is-final'
+stdout 'ERROR  unverified: sc:cancelled-order-refuses-payment'
+! stdout 'unverified: inv:paid-before-shipped'
+stdout 'failed: 2 finding\(s\)'
+
+# owing them clears the errors
+cp owed_all.yaml design/owed.yaml
+exec mrun 0 trace
+stdout '^passed$'
+
+# a critical area adds an fv id: the formal stage proves it, tests do not claim it
+fixture shop
+cp machinery_risk.yaml machinery.yaml
+mkdir -p design
+cp risk.yaml design/risk.yaml
+exec mrun 0 trace
+stdout 'checked: 2 code files, 1 test files, 4 act ids, 17 obligations'
+stdout '^passed$'
+
+-- orders_missing.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-*
+# machinery:verifies sc:customer-pays-and-the-order-ships
+# machinery:verifies inv:paid-before-shipped inv:customer-email-unique
+true
+-- owed_all.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: inv:terminal-is-final
+    reason: "not proven yet"
+  - id: sc:cancelled-order-refuses-payment
+    reason: "not proven yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- machinery_risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- risk.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: critical
+    why: "money moves here"
+    ids: ["inv:paid-before-shipped"]
+    questions: [ordering]

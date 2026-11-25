@@ -1,0 +1,85 @@
+# a configured glob list that matches no file is an error
+fixture shop
+cp trace_code.yaml machinery.yaml
+exec mrun 1 trace
+stdout 'ERROR  trace.code matches no file'
+! stdout 'trace.tests matches'
+stdout 'checked: 0 code files, 1 test files'
+
+cp trace_tests.yaml machinery.yaml
+exec mrun 1 trace
+stdout 'ERROR  trace.tests matches no file'
+! stdout 'trace.code matches'
+stdout 'checked: 2 code files, 0 test files'
+
+# a trace block with no tests list reads no test files and the obligations are unverified
+cp trace_notests.yaml machinery.yaml
+exec mrun 1 trace
+! stdout 'matches no file'
+stdout 'ERROR  unverified: inv:terminal-is-final'
+
+# code files outside scope are not read
+cp trace_scope.yaml machinery.yaml
+exec mrun 1 trace
+stdout 'ERROR  trace.code matches no file'
+
+-- trace_code.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["nothing/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- trace_tests.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["nothing/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- trace_notests.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- trace_scope.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["elsewhere/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

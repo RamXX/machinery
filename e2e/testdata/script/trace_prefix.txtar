@@ -1,0 +1,43 @@
+# a tc id may end in *: it claims every tc id with that prefix
+fixture shop
+# the fixture claims all transition cases with tc:ORDE-*
+exec mrun 0 trace
+stdout '^passed$'
+
+# a narrower prefix claims only what it matches
+cp orders_narrow.sh.in e2e/orders.sh
+exec mrun 1 trace
+stdout 'ERROR  unverified: tc:ORDE-70d94f'
+stdout 'ERROR  unverified: tc:ORDE-e6d28f'
+! stdout 'unverified: tc:ORDE-2e883d'
+! stdout 'unverified: tc:ORDE-267d12'
+! stdout 'unverified: tc:ORDE-2fa2af'
+
+# a prefix that matches no id is an unknown id
+cp orders_nomatch.sh.in e2e/orders.sh
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/orders.sh:3: tc:NOPE-\*'
+! stdout 'unknown-id: e2e/orders.sh:2'
+
+# a prefix may name any id kind
+cp orders_acts.sh.in e2e/orders.sh
+exec mrun 0 trace
+stdout '^passed$'
+
+-- orders_narrow.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-2*
+# machinery:verifies sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
+# machinery:verifies inv:*
+true
+-- orders_nomatch.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-*
+# machinery:verifies tc:NOPE-*
+# machinery:verifies sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
+# machinery:verifies inv:paid-before-shipped inv:terminal-is-final inv:customer-email-unique
+true
+-- orders_acts.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-* sc:* inv:* act:Order.*
+true

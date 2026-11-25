@@ -1,0 +1,40 @@
+# without a trace block the stage is not applicable
+fixture shop
+cp bare.yaml machinery.yaml
+exec mrun 0 trace
+stdout '== trace =='
+stdout 'not applicable: no trace configured'
+! stdout 'checked:'
+stdout 'machinery trace: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+# a trace block over a project with no design ids has nothing to check
+cp empty.yaml machinery.yaml
+rm design/owed.yaml
+rm internal/api/handlers.go
+cp plain.go.in internal/domain/order.go
+cp plain.sh.in e2e/orders.sh
+exec mrun 1 trace
+stdout 'not demonstrated: nothing to check'
+
+-- bare.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- plain.go.in --
+package domain
+-- plain.sh.in --
+#!/bin/sh
+true
+-- empty.yaml --
+version: 2
+trace:
+  code: ["**/*.go"]
+  tests: ["e2e/**"]

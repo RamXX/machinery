@@ -1,0 +1,40 @@
+# a tag that names an id the design does not declare is an error, with file and line
+fixture shop
+cp order_unknown.go.in internal/domain/order.go
+cp extra.sh.in e2e/extra.sh
+mkdir docs
+cp note.md docs/note.md
+cp other.go.in internal/domain/other.go
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/extra.sh:2: inv:no-such-invariant'
+stdout 'ERROR  unknown-id: internal/domain/order.go:6: act:Order.nope'
+stdout 'failed: 2 finding\(s\)'
+# only files matched by trace.code carry serves tags, only trace.tests files carry verifies tags
+! stdout 'Bogus'
+! stdout 'note.md'
+! stdout 'other.go'
+# the extra test file is counted
+stdout 'checked: 3 code files, 2 test files, 4 act ids, 16 obligations'
+
+-- order_unknown.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel act:Order.nope
+func Apply(event string) string {
+	return event
+}
+-- extra.sh.in --
+#!/bin/sh
+# machinery:verifies inv:no-such-invariant
+# machinery:serves act:Bogus.fromtest
+true
+-- note.md --
+machinery:serves act:Bogus.fromdocs
+-- other.go.in --
+package domain
+
+// machinery:verifies inv:Bogus.fromcode
+func other() {}

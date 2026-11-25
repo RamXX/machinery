@@ -1,0 +1,63 @@
+# an act id nothing serves is an error unless it is owed
+fixture shop
+cp order_no_cancel.go.in internal/domain/order.go
+exec mrun 1 trace
+stdout 'ERROR  unserved: act:Order.cancel'
+! stdout 'unserved: act:Order.pay'
+stdout 'failed: 1 finding\(s\)'
+
+# an owed act id is accepted
+cp owed_cancel.yaml design/owed.yaml
+exec mrun 0 trace
+stdout '^passed$'
+
+# an owed id that is not a known id is an error
+cp owed_unknown.yaml design/owed.yaml
+exec mrun 1 trace
+stdout 'ERROR  unknown owed id: act:Order.bogus'
+stdout 'failed: 1 finding\(s\)'
+
+# problems of the owed file are errors here too
+cp owed_noreason.yaml design/owed.yaml
+exec mrun 1 trace
+stdout 'ERROR  design/owed.yaml: act:Order.cancel: reason is required'
+
+-- order_no_cancel.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship
+func Apply(event string) string {
+	return event
+}
+-- owed_cancel.yaml --
+version: 1
+owed:
+  - id: act:Order.cancel
+    reason: "cancellation is not built yet"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- owed_unknown.yaml --
+version: 1
+owed:
+  - id: act:Order.cancel
+    reason: "cancellation is not built yet"
+  - id: act:Order.bogus
+    reason: "a typo"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- owed_noreason.yaml --
+version: 1
+owed:
+  - id: act:Order.cancel
+    reason: ""
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
