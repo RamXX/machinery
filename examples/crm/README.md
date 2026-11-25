@@ -136,7 +136,7 @@ which the test also rejects.
 `make demo-pm` runs `demo/pm.sh`: it copies the committed tree into a temporary directory, makes
 it its own git repository and its own bd backlog, then plays the planner (a new scenario and a
 new abuse case, `machinery gen`, one suite run, `machinery owed sync`, `plan --apply`, `waves`,
-`waves --freeze`, three briefs) and the gates (a consequential story and a critical one, proof by
+`waves --freeze`, briefs for the builder, the verifier and the modeler of the critical story) and the gates (a consequential story and a critical one, proof by
 `builder`, prediction and verdict by `verifier`, the builder refused as its own verifier). It
 prints every command, stops at the first unexpected failure and removes the copy.
 
