@@ -49,6 +49,22 @@ exec sh -c 'grep -v never-declared e2e/orders.sh | grep -v decisions-logged > e2
 exec sh -c 'echo "# machinery:verifies ck:rules:*" >> e2e/orders.sh'
 exec mrun 0 trace
 
+# the capstone: a requirement that came from the checker is proven on the running
+# system like any other obligation, and leaves the owed list
+cp ck.sh.in e2e/ck.sh
+gitinit
+exec machinery run -- sh -c 'sh e2e/orders.sh && sh e2e/ck.sh'
+exec machinery owed sync
+stdout 'owed: [0-9]+ kept, [0-9]+ added, 1 removed'
+! grep 'ck:rules:operator-can-halt' design/owed.yaml
+gitcommit 'owed list from the evidence'
+exec machinery verify
+stdout '^passed$'
+exec machinery proof --prefix ck:rules:
+stdout 'ck:rules:operator-can-halt -> ck.sh -> pass: the halt switch stops order processing'
+exec machinery status
+stdout 'ck 2\)'
+
 -- machinery.ck.yaml --
 version: 2
 design:
@@ -101,3 +117,12 @@ owed:
     reason: "effect recordCharge is a noop in the skeleton"
   - id: ck:rules:operator-can-halt
     reason: "no test halts processing yet"
+-- ck.sh.in --
+#!/bin/sh
+# Stands in for the end-to-end tests of the two requirements the checker declared.
+#
+# machinery:verifies ck:rules:operator-can-halt ck:rules:decisions-logged
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+printf '{"v":1,"type":"receipt","id":"ck:rules:operator-can-halt","outcome":"pass","test":"ck.sh","observed":"the halt switch stops order processing"}\n' >> "$MACHINERY_RECEIPTS"
+printf '{"v":1,"type":"receipt","id":"ck:rules:decisions-logged","outcome":"pass","test":"ck.sh","observed":"each decision is logged with its inputs"}\n' >> "$MACHINERY_RECEIPTS"
