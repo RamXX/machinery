@@ -320,6 +320,19 @@ func (j *Judgement) Stage() *report.Stage {
 	if !j.Applicable {
 		return s.NotApplicable("no formal model and no critical area")
 	}
+	if len(j.Specs) == 0 && j.ND == "" {
+		blocking, owedAreas := 0, 0
+		for _, f := range j.Findings {
+			if f.Sev != report.Warn {
+				blocking++
+			} else if f.Area != "" {
+				owedAreas++
+			}
+		}
+		if blocking == 0 {
+			return s.NotApplicable(fmt.Sprintf("no formal model yet: %d critical area(s) owed", owedAreas))
+		}
+	}
 	s.Count(len(j.Specs), "specs").Count(j.Runs, "runs").Count(j.Reach, "reach predicates").Count(j.Mutations, "mutations").Count(j.Assumptions, "assumptions")
 	for _, f := range j.Findings {
 		s.Findings = append(s.Findings, report.Finding{Sev: f.Sev, Msg: f.Msg})

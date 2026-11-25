@@ -302,7 +302,8 @@ states**. States whose name starts with a lowercase letter are transient overlay
 - `kind: openapi`: an OpenAPI 3.x document in YAML or JSON. An operation binds to a model action
   with the extension `x-machinery-action: "<Entity>.<action>"` (a string or a list of strings).
 - `kind: proto`: a `.proto` file. An rpc binds to a model action with a comment line
-  `// machinery:action <Entity>.<action>` directly above the `rpc` line.
+  `// machinery:action <Entity>.<action>` directly above the `rpc` line. Such a comment anywhere
+  else is an ERROR: a binding is never dropped silently.
 
 ### 5.4 Failure modes
 
@@ -361,7 +362,8 @@ Lints every `*.machine.json` in the machines directory with the rules in
 `docs/machine-format.md`: subset conformance, name patterns, strict target resolution, declared
 delays, reachability, dead ends, every invoke has `onError` and a timeout, event completeness on
 resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`), fail-closed
-tags. Two machines whose id tags collide (section 7.2) are an ERROR.
+tags. Two machines whose id tags collide (section 7.2), or that share a machine `id`, are an
+ERROR.
 
 `checked:` counts machines, states and transitions. Not applicable when `design.machines` is
 absent.
@@ -420,8 +422,11 @@ waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state"}
 ```
 
-`rule` is a rule name from the tables above. `id` is the subject the finding names (an `act:` id,
-or `<machine id>.<event>` for `event-action`, or `invoke:<machine id>.<src>`). `reason` is
+`rule` is a rule name from the tables above. `id` is the subject the finding names: an `act:` id;
+`<machine id>.<event>` for `event-action`; the machine id for `machine-binding` and `state-enum`;
+`<METHOD> <path>` or `RPC <Service>/<Rpc>` for `operation-id`; the failure-mode subject for
+`subject-resolves`; `invoke:<machine id>.<src>` or `dependency:<name>` for the failure rules. A
+finding prints as `<rule>: <subject>: <what is wrong>`. `reason` is
 required. A waived finding prints as `warn   waived: <message> (<reason>)`. A waiver that matches
 no finding is an ERROR `stale waiver`, so the list only shrinks. Only cross-reference rules can be
 waived.
@@ -623,7 +628,7 @@ machinery:verifies tc:ORDE-*
 - A tag is the literal `machinery:serves` or `machinery:verifies`, then one or more ids separated
   by spaces, to the end of the line. An id token matches `[A-Za-z0-9_.:*-]+`; parsing stops at
   the first token that does not.
-- A `tc:` token may end with `*` and then matches every `tc` id with that prefix.
+- A token may end with `*` and then matches every id with that prefix (`tc:ORDE-*`).
 - `machinery:serves` is read from files matched by `trace.code`. `machinery:verifies` is read
   from files matched by `trace.tests`.
 
@@ -668,7 +673,14 @@ baseline:
 
 A violation listed in the baseline prints as `warn   baselined: <message>`. A baseline entry with
 no matching violation is `ERROR  stale baseline entry: <rule> <subject>`. The baseline only
-shrinks. `machinery arch --write-baseline` writes the current violations and is a deliberate act.
+shrinks. `machinery arch --write-baseline` writes the current violations (sorted by rule, then
+subject), prints `arch: wrote <n> baseline entries to <file>` and then runs the stage; it is a
+deliberate act, and a config error when no baseline path is configured.
+
+Subjects: a layer violation is `<file> -> <package directory or file>`; a function is
+`<file>:<Func>` or `<file>:<Type>.<Method>`. A Go file that does not parse is
+`ERROR  parse: <file>: <error>`, and a layered Go file with no `go.mod` above it is
+`ERROR  go-mod: <file>: no go.mod found`.
 
 `checked:` counts files, imports and functions. Only files inside `scope` are read. Not applicable
 when `constraints:` is absent.
@@ -725,12 +737,18 @@ machinery run [--stack "<description>"] -- <command> [args...]
    (`git status --porcelain` not empty, ignoring the receipts directory and the owed file);
 2. deletes receipt files in the receipts directory that are not valid for the current commit
    (section 10.1);
-3. creates `<receipts dir>/<UTC timestamp>-<short sha>.jsonl` and writes the header line;
+3. creates `<receipts dir>/<UTC timestamp>-<short sha>.jsonl` (timestamp
+   `20060102T150405.000Z`) and writes the header line;
 4. runs the command with extra environment variables: `MACHINERY_RECEIPTS` (absolute path of
    the file), `MACHINERY_COMMIT` (the full commit sha) and, for a targeted run (section 12.1),
    `MACHINERY_ONLY` (the ids to exercise, comma separated);
 5. appends the end line when the command exits;
-6. exits with the command's exit code.
+6. exits with the command's exit code, after printing `machinery run: <file> (exit <n>)` on
+   stderr. A command that cannot be started exits 127 and leaves no file; a command killed by a
+   signal exits 128 plus the signal number.
+
+The command runs in the project root. `MACHINERY_*` variables inherited from the caller are not
+passed on.
 
 The file is JSON Lines. Three line types:
 
@@ -799,8 +817,11 @@ Reads the evidence exactly as `verify` does (section 12), then rewrites `owed.ya
   `unproven at <short sha>`;
 - keeps existing reasons and story fields.
 
-It prints `owed: <n> kept, <n> added, <n> removed` and exits 0. It refuses with an ERROR when
-there is no complete run valid for the current commit. Because of section 10.1, the sequence
+It prints `owed: <n> kept, <n> added, <n> removed` and exits 0. It refuses with
+`ERROR  no complete run valid for <short sha>: run the tests through machinery run first` (exit 1)
+when there is no complete run valid for the current commit, and when the owed file has problems.
+`machinery owed list` prints one line per entry, `<id>  <reason>` followed by two spaces and the
+story when there is one, then `owed: <n> entries` (`1 entry`). Because of section 10.1, the sequence
 `machinery run`, `machinery owed sync`, commit, `machinery verify` works without running the
 tests twice.
 
@@ -843,7 +864,9 @@ Per obligation:
 
 Findings:
 
-- `ERROR  unknown id in receipt: <id>`.
+- `ERROR  malformed receipts file: <file>: line <n>: <what>`. A file whose first line is not a
+  run header is not a receipts file and is ignored.
+- `ERROR  unknown id in receipt: <id>` (an `act` id is not an obligation).
 - `ERROR  unexpected effect: <id> observed <name>` when a receipt lists an effect the case does
   not have.
 - `ERROR  failed: <id> (<test>)`.
@@ -931,6 +954,11 @@ not proven:
   assumption <spec> <A-id>: <text>
 learnings:
 ```
+
+`--ids` and `--prefix` select the union; each must match something. Without evidence the block
+has no `command:` line and `result:   no evidence at <short sha>`. The `, against <stack>` part is
+left out when no run names a stack. An owed id prints under `not proven` as
+`<id> (<state>, owed)`.
 
 `criteria` lists one line per selected obligation that has a receipt, sorted by id; an `fv` id
 prints as `<id> -> formal -> pass: <n> run(s), <n> mutation(s) detected`. `not proven` lists the
@@ -1453,7 +1481,8 @@ holds the tool's first error line). `input_sha256` is the sha256 over the manife
 timestamps and no durations.
 
 Stage `formal` applies when the formal directory holds a manifest or the risk file has a critical
-area. It reads the manifests, the results, the baseline, the risk file and git history, and runs
+area. With no manifest at all and every critical area owed it is
+`not applicable: no formal model yet: <n> critical area(s) owed`. It reads the manifests, the results, the baseline, the risk file and git history, and runs
 no tool:
 
 - manifest errors; skeleton drift (as `formal gen --check`);
@@ -1663,6 +1692,9 @@ mutations. For each mutation, `machinery probe`:
    no receipt at all proves nothing either way: `ERROR  probe run produced no receipts: <id>
    <mutation>`, counted neither as killed nor as survived;
 4. removes the temporary directory and file.
+
+`<what was changed>` is `target <old> -> <new>` or `dropped <name>`. The command's output goes to
+stderr.
 
 Stage `probe` reports `ERROR  survived: <id> <mutation> (<what was changed>)` for every survivor
 and `checked: <n> mutations, <n> killed, <n> survived`. Selecting nothing that can be mutated is
