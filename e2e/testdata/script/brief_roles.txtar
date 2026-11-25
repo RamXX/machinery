@@ -1,0 +1,161 @@
+# brief prints pointers per role; the verifier never gets the proof (section 15.5)
+fixture shop
+fixture shop-formal
+exec sh -c 'printf "backlog:\n  tool: bd\ncommands:\n  e2e: [\"sh\", \"e2e/orders.sh\"]\n" >> machinery.yaml'
+mkdir docs
+cp formats.md docs/formats.md
+cp baseline-main.json design/formal/baseline.json
+exec machinery gen
+gitinit
+exec git checkout -q -b story
+cp baseline-story.json design/formal/baseline.json
+gitcommit 'accept a smaller bound'
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-r1 --title 'Prove the terminal invariant and the happy path' --body-file r1.txt --silent
+exec bd create --id shop-c1 --title 'Only a clerk ships' --body-file c1.txt --silent
+exec bd create --id shop-k1 --title 'Prove order pay' --body-file k1.txt --silent
+exec bd create --id shop-m1 --title 'Model order-payment (tla)' --body-file m1.txt --silent
+
+# a routine builder brief, exactly, in at most 40 lines
+exec machinery brief shop-r1
+stdout '^contract: [0-9a-f]{12} at [0-9a-f]{7}$'
+exec sh -c 'machinery brief shop-r1 | sed -E "s/^contract: .*/contract: X/"'
+cmp stdout want-r1.txt
+exec sh -c 'test $(machinery brief shop-r1 | wc -l) -le 40'
+exec sh -c 'machinery brief shop-r1 --role builder | sed -E "s/^contract: .*/contract: X/"'
+cmp stdout want-r1.txt
+
+# a critical builder brief: the machine, its table, the failure modes, the tier and its route
+exec machinery brief shop-k1
+stdout '^BRIEF shop-k1 \(builder\)$'
+stdout '^tier: critical \(order-payment: money moves; a double charge cannot be undone\)$'
+stdout '^route: strongest model for the formal model; standard model for code; fresh verifier$'
+stdout '^  tc:ORDE-2e883d  Pending on:pay \[hasPaymentMethod\] -> paying$'
+stdout '^  design/machines/Order.machine.json$'
+stdout '^  design/gen/tables/order.table.json$'
+stdout '^  design/failure-modes.yaml$'
+stdout '^  docs/formats.md$'
+stdout '^scope:\n  none\n'
+stdout '^done when: the proof is posted and a fresh verifier''s machinery accept shop-k1 exits 0$'
+
+# the builder posts a proof; the verifier brief still has no proof text
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 proof --story shop-c1 --post
+exec bd show shop-c1 --json
+stdout 'machinery:proof [0-9a-f]{40} builder'
+exec machinery brief shop-c1 --role verifier
+stdout '^BRIEF shop-c1 \(verifier\)$'
+stdout '^tier: consequential \(shipping-permission: authorization: only a Clerk ships\)$'
+stdout '^route: standard model; fresh verifier$'
+stdout '^  act:Order.ship  action ship of Order$'
+stdout '^read:\n  design/failure-modes.yaml\n  design/model/shop.modelith.yaml\n  docs/formats.md\n'
+stdout '^run:\n  machinery predict shop-c1 --observation "..." --expect "..."\n  machinery proof --story shop-c1\n  machinery accept shop-c1 --verdict accept\|reject --observed "..."\n'
+stdout '^weakened since main:\n  order-payment: run strict: constant Instances lowered from 2 to 1 \(a smaller bound for the suite\)\n'
+! stdout 'an accepted weakening older than the base'
+stdout '^done when: machinery accept shop-c1 --verdict accept exits 0$'
+! stdout 'PROOF'
+! stdout 'machinery:proof'
+! stdout 'criteria'
+! stdout 'orders.sh'
+
+# a modeler brief: the machine the model derives from, the manifest, the formal commands
+exec sh -c 'machinery brief shop-k1 --role modeler | sed -E "s/^contract: .*/contract: X/"'
+cmp stdout want-k1-modeler.txt
+exec machinery brief shop-m1 --role modeler
+stdout '^read:\n  design/formal/order-payment.spec.yaml\n  design/machines/Order.machine.json\n'
+stdout '^done when: machinery check --stage formal passes and fv:order-payment is proven$'
+
+-- formats.md --
+The contract.
+-- baseline-main.json --
+{
+  "version": 1,
+  "specs": {
+    "order-payment": {
+      "properties": {},
+      "fairness": "",
+      "runs": {},
+      "accepted": [
+        {
+          "at": "0000000000000000000000000000000000000000",
+          "change": "property PayingSettles changed",
+          "reason": "an accepted weakening older than the base"
+        }
+      ]
+    }
+  }
+}
+-- baseline-story.json --
+{
+  "version": 1,
+  "specs": {
+    "order-payment": {
+      "properties": {},
+      "fairness": "",
+      "runs": {},
+      "accepted": [
+        {
+          "at": "0000000000000000000000000000000000000000",
+          "change": "property PayingSettles changed",
+          "reason": "an accepted weakening older than the base"
+        },
+        {
+          "at": "1111111111111111111111111111111111111111",
+          "change": "run strict: constant Instances lowered from 2 to 1",
+          "reason": "a smaller bound for the suite"
+        }
+      ]
+    }
+  }
+}
+-- r1.txt --
+machinery:ids inv:terminal-is-final sc:customer-pays-and-the-order-ships
+machinery:scope e2e/orders.sh internal/domain/**
+-- c1.txt --
+machinery:ids act:Order.ship fm:ship-by-non-clerk
+-- k1.txt --
+machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f
+machinery:ids fm:payment-provider-down
+-- m1.txt --
+machinery:ids fv:order-payment
+-- want-r1.txt --
+BRIEF shop-r1 (builder)
+title: Prove the terminal invariant and the happy path
+tier: routine
+route: small model
+contract: X
+ids:
+  inv:terminal-is-final  A shipped or cancelled Order never changes status again.
+  sc:customer-pays-and-the-order-ships  Customer pays and the order ships
+read:
+  design/model/shop.modelith.yaml
+  docs/formats.md
+scope:
+  e2e/orders.sh
+  internal/domain/**
+run:
+  machinery check --base main
+  machinery run --affected --base main -- sh e2e/orders.sh
+  machinery verify --story shop-r1
+  machinery proof --story shop-r1 --post
+done when: machinery story shop-r1 passes
+-- want-k1-modeler.txt --
+BRIEF shop-k1 (modeler)
+title: Prove order pay
+tier: critical (order-payment: money moves; a double charge cannot be undone)
+route: strongest model for the formal model; standard model for code; fresh verifier
+contract: X
+ids:
+  fm:payment-provider-down  The payment provider does not answer or answers with an error.
+  tc:ORDE-2e883d  Pending on:pay [hasPaymentMethod] -> paying
+  tc:ORDE-70d94f  Pending on:pay -> (internal)
+read:
+  design/formal/order-payment.spec.yaml
+  design/machines/Order.machine.json
+scope:
+  none
+run:
+  machinery formal gen
+  machinery formal check order-payment
+  machinery formal baseline
+done when: machinery check --stage formal passes and fv:order-payment is proven

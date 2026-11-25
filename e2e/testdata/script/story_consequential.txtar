@@ -1,0 +1,129 @@
+# the consequential tier gate: a fresh verifier predicts, then accepts, for the commit of the proof (section 15.6)
+fixture shop
+cp machinery-bd.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-c1 --title 'Only a clerk ships' --body-file c1.txt --silent
+exec machinery run -- sh e2e/orders.sh
+
+# the builder may predict before posting; the routine gate holds, the tier asks for more
+exec machinery predict shop-c1 --observation 'a Customer ships' --expect 'refused'
+stdout '^machinery:prediction commit=[0-9a-f]{40} actor=builder observation="a Customer ships" expect="refused"$'
+exec machinery proof --story shop-c1 --post
+exec mrun 1 story shop-c1
+stdout '^checked: 1 ids, 1 proofs, 1 predictions, 0 verdicts$'
+stdout '^  ERROR  verifier is the builder: builder$'
+stdout '^failed: 1 finding\(s\)$'
+
+# once the proof is posted, its author can no longer predict
+exec mrun 1 predict shop-c1 --observation 'x' --expect 'y'
+stderr '^machinery: refused: builder posted the proof for [0-9a-f]{7}; a fresh verifier predicts$'
+exec mrun 1 predict shop-c1 --observation 'x' --expect 'y' --actor builder
+stderr 'refused'
+
+# a fresh verifier predicts; the verdict is missing
+env BEADS_ACTOR=verifier
+exec machinery predict shop-c1 --observation 'a Customer asks to ship a paid order' --expect 'FORBIDDEN, still Paid'
+stdout 'actor=verifier observation="a Customer asks to ship a paid order" expect="FORBIDDEN, still Paid"$'
+exec mrun 1 story shop-c1
+stdout '^  ERROR  no verdict for [0-9a-f]{7}: the verifier runs machinery accept shop-c1$'
+stdout '^  ERROR  verifier is the builder: builder$'
+
+# a code commit: every prediction is for another commit
+env BEADS_ACTOR=builder
+exec sh -c 'printf "// shipping\n" >> internal/api/handlers.go'
+gitcommit 'tighten shipping'
+exec machinery run -- sh e2e/orders.sh
+exec machinery proof --story shop-c1 --post
+exec mrun 1 story shop-c1
+stdout '^checked: 1 ids, 2 proofs, 2 predictions, 0 verdicts$'
+stdout '^  ERROR  no prediction for [0-9a-f]{7}: a verifier runs machinery predict before reading the proof$'
+! stdout 'verifier is the builder'
+
+# a verdict before the prediction does not count
+env BEADS_ACTOR=verifier
+exec mrun 1 accept shop-c1 --verdict accept --observed 'looked fine'
+stdout '^machinery:verdict accept commit=[0-9a-f]{40} actor=verifier observed="looked fine"$'
+stdout '^  ERROR  no prediction for [0-9a-f]{7}'
+exec machinery predict shop-c1 --observation 'a Customer asks to ship a paid order' --expect 'FORBIDDEN, still Paid'
+exec mrun 1 story shop-c1
+stdout '^  ERROR  verdict before prediction: verifier; the verifier predicts first, then runs machinery accept$'
+
+# a reject verdict records and exits 0; the gate fails on it
+exec machinery accept shop-c1 --verdict reject --observed 'a Customer shipped the order'
+stdout '^machinery:verdict reject commit=[0-9a-f]{40} actor=verifier observed="a Customer shipped the order"$'
+! stdout '== story =='
+exec mrun 1 story shop-c1
+stdout '^  ERROR  verdict reject by verifier at [0-9a-f]{7}: a Customer shipped the order$'
+
+# the passing order: proof by the builder, prediction then accept by the verifier; --close
+exec machinery accept shop-c1 --verdict accept --observed 'FORBIDDEN, the order stayed Paid' --close
+stdout '^== story ==$'
+stdout '^checked: 1 ids, 2 proofs, 3 predictions, 3 verdicts$'
+stdout '^passed$'
+stdout '^closed: shop-c1$'
+exec bd show shop-c1 --json
+stdout '"status": "closed"'
+stdout 'machinery:verdict accept commit=[0-9a-f]{40} actor=verifier observed=\\"FORBIDDEN, the order stayed Paid\\"'
+
+# --close only after a passing gate
+exec bd create --id shop-c2 --title 'Ship again' --body-file c1.txt --silent
+exec mrun 1 accept shop-c2 --verdict accept --observed 'x' --close
+! stdout 'closed:'
+exec bd show shop-c2 --json
+stdout '"status": "open"'
+
+# usage errors
+exec mrun 2 predict shop-c2 --observation x
+stderr '^usage: machinery predict needs --observation and --expect$'
+exec mrun 2 accept shop-c2 --verdict maybe --observed x
+stderr '^usage: --verdict must be accept or reject$'
+exec mrun 2 accept shop-c2 --verdict accept
+stderr '^usage: machinery accept needs --observed$'
+exec mrun 2 accept shop-c2 --verdict reject --observed x --close
+stderr '^usage: --close needs --verdict accept$'
+
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+routing:
+  routine: "small model, one pass"
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]
+-- c1.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**
