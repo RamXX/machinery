@@ -1,0 +1,19 @@
+# A pass that cannot reach the interesting state is vacuous.
+fixture shop
+fixture shop-formal
+rm design/formal/order-ownership.spec.yaml design/formal/shop_props.als
+exec shopformal
+
+# a reach predicate no behavior satisfies
+exec sh -c 'sed "s/^====$/ShippedUncharged == \\\\E i \\\\in Instances : st[i] = \"Shipped\" \/\\\\ fx[i][\"recordCharge\"] = 0\n====/" design/formal/OrderProps.tla > p.tmp && mv p.tmp design/formal/OrderProps.tla'
+grep 'ShippedUncharged ==' design/formal/OrderProps.tla
+exec sed -i.bak 's/reach: \[SomeShipped, SomeRefunded\]/reach: [SomeShipped, ShippedUncharged]/' design/formal/order-payment.spec.yaml
+exec mrun 1 formal check order-payment
+stdout 'ERROR  order-payment run strict: reach ShippedUncharged not reached: the pass is vacuous'
+grep '"ShippedUncharged": false' design/formal/order-payment.result.json
+grep '"SomeShipped": true' design/formal/order-payment.result.json
+
+# a run that expects a pass must name a reach predicate
+exec sed -i.bak 's/    reach: \[SomeShipped, ShippedUncharged\]//' design/formal/order-payment.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  design/formal/order-payment.spec.yaml: run strict: a run with expect: pass lists at least one reach predicate'

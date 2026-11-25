@@ -1,0 +1,49 @@
+# A spec cannot be weakened silently.
+fixture shop
+fixture shop-formal
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec sh -c 'printf "  - id: fv:order-payment\n    reason: \"the payment model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+exec mrun 1 formal check order-ownership
+exec machinery formal baseline
+gitcommit 'formal baseline'
+exec machinery check --stage formal
+stdout '^passed$'
+
+# weaken a property: the hash differs
+exec sed -i.bak 's/assert NoOrphanOrder { all o: Order | one c: Customer | o in c.order }/assert NoOrphanOrder { all o: Order | some c: Customer | o in c.order }/' design/formal/shop_props.als
+exec mrun 1 check --stage formal
+stdout 'ERROR  weakened: order-ownership: property NoOrphanOrder changed; accept with machinery formal baseline --accept --reason'
+
+# recording refuses a weakening without a reason
+exec mrun 1 formal baseline
+stdout 'ERROR  weakened: order-ownership: property NoOrphanOrder changed'
+exec mrun 2 formal baseline --accept
+stderr '--accept needs --reason'
+
+# a smaller bound and a removed property are weakenings too
+exec sed -i.bak 's/constants: {scope: 4}/constants: {scope: 3}/' design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  weakened: order-ownership: run strict: constant scope lowered from 4 to 3'
+
+# a deliberate acceptance is recorded with its reason
+exec machinery formal baseline --accept --reason 'ownership may be shared in the next release'
+stdout 'baseline: 1 spec\(s\), 1 updated'
+grep '"reason": "ownership may be shared in the next release"' design/formal/baseline.json
+grep '"change": "property NoOrphanOrder changed"' design/formal/baseline.json
+grep '"change": "run strict: constant scope lowered from 4 to 3"' design/formal/baseline.json
+exec mrun 1 check --stage formal
+! stdout 'weakened'
+stdout 'order-ownership.result.json: stale'
+
+# a new property or a larger bound only needs recording
+exec sed -i.bak 's/constants: {scope: 3}/constants: {scope: 5}/' design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'DRIFT  baseline: order-ownership: run strict: constant scope raised to 5 not recorded; run machinery formal baseline'
+exec machinery formal baseline
+stdout 'baseline: 1 spec\(s\), 1 updated'
+
+# removing a spec is a weakening
+rm design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'weakened: order-ownership: spec removed'

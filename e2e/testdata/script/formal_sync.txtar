@@ -1,0 +1,54 @@
+# A model describes the sources as read at one commit; later changes must be classified.
+fixture shop
+fixture shop-formal
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec sh -c 'printf "  - id: fv:order-payment\n    reason: \"the payment model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+exec mrun 1 formal check order-ownership
+exec machinery formal baseline
+gitcommit 'formal models'
+exec machinery formal sync
+stdout 'order-ownership: in sync at [0-9a-f]+'
+exec machinery formal sync order-ownership --class no-effect --evidence 'the model as first written'
+gitcommit 'sync marker'
+exec machinery check --stage formal
+stdout '^passed$'
+
+# a commit touches the model: the spec drifts
+exec sh -c 'printf "\n# a later note\n" >> design/model/shop.modelith.yaml'
+gitcommit 'touch the model'
+exec mrun 1 check --stage formal
+stdout 'DRIFT  sync: order-ownership: 1 commit\(s\) touched its sources since [0-9a-f]+; classify with machinery formal sync order-ownership'
+exec mrun 1 formal sync order-ownership
+stdout 'order-ownership: 1 commit\(s\) touched its sources since'
+stdout '  [0-9a-f]+  design/model/shop.modelith.yaml'
+
+# model-drift needs the model to have been updated; promise-change needs evidence
+exec mrun 1 formal sync order-ownership --class model-drift
+stderr 'model-drift needs a change to the spec since'
+exec mrun 2 formal sync order-ownership --class promise-change
+stderr 'config: promise-change needs --evidence naming the decision'
+exec mrun 2 formal sync order-ownership --class nonsense
+stderr 'unknown class'
+
+# a possible bug stays open and blocks until someone classifies again
+exec machinery formal sync order-ownership --class possible-bug --story shop-12
+stdout 'sync: order-ownership: possible-bug recorded \(shop-12\); read_at stays at'
+exec mrun 1 check --stage formal
+stdout 'ERROR  sync: order-ownership: possible bug under investigation \(shop-12\)'
+
+# no-effect moves the marker and records the classification
+exec machinery formal sync order-ownership --class no-effect --evidence 'a comment only'
+stdout 'sync: order-ownership: no-effect recorded; read_at [0-9a-f]+ -> [0-9a-f]+'
+grep 'class: "no-effect"' design/formal/order-ownership.spec.yaml
+grep 'class: "possible-bug"' design/formal/order-ownership.spec.yaml
+grep 'evidence: "a comment only"' design/formal/order-ownership.spec.yaml
+exec machinery check --stage formal
+stdout '^passed$'
+exec machinery formal sync
+stdout 'order-ownership: in sync at'
+
+# a marker that is not a commit of this history is an error
+exec sed -i.bak 's/read_at: .*/read_at: 0000000000000000000000000000000000000000/' design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  sync: order-ownership: sources.read_at 0000000 is not a commit'

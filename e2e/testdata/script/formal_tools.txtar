@@ -1,0 +1,41 @@
+# The formal tools are pinned by checksum; a run never passes on absence.
+exec machinery formal tools --check
+stdout 'jars/tla2tools.jar: ok \(v1.7.4\)'
+stdout 'jars/alloy.jar: ok \(v6.2.0\)'
+
+# an empty tools directory: --check reports, fetch installs from a mirror and verifies
+env MACHINERY_TOOLS=$WORK/tools
+exec mrun 1 formal tools --check
+stdout 'ERROR  jars/tla2tools.jar: missing \(run machinery formal tools\)'
+env MACHINERY_TOOLS_MIRROR=file://$REPO/.bin/jars
+exec machinery formal tools
+stdout 'jars/tla2tools.jar: fetched \(v1.7.4\)'
+stdout 'jars/alloy.jar: fetched \(v6.2.0\)'
+exec machinery formal tools --check
+stdout 'jars/alloy.jar: ok'
+
+# a file with another checksum is never used, and never silently replaced
+exec sh -c 'printf "not a jar" > tools/jars/tla2tools.jar'
+exec mrun 1 formal tools
+stdout 'ERROR  jars/tla2tools.jar: checksum mismatch'
+
+# a mirror that serves the wrong bytes is refused
+rm tools/jars/tla2tools.jar
+mkdir badmirror
+exec sh -c 'printf "tampered" > badmirror/tla2tools.jar'
+env MACHINERY_TOOLS_MIRROR=file://$WORK/badmirror
+exec mrun 1 formal tools
+stdout 'ERROR  jars/tla2tools.jar: checksum mismatch'
+! exists tools/jars/tla2tools.jar
+
+# formal check without the jar, or without Java, is not demonstrated
+fixture shop proj
+fixture shop-formal proj
+cd proj
+exec shopformal
+exec mrun 1 formal check order-payment
+stdout 'not demonstrated: jars/tla2tools.jar: missing \(run machinery formal tools\)'
+env MACHINERY_TOOLS=$REPO/.bin
+exec sh -c 'printf "tools:\n  java: /nonexistent/java\n" >> machinery.yaml'
+exec mrun 1 formal check order-payment
+stdout 'not demonstrated: java runtime not found \(/nonexistent/java\)'

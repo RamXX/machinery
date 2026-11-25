@@ -1,0 +1,39 @@
+# formal new scaffolds a manifest and a property module, and never overwrites.
+fixture shop
+exec cp $REPO/e2e/testdata/fixtures/shop-formal/design/risk.yaml design/risk.yaml
+exec cp $REPO/e2e/testdata/fixtures/shop-formal/design/failure-modes.yaml design/failure-modes.yaml
+exec cp $REPO/e2e/testdata/fixtures/shop-formal/design/owed.yaml design/owed.yaml
+exec cp $REPO/e2e/testdata/fixtures/shop-formal/machinery.yaml machinery.yaml
+
+# it needs a commit to stamp sources.read_at
+exec mrun 2 formal new order-payment --tool tla --machine Order --area order-payment
+stderr 'config: formal new needs a git repository with a commit'
+exec machinery gen
+gitinit
+
+exec machinery formal new order-payment --tool tla --machine Order --area order-payment
+stdout 'formal: wrote design/formal/order-payment.spec.yaml and design/formal/OrderProps.tla'
+grep 'questions: \[concurrency\]' design/formal/order-payment.spec.yaml
+grep 'machine: Order' design/formal/order-payment.spec.yaml
+grep 'read_at: [0-9a-f]{40}' design/formal/order-payment.spec.yaml
+grep 'paths: \["design/machines/Order.machine.json"\]' design/formal/order-payment.spec.yaml
+grep 'EXTENDS Order' design/formal/OrderProps.tla
+
+exec machinery formal new order-ownership --tool alloy --model design/model/shop.modelith.yaml --area order-ownership
+grep 'open shop' design/formal/shop_props.als
+
+# never overwrites
+exec mrun 1 formal new order-payment --tool tla --machine Order --area order-payment
+stderr 'formal new never overwrites'
+exec mrun 2 formal new x --tool tla --machine Nope --area order-payment
+stderr 'config: no machine file Nope.machine.json'
+exec mrun 2 formal new x --tool prolog --area a
+stderr 'usage: machinery formal new'
+
+# the scaffold checks for real: the TLA+ one passes, the Alloy one asks for a property
+exec machinery formal gen
+exec mrun 1 formal check
+stdout 'ERROR  order-ownership: ReplaceMe has no mutation it must catch'
+! stdout 'order-payment run strict'
+grep '"SomeFinal": true' design/formal/order-payment.result.json
+grep '"NonEmpty": true' design/formal/order-ownership.result.json

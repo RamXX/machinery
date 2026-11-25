@@ -1,0 +1,29 @@
+version: 1
+spec: order-ownership
+tool: alloy
+areas: [order-ownership]
+questions: [structure]
+model: design/model/shop.modelith.yaml
+properties: shop_props
+sources:
+  read_at: READ_AT
+  paths: ["design/model/shop.modelith.yaml"]
+runs:
+  - name: strict
+    constants: {scope: 4}
+    invariants: [NoOrphanOrder, OwnerListsOrder]
+    reach: [SomeOrder, TwoBusyCustomers]
+    expect: pass
+mutations:
+  - id: M1
+    bug: "An order names a customer who does not list it."
+    from: "fact { all a: Customer, b: Order | b in a.order iff a in b.customer }"
+    to: ""
+    detects: OwnerListsOrder
+    run: strict
+  - id: M2
+    bug: "An order can exist that no customer owns."
+    from: "fact { all y: Order | one order.y }\nfact { all a: Customer, b: Order | b in a.order iff a in b.customer }"
+    to: ""
+    detects: NoOrphanOrder
+    run: strict

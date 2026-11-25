@@ -1219,9 +1219,11 @@ exactly when the table does. The module is named after the machine file. It decl
   the step in `pend`; a caller has at most one step in flight) and `Commit_<s>(i, c)` (applies a
   pending step without looking at the state again). Every other row is engine-driven and yields
   `Do_<s>(i)` only, with `c` recorded as `"engine"`.
-- `Terminated` (every instance final and nothing pending: stutter, so termination is not a
-  deadlock), `Next`, `Internal` (the engine-driven and commit steps), `Fairness ==
-  WF_vars(Internal)` and `Spec == Init /\ [][Next]_vars /\ Fairness`.
+- `CallerStepOf(i)`, `CommitStepOf(i)`, `EngineStepOf(i)` and `InternalOf(i)` (the engine-driven
+  and commit steps of one instance); `Terminated` (every instance final and nothing pending:
+  stutter, so termination is not a deadlock); `Next`;
+  `Fairness == \A i \in Instances : WF_vars(InternalOf(i))`, so no instance is starved by
+  another; and `Spec == Init /\ [][Next]_vars /\ Fairness`.
 
 Guards are not modeled: any branch may fire, the environment decides. Ignore, refusal and clause
 cases change nothing and are not actions. The generated header states these as assumptions `G1`
@@ -1248,10 +1250,13 @@ The property file starts with `open <model>` and holds facts, predicates and ass
 commands: machinery writes the commands from the runs.
 
 `machinery formal gen` writes the skeleton of every manifest and never touches a property file.
-`--check` reports `DRIFT  <path>: stale` or `missing`. `machinery formal new <spec> --tool tla
---machine <Name> --area <area>` (or `--tool alloy --model <path>`) writes a manifest with
-`sources.read_at` set to the current commit, one `strict` run, and a property module holding
-`TypeOK` only; it never overwrites.
+`--check` prints a block named `formal-gen` with `DRIFT  <path>: stale` or `missing`.
+`machinery formal new <spec> --tool tla --machine <Name> --area <area>` (or `--tool alloy --model
+<path>`) writes a manifest with `sources.read_at` set to the current commit and one `strict` run,
+and a property file: for TLA+ a reach predicate `SomeFinal` beside the skeleton's `TypeOK`; for
+Alloy a reach predicate `NonEmpty` and a placeholder assertion `ReplaceMe` that the mutation rule
+(section 16.5) then asks to be replaced. It needs a git repository with a commit and never
+overwrites.
 
 ### 16.3 Assumptions
 
@@ -1259,9 +1264,9 @@ A model is a statement about a system under assumptions about its host: what is 
 platform guarantees, what a dependency does. They are numbered data, not comments:
 
 - `id` matches `^A[0-9]+$` and is unique in the spec; `text` is required.
-- `status: proven` requires `evidence`, the id of an obligation that is not owed (often the `cx`
-  id of the run that negates the assumption, section 16.4). Otherwise the assumption counts as
-  unproven.
+- `status: proven` requires `evidence`, the id of an obligation (often the `cx` id of the run that
+  negates the assumption, section 16.4). Evidence that is not an obligation is an ERROR. While
+  the evidence is in the owed list the assumption counts as unproven.
 - Every unproven assumption prints in stage `formal` as
   `warn   <spec>: assumption <id> unproven: <text>`, in every proof block that touches the area
   (section 13) and in the verifier brief. It cannot be hidden, and it does not block.
@@ -1304,8 +1309,8 @@ must catch it.
 - `file` is the skeleton or the property file (default: the skeleton). `from` must occur exactly
   once in it; it is replaced by `to` in a temporary copy. The tree is never modified.
 - `detects` names an invariant or property of `run`, which must be a run with `expect: pass`.
-- `origin` is optional: the commit of a bug fix. A past bug becomes a mutation that puts the old
-  behavior back, so the model is shown to catch what already went wrong once.
+- `origin` is optional: the commit of a bug fix, which must exist. A past bug becomes a mutation
+  that puts the old behavior back, so the model is shown to catch what already went wrong once.
 
 `machinery formal check` runs each mutation with only the named property and records `detected`
 (the property is violated), `missed` (it is not) or `inapplicable` (`from` does not occur exactly
@@ -1349,6 +1354,7 @@ Stage `formal` compares the tree with the baseline:
 | A recorded property is gone or its hash differs | `ERROR  weakened: <spec>: property <name> removed` or `changed` |
 | Fairness differs | `ERROR  weakened: <spec>: fairness changed` |
 | A recorded run is gone, its `expect` went from `pass` to `finding`, a numeric constant is lower, or another constant differs | `ERROR  weakened: <spec>: run <run>: <what>` |
+| A recorded spec has no manifest any more | `ERROR  weakened: <spec>: spec removed` |
 
 `machinery formal baseline` records additions and larger bounds. It refuses the differences in the
 ERROR rows unless given `--accept --reason "<text>"`, which records the new state and appends to
@@ -1391,7 +1397,10 @@ The pinned tools:
 
 `machinery formal tools` downloads what is missing from the projects' release pages into the
 tools directory (section 2) and verifies the checksum; `--check` only verifies. A file with
-another checksum is never used: `ERROR  <file>: checksum mismatch`. `machinery formal check` needs
+another checksum is never used and never replaced: `ERROR  <file>: checksum mismatch`. The
+environment variable `MACHINERY_TOOLS_MIRROR` names a base URL (`https://` or `file://`) that holds
+the two files under the names `tla2tools.jar` and `alloy.jar`, for offline use; the checksums
+still apply. `machinery formal check` needs
 the jar of each tool it runs and a Java runtime (`tools.java`); when one is missing the command is
 `not demonstrated` with the reason and exits 1. It never passes on absence.
 
@@ -1472,7 +1481,7 @@ settle it.
 - TLA+: `steps` come from the `last` and `st` variables of each state after the initial one;
   `state` is `st` after the step. `loop` is the step a liveness counterexample returns to, else 0.
 - Alloy: `steps` is empty and `instance` maps each atom to its fields, as the tool reports them,
-  with atom names stripped of `$`.
+  with atom names stripped of the module prefix and of `$` (`Order0`).
 - `expect` says what the real system must do when a test replays the trace:
 
 | The run | `expect` | Meaning |

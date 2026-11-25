@@ -1,0 +1,15 @@
+#!/bin/sh
+# shopformal finishes the shop-formal fixture in the current directory: it
+# generates, commits, stamps sources.read_at with the commit, and writes the
+# skeletons of the formal models.
+set -eu
+machinery gen >/dev/null
+[ -f .gitignore ] || printf '.home/\n.machinery/\n.beads/\n' > .gitignore
+git init -q -b main
+git add -A
+git commit -q -m fixture
+sha=$(git rev-parse HEAD)
+for f in design/formal/*.spec.yaml; do
+  sed "s/READ_AT/$sha/" "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
+machinery formal gen >/dev/null

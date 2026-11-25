@@ -1,0 +1,35 @@
+# Alloy answers structural questions; a violated assertion yields an instance to replay.
+fixture shop
+fixture shop-formal
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec sh -c 'printf "  - id: fv:order-payment\n    reason: \"the payment model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+
+# an assertion the model does not keep: violated, with the instance as a trace
+exec sh -c 'printf "\nassert EveryCustomerOrders { all c: Customer | some c.order }\npred Impossible { some o: Order | no o.customer }\n" >> design/formal/shop_props.als'
+exec sed -i.bak -e 's/invariants: \[NoOrphanOrder, OwnerListsOrder\]/invariants: [NoOrphanOrder, OwnerListsOrder, EveryCustomerOrders]/' -e 's/reach: \[SomeOrder, TwoBusyCustomers\]/reach: [SomeOrder, Impossible]/' design/formal/order-ownership.spec.yaml
+exec mrun 1 formal check order-ownership
+stdout 'ERROR  order-ownership run strict: EveryCustomerOrders violated; replay cx:order-ownership:strict against the real system'
+stdout 'ERROR  order-ownership run strict: reach Impossible not reached: the pass is vacuous'
+stdout 'ERROR  order-ownership: EveryCustomerOrders has no mutation it must catch'
+grep '"tool": "alloy"' design/formal/traces/order-ownership.strict.trace.json
+grep '"violates": "EveryCustomerOrders"' design/formal/traces/order-ownership.strict.trace.json
+grep '"expect": "undetermined"' design/formal/traces/order-ownership.strict.trace.json
+grep '"Customer[0-9]": {' design/formal/traces/order-ownership.strict.trace.json
+grep '"order": \[\]' design/formal/traces/order-ownership.strict.trace.json
+grep '"id": "cx:order-ownership:strict"' design/gen/obligations.json
+
+# commands belong in the manifest, not in the property file
+exec sh -c 'printf "\ncheck NoOrphanOrder for 3\n" >> design/formal/shop_props.als'
+exec mrun 1 check --stage formal
+stdout 'ERROR  design/formal/shop_props.als: commands belong in the manifest runs, not in the property file'
+
+# a property the file does not define
+exec sed -i.bak 's/invariants: \[NoOrphanOrder, OwnerListsOrder, EveryCustomerOrders\]/invariants: [NoOrphanOrder, OwnerListsOrder, Undefined]/' design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  order-ownership: property Undefined is not defined in design/formal/shop_props.als'
+
+# a syntax error is an error of the run, never a pass
+exec sh -c 'printf "\nassert Broken { all o: Order | \n" >> design/formal/shop_props.als'
+exec mrun 1 formal check order-ownership
+stdout 'ERROR  order-ownership run strict: the model checker failed: '

@@ -1,0 +1,36 @@
+# Every property must catch a plausible bug; a mutation it misses is a finding.
+fixture shop
+fixture shop-formal
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec shopformal
+
+# M3 is an equivalent mutant: the model still forces one owner, so NoOrphanOrder misses it.
+# M4 names text that is not in the file. OwnerListsOrder loses its only mutation.
+cp mutations.yaml.in m.tmp
+exec sh -c 'sed "/^mutations:/,\$d" design/formal/order-ownership.spec.yaml > s.tmp && cat s.tmp m.tmp > design/formal/order-ownership.spec.yaml'
+exec mrun 1 formal check order-ownership
+stdout 'ERROR  order-ownership mutation M3 missed: NoOrphanOrder does not catch "An order can have a second owner\."'
+stdout 'ERROR  order-ownership mutation M4 does not apply'
+stdout 'ERROR  order-ownership: OwnerListsOrder has no mutation it must catch'
+grep '"outcome": "missed"' design/formal/order-ownership.result.json
+grep '"outcome": "inapplicable"' design/formal/order-ownership.result.json
+
+# a mutation must name a property of a run that expects a pass
+exec sed -i.bak 's/detects: NoOrphanOrder/detects: Nonexistent/' design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'mutation M3: Nonexistent is not an invariant or property of run strict'
+
+-- mutations.yaml.in --
+mutations:
+  - id: M3
+    bug: "An order can have a second owner."
+    from: "fact { all y: Order | one order.y }"
+    to: "fact { all y: Order | some order.y }"
+    detects: NoOrphanOrder
+    run: strict
+  - id: M4
+    bug: "Text that is not in the model."
+    from: "fact { no such text }"
+    to: ""
+    detects: NoOrphanOrder
+    run: strict

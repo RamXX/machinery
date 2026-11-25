@@ -1,0 +1,50 @@
+version: 1
+spec: order-payment
+tool: tla
+areas: [order-payment]
+questions: [concurrency]
+machine: Order
+properties: OrderProps
+sources:
+  read_at: READ_AT
+  paths: ["design/machines/Order.machine.json", "internal/**"]
+assumptions:
+  - {id: A1, text: "A transition is applied as one compare-and-set on the stored order status.", status: proven, evidence: "cx:order-payment:race"}
+  - {id: A2, text: "The payment provider answers, fails or times out; it never answers twice.", status: unproven}
+runs:
+  - name: strict
+    constants: {Instances: 2, Callers: 2, Atomic: true}
+    invariants: [TypeOK, ChargedOnce, ShippedOnlyAfterCharge, RefundOnlyIfCharged]
+    properties: [PayingSettles]
+    reach: [SomeShipped, SomeRefunded]
+    expect: pass
+  - name: race
+    constants: {Instances: 1, Callers: 2, Atomic: false}
+    invariants: [ChargedOnce]
+    expect: finding
+    assumption: A1
+mutations:
+  - id: M1
+    bug: "A charge result is applied to an order that is already paid."
+    from: "Do_ORDE_8bd6e7(i) ==\n    /\\ st[i] \\in {\"paying\"}"
+    to: "Do_ORDE_8bd6e7(i) ==\n    /\\ st[i] \\in {\"paying\", \"Paid\"}"
+    detects: ChargedOnce
+    run: strict
+  - id: M2
+    bug: "An unpaid order can be shipped."
+    from: "Do_ORDE_e6d28f(i, c) ==\n    /\\ Atomic\n    /\\ st[i] \\in {\"Paid\"}"
+    to: "Do_ORDE_e6d28f(i, c) ==\n    /\\ Atomic\n    /\\ st[i] \\in {\"Paid\", \"Pending\"}"
+    detects: ShippedOnlyAfterCharge
+    run: strict
+  - id: M3
+    bug: "Cancelling an unpaid order refunds money that was never taken."
+    from: "Bump(@, {\"recordCancellation\"})"
+    to: "Bump(@, {\"refundPayment\", \"recordCancellation\"})"
+    detects: RefundOnlyIfCharged
+    run: strict
+  - id: M4
+    bug: "Nothing drives an order out of paying: no result, no timeout."
+    from: "Fairness == \\A i \\in Instances : WF_vars(InternalOf(i))"
+    to: "Fairness == TRUE"
+    detects: PayingSettles
+    run: strict

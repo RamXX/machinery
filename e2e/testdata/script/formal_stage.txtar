@@ -1,0 +1,40 @@
+# Stage formal is pure: coverage of critical areas, results, assumptions.
+fixture shop
+fixture shop-formal
+exec shopformal
+
+# both critical areas have a spec of the right tool, but nothing ran yet
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec mrun 1 check --stage formal
+stdout 'ERROR  fv:order-payment: no tla spec answers concurrency'
+stdout 'DRIFT  baseline: order-ownership: spec not recorded'
+
+# an owed critical area does not block; the missing result is still not demonstrated
+exec sh -c 'printf "  - id: fv:order-payment\n    reason: \"the payment model is not written yet\"\n" >> design/owed.yaml'
+exec machinery formal baseline
+exec mrun 1 check --stage formal
+stdout 'warn   owed: fv:order-payment: no tla spec answers concurrency'
+stdout 'not demonstrated: no result for order-ownership; run machinery formal check'
+
+# a spec whose area is owed is under construction: its findings are warnings
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"the ownership model is not written yet\"\n" >> design/owed.yaml'
+exec machinery check --stage formal
+stdout '^passed$'
+
+# a spec that answers a question with the wrong tool, an unknown area, an unknown key
+exec sed -i.bak 's/questions: \[structure\]/questions: [concurrency]/' design/formal/order-ownership.spec.yaml
+exec machinery check --stage formal
+stdout 'owed: design/formal/order-ownership.spec.yaml: question concurrency is answered with tla, not alloy'
+exec sed -i.bak -e 's/questions: \[concurrency\]/questions: [structure]/' -e 's/areas: \[order-ownership\]/areas: [nowhere]/' design/formal/order-ownership.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  order-ownership: unknown area nowhere'
+exec sh -c 'printf "surprise: true\n" >> design/formal/order-ownership.spec.yaml'
+exec mrun 1 check --stage formal
+stdout 'ERROR  design/formal/order-ownership.spec.yaml: .*field surprise not found'
+
+# no formal model and no critical area: not applicable
+rm design/formal
+exec sed -i.bak 's/tier: critical/tier: consequential/' design/risk.yaml
+exec sed -i.bak '/questions:/d' design/risk.yaml
+exec machinery check --stage formal
+stdout 'not applicable: no formal model and no critical area'

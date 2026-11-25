@@ -1,0 +1,56 @@
+# The whole formal loop on the fixture, with the real TLC and the real Alloy.
+fixture shop
+fixture shop-formal
+exec shopformal
+
+# before any run: assumption A1 names a counterexample that does not exist yet
+exec mrun 1 check --stage formal
+stdout 'ERROR  order-payment: assumption A1: evidence cx:order-payment:race is not an obligation'
+stdout 'warn   order-payment: assumption A1 unproven'
+
+# run both tools
+exec mrun 1 formal check
+stdout 'checked: 2 specs, 3 runs, 4 reach predicates, 6 mutations, 2 assumptions'
+stdout 'DRIFT  baseline: order-payment: spec not recorded; run machinery formal baseline'
+stdout 'warn   finding: order-payment run race: ChargedOnce violated \(assumption A1\)'
+stdout 'warn   order-payment: assumption A2 unproven: The payment provider answers'
+
+# results are bound to the spec bytes and carry no timestamps
+grep '"tool_version": "tla2tools v1.7.4"' design/formal/order-payment.result.json
+grep '"tool_version": "alloy v6.2.0"' design/formal/order-ownership.result.json
+grep '"SomeShipped": true' design/formal/order-payment.result.json
+grep '"TwoBusyCustomers": true' design/formal/order-ownership.result.json
+grep -count=4 '"outcome": "detected"' design/formal/order-payment.result.json
+grep -count=2 '"outcome": "detected"' design/formal/order-ownership.result.json
+
+# the race counterexample is a trace file and an obligation
+grep '"id": "cx:order-payment:race"' design/formal/traces/order-payment.race.trace.json
+grep '"violates": "ChargedOnce"' design/formal/traces/order-payment.race.trace.json
+grep '"expect": "refuted"' design/formal/traces/order-payment.race.trace.json
+grep '"step": "begin"' design/formal/traces/order-payment.race.trace.json
+grep '"step": "commit"' design/formal/traces/order-payment.race.trace.json
+grep '"caller": "engine"' design/formal/traces/order-payment.race.trace.json
+grep '"id": "cx:order-payment:race"' design/gen/obligations.json
+grep '"id": "fv:order-payment"' design/gen/obligations.json
+grep '"title": "Replay ChargedOnce \(order-payment run race\)"' design/gen/obligations.json
+
+# record the baseline: the pure stage now passes, with no Java involved
+exec machinery formal baseline
+stdout 'baseline: 2 spec\(s\), 2 updated'
+env MACHINERY_TOOLS=$WORK/no-tools
+exec machinery check --stage formal
+stdout '^passed$'
+stdout 'machinery check: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+env MACHINERY_TOOLS=$REPO/.bin
+
+# a second run changes nothing: the files are deterministic
+gitcommit 'formal models'
+exec machinery formal check
+stdout '^passed$'
+exec git status --short
+! stdout .
+
+# changing a property makes the committed result stale
+exec sh -c 'printf "\n\\* a note\n" >> design/formal/OrderProps.tla'
+exec mrun 1 check --stage formal
+stdout 'DRIFT  design/formal/order-payment.result.json: stale; run machinery formal check'

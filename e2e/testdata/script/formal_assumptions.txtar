@@ -1,0 +1,27 @@
+# Assumptions are numbered data; an unproven one cannot be hidden.
+fixture shop
+fixture shop-formal
+rm design/formal/order-ownership.spec.yaml design/formal/shop_props.als
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"the ownership model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+exec mrun 1 formal check order-payment
+exec machinery formal baseline
+
+# A1 is proven by the replay of the race counterexample; A2 is flagged
+exec machinery check --stage formal
+stdout 'warn   order-payment: assumption A2 unproven: The payment provider answers, fails or times out; it never answers twice\.'
+! stdout 'assumption A1 unproven'
+stdout '^passed$'
+
+# evidence that is owed is not evidence yet
+exec sh -c 'printf "  - id: cx:order-payment:race\n    reason: \"no replay test yet\"\n" >> design/owed.yaml'
+exec machinery check --stage formal
+stdout 'warn   order-payment: assumption A1 unproven: A transition is applied as one compare-and-set'
+
+# evidence must be an obligation; a proven assumption must name evidence
+exec sed -i.bak 's/evidence: "cx:order-payment:race"/evidence: "act:Order.pay"/' design/formal/order-payment.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  order-payment: assumption A1: evidence act:Order.pay is not an obligation'
+exec sed -i.bak 's/, evidence: "act:Order.pay"//' design/formal/order-payment.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'ERROR  design/formal/order-payment.spec.yaml: assumption A1: status proven needs evidence'

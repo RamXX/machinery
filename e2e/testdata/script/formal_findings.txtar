@@ -1,0 +1,62 @@
+# Findings stay in the open; an unexpected violation becomes a counterexample to replay.
+fixture shop
+fixture shop-formal
+rm design/formal/order-ownership.spec.yaml design/formal/shop_props.als
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"the ownership model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+
+# a run that expects a pass and is violated: an ERROR, a trace, a cx obligation
+exec sed -i.bak 's/constants: {Instances: 2, Callers: 2, Atomic: true}/constants: {Instances: 1, Callers: 2, Atomic: false}/' design/formal/order-payment.spec.yaml
+exec mrun 1 formal check order-payment
+stdout 'ERROR  order-payment run strict: ChargedOnce violated; replay cx:order-payment:strict against the real system'
+grep '"expect": "undetermined"' design/formal/traces/order-payment.strict.trace.json
+grep '"id": "cx:order-payment:strict"' design/gen/obligations.json
+
+# back to a passing run: the trace file and its obligation go away
+exec sed -i.bak 's/constants: {Instances: 1, Callers: 2, Atomic: false}\n    invariants: \[TypeOK/X/' design/formal/order-payment.spec.yaml
+cp spec-fixed.yaml.in design/formal/order-payment.spec.yaml
+exec sh -c 'sed "s/READ_AT/$(git rev-parse HEAD)/" design/formal/order-payment.spec.yaml > s.tmp && mv s.tmp design/formal/order-payment.spec.yaml'
+exec mrun 1 formal check order-payment
+! exists design/formal/traces/order-payment.strict.trace.json
+! grep 'cx:order-payment:strict' design/gen/obligations.json
+
+# a finding run that passes: the bug is gone or the model changed
+stdout 'ERROR  order-payment run race: expected a finding and the run passed; the bug is gone or the model changed: set expect: pass'
+! exists design/formal/traces/order-payment.race.trace.json
+
+# a finding names exactly one of an assumption and a story
+exec sed -i.bak 's/    assumption: A1/    assumption: A1\n    story: shop-7/' design/formal/order-payment.spec.yaml
+exec mrun 1 check --stage formal
+stdout 'run race: expect: finding needs exactly one of assumption and story'
+
+-- spec-fixed.yaml.in --
+version: 1
+spec: order-payment
+tool: tla
+areas: [order-payment]
+questions: [concurrency]
+machine: Order
+properties: OrderProps
+sources:
+  read_at: READ_AT
+  paths: ["design/machines/Order.machine.json"]
+assumptions:
+  - {id: A1, text: "A transition is applied as one compare-and-set on the stored order status.", status: unproven}
+runs:
+  - name: strict
+    constants: {Instances: 1, Callers: 2, Atomic: true}
+    invariants: [TypeOK, ChargedOnce]
+    reach: [SomeShipped]
+    expect: pass
+  - name: race
+    constants: {Instances: 1, Callers: 2, Atomic: true}
+    invariants: [ChargedOnce]
+    expect: finding
+    assumption: A1
+mutations:
+  - id: M1
+    bug: "A charge result is applied to an order that is already paid."
+    from: "Do_ORDE_8bd6e7(i) ==\n    /\\ st[i] \\in {\"paying\"}"
+    to: "Do_ORDE_8bd6e7(i) ==\n    /\\ st[i] \\in {\"paying\", \"Paid\"}"
+    detects: ChargedOnce
+    run: strict
