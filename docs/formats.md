@@ -432,16 +432,18 @@ Applies when `tools.xstate` is true. The stage runs an embedded script with `too
 the real `xstate` package found at `<tools dir>/xstate/node_modules/xstate` (version 5.33.4 or
 newer, below 6). For each machine it calls `createMachine` with the machine file as written, and
 for every transition case of kind `on` in the generated table (section 7.3) it asks XState for
-the next snapshot from the case's source state with the case's guard true and every earlier
-branch's guard false, then compares:
+the next snapshot and the actions it would execute from the case's source state (the initial leaf
+of a compound source) with the case's guard true and every other guard false, then compares:
 
 | Rule | Check |
 |---|---|
-| `target` | The state XState enters is the case's `target`, or the source state for an internal transition. When the target has an eventless (`always`) transition XState settles past it; the comparison then uses the state the table reaches by following `always` rows whose guard is empty. |
-| `actions` | The named actions XState would execute, in order and deduplicated, equal the case's `effects`. |
-| `initial` | XState's initial state is the table's `initial`. |
+| `target` | The leaf XState enters is the case's `target`, or its initial leaf when the target is compound, or the source's initial leaf for an internal transition. XState then settles in the same step: it takes an eventless (`always`) row of the active leaf or of an ancestor, innermost first, and the state `onDone` row of a compound state whose final child was entered. The comparison follows the same rows in the table, taking the first row of a state whose guard is empty or is the case's guard, and uses the leaf where they stop. |
+| `actions` | The named actions XState would execute, in order and deduplicated, equal the case's `effects` followed by the `effects` of the rows the `target` rule followed, deduplicated. Built-in `xstate.*` actions (spawning an invoke, scheduling and cancelling an `after`) are left out. |
+| `initial` | XState's initial leaf is the table's `initial`, followed down its initial children and settled as in the `target` rule with every guard false. |
 
-A disagreement is `ERROR  xstate: <machine id> <case id>: <what differs>`. Node or the package
+A disagreement is `ERROR  xstate: <machine id> <case id>: <what differs>`; for the `initial` rule
+the case id is the word `initial`, and a machine XState refuses to load is
+`ERROR  xstate: <machine id>: XState rejects the machine: <error>`. Node or the package
 missing, or a version outside the range, is `not demonstrated` with the reason. `checked:` counts
 machines and cases compared. Not applicable when `tools.xstate` is false or absent.
 

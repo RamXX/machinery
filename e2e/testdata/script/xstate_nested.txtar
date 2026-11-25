@@ -1,0 +1,28 @@
+# a compound state: XState exits and enters ancestors and initial children,
+# and the generated effects follow XState's order
+fixture nested
+exec machinery lint --stage machines --stage xstate
+stdout '^checked: 1 machines, 7 cases$'
+! stdout 'ERROR'
+stdout 'machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/tables/job.table.json > flat.json'
+
+# into the compound state: its entry, then its initial child's entry
+grep '"source":"Idle","kind":"on","event":"start","guard":"","target":"Running","actions":\["beginRun"\],"effects":\["leaveIdle","beginRun","enterRunning","enterWarming"\]' flat.json
+# to a deep target: the ancestor is entered, the initial child is not
+grep '"event":"resume","guard":"","target":"Running.working","actions":\["resumeRun"\],"effects":\["leaveIdle","resumeRun","enterRunning","enterWorking"\]' flat.json
+# out of it: the active child is exited first, then the parent
+grep '"event":"stop","guard":"","target":"Idle","actions":\["endRun"\],"effects":\["leaveWarming","leaveRunning","endRun","enterIdle"\]' flat.json
+# a self-target on the compound state resets the child without leaving the parent
+grep '"event":"reset","guard":"","target":"Running","actions":\["resetRun"\],"effects":\["leaveWarming","resetRun","enterWarming"\]' flat.json
+# a self-target on an atomic state exits and enters nothing
+grep '"event":"poke","guard":"","target":"Idle","actions":\["notePoke"\],"effects":\["notePoke"\]' flat.json
+# to a sibling inside it: only the children change
+grep '"event":"ready","guard":"","target":"Running.working","actions":\["markReady"\],"effects":\["leaveWarming","markReady","enterWorking"\]' flat.json
+grep '"event":"pause","guard":"","target":"Running.warming","actions":\["pauseWork"\],"effects":\["leaveWorking","pauseWork","enterWarming"\]' flat.json
+
+# the obligations carry the same effects
+exec sh -c 'tr -d " \n" < design/gen/obligations.json > flatobl.json'
+grep '"title":"Runningon:stop->Idle","effects":\["leaveWarming","leaveRunning","endRun","enterIdle"\]' flatobl.json

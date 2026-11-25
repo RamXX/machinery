@@ -1,0 +1,34 @@
+# the stage fails when the real XState package reads a machine differently from its table
+
+# a child handler for stop shadows the parent's: from Running (its initial leaf
+# warming) XState takes the child's transition, so the parent's case cannot fire
+# there. The machines stage has nothing against it; only XState shows it.
+fixture nested
+exec sed -i.bak 's/"on": { "ready": { "target": "working", "actions": "markReady" } }/"on": { "ready": { "target": "working", "actions": "markReady" }, "stop": { "target": "working", "actions": "holdStop" } }/' design/machines/Job.machine.json
+rm design/machines/Job.machine.json.bak
+exec machinery lint --stage machines
+stdout '^passed$'
+exec mrun 1 lint --stage xstate
+stdout '^checked: 1 machines, 8 cases$'
+stdout '^  ERROR  xstate: job tc:JOB-32bfe2: actions: XState executes \[leaveWarming holdStop enterWorking\], the table expects \[leaveWarming leaveRunning endRun enterIdle\]$'
+stdout '^  ERROR  xstate: job tc:JOB-32bfe2: target: XState enters Running.working, the table expects Idle$'
+stdout '^failed: 2 finding\(s\)$'
+stdout 'machinery lint: 0 passed, 1 failed, 0 not demonstrated, 0 not applicable'
+
+# a compound initial that names no child: XState refuses to resolve the state
+cp bad.json design/machines/Bad.machine.json
+exec mrun 1 lint --stage xstate
+stdout '^checked: 2 machines, 9 cases$'
+stdout '^  ERROR  xstate: bad tc:BAD-050612: XState fails: Initial state node "missing" not found on parent state node #bad.Closed$'
+stdout '^failed: 3 finding\(s\)$'
+
+-- bad.json --
+{
+  "_role": "operational",
+  "id": "bad",
+  "initial": "Open",
+  "states": {
+    "Open": { "on": { "close": { "target": "Closed" } } },
+    "Closed": { "initial": "missing", "states": { "sealed": { "type": "final" } } }
+  }
+}

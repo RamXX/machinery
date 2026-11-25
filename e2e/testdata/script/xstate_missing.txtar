@@ -1,0 +1,32 @@
+# without node or without the package the stage is not demonstrated
+
+# node missing; the package is there
+fixture nested
+cp nonode.yaml machinery.yaml
+exec mrun 1 lint --stage xstate
+stdout '^not demonstrated: node not found \(tools.node is /nonexistent\)$'
+! stdout 'checked:'
+stdout 'machinery lint: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+
+# a tools directory without the package
+cp xstate.yaml machinery.yaml
+mkdir empty
+env MACHINERY_TOOLS=$WORK/empty
+exec mrun 1 lint --stage xstate
+stdout '^not demonstrated: the xstate package is not in the tools directory \(npm install --save-exact xstate@5.33.4 in <tools dir>/xstate\)$'
+! stdout 'checked:'
+stdout 'machinery lint: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+
+-- nonode.yaml --
+version: 2
+design:
+  machines: design/machines
+tools:
+  xstate: true
+  node: /nonexistent
+-- xstate.yaml --
+version: 2
+design:
+  machines: design/machines
+tools:
+  xstate: true

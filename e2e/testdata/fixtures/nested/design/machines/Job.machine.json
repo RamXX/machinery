@@ -1,0 +1,44 @@
+{
+  "_comment": "A job with a compound Running state: entry and exit actions on the parent and on its children.",
+  "_role": "operational",
+  "id": "job",
+  "initial": "Idle",
+  "states": {
+    "Idle": {
+      "entry": "enterIdle",
+      "exit": "leaveIdle",
+      "on": {
+        "start": { "target": "Running", "actions": "beginRun" },
+        "resume": { "target": "#job.Running.working", "actions": "resumeRun" },
+        "poke": { "target": "Idle", "actions": "notePoke" }
+      },
+      "_ignores": {
+        "stop": "nothing runs; the API answers JOB_NOT_RUNNING",
+        "reset": "nothing runs; the API answers JOB_NOT_RUNNING",
+        "ready": "nothing runs; the API answers JOB_NOT_RUNNING",
+        "pause": "nothing runs; the API answers JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "entry": "enterRunning",
+      "exit": "leaveRunning",
+      "initial": "warming",
+      "on": {
+        "stop": { "target": "Idle", "actions": "endRun" },
+        "reset": { "target": "Running", "actions": "resetRun" }
+      },
+      "states": {
+        "warming": {
+          "entry": "enterWarming",
+          "exit": "leaveWarming",
+          "on": { "ready": { "target": "working", "actions": "markReady" } }
+        },
+        "working": {
+          "entry": "enterWorking",
+          "exit": "leaveWorking",
+          "on": { "pause": { "target": "warming", "actions": "pauseWork" } }
+        }
+      }
+    }
+  }
+}

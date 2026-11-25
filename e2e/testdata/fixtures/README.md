@@ -52,6 +52,13 @@ state's entry actions.
 - Contract: 5 operations, 4 bound to an action.
 - Code: 2 Go files in 2 layers, 1 import between them, 2 functions.
 
+## `nested`
+
+One operational machine `job` (tag `JOB`) with a compound state `Running` (children `warming`,
+`working`), entry and exit actions on every state, and `tools.xstate: true`. Its 7 `on` rows cover a
+transition into the compound state, a deep target, one out of it, a sibling inside it, a compound
+self-target and an atomic self-target. No model; generated files are not part of the fixture.
+
 ## `receiptprog`
 
 A tiny Go program that emits receipts with `pkg/receipt`. Added by the story that builds

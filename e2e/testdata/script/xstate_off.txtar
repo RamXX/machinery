@@ -1,0 +1,11 @@
+# the stage is not applicable unless tools.xstate is true
+fixture shop
+exec machinery lint --stage xstate
+stdout '== xstate =='
+stdout '^not applicable: tools.xstate is not enabled$'
+! stdout 'checked:'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+exec sh -c 'printf "tools:\n  xstate: false\n" >> machinery.yaml'
+exec machinery lint --stage xstate
+stdout '^not applicable: tools.xstate is not enabled$'

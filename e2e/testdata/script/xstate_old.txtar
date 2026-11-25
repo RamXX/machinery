@@ -1,0 +1,18 @@
+# a package outside 5.33.4 or newer, below 6, is not demonstrated.
+# No older real package is available offline, so the tools directory holds a
+# copy of the real 5.33.4 package with only the version field of its
+# package.json changed: this exercises the version gate and nothing else.
+fixture nested
+mkdir old/xstate/node_modules
+exec cp -R $MACHINERY_TOOLS/xstate/node_modules/xstate old/xstate/node_modules/xstate
+exec sed -i.bak 's/"version": "5.33.4"/"version": "4.38.3"/' old/xstate/node_modules/xstate/package.json
+grep '"version": "4.38.3"' old/xstate/node_modules/xstate/package.json
+env MACHINERY_TOOLS=$WORK/old
+exec mrun 1 lint --stage xstate
+stdout '^not demonstrated: xstate 4.38.3 is outside the range 5.33.4 or newer, below 6 \(npm install --save-exact xstate@5.33.4 in <tools dir>/xstate\)$'
+! stdout 'checked:'
+
+# the upper bound: 6 is out of range too
+exec sed -i.bak 's/"version": "4.38.3"/"version": "6.0.0"/' old/xstate/node_modules/xstate/package.json
+exec mrun 1 lint --stage xstate
+stdout '^not demonstrated: xstate 6.0.0 is outside the range 5.33.4 or newer, below 6'

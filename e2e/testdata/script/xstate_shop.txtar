@@ -1,0 +1,15 @@
+# the shop machine read by the real XState package agrees with its table
+fixture shop
+exec sh -c 'printf "tools:\n  xstate: true\n" >> machinery.yaml'
+exec machinery lint --stage xstate
+stdout '== xstate =='
+stdout '^checked: 1 machines, 5 cases$'
+! stdout 'ERROR'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# the stage is part of lint
+exec machinery gen
+exec machinery lint
+stdout '== xstate =='
+stdout '^checked: 1 machines, 5 cases$'
