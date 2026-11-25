@@ -5,6 +5,7 @@ fixture shop
 exec machinery gen
 cp design/gen/obligations.json plain-obligations.json
 ! grep '"requires"' design/gen/tables/order.table.json
+! grep 'Callers' design/gen/tables/order.table.md
 
 # valid: two branches name their callers
 cp valid.json design/machines/Order.machine.json
@@ -17,6 +18,11 @@ exec machinery gen
 grep -count=2 '"requires"' design/gen/tables/order.table.json
 grep '"id": "tc:ORDE-1ded14",\n +"source": "Pending",\n +"kind": "on",\n +"event": "cancel",\n +"guard": "",\n +"target": "Cancelled",\n +"actions": \[\n +"recordCancellation"\n +\],\n +"effects": \[\n +"recordCancellation"\n +\],\n +"requires": \[\n +"Clerk",\n +"Customer"\n +\]\n +\}' design/gen/tables/order.table.json
 grep '"id": "tc:ORDE-e6d28f",(?s:[^}]*)"requires": \[\n +"Clerk",\n +"system/fulfilment"\n +\]\n +\}' design/gen/tables/order.table.json
+
+# the readable rendering lists them too
+grep '^## Callers$' design/gen/tables/order.table.md
+grep '^\| tc:ORDE-1ded14 \| Clerk, Customer \|$' design/gen/tables/order.table.md
+grep '^\| tc:ORDE-e6d28f \| Clerk, system/fulfilment \|$' design/gen/tables/order.table.md
 
 # callers change no case: the obligations are those of the plain shop
 cmp design/gen/obligations.json plain-obligations.json

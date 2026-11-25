@@ -16,11 +16,13 @@ stdout '^passed$'
 # the runtime table carries the entries, sorted, after initial
 exec machinery gen
 grep '"initial": "Pending",\n  "entries": \[\n    "Legacy",\n    "Paid"\n  \],\n  "states": \[' design/gen/tables/order.table.json
+grep '^Tag ORDE, initial state Pending, entry states Legacy, Paid\.$' design/gen/tables/order.table.md
 
 # a machine without the annotation has no entries key
 cp $REPO/e2e/testdata/fixtures/shop/design/machines/Order.machine.json design/machines/Order.machine.json
 exec machinery gen
 ! grep '"entries"' design/gen/tables/order.table.json
+grep '^Tag ORDE, initial state Pending\.$' design/gen/tables/order.table.md
 
 # the annotation is a non-empty array
 cp not_array.json design/machines/Order.machine.json
