@@ -6,7 +6,7 @@ questions: [concurrency]
 machine: Deal
 properties: DealProps
 sources:
-  read_at: 73c82bda960d5ecde07040e6c50e19fc2112eda5
+  read_at: 06fcff07633778edc02d501f576af9d4305c7de1
   paths:
     - "design/machines/Deal.machine.json"
     - "internal/api/deals.go"
