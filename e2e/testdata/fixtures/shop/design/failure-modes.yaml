@@ -1,0 +1,7 @@
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."

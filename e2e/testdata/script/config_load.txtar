@@ -1,0 +1,54 @@
+# a project is found by walking up, and config prints the defaults applied
+fixture shop
+cd internal/api
+exec machinery config
+stdout 'version: 2'
+stdout 'owed: design/owed.yaml'
+stdout 'gen: design/gen'
+stdout 'dir: .machinery/receipts'
+stdout 'modelith: modelith'
+cd ../..
+
+# --project names it explicitly
+mkdir elsewhere
+cd elsewhere
+exec machinery -C .. config
+stdout 'version: 2'
+cd ..
+exec mrun 2 -C elsewhere config
+stderr 'config: no machinery.yaml in elsewhere'
+
+# unknown keys, wrong version, paths that leave the root: exit 2
+cp bad-key.yaml machinery.yaml
+exec mrun 2 config
+stderr 'config: machinery.yaml: .*field nosuchkey not found'
+cp bad-version.yaml machinery.yaml
+exec mrun 2 config
+stderr 'config: machinery.yaml: version must be 2'
+cp bad-path.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: design.models: "../x.modelith.yaml" must stay inside the project root'
+cp bad-posture.yaml machinery.yaml
+exec mrun 2 config
+stderr 'posture must be real or sandbox'
+cp bad-waiver.yaml machinery.yaml
+exec mrun 2 config
+stderr 'is not a rule that can be waived'
+
+-- bad-key.yaml --
+version: 2
+nosuchkey: true
+-- bad-version.yaml --
+version: 1
+-- bad-path.yaml --
+version: 2
+design:
+  models: ["../x.modelith.yaml"]
+-- bad-posture.yaml --
+version: 2
+dependencies:
+  - {name: postgres, posture: fake}
+-- bad-waiver.yaml --
+version: 2
+waivers:
+  - {rule: file-size, id: "x", reason: "y"}

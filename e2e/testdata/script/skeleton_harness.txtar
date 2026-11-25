@@ -1,0 +1,9 @@
+# the helpers every script uses
+fixture empty
+gitinit
+exec git log --oneline
+stdout -count=1 'fixture'
+
+# mrun fails on a wrong exit code
+! exec mrun 0 nosuch
+stderr 'mrun: expected exit 0, got 2'

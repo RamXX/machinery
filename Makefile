@@ -1,130 +1,35 @@
-# machinery: contributor tasks only.
-#
-# End users do NOT need this file, Make, or a clone. Install the binary and let
-# it install the skill:
-#   curl -fsSL https://raw.githubusercontent.com/RamXX/machinery/main/install.sh | sh
-#   machinery install            # place the skill + role docs into your agent homes
-#   machinery uninstall          # remove them
-# Every design command is a machinery subcommand run on your own path, no clone:
-#   machinery check|verify-formal|oracle|lint|... <your-design>
-#
-# The targets below build and test machinery itself and need the Go source tree.
-
-AGENT_HOMES ?= $(HOME)/.agents $(HOME)/.claude
-SHELL := /bin/bash
-.SHELLFLAGS := -eu -o pipefail -c
-SRC := $(CURDIR)
-INTERNAL_VERSION := v0.11.2
-MODELITH_VERSION := v0.5.0
-MACH ?= $(CURDIR)/.bin/machinery
-EXAMPLE_INVENTORY := scripts/example-inventory.sh
-# Single owner of the accepted example-gate policy, shared verbatim with the
-# CI gates job and local preflight phase 11 so the mirrors cannot drift.
-EXAMPLE_GATES := scripts/example-gates.sh
-MODELITH_INVENTORY := scripts/modelith-inventory.sh
-MODELITH_RENDER := scripts/modelith-render.sh
-# Single source of truth for the linter version, shared with CI (ci.yml reads
-# the same file) and the local preflight gate.
-GOLANGCI_VERSION := $(shell cat .golangci-version 2>/dev/null)
-ACTIONLINT_VERSION := $(shell cat .actionlint-version 2>/dev/null)
-# Where dev-link copies the built binary. Override: INSTALL_DIR=/usr/local/bin
-INSTALL_DIR ?= $(HOME)/.local/bin
-
 .DEFAULT_GOAL := help
-.PHONY: build dev-link uninstall test test-integration test-install golden golden-update check verify-formal modelith-inventory modelith-render modelith-render-check preflight preflight-fast dagger-ci dagger-job ci-linux hooks lint-install runtime-pins consumer-diff help
+SHELL := /bin/sh
+JOBS ?= 4
+TOOLS := $(CURDIR)/.bin
+export MACHINERY_TOOLS := $(TOOLS)
 
-build: ## Build the machinery binary from source into .bin/machinery (needs Go)
-	@mkdir -p .bin && go build -ldflags "-s -w -X main.version=$(INTERNAL_VERSION)" -o .bin/machinery ./cmd/machinery
+.PHONY: help tools build check e2e e2e-one crm verify
 
-dev-link: build ## DEVELOPER: live-symlink skill+agents from this checkout into agent homes + binary on PATH
-	@for home in $(AGENT_HOMES); do \
-	  mkdir -p "$$home/skills" "$$home/agents"; \
-	  rm -rf "$$home/skills/machinery"; \
-	  ln -sfn "$(SRC)/skills/machinery" "$$home/skills/machinery"; \
-	  ln -sfn "$(SRC)/agents/machinery-fsm-author.md" "$$home/agents/machinery-fsm-author.md"; \
-	  ln -sfn "$(SRC)/agents/machinery-build-writer.md" "$$home/agents/machinery-build-writer.md"; \
-	  echo "linked machinery -> $$home"; \
-	done
-	@mkdir -p "$(INSTALL_DIR)" && cp "$(MACH)" "$(INSTALL_DIR)/machinery"
-	@echo "installed $(MACH) -> $(INSTALL_DIR)/machinery"
+help: ## List the targets
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-10s %s\n", $$1, $$2}'
 
-uninstall: ## Remove machinery from every agent home
-	@for home in $(AGENT_HOMES); do \
-	  rm -rf "$$home/skills/machinery"; \
-	  rm -f "$$home/agents/machinery-fsm-author.md" "$$home/agents/machinery-build-writer.md"; \
-	  echo "removed machinery from $$home"; \
-	done
+tools: ## Install the pinned external tools into .bin (modelith, xstate, formal jars)
+	GOBIN=$(TOOLS) go install github.com/stacklok/modelith/cmd/modelith@v0.6.0
+	GOBIN=$(TOOLS)/old go install github.com/stacklok/modelith/cmd/modelith@v0.5.0
+	mkdir -p $(TOOLS)/xstate && cd $(TOOLS)/xstate && { [ -f package.json ] || npm init -y >/dev/null; } && npm install --no-audit --no-fund --save-exact xstate@5.33.4
+	go run ./cmd/machinery formal tools
 
-test: ## Run the service-free native Go suite (needs Go)
-	@go test ./...
+build: ## Build .bin/machinery
+	go build -o $(TOOLS)/machinery ./cmd/machinery
 
-test-integration: ## Provision and execute every required native runtime suite
-	@go run ./scripts/integration-lane --lane required
+check: build ## Formatting, go vet, build, and no unit tests in this repository
+	@out="$$(gofmt -l $$(git ls-files '*.go' | grep -v testdata/))"; if [ -n "$$out" ]; then echo "gofmt: $$out"; exit 1; fi
+	go vet ./...
+	@out="$$(git ls-files '*_test.go' | grep -v -E '^(e2e|examples/[^/]+/e2e)/' || true)"; if [ -n "$$out" ]; then echo "unit test outside e2e: $$out"; exit 1; fi
 
-test-install: ## Verify the install path lays down the canonical-copy + symlink topology (offline)
-	@go test -count=1 -run '[Ii]nstall' ./cmd/machinery ./internal/install
+e2e: build ## The whole end-to-end suite against the real binary
+	GOMAXPROCS=$(JOBS) go test ./e2e/... -count=1 -p $(JOBS) -parallel $(JOBS) -timeout 30m
 
-golden: ## Run the golden-corpus byte-for-byte regression net
-	@go test -count=1 -run TestGolden ./cmd/machinery
+e2e-one: build ## One script: make e2e-one S=<script name without .txtar>
+	GOMAXPROCS=$(JOBS) go test ./e2e/... -count=1 -run 'TestScripts/$(S)$$' -timeout 10m
 
-golden-update: ## Re-capture the golden corpus from the current binary (review the diff!)
-	@go test -count=1 -run TestGolden ./cmd/machinery -update
+crm: build ## The reference project: its own check and landing (needs Docker)
+	$(MAKE) -C examples/crm verify
 
-check: build ## Run the deterministic gate suite across the bundled examples
-	@$(EXAMPLE_GATES) $(MACH)
-
-verify-formal: build ## Regenerate + TLC-check the whole formal suite across the examples (needs Java)
-	@$(EXAMPLE_INVENTORY) formal | while IFS= read -r design; do \
-		echo "== $$design =="; \
-		$(MACH) verify-formal "$$design"; \
-	done
-
-modelith-render: ## Regenerate Modelith renders and mechanically normalize house style
-	@$(MODELITH_RENDER) render examples "$(MODELITH_VERSION)"
-
-modelith-inventory: ## Require an exact source/render pair for every authoritative Modelith model
-	@$(MODELITH_INVENTORY) check
-
-modelith-render-check: modelith-inventory modelith-render ## Regenerate committed Modelith renders and reject byte drift
-	@$(MODELITH_INVENTORY) git-diff
-
-preflight: ## Run every required local CI/formal gate: the fast tier, then the heavy tier
-	@scripts/preflight.sh
-
-preflight-fast: ## Run the cheap gate tier the pre-push hook runs (budget: under 5 minutes)
-	@scripts/preflight-fast.sh
-
-dagger-ci: ## Run every containerizable CI job in Dagger, concurrently (needs Docker)
-	@dagger call ci
-
-dagger-job: ## Run one Dagger CI job: make dagger-job JOB=lint (see: dagger functions)
-	@test -n "$(JOB)" || { echo "set JOB, for example: make dagger-job JOB=lint"; exit 1; }
-	@dagger call $(JOB)
-
-ci-linux: ## Reproduce the hosted race sweep + required lane in a pinned 2-CPU linux/amd64 container
-	@scripts/ci-linux.sh
-
-hooks: ## Install the git pre-push hook (points core.hooksPath at .githooks)
-	@git config core.hooksPath .githooks
-	@chmod +x .githooks/pre-push scripts/preflight.sh scripts/preflight-fast.sh scripts/ci-linux.sh
-	@echo "pre-push hook installed. There is no bypass; every push runs scripts/preflight-fast.sh"
-	@echo "heavy evidence: hosted CI on the pushed commit, or make preflight / make ci-linux locally"
-
-lint-install: ## Install the pinned static-analysis tools so local matches CI exactly
-	@go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
-	@go install github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
-	@echo "installed golangci-lint $(GOLANGCI_VERSION) to $(shell go env GOPATH)/bin"
-	@echo "installed actionlint $(ACTIONLINT_VERSION) to $(shell go env GOPATH)/bin"
-
-runtime-pins: ## Report pinned vs host vs latest upstream runtimes; exits non-zero when a pin is behind
-	@go run ./scripts/runtime-pins
-
-# Built rather than `go run` so the tool's exit code (0 explained, 1
-# unexplained new findings, 2 usage or execution error) reaches the caller.
-consumer-diff: ## Diff two machinery binaries over a consumer design: OLD=<bin> NEW=<bin> DESIGN=<dir> [IMPL= ALLOW= COMMIT= GATES=]
-	@test -n "$(OLD)" && test -n "$(NEW)" && test -n "$(DESIGN)" || { echo "usage: make consumer-diff OLD=<bin> NEW=<bin> DESIGN=<dir> [IMPL=<dir>] [ALLOW=<file>] [COMMIT=<sha>] [GATES=<list>]"; exit 2; }
-	@mkdir -p .bin && go build -o .bin/consumer-diff ./scripts/consumer-diff
-	@.bin/consumer-diff -old "$(OLD)" -new "$(NEW)" -design "$(DESIGN)" $(if $(IMPL),-impl "$(IMPL)") $(if $(ALLOW),-allow "$(ALLOW)") $(if $(COMMIT),-commit "$(COMMIT)") $(if $(GATES),-gates "$(GATES)")
-
-help: ## List targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
+verify: check e2e crm ## Full verification: check, the e2e suite, the reference project

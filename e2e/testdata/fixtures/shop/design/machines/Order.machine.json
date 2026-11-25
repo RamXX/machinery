@@ -1,0 +1,40 @@
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": { "orderId": null, "lastError": null },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          { "target": "paying", "guard": "hasPaymentMethod", "actions": "stampAttempt" },
+          { "actions": "recordPayRefused" }
+        ],
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": { "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID" }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid", "actions": "recordCharge" },
+        "onError": { "target": "Pending", "actions": "recordPaymentFailure" }
+      },
+      "after": {
+        "payTimeout": { "target": "Pending", "actions": "recordPaymentTimeout" }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": { "target": "Shipped", "actions": "recordShipment" },
+        "cancel": { "target": "Cancelled", "actions": ["refundPayment", "recordCancellation"] }
+      },
+      "_ignores": { "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID" }
+    },
+    "Shipped": { "type": "final", "entry": "notifyCustomer" },
+    "Cancelled": { "type": "final" }
+  }
+}

@@ -1,8 +1,0 @@
-// Y occurs only in a negated atom: not range-restricted.
-.decl b(x:symbol)
-.input b
-.decl c(x:symbol, y:symbol)
-.input c
-.decl a(x:symbol)
-.output a
-a(X) :- b(X), !c(X, Y).

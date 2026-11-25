@@ -1,3 +1,0 @@
-machine: order
-pattern: control-flow-only
-reason: Order is an event-driven aggregate with command-specific transitions and a shared persistence overlay; it truthfully fits neither the uniform reopenable linear-lifecycle algebra nor the invoke-only terminal pipeline algebra.

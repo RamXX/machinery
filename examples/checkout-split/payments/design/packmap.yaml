@@ -1,8 +1,0 @@
-subsystem: payments
-pack_hash: a82ea5982ee4183df9f1cd00a9add6eea0a06c3410d9a35a39cd871ddb62e8ec
-machine: Payment
-mapping:
-  Requested: Settling
-  Captured: Done
-  Declined: Done
-  Refunded: Done

@@ -1,0 +1,12 @@
+#!/bin/sh
+# mrun <code> <machinery args...>: runs machinery and succeeds only when it
+# exits with exactly <code>.
+want="$1"
+shift
+machinery "$@"
+got=$?
+if [ "$got" -ne "$want" ]; then
+  echo "mrun: expected exit $want, got $got" >&2
+  exit 1
+fi
+exit 0

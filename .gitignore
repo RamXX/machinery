@@ -1,48 +1,9 @@
-# OS
 .DS_Store
-
-# Agent scratch
-scratchpad/
-.codebase-memory/
-*.tmp
-
-# Editors
-.idea/
-.vscode/
-
-# Python (legacy, no longer runtime deps)
-__pycache__/
-*.pyc
-.venv/
-.pytest_cache/
-
-# Go build artifacts. Root-anchored: an unanchored "machinery" matches the
-# cmd/machinery/ DIRECTORY and silently swallows every new file in it.
 .bin/
-/machinery
-/machinery.exe
-
-# Archived code (moved out of the active tree). Root-anchored: an unanchored
-# experiments/ would silently swallow internal/experiments/ test files.
-/legacy/
-/experiments/
-
-# TLC scratch (tlc.sh runs with -cleanup, but interrupted runs leave these)
+.machinery/
+.beads/
+.worktrees/
+node_modules/
 states/
-
-# External-checker registry: machine-local binding of checker id -> command,
-# resolved outside the design so no tool name leaks into a committed artifact.
-# Examples ship a committed *.example.yaml; the live file stays untracked.
-.machinery/checkers.local.yaml
-
-# Paivot runtime state (managed by pvg)
-.vault/issues/
-.vault/.nd.yaml
-.vault/.piv-loop-state.json
-.vault/.piv-loop-snapshot.json
-.vault/.dispatcher-state.json
-.vault/.vlt.lock
-.vault/.guard/
-
-# Private backlog inbox, never committed
+*.tmp
 NEXT*.md

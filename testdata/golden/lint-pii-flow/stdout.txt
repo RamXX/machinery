@@ -1,4 +1,0 @@
-== DataSubject.machine.json: 2 states ==
-  ok
-
-0 error/drift finding(s) across 1 machine(s)

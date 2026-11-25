@@ -1,0 +1,53 @@
+# gen writes the tables, the obligation inventory and the model rendering
+fixture shop
+exec machinery gen
+stdout 'gen: wrote 4 file\(s\)'
+stdout 'design/gen/obligations.json'
+stdout 'design/gen/tables/order.table.json'
+stdout 'design/gen/tables/order.table.md'
+stdout 'design/model/shop.modelith.md'
+
+# the ids are the stable ids of the fixture
+grep '"id": "tc:ORDE-2e883d"' design/gen/obligations.json
+grep '"title": "Pending on:pay \[hasPaymentMethod\] -> paying"' design/gen/obligations.json
+grep '"id": "tc:ORDE-70d94f"' design/gen/obligations.json
+grep '"id": "tc:ORDE-1ded14"' design/gen/obligations.json
+grep '"id": "tc:ORDE-ad945c"' design/gen/obligations.json
+grep '"id": "tc:ORDE-8bd6e7"' design/gen/obligations.json
+grep '"id": "tc:ORDE-267d12"' design/gen/obligations.json
+grep '"id": "tc:ORDE-e6d28f"' design/gen/obligations.json
+grep '"id": "tc:ORDE-507e4f"' design/gen/obligations.json
+grep '"id": "tc:ORDE-2fa2af"' design/gen/obligations.json
+grep '"id": "tc:ORDE-8799a1"' design/gen/obligations.json
+grep '"id": "sc:customer-pays-and-the-order-ships"' design/gen/obligations.json
+grep '"id": "inv:terminal-is-final"' design/gen/obligations.json
+grep '"id": "fm:payment-provider-down"' design/gen/obligations.json
+grep '"id": "act:Order.place"' design/gen/obligations.json
+grep -count=16 '"kind": "' design/gen/obligations.json
+
+# effects include the target state's entry actions; the table keeps evaluation order
+grep '"recordShipment",' design/gen/tables/order.table.json
+grep '"notifyCustomer"' design/gen/tables/order.table.json
+grep '"payTimeout": 5000' design/gen/tables/order.table.json
+grep '"resting": true' design/gen/tables/order.table.json
+grep 'tc:ORDE-2fa2af \| Pending \| ship' design/gen/tables/order.table.md
+
+# generation is deterministic and drift is reported
+exec machinery gen
+stdout 'gen: wrote 0 file\(s\)'
+exec machinery gen --check
+stdout '== gen-drift =='
+stdout 'checked: 3 generated files'
+stdout '^passed$'
+stdout 'machinery gen: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# a stale, a missing and an unexpected file
+cp design/gen/obligations.json keep.json
+exec sh -c 'echo "{}" > design/gen/obligations.json'
+rm design/gen/tables/order.table.md
+cp keep.json design/gen/extra.json
+exec mrun 1 gen --check
+stdout 'DRIFT  design/gen/obligations.json: stale'
+stdout 'DRIFT  design/gen/tables/order.table.md: missing'
+stdout 'ERROR  design/gen/extra.json: unexpected file in gen directory'
+stdout 'failed: 3 finding\(s\)'

@@ -1,4 +1,0 @@
-{"total_count": 2, "jobs": [
-  {"id": 51, "name": "integration-required", "status": "completed", "conclusion": "success"},
-  {"id": 52, "name": "verify-formal", "status": "completed", "conclusion": "success"}
-]}

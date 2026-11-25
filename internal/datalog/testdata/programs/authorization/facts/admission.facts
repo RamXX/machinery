@@ -1,3 +1,0 @@
-action:Order.confirm	c4:orderService
-action:Ledger.post	cap:ledger.write
-action:Order.cancel	cap:unknown

@@ -1,0 +1,34 @@
+openapi: 3.1.0
+info:
+  title: Shop API
+  version: 0.1.0
+paths:
+  /orders:
+    post:
+      operationId: placeOrder
+      x-machinery-action: Order.place
+      responses:
+        "201": {description: Created}
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses:
+        "200": {description: The order}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses:
+        "200": {description: Paid or refused with a code}
+  /orders/{id}/ship:
+    post:
+      operationId: shipOrder
+      x-machinery-action: Order.ship
+      responses:
+        "200": {description: Shipped or refused with a code}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses:
+        "200": {description: Cancelled or refused with a code}

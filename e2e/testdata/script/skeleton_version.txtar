@@ -1,0 +1,13 @@
+# version prints the version and needs no project
+exec machinery version
+stdout '^machinery 2\.0\.0$'
+
+# no arguments prints help and exits 0
+exec machinery
+stdout 'Usage: machinery'
+stdout 'docs/formats.md'
+
+# an unknown command is a usage error
+exec mrun 2 nosuch
+stderr 'unknown command'
+exec mrun 2 lint --nosuchflag
