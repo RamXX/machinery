@@ -21,7 +21,7 @@ func unit(c fsm.Ctx) *unitCtx { return c.(*unitCtx) }
 type record struct {
 	machine *fsm.Machine
 	lock    func(tx *store.Tx, id string, u *unitCtx) (state string, err error)
-	save    func(tx *store.Tx, id, state string) error
+	save    func(tx *store.Tx, id, state, caseID string) error
 }
 
 // fire answers an event on a record: load it FOR UPDATE, fire the event
@@ -43,7 +43,7 @@ func (s *Server) fire(rec record, event string) userHandler {
 				return engineError{err}
 			}
 			if res.State != state {
-				return rec.save(tx, id, res.State)
+				return rec.save(tx, id, res.State, res.Cases[len(res.Cases)-1])
 			}
 			return nil
 		})

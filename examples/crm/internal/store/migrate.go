@@ -19,8 +19,9 @@ var migrations embed.FS
 const migrateLock = 7243
 
 // Migrate applies the embedded migrations in name order, each in its own
-// transaction as the admin role, and records them in schema_migrations.
-func Migrate(ctx context.Context, adminURL string) error {
+// transaction as the admin role, and records them in schema_migrations;
+// then it replaces lifecycle_edges with the given lifecycles.
+func Migrate(ctx context.Context, adminURL string, ls ...Lifecycle) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	conn, err := pgx.Connect(ctx, adminURL)
@@ -43,7 +44,7 @@ func Migrate(ctx context.Context, adminURL string) error {
 			return err
 		}
 	}
-	return nil
+	return syncLifecycles(ctx, conn, ls)
 }
 
 func apply(ctx context.Context, conn *pgx.Conn, name string) error {
@@ -77,10 +78,10 @@ func apply(ctx context.Context, conn *pgx.Conn, name string) error {
 
 // MigrateUntilDone retries Migrate until it succeeds or ctx ends, then marks
 // the store ready. A database that comes up late is picked up.
-func (s *Store) MigrateUntilDone(ctx context.Context, adminURL string) {
+func (s *Store) MigrateUntilDone(ctx context.Context, adminURL string, ls ...Lifecycle) {
 	last := ""
 	for {
-		err := Migrate(ctx, adminURL)
+		err := Migrate(ctx, adminURL, ls...)
 		if err == nil {
 			s.migrated.Store(true)
 			log.Print("crm: migrations applied")

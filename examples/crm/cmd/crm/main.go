@@ -44,7 +44,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	go st.MigrateUntilDone(ctx, adminURL)
+	go st.MigrateUntilDone(ctx, adminURL, handler.Lifecycles()...)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", addr, err)

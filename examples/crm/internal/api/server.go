@@ -58,4 +58,14 @@ func (s *Server) routes() {
 	})
 }
 
+// Lifecycles is what the database must let the service do to the state
+// columns: the initial state and the persisted edges of each loaded table.
+func (s *Server) Lifecycles() []store.Lifecycle {
+	var out []store.Lifecycle
+	for _, m := range []*fsm.Machine{s.deal, s.task} {
+		out = append(out, store.Lifecycle{Machine: m.Name(), Initial: m.Initial(), Edges: m.PersistedEdges()})
+	}
+	return out
+}
+
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }

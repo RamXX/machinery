@@ -15,7 +15,7 @@ func (s *Server) dealRecord() record {
 			u.deal = &d
 			return d.Stage, err
 		},
-		save: func(tx *store.Tx, id, state string) error { return tx.SetDealStage(id, state) },
+		save: func(tx *store.Tx, id, state, caseID string) error { return tx.SetDealStage(id, state, caseID) },
 	}
 }
 

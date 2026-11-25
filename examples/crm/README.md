@@ -51,6 +51,24 @@ subtest of `MACHINERY_PROBE_CASE`.
 After a change: `make up`, `make evidence`, `machinery owed sync --prune-only`, commit,
 `machinery verify`. `machinery owed list` says what is still unproven and why.
 
+## Single writer
+
+The engine keeps the service's own transition path on the table; the database keeps every other
+code path off the state columns. `0006_single_writer.sql` adds `lifecycle_edges` and a trigger
+on `deals.stage` and `tasks.status` that applies to the app role `crm_app` only. At start the
+service replaces `lifecycle_edges` with the initial states and the persisted edges of the tables
+it loaded (`fsm.Machine.PersistedEdges`: a transition into a transient state such as `closing`
+is followed to the domain states it can end in). The save functions set `crm.transition` to the
+fired case id in the same transaction, immediately before the update.
+
+What it guarantees: as `crm_app`, a record is created only in its initial state, and its state
+changes only along an edge of its machine and only inside the transition path (with
+`crm.transition` set). Anything else fails with an error starting `lifecycle:`.
+
+What it does not: a forged `crm.transition` on an allowed edge passes. Guards are the engine's
+job, and `machinery probe` checks that the service really drives its transitions through the
+engine. The admin role is not restricted, which is how the tests arrange data.
+
 ## Clean up
 
 `make down`. Afterwards `docker ps -a --filter name=machinery-crm` prints no container.

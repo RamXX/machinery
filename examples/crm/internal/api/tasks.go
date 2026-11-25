@@ -16,7 +16,7 @@ func (s *Server) taskRecord() record {
 			u.task = &t
 			return t.Status, err
 		},
-		save: func(tx *store.Tx, id, state string) error { return tx.SetTaskStatus(id, state) },
+		save: func(tx *store.Tx, id, state, caseID string) error { return tx.SetTaskStatus(id, state, caseID) },
 	}
 }
 

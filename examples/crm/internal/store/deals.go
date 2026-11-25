@@ -47,8 +47,12 @@ func (t *Tx) LockDeal(id string) (Deal, error) {
 	return scanDeal(t.tx.QueryRow(t.ctx, "SELECT "+dealCols+" FROM deals WHERE id = $1::uuid FOR UPDATE", id))
 }
 
-// SetDealStage stores the new stage of a locked deal.
-func (t *Tx) SetDealStage(id, stage string) error {
+// SetDealStage stores the new stage of a locked deal, inside the transition
+// path of the case that fired.
+func (t *Tx) SetDealStage(id, stage, caseID string) error {
+	if err := t.transition(caseID); err != nil {
+		return err
+	}
 	_, err := t.tx.Exec(t.ctx, "UPDATE deals SET stage = $2 WHERE id = $1::uuid", id, stage)
 	return err
 }

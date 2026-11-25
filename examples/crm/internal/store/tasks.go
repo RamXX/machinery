@@ -54,8 +54,12 @@ func (t *Tx) LockTask(id string) (Task, error) {
 	return scanTask(t.tx.QueryRow(t.ctx, "SELECT "+taskCols+" FROM tasks WHERE id = $1::uuid FOR UPDATE", id))
 }
 
-// SetTaskStatus stores the new status of a locked task.
-func (t *Tx) SetTaskStatus(id, status string) error {
+// SetTaskStatus stores the new status of a locked task, inside the
+// transition path of the case that fired.
+func (t *Tx) SetTaskStatus(id, status, caseID string) error {
+	if err := t.transition(caseID); err != nil {
+		return err
+	}
 	_, err := t.tx.Exec(t.ctx, "UPDATE tasks SET status = $2 WHERE id = $1::uuid", id, status)
 	return err
 }
