@@ -1,0 +1,55 @@
+kind: DomainModel
+version: v1
+title: Depot
+description: >
+  The shipment desk of a small depot. A Warehouse worker packs a Shipment and
+  dispatches it; a Courier delivers it. A Shipment can be cancelled until it
+  leaves the depot.
+
+glossary:
+  Warehouse: "A depot worker who creates, packs, dispatches and cancels a `Shipment`."
+  Courier: "A carrier who delivers a dispatched `Shipment`."
+
+enums:
+  ShipmentStatus:
+    values:
+      - {name: Created, definition: "Registered, not yet packed."}
+      - {name: Packed, definition: "Packed and waiting for the carrier."}
+      - {name: Dispatched, definition: "Handed to the carrier."}
+      - {name: Delivered, definition: "Received by the customer; terminal."}
+      - {name: Cancelled, definition: "Abandoned before it left the depot; terminal."}
+
+entities:
+  Shipment:
+    definition: >
+      One parcel moving through the depot. Its status follows the shipment
+      lifecycle from created to delivered or cancelled.
+    attributes:
+      - {name: id, type: string}
+      - {name: status, type: ShipmentStatus}
+    actions:
+      - {name: create, actor: Warehouse, description: "Register the `Shipment` in the created status."}
+      - {name: pack, actor: Warehouse}
+      - {name: dispatch, actor: Warehouse, preserves: [dispatched-only-from-packed]}
+      - {name: deliver, actor: Courier, preserves: [terminal-is-final]}
+      - {name: cancel, actor: Warehouse, preserves: [terminal-is-final]}
+    invariants:
+      - {id: dispatched-only-from-packed, statement: "A `Shipment` reaches the dispatched status only from the packed status."}
+
+invariants:
+  - {id: terminal-is-final, statement: "A delivered or cancelled `Shipment` never changes status again."}
+
+scenarios:
+  - name: Shipment is packed, dispatched and delivered
+    actors: [Warehouse, Courier]
+    steps:
+      - "Warehouse creates a `Shipment`; it is created."
+      - "Warehouse packs it, then dispatches it."
+      - "Courier delivers it; the `Shipment` is delivered."
+    invariants_touched: [dispatched-only-from-packed]
+  - name: Dispatched shipment refuses cancellation
+    actors: [Warehouse]
+    steps:
+      - "Warehouse creates, packs and dispatches a `Shipment`."
+      - "Warehouse tries to cancel; the request is refused and the `Shipment` stays dispatched."
+    invariants_touched: [terminal-is-final]

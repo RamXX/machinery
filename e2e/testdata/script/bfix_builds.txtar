@@ -1,0 +1,49 @@
+# the brownfield fixture is a real existing project: it builds, its tests pass, its smoke script
+# drives the binary, and backlog.sh creates its own bd backlog
+fixture brownfield
+! exists machinery.yaml
+! exists design
+
+exec go build ./...
+exec go vet ./...
+exec go test ./... -count=1
+stdout 'ok  \texample.test/depot/internal/billing'
+stdout 'ok  \texample.test/depot/internal/shipping'
+
+exec sh e2e/smoke.sh
+stdout 'smoke: ok'
+
+# the command line refuses an illegal move with a code on stderr and exit 1
+exec go build -o depot ./cmd/depot
+exec ./depot --db db.json ship create a1
+stdout 'shipment a1 created'
+! exec ./depot --db db.json ship dispatch a1
+stderr '^SHIPMENT_NOT_PACKED: '
+! exec ./depot --db db.json ship pack missing
+stderr '^SHIPMENT_NOT_FOUND: '
+! exec ./depot --db db.json ship create a1
+stderr '^SHIPMENT_EXISTS: '
+! exec ./depot --db db.json invoice a1 0
+stderr '^INVOICE_AMOUNT_INVALID: '
+
+# the unit tests keep a comment about gomock, and the project has no test-double import
+grep 'gomock' internal/shipping/shipment_test.go
+! grep 'github.com/golang/mock' internal/shipping/shipment_test.go
+
+# backlog.sh creates the backlog of the work directory
+gitinit
+exec sh backlog.sh
+stdout 'backlog.sh: 1 epic, 4 stories'
+exists .beads
+exec bd list --all
+stdout 'Depot shipping'
+stdout 'Shipment lifecycle'
+stdout 'Dispatch rules'
+stdout 'Invoice rounding'
+stdout 'Delivery receipts'
+exec git status --short
+! stdout .
+
+# it refuses to run twice in one directory
+! exec sh backlog.sh
+stderr 'already exists'

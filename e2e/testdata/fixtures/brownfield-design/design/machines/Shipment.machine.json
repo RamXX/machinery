@@ -1,0 +1,40 @@
+{
+  "_comment": "Shipment lifecycle. Domain states mirror the ShipmentStatus enum. Creation enters the initial state, so the create action has no event.",
+  "id": "shipment",
+  "initial": "Created",
+  "context": { "shipmentId": null },
+  "states": {
+    "Created": {
+      "on": {
+        "pack": { "target": "Packed", "actions": "recordPacking" },
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": {
+        "dispatch": "an unpacked shipment cannot leave; the command line refuses with SHIPMENT_NOT_PACKED",
+        "deliver": "a shipment that never left cannot arrive; refused with SHIPMENT_NOT_DISPATCHED"
+      }
+    },
+    "Packed": {
+      "on": {
+        "dispatch": { "target": "Dispatched", "actions": "recordDispatch" },
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": {
+        "pack": "already packed; a repeated pack is refused with SHIPMENT_NOT_CREATED",
+        "deliver": "a packed shipment has not left; refused with SHIPMENT_NOT_DISPATCHED"
+      }
+    },
+    "Dispatched": {
+      "on": {
+        "deliver": { "target": "Delivered", "actions": "recordDelivery" }
+      },
+      "_ignores": {
+        "pack": "already past packing; refused with SHIPMENT_NOT_CREATED",
+        "dispatch": "already dispatched; refused with SHIPMENT_NOT_PACKED",
+        "cancel": "a dispatched shipment cannot be cancelled; refused with SHIPMENT_NOT_CANCELLABLE"
+      }
+    },
+    "Delivered": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}

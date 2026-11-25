@@ -83,3 +83,35 @@ modes, a TLA+ spec of the order payment (`order-payment`) and an Alloy spec of o
 (`order-ownership`), and `e2e/replay.sh`, which emits the replay receipt of the race
 counterexample. The helper `shopformal` (`e2e/testdata/bin`) generates, commits, stamps
 `sources.read_at` and writes the skeletons.
+
+## `brownfield`
+
+A small existing Go project, module `example.test/depot`, standard library only, with no
+`machinery.yaml` and no design directory. It builds and runs: `depot ship
+create|pack|dispatch|deliver|cancel|show <id>` and `depot invoice <id> <cents>` over a JSON file
+store (`--db <file>`), printing the shipment status after each command and refusing an illegal
+move with a code on stderr (for example `SHIPMENT_NOT_PACKED`) and exit 1.
+
+- `internal/shipping/`: the shipment lifecycle (created, packed, dispatched, delivered,
+  cancelled) hard-coded in Go, and the store. `shipment_test.go` is an ordinary unit test; its
+  comment mentions `gomock` (the team once used it).
+- `internal/billing/`: invoice arithmetic and `invoice_test.go`.
+- `e2e/smoke.sh`: builds the binary and drives it for real. It is the only file under `e2e/`.
+- `backlog.sh`: creates the project's own bd backlog in the current directory: one epic, four
+  stories, two blocking edges, one story closed (4 open, 3 ready, 1 closed). Scripts run it after
+  `gitinit`; it refuses to run where `.beads` exists.
+
+Counts the scripts rely on: 4 code files and 2 unit tests in all, of which 2 code files and 1 unit
+test (with the `gomock` text) under `internal/shipping/`.
+
+## `brownfield-design`
+
+What a team adds when it models its riskiest stateful resource. Copy it over `brownfield` with
+`fixture brownfield-design`: `design/model/depot.modelith.yaml` (entity Shipment, five statuses, five
+actions, two invariants, two scenarios; passes `modelith lint` 0.6.0) and
+`design/machines/Shipment.machine.json` (the lifecycle: 5 states, 5 transitions, 7 ignores). It has
+no `machinery.yaml`: `machinery adopt` adds the files to the config. The action
+`act:Shipment.create` has no machine event (creation enters the initial state), so a script that
+runs the cross-reference stage appends a waiver for rule `action-event`.
+
+Obligations once generated: 12 cases (`tc:SHIP-*`), 2 invariants, 2 scenarios (16), and 5 act ids.
