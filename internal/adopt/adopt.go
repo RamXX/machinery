@@ -112,6 +112,25 @@ func Run(o Options) (*Result, error) {
 	}
 	p := &project.Project{Root: root, Cfg: *cfg}
 
+	// step 4: the failure states and events the design already has are
+	// unmodeled, not new; waive them so day one passes
+	waived := 0
+	if gaps := stages.UnmodeledFailures(&stages.Context{P: p}); len(gaps) > 0 {
+		sha := head
+		if sha == "" {
+			sha = "no commit"
+		}
+		ed.addWaivers(gaps, "unmodeled at adoption ("+sha+")")
+		waived = len(gaps)
+		if newBytes, err = ed.bytes(); err != nil {
+			return nil, err
+		}
+		if cfg, err = project.Parse(newBytes); err != nil {
+			return nil, err
+		}
+		p = &project.Project{Root: root, Cfg: *cfg}
+	}
+
 	if err := describe(res, p, files); err != nil {
 		return nil, err
 	}
@@ -120,6 +139,8 @@ func Run(o Options) (*Result, error) {
 		what := "new config"
 		if existing {
 			what = "edit: " + strings.Join(ed.changes, "; ")
+		} else if waived > 0 {
+			what += fmt.Sprintf("; new waivers: %d", waived)
 		}
 		if err := w.config(newBytes, what); err != nil {
 			return nil, err

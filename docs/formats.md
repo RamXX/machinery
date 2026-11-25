@@ -1709,8 +1709,9 @@ next:
    unmodeled, not new. For each such finding no waiver covers, it adds a waiver to
    `machinery.yaml` (written with step 1) with the reason `unmodeled at adoption (<short sha>)`.
    It never removes or rewrites a waiver, so the list only shrinks as failure modes are written:
-   a waiver whose finding is gone is an ERROR `stale waiver` (section 6.7). Without `--write`,
-   the `machinery.yaml` line under `would write:` says `new waivers: <n>`.
+   a waiver whose finding is gone is an ERROR `stale waiver` (section 6.7). While the
+   failure-mode file has an ERROR it adds none, since what the file names is then unknown.
+   Without `--write`, the `machinery.yaml` line under `would write:` says `new waivers: <n>`.
 
 `adopt` never creates, changes or deletes a file outside `machinery.yaml` and the design
 directory. That includes `.gitignore`: when the receipts directory is not ignored it prints

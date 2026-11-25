@@ -1,0 +1,298 @@
+# adopt --write waives the failure states and failure events the design already has, so day one passes
+fixture brownfield
+gitinit
+
+# the first design: a job machine that already records failures, and no failure modes yet
+mkdir design/machines
+cp job.json design/machines/Job.machine.json
+
+# the dry run says how many waivers it would add, and writes nothing
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^  machinery.yaml  new config; new waivers: 2$'
+! exists machinery.yaml
+
+# --write adds one per finding, with the reason and the commit
+exec machinery adopt --paths 'internal/shipping/**' --write
+stdout '^  machinery.yaml$'
+grep '^  - \{rule: failure-event-mode, id: "event:job\.jobFailed", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}$' machinery.yaml
+grep '^  - \{rule: failure-state-mode, id: "state:job\.Failed", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}$' machinery.yaml
+
+# machinery check passes: the failures are waived and print as warnings
+exec mrun 0 check --stage machines --stage xref-failure --stage gen-drift
+stdout '^  warn   waived: failure-state-mode: state:job\.Failed: no failure mode names this failure state; configure design\.failure_modes and declare what the system must do when it is entered \(unmodeled at adoption \([0-9a-f]{7}\)\)$'
+stdout '^  warn   waived: failure-event-mode: event:job\.jobFailed: '
+
+# a second run writes nothing
+exec machinery adopt --paths 'internal/shipping/**' --write
+cmp stdout want-wrote-nothing.txt
+gitcommit adopted
+
+# a failure event added later is waived too; the waivers already there are kept as they are
+exec sh -c 'sed "s/unmodeled at adoption/kept by hand/" machinery.yaml > m.tmp && mv m.tmp machinery.yaml'
+cp job-lease.json design/machines/Job.machine.json
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^  machinery.yaml  edit: new waivers: 1$'
+exec machinery adopt --paths 'internal/shipping/**' --write
+grep -count=2 'reason: "kept by hand \([0-9a-f]{7}\)"' machinery.yaml
+grep '\{rule: failure-event-mode, id: "event:job\.leaseLost", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}' machinery.yaml
+exec mrun 0 check --stage machines --stage xref-failure --stage gen-drift
+
+# a failure mode written for a waived state makes its waiver stale, and adopt never removes one
+cp failure-modes.yaml design/failure-modes.yaml
+exec sh -c 'awk ''{print} /^  machines: design\/machines$/ {print "  failure_modes: design/failure-modes.yaml"}'' machinery.yaml > m.tmp && mv m.tmp machinery.yaml'
+exec mrun 1 check --stage xref-failure
+stdout '^  ERROR  stale waiver: failure-state-mode state:job\.Failed$'
+stdout '^  warn   waived: failure-event-mode: event:job\.jobFailed: no failure mode names this failure event; declare what the system must do when it arrives in design/failure-modes\.yaml'
+stdout 'failed: 1 finding\(s\)'
+exec machinery adopt --paths 'internal/shipping/**' --write
+grep 'id: "state:job\.Failed"' machinery.yaml
+exec mrun 1 check --stage xref-failure
+stdout '^  ERROR  stale waiver: failure-state-mode state:job\.Failed$'
+
+# while the failure-mode file has an error no waiver is added: what it names is unknown
+exec sh -c 'echo "version: [1" > design/failure-modes.yaml'
+cp job-crash.json design/machines/Job.machine.json
+exec mrun 1 adopt --paths 'internal/shipping/**'
+! stdout 'new waivers'
+stdout '^== failure-modes ==$'
+exec mrun 1 adopt --paths 'internal/shipping/**' --write
+! grep 'crashDetected' machinery.yaml
+
+-- job.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- job-lease.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed",
+    "leaseLost"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued",
+        "leaseLost": "no lease is held yet"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "leaseLost": {
+          "target": "Queued",
+          "actions": "revokeLease"
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped",
+        "leaseLost": "the lease ended with the failed run"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- job-crash.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed",
+    "leaseLost",
+    "crashDetected"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued",
+        "leaseLost": "no lease is held yet",
+        "crashDetected": "no worker runs it yet"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "leaseLost": {
+          "target": "Queued",
+          "actions": "revokeLease"
+        },
+        "crashDetected": {
+          "target": "Failed",
+          "actions": "recordCrash"
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped",
+        "leaseLost": "the lease ended with the failed run",
+        "crashDetected": "already failed"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: job-run-failed
+    subject: state:job.Failed
+    failure: "A run of the job failed and the job records it."
+    required: surface
+    behavior: "The job stays Failed until an Operator retries it; the failure is visible on the job."
+-- want-wrote-nothing.txt --
+adopt: wrote 0 file(s)

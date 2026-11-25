@@ -173,6 +173,34 @@ func (e *editor) addContract(path string) {
 	e.note("contracts +%s", path)
 }
 
+// addWaivers appends one waiver per entry, each with the reason, to the
+// waivers list (section 17.2). It never removes or rewrites a waiver.
+func (e *editor) addWaivers(ws []project.Waiver, reason string) {
+	seq := get(e.root, "waivers")
+	if seq == nil || (seq.Kind == yaml.ScalarNode && seq.Tag == "!!null") {
+		fresh := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+		if seq == nil {
+			e.root.Content = append(e.root.Content, scalar("waivers", false), fresh)
+		} else {
+			*seq = *fresh
+		}
+		seq = get(e.root, "waivers")
+	}
+	if seq.Kind != yaml.SequenceNode {
+		return
+	}
+	if len(seq.Content) == 0 {
+		seq.Style = 0 // an empty flow list becomes a block list
+	}
+	for _, w := range ws {
+		seq.Content = append(seq.Content, &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Style: yaml.FlowStyle, Content: []*yaml.Node{
+			scalar("rule", false), scalar(w.Rule, false),
+			scalar("id", false), scalar(w.ID, true),
+			scalar("reason", false), scalar(reason, true)}})
+	}
+	e.note("new waivers: %d", len(ws))
+}
+
 func (e *editor) contractPaths() map[string]bool {
 	res := map[string]bool{}
 	if seq := get(e.root, "contracts"); seq != nil && seq.Kind == yaml.SequenceNode {
