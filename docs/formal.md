@@ -36,6 +36,7 @@ machinery formal gen                        # writes Order.tla from the machine
 machinery formal check order-payment        # runs TLC for real
 machinery formal baseline                   # records what the spec promises
 machinery check                             # the pure stage: needs no Java
+machinery formal check --verify             # re-run, write nothing, compare with what is committed
 ```
 
 ## What the skeleton gives you

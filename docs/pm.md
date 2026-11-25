@@ -15,8 +15,8 @@ story is accepted with the formality of its tier. The backlog tool is `bd`. The 
 | consequential | Authorization, money, audit, published contracts, migrations. | An abuse case per action; a fresh verifier who predicts before reading the proof. |
 | critical | Races, lost or repeated work, structural rules. | A formal model (`docs/formal.md`). |
 
-Choose the tier at planning. When unsure, the higher one. Lowering a tier later shows in the
-ratchet.
+Choose the tier at planning. When unsure, the higher one. Lowering a tier later fails the
+ratchet unless the risk file records it under `lowered:` with a reason.
 
 ## From owed to stories
 
@@ -68,6 +68,7 @@ that is ready:
 machinery landing --base main
 ```
 
-It runs `check` with the ratchet, the full end-to-end suite and `verify`, and counts attempts.
-After two fix-forwards a failing story goes back to the backlog. `machinery probe` runs per batch
-and before a release: it is the measure of test quality.
+It runs `check` with the ratchet, re-runs the formal tools against the committed results, runs
+the full end-to-end suite and `verify`, and counts attempts. After two fix-forwards a failing
+story goes back to the backlog. `machinery probe` is the measure of test quality: run it per
+batch and before a release, or as the last step of the landing with `--probe`.
