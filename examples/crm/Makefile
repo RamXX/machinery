@@ -21,7 +21,7 @@ export CRM_ADMIN_DATABASE_URL ?= postgres://$(PG_ADMIN):$(PG_ADMIN)@127.0.0.1:$(
 E2E := env GOMAXPROCS=2 go test ./e2e/... -count=1 -p 1
 # What the receipts say the suite ran against.
 STACK := postgres 17 in docker, crm over http
-BASE ?= experimental/v2
+BASE ?= HEAD~1
 MAX ?= 6
 
 .PHONY: help up down build serve psql check e2e evidence verify probe

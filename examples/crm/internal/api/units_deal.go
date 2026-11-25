@@ -6,26 +6,28 @@ import (
 	"github.com/RamXX/machinery/examples/crm/internal/fsm"
 )
 
-// dealUnits implements every unit the deal table names. recordWin is
-// simulated: it succeeds and does nothing, under the closeTimeout deadline
-// the engine gives it.
+// dealUnits implements every unit the deal table names. Every action writes
+// its audit row; stampWinAttempt writes win-attempt. The recordWin actor is
+// still simulated: it succeeds and does nothing, under the closeTimeout
+// deadline the engine gives it.
 func dealUnits() fsm.Units {
+	actions := audits(map[string]string{
+		"auditQualify":      applied,
+		"auditLose":         applied,
+		"auditReopen":       applied,
+		"auditWin":          applied,
+		"auditDealDenied":   refused,
+		"auditCloseFailure": failed,
+		"auditCloseTimeout": failed,
+	})
+	actions["stampWinAttempt"] = auditAction("win-attempt", applied)
 	return fsm.Units{
 		Guards: map[string]func(fsm.Ctx) bool{
 			"canWriteDeal": canWriteDeal,
 			"canWinDeal":   canWinDeal,
 			"isAdmin":      isAdmin,
 		},
-		Actions: map[string]fsm.Action{
-			"auditQualify":      noop,
-			"auditLose":         noop,
-			"auditReopen":       noop,
-			"auditDealDenied":   noop,
-			"stampWinAttempt":   noop,
-			"auditWin":          noop,
-			"auditCloseFailure": noop,
-			"auditCloseTimeout": noop,
-		},
+		Actions: actions,
 		Actors: map[string]fsm.Actor{
 			"recordWin": {Run: func(context.Context, fsm.Ctx) error { return nil }, Simulated: true},
 		},

@@ -18,7 +18,7 @@ names a unit the service does not implement stops it at start.
 | `make e2e` | The end-to-end suite: the real binary over HTTP against the real Postgres. Needs `make up`. |
 | `make check` | gofmt, `go vet`, `machinery check`. |
 | `make evidence` | The suite through `machinery run`: a receipts file for the current commit. |
-| `make verify` | The end gate: `machinery landing --base $(BASE)` (check with the ratchet, the whole suite through `run`, `verify`). `BASE` defaults to `experimental/v2`. |
+| `make verify` | The end gate: `machinery landing --base $(BASE)` (check with the ratchet, the whole suite through `run`, `verify`). `BASE` is the ref the change started from (default `HEAD~1`); it must contain this project. |
 | `make probe` | `machinery probe --max $(MAX)`: mutates the tables the service reads and expects the suite to notice. |
 | `make psql` | A psql shell as the admin role. |
 | `make down` | Stops Postgres and removes the container and its data. |

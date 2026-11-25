@@ -17,6 +17,14 @@ type AuditEntry struct {
 	At      time.Time `json:"at"`
 }
 
+// Audit appends one entry to the audit trail inside the transaction, so it
+// commits or rolls back with the change it records.
+func (t *Tx) Audit(actorID, action, subject, outcome string) error {
+	_, err := t.tx.Exec(t.ctx, `INSERT INTO audit_entries (actor_id, action, subject, outcome)
+		VALUES ($1::uuid, $2, $3, $4)`, actorID, action, subject, outcome)
+	return err
+}
+
 // ListAudit returns the audit trail, oldest first.
 func (s *Store) ListAudit(ctx context.Context) ([]AuditEntry, error) {
 	rows, err := s.pool.Query(ctx, "SELECT id::text, actor_id::text, action, subject, outcome, at FROM audit_entries ORDER BY id")

@@ -10,6 +10,7 @@ package e2e
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -72,8 +73,31 @@ var refusalCode = regexp.MustCompile(`refuses with ([A-Z][A-Z0-9_]*)`)
 // means it did. An effect without an observer is not claimed in a receipt.
 type observer func(t *testing.T, a arranged) error
 
-// observers is filled in as effects become real.
-var observers = map[string]observer{}
+// observers maps each real effect to its check: the audit row it writes.
+var observers = map[string]observer{
+	"auditQualify":    auditRow("qualify", "applied"),
+	"auditLose":       auditRow("lose", "applied"),
+	"auditReopen":     auditRow("reopen", "applied"),
+	"auditWin":        auditRow("win", "applied"),
+	"stampWinAttempt": auditRow("win-attempt", "applied"),
+	"auditDealDenied": auditRow("dealdenied", "refused"),
+	"auditStart":      auditRow("start", "applied"),
+	"auditComplete":   auditRow("complete", "applied"),
+	"auditCancel":     auditRow("cancel", "applied"),
+	"auditTaskDenied": auditRow("taskdenied", "refused"),
+}
+
+// auditRow observes an effect that writes one audit row: exactly one row
+// with the record as subject, the caller as actor, the action and outcome.
+func auditRow(action, outcome string) observer {
+	return func(t *testing.T, a arranged) error {
+		n := auditRows(t, a.subject(), action, a.caller, outcome)
+		if n != 1 {
+			return fmt.Errorf("%d audit rows (%s, %s, %s), want 1", n, action, a.caller, outcome)
+		}
+		return nil
+	}
+}
 
 // answer is either a Change or an Error of the contract.
 type answer struct {

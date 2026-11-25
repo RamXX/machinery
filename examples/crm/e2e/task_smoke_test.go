@@ -28,11 +28,11 @@ func TestTaskHappyPath(t *testing.T) {
 	rep := createUser(t, "Rep")
 	id := newTask(t, rep)
 	c := fire(t, "/tasks/"+id+"/start", rep)
-	wantChange(t, c, "InProgress", []string{"tc:TASK-067fe3"}, nil, []string{"auditStart"})
+	wantChange(t, c, "InProgress", []string{"tc:TASK-067fe3"}, []string{"auditStart"}, nil)
 	wantRow(t, "tasks", id, "InProgress")
 	pass(t, "tc:TASK-067fe3", "Open start by the assignee: 200, InProgress in the answer and the row")
 	c = fire(t, "/tasks/"+id+"/complete", rep)
-	wantChange(t, c, "Done", []string{"tc:TASK-d307aa"}, nil, []string{"auditComplete"})
+	wantChange(t, c, "Done", []string{"tc:TASK-d307aa"}, []string{"auditComplete"}, nil)
 	wantRow(t, "tasks", id, "Done")
 	pass(t, "tc:TASK-d307aa", "InProgress complete by the assignee: 200, Done in the answer and the row")
 }
@@ -57,7 +57,7 @@ func TestTaskDenied(t *testing.T) {
 	wantRow(t, "tasks", id, "Open")
 	pass(t, "tc:TASK-2a7cdb", "start by another Rep: 403 FORBIDDEN, the row stays Open")
 	c := fire(t, "/tasks/"+id+"/start", admin)
-	wantChange(t, c, "InProgress", []string{"tc:TASK-067fe3"}, nil, []string{"auditStart"})
+	wantChange(t, c, "InProgress", []string{"tc:TASK-067fe3"}, []string{"auditStart"}, nil)
 	wantRow(t, "tasks", id, "InProgress")
 	pass(t, "tc:TASK-067fe3", "Open start by an Admin: 200, InProgress in the answer and the row")
 }

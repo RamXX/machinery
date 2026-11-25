@@ -26,14 +26,14 @@ func newDeal(t *testing.T, user string, amount int64) string {
 func qualify(t *testing.T, id, user string) {
 	t.Helper()
 	c := fire(t, "/deals/"+id+"/qualify", user)
-	wantChange(t, c, "Qualified", []string{"tc:DEAL-4a25db"}, nil, []string{"auditQualify"})
+	wantChange(t, c, "Qualified", []string{"tc:DEAL-4a25db"}, []string{"auditQualify"}, nil)
 	wantRow(t, "deals", id, "Qualified")
 }
 
 func lose(t *testing.T, id, user string) {
 	t.Helper()
 	c := fire(t, "/deals/"+id+"/lose", user)
-	wantChange(t, c, "Lost", []string{"tc:DEAL-776ffd"}, nil, []string{"auditLose"})
+	wantChange(t, c, "Lost", []string{"tc:DEAL-776ffd"}, []string{"auditLose"}, nil)
 	wantRow(t, "deals", id, "Lost")
 }
 
@@ -44,7 +44,7 @@ func TestDealHappyPath(t *testing.T) {
 	qualify(t, id, rep)
 	pass(t, "tc:DEAL-4a25db", "Lead qualify by the owner: 200, Qualified in the answer and the row")
 	c := fire(t, "/deals/"+id+"/win", rep)
-	wantChange(t, c, "Won", []string{"tc:DEAL-d09c4d", "tc:DEAL-701b01"}, nil, []string{"stampWinAttempt", "recordWin", "auditWin"})
+	wantChange(t, c, "Won", []string{"tc:DEAL-d09c4d", "tc:DEAL-701b01"}, []string{"stampWinAttempt", "auditWin"}, []string{"recordWin"})
 	wantRow(t, "deals", id, "Won")
 	pass(t, "tc:DEAL-d09c4d", "Qualified win by the owner with an amount: the walk entered closing")
 	pass(t, "tc:DEAL-701b01", "closing: recordWin done, Won in the answer and the row")
@@ -106,7 +106,7 @@ func TestDealReopen(t *testing.T) {
 	wantRow(t, "deals", id, "Lost")
 	pass(t, "tc:DEAL-7bb594", "reopen by the owning Rep: 403 FORBIDDEN, the row stays Lost")
 	c := fire(t, "/deals/"+id+"/reopen", admin)
-	wantChange(t, c, "Lead", []string{"tc:DEAL-fe513e"}, nil, []string{"auditReopen"})
+	wantChange(t, c, "Lead", []string{"tc:DEAL-fe513e"}, []string{"auditReopen"}, nil)
 	wantRow(t, "deals", id, "Lead")
 	pass(t, "tc:DEAL-fe513e", "Lost reopen by an Admin: 200, Lead in the answer and the row")
 	pass(t, "sc:admin-reopens-a-lost-deal", "lost by the Rep, reopen refused for the Rep, reopened by the Admin: a Lead again")
@@ -141,11 +141,31 @@ func TestDealReads(t *testing.T) {
 	}
 }
 
-func TestAuditEmpty(t *testing.T) {
+// TestAuditList: GET /audit lists the row a qualify wrote.
+func TestAuditList(t *testing.T) {
 	rep := createUser(t, "Rep")
-	code, b := call(t, "GET", "/audit", rep, nil)
-	var entries []json.RawMessage
-	if err := json.Unmarshal(b, &entries); code != http.StatusOK || err != nil || entries == nil || len(entries) != 0 {
-		t.Fatalf("GET /audit = %d %s, want 200 with an empty list", code, b)
+	id := newDeal(t, rep, 100)
+	qualify(t, id, rep)
+	var entries []struct {
+		ActorID string `json:"actorId"`
+		Action  string `json:"action"`
+		Subject string `json:"subject"`
+		Outcome string `json:"outcome"`
+		At      string `json:"at"`
+	}
+	if code := callInto(t, "GET", "/audit", rep, nil, &entries); code != http.StatusOK {
+		t.Fatalf("GET /audit = %d, want 200", code)
+	}
+	found := 0
+	for _, e := range entries {
+		if e.Subject == "deal:"+id {
+			found++
+			if e.ActorID != rep || e.Action != "qualify" || e.Outcome != "applied" || e.At == "" {
+				t.Fatalf("GET /audit lists %+v for deal %s, want qualify applied by %s", e, id, rep)
+			}
+		}
+	}
+	if found != 1 {
+		t.Fatalf("GET /audit lists %d rows for deal %s, want 1", found, id)
 	}
 }

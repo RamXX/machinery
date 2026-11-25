@@ -74,6 +74,62 @@ func insertTask(t *testing.T, assignee, deal, status string) string {
 	return id
 }
 
+// auditRows counts the audit rows of a subject with the given action, actor
+// and outcome.
+func auditRows(t *testing.T, subject, action, actor, outcome string) int {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	var n int
+	err := adminPool.QueryRow(ctx, `SELECT count(*) FROM audit_entries
+		WHERE subject = $1 AND action = $2 AND actor_id = $3::uuid AND outcome = $4`, subject, action, actor, outcome).Scan(&n)
+	if err != nil {
+		t.Fatalf("count audit rows of %s: %v", subject, err)
+	}
+	return n
+}
+
+// trailRow is one audit row as the tests compare it.
+type trailRow struct{ actor, action, outcome string }
+
+// trail reads the audit rows of a subject, oldest first.
+func trail(t *testing.T, subject string) []trailRow {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	rows, err := adminPool.Query(ctx, "SELECT actor_id::text, action, outcome FROM audit_entries WHERE subject = $1 ORDER BY id", subject)
+	if err != nil {
+		t.Fatalf("read the audit trail of %s: %v", subject, err)
+	}
+	defer rows.Close()
+	var out []trailRow
+	for rows.Next() {
+		var r trailRow
+		if err := rows.Scan(&r.actor, &r.action, &r.outcome); err != nil {
+			t.Fatalf("read the audit trail of %s: %v", subject, err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("read the audit trail of %s: %v", subject, err)
+	}
+	return out
+}
+
+// wantTrail compares the audit trail of a subject with want, in order.
+func wantTrail(t *testing.T, subject string, want ...trailRow) {
+	t.Helper()
+	got := trail(t, subject)
+	if len(got) != len(want) {
+		t.Fatalf("audit trail of %s = %v, want %v", subject, got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("audit trail of %s = %v, want %v", subject, got, want)
+		}
+	}
+}
+
 // auditCount counts the audit rows of one subject.
 func auditCount(t *testing.T, subject string) int {
 	t.Helper()
