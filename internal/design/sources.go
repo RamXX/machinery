@@ -133,9 +133,27 @@ type Area struct {
 	Questions []string `yaml:"questions,omitempty"`
 }
 
+// Lowering records a deliberate lowering of a tier (section 22).
+type Lowering struct {
+	IDs    []string `yaml:"ids"`
+	From   string   `yaml:"from"`
+	Reason string   `yaml:"reason"`
+}
+
 type riskFile struct {
-	Version int    `yaml:"version"`
-	Areas   []Area `yaml:"areas"`
+	Version int        `yaml:"version"`
+	Areas   []Area     `yaml:"areas"`
+	Lowered []Lowering `yaml:"lowered,omitempty"`
+}
+
+// ParseLowered returns the lowered entries of risk file bytes (nil when the
+// file does not parse; ParseRisk reports that).
+func ParseLowered(data []byte) []Lowering {
+	var f riskFile
+	if strictYAML(data, &f) != nil {
+		return nil
+	}
+	return f.Lowered
 }
 
 // Questions maps each formal question to its tool (section 16.1).
@@ -196,6 +214,18 @@ func ParseRisk(rel string, data []byte) (areas []Area, problems []string, config
 		}
 		if a.Tier != Critical && len(a.Questions) > 0 {
 			problems = append(problems, where+": only a critical area lists questions")
+		}
+	}
+	for i, l := range f.Lowered {
+		where := fmt.Sprintf("%s: lowered entry %d", rel, i+1)
+		if len(l.IDs) == 0 {
+			problems = append(problems, where+": ids needs at least one id pattern")
+		}
+		if l.From != Consequential && l.From != Critical {
+			problems = append(problems, where+": from must be consequential or critical")
+		}
+		if strings.TrimSpace(l.Reason) == "" {
+			problems = append(problems, where+": reason is required")
 		}
 	}
 	return f.Areas, problems, true

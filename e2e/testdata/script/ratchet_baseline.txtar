@@ -27,18 +27,27 @@ exec mrun 1 check --stage ratchet --base base
 stdout 'ERROR  ratchet: baseline grew: unit-test internal/domain/calc_test.go'
 stdout 'failed: 2 finding\(s\)'
 
-# a wider scope in the same change lets the baseline grow
+# a wider scope elsewhere does not let the baseline grow for files that were in scope already
 cp machinery_wide.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: baseline grew: layer internal/domain/bad.go -> internal/api'
+stdout 'ERROR  ratchet: baseline grew: unit-test internal/domain/calc_test.go'
+
+# a file that is newly in scope may enter the baseline in the same change
+rm internal/domain/bad.go internal/domain/calc_test.go
+cp calc_test.go.in contracts/calc_test.go
+exec machinery arch --write-baseline
+exec machinery tests --write-baseline
 exec mrun 0 check --stage ratchet --base base
 stdout '^passed$'
-stdout 'checked: 16 obligations, 2 scope globs, 0 tiered ids, 2 baseline entries'
+stdout 'checked: 16 obligations, 2 scope globs, 0 tiered ids, 1 baseline entries'
 
 # a baseline that only shrinks is free
 exec git add -A
 exec git -c user.name=t -c user.email=t@t commit -q -m grown
 exec git branch grown
-rm internal/domain/bad.go
-exec machinery arch --write-baseline
+rm contracts/calc_test.go
+exec machinery tests --write-baseline
 exec mrun 0 check --stage ratchet --base grown
 stdout '^passed$'
 

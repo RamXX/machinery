@@ -1,0 +1,39 @@
+# Deleting a config block may not switch a gate off, and a removed obligation is visible.
+fixture shop
+exec machinery gen
+gitinit
+exec git branch base
+exec machinery check --stage ratchet --base base
+stdout '^passed$'
+
+# removing trace: and constraints: would make three stages not applicable
+cp machinery_stripped.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: stage disabled: arch applied at base and constraints is gone now'
+stdout 'ERROR  ratchet: stage disabled: trace applied at base and trace is gone now'
+stdout 'ERROR  ratchet: stage disabled: tests applied at base and tests or trace.tests is gone now'
+stdout 'ERROR  ratchet: stage disabled: xref-contract applied at base and contracts is gone now'
+stdout 'failed: 4 finding\(s\)'
+
+# an obligation that existed at the base and is gone now is reported, not hidden
+fixture shop
+exec sh -c 'awk -f strip.awk design/model/shop.modelith.yaml > m.tmp && mv m.tmp design/model/shop.modelith.yaml'
+exec machinery gen
+exec machinery check --stage ratchet --base base
+stdout 'warn   ratchet: obligation removed since base: inv:customer-email-unique'
+stdout '^passed$'
+
+-- machinery_stripped.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- strip.awk --
+# drops the Customer entity's invariants block (its header and its one entry)
+/^    invariants:$/ && !done { done = 1; next }
+/customer-email-unique/ { next }
+{ print }

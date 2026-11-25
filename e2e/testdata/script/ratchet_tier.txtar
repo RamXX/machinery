@@ -1,4 +1,4 @@
-# a tier may not be lowered quietly: an error, or a warn when the why changed too
+# a tier may not be lowered quietly: an error, unless the risk file records the lowering with a reason
 fixture shop
 cp machinery_risk.yaml machinery.yaml
 cp risk_base.yaml design/risk.yaml
@@ -23,7 +23,12 @@ stdout 'ERROR  ratchet: tier lowered: tc:ORDE-2e883d critical -> consequential'
 ! stdout 'tc:ORDE-8bd6e7'
 stdout 'failed: 2 finding\(s\)'
 
-# the same lowering with a new why is a warn that carries the new reason
+# a new why alone is not enough any more
+cp risk_lowered_why_only.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: tier lowered: act:Order.pay critical -> consequential; record it under lowered: in the risk file with a reason'
+
+# the same lowering recorded under lowered: is a warn that carries the reason
 cp risk_lowered_why.yaml design/risk.yaml
 exec mrun 0 check --stage ratchet --base base
 stdout 'warn   ratchet: tier lowered: act:Order.pay critical -> consequential \(card payments moved to the hosted page\)'
@@ -102,6 +107,17 @@ areas:
     tier: consequential
     why: "a wrong shipment costs a return"
     ids: ["inv:paid-before-shipped"]
+-- risk_lowered_why_only.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: consequential
+    why: "card payments moved to the hosted page"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+  - name: shipping
+    tier: consequential
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]
 -- risk_lowered_why.yaml --
 version: 1
 areas:
@@ -113,6 +129,8 @@ areas:
     tier: consequential
     why: "a wrong shipment costs a return"
     ids: ["inv:paid-before-shipped"]
+lowered:
+  - {ids: ["act:Order.pay", "tc:ORDE-2e883d"], from: critical, reason: "card payments moved to the hosted page"}
 -- risk_dropped.yaml --
 version: 1
 areas:
