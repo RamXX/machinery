@@ -10,14 +10,6 @@ owed:
     reason: "no handler yet"
   - id: act:Deal.win
     reason: "no handler yet"
-  - id: act:Task.cancel
-    reason: "no handler yet"
-  - id: act:Task.complete
-    reason: "no handler yet"
-  - id: act:Task.create
-    reason: "no handler yet"
-  - id: act:Task.start
-    reason: "no handler yet"
   - id: fm:database-unreachable
     reason: "skeleton: not built yet; no test provokes this failure"
   - id: fm:deal-lose-by-non-owner

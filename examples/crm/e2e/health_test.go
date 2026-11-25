@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -87,8 +88,12 @@ func TestMigrationsApplied(t *testing.T) {
 	if err := adminPool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&rows); err != nil {
 		t.Fatalf("count schema_migrations: %v", err)
 	}
-	if rows != 1 {
-		t.Fatalf("schema_migrations has %d rows, want 1", rows)
+	files, err := filepath.Glob("../internal/store/migrations/*.sql")
+	if err != nil || len(files) == 0 {
+		t.Fatalf("no migration files (%v)", err)
+	}
+	if rows != len(files) {
+		t.Fatalf("schema_migrations has %d rows, want %d (one per migration file)", rows, len(files))
 	}
 	var exists bool
 	if err := adminPool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'crm_app')").Scan(&exists); err != nil {

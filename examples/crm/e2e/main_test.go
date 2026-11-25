@@ -107,6 +107,7 @@ func start(app, admin string) (*service, error) {
 		return nil, err
 	}
 	cmd := exec.Command(binPath)
+	cmd.Dir = ".." // the project directory, where design/gen/tables is
 	cmd.Env = append(os.Environ(), "CRM_ADDR="+addr, "CRM_DATABASE_URL="+app, "CRM_ADMIN_DATABASE_URL="+admin)
 	cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr
 	if err := cmd.Start(); err != nil {

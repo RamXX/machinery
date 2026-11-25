@@ -2,9 +2,9 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"github.com/RamXX/machinery/examples/crm/internal/fsm"
 	"github.com/RamXX/machinery/examples/crm/internal/store"
 )
 
@@ -12,29 +12,36 @@ import (
 type Server struct {
 	store *store.Store
 	mux   *http.ServeMux
+	task  *fsm.Machine
 }
 
-// New builds the handler of the service.
-func New(st *store.Store) *Server {
-	s := &Server{store: st, mux: http.NewServeMux()}
-	s.mux.HandleFunc("GET /healthz", s.health)
-	return s
+// New loads the tables from dir, binds their units and builds the handler.
+// A table naming a unit the service does not implement is an error.
+func New(st *store.Store, dir string) (*Server, error) {
+	task, err := loadMachine(dir, "task", taskUnits())
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{store: st, mux: http.NewServeMux(), task: task}
+	s.routes()
+	return s, nil
+}
+
+func (s *Server) routes() {
+	m := s.mux
+	m.HandleFunc("GET /healthz", s.health)
+	m.HandleFunc("GET /users", s.listUsers)
+	m.HandleFunc("POST /users", s.createUser)
+	m.HandleFunc("GET /tasks", s.authed(s.listTasks))
+	m.HandleFunc("POST /tasks", s.authed(s.createTask))
+	m.HandleFunc("GET /tasks/{id}", s.authed(s.getTask))
+	tasks := s.taskRecord()
+	m.HandleFunc("POST /tasks/{id}/start", s.authed(s.fire(tasks, "start")))       // machinery:serves act:Task.start
+	m.HandleFunc("POST /tasks/{id}/complete", s.authed(s.fire(tasks, "complete"))) // machinery:serves act:Task.complete
+	m.HandleFunc("POST /tasks/{id}/cancel", s.authed(s.fire(tasks, "cancel")))     // machinery:serves act:Task.cancel
+	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "NO_ROUTE", r.Method+" "+r.URL.Path+" is not an operation of this service")
+	})
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) { s.mux.ServeHTTP(w, r) }
-
-// errorBody is the body of every refusal.
-type errorBody struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-
-func writeError(w http.ResponseWriter, status int, code, msg string) {
-	writeJSON(w, status, errorBody{Code: code, Message: msg})
-}

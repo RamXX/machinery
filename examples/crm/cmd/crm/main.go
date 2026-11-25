@@ -40,12 +40,16 @@ func run() error {
 		return err
 	}
 	defer st.Close()
+	handler, err := api.New(st, api.TablesDir())
+	if err != nil {
+		return err
+	}
 	go st.MigrateUntilDone(ctx, adminURL)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", addr, err)
 	}
-	srv := &http.Server{Handler: api.New(st), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
 	log.Printf("crm: listening on %s", ln.Addr())
