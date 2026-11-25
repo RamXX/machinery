@@ -1,120 +1,88 @@
 version: 1
 owed:
   - id: fm:database-unreachable
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet: no test takes the database away and brings it back"
   - id: fm:deal-lose-by-non-owner
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fm:deal-qualify-by-non-owner
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fm:deal-reopen-by-rep
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fm:deal-win-by-non-owner
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fm:deal-win-store-failure
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet: no test makes the recordWin store write fail or time out"
   - id: fm:task-cancel-by-non-assignee
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fm:task-complete-by-non-assignee
-    reason: "skeleton: not built yet; no test provokes this failure"
-  - id: fm:task-create-without-user
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fm:task-start-by-non-assignee
-    reason: "skeleton: not built yet; no test provokes this failure"
+    reason: "no test yet"
   - id: fv:deal-win
     reason: "formal model not written yet"
   - id: fv:record-ownership
     reason: "formal model not written yet"
   - id: inv:audit-append-only
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:deal-owner-or-admin-writes
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:deal-reopen-admin-only
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:deal-won-is-final
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:deal-won-needs-amount
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:every-change-audited
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:lifecycle-single-writer
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:refusals-are-audited
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:task-assignee-or-admin-writes
-    reason: "skeleton: not built yet; no test observes this invariant"
+    reason: "no test yet"
   - id: inv:task-terminal-is-final
-    reason: "skeleton: not built yet; no test observes this invariant"
-  - id: inv:user-email-unique
-    reason: "skeleton: not built yet; no test observes this invariant"
-  - id: sc:admin-reopens-a-lost-deal
-    reason: "skeleton: not built yet; no test walks this scenario"
-  - id: sc:rep-cannot-change-another-rep-s-deal
-    reason: "skeleton: not built yet; no test walks this scenario"
+    reason: "no test yet"
   - id: sc:rep-qualifies-and-wins-a-deal
-    reason: "skeleton: not built yet; no test walks this scenario"
-  - id: sc:rep-works-a-task-to-completion
-    reason: "skeleton: not built yet; no test walks this scenario"
-  - id: tc:DEAL-062b75
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "no test yet"
   - id: tc:DEAL-23efa8
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-2c0b2a
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-3080d9
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-346352
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-3545e5
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "failure path not induced yet: no test makes the recordWin actor fail"
   - id: tc:DEAL-4a25db
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-559572
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditQualify is a noop"
   - id: tc:DEAL-55eecd
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-59fcd3
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "failure path not induced yet: no test makes recordWin outlast closeTimeout"
   - id: tc:DEAL-701b01
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditWin is a noop"
   - id: tc:DEAL-776ffd
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditLose is a noop"
   - id: tc:DEAL-7bb594
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditDealDenied is a noop"
   - id: tc:DEAL-81d0ab
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-9369a6
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:DEAL-9597fe
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditDealDenied is a noop"
   - id: tc:DEAL-9f48af
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditDealDenied is a noop"
   - id: tc:DEAL-a627f4
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditLose is a noop"
   - id: tc:DEAL-d09c4d
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect stampWinAttempt is a noop"
   - id: tc:DEAL-fdd582
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditDealDenied is a noop"
   - id: tc:DEAL-fdf795
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditDealDenied is a noop"
   - id: tc:DEAL-fe513e
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditReopen is a noop"
   - id: tc:TASK-067fe3
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditStart is a noop"
   - id: tc:TASK-2a7cdb
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditTaskDenied is a noop"
   - id: tc:TASK-36d38a
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditTaskDenied is a noop"
   - id: tc:TASK-67d9f6
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditCancel is a noop"
   - id: tc:TASK-7d91c2
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:TASK-ac3aa3
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditTaskDenied is a noop"
   - id: tc:TASK-d159c9
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditTaskDenied is a noop"
   - id: tc:TASK-d307aa
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditComplete is a noop"
   - id: tc:TASK-f7ab1e
-    reason: "skeleton: not built yet; no handler fires this case"
-  - id: tc:TASK-fcd596
-    reason: "skeleton: not built yet; no handler fires this case"
+    reason: "effect auditCancel is a noop"
