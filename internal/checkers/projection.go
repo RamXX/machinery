@@ -107,6 +107,19 @@ type Ignore struct {
 	Event string `json:"event"`
 }
 
+type Refusal struct {
+	ID      string `json:"id"`
+	State   string `json:"state"`
+	Handler string `json:"handler"`
+}
+
+type Clause struct {
+	ID         string `json:"id"`
+	Transition string `json:"transition"`
+	Guard      string `json:"guard"`
+	Clause     string `json:"clause"`
+}
+
 type Invoke struct {
 	State string `json:"state"`
 	Src   string `json:"src"`
@@ -120,6 +133,8 @@ type Machine struct {
 	States      []State      `json:"states"`
 	Transitions []Transition `json:"transitions"`
 	Ignores     []Ignore     `json:"ignores"`
+	Refusals    []Refusal    `json:"refusals"`
+	Clauses     []Clause     `json:"clauses"`
 	Invokes     []Invoke     `json:"invokes"`
 }
 
@@ -187,6 +202,12 @@ func (pr *Projection) IDs() map[string]bool {
 		}
 		for _, ig := range m.Ignores {
 			ids[ig.ID] = true
+		}
+		for _, rf := range m.Refusals {
+			ids[rf.ID] = true
+		}
+		for _, cl := range m.Clauses {
+			ids[cl.ID] = true
 		}
 	}
 	for _, f := range pr.FailureModes {
@@ -271,7 +292,7 @@ func Build(d *design.Design) (*Projection, []string) {
 			role = "operational"
 		}
 		mm := Machine{ID: m.ID, Tag: m.Tag, Role: role, LifecycleOf: d.LifecycleEntity(m),
-			States: []State{}, Transitions: []Transition{}, Ignores: []Ignore{}, Invokes: []Invoke{}}
+			States: []State{}, Transitions: []Transition{}, Ignores: []Ignore{}, Refusals: []Refusal{}, Clauses: []Clause{}, Invokes: []Invoke{}}
 		for _, s := range m.Table.States {
 			mm.States = append(mm.States, State{Path: s.Path, Kind: s.Kind, Resting: s.Resting})
 			for _, src := range s.Invoke {
@@ -284,6 +305,14 @@ func Build(d *design.Design) (*Projection, []string) {
 		for _, ig := range m.Table.Ignores {
 			mm.Ignores = append(mm.Ignores, Ignore{ID: ig.ID, State: ig.State, Event: ig.Event})
 		}
+		for _, rf := range m.Table.Refusals {
+			mm.Refusals = append(mm.Refusals, Refusal{ID: rf.ID, State: rf.State, Handler: rf.Handler})
+		}
+		for _, cl := range m.Table.Clauses {
+			mm.Clauses = append(mm.Clauses, Clause{ID: cl.ID, Transition: cl.Transition, Guard: cl.Guard, Clause: cl.Clause})
+		}
+		sort.Slice(mm.Refusals, func(i, j int) bool { return mm.Refusals[i].ID < mm.Refusals[j].ID })
+		sort.Slice(mm.Clauses, func(i, j int) bool { return mm.Clauses[i].ID < mm.Clauses[j].ID })
 		sort.Slice(mm.States, func(i, j int) bool { return mm.States[i].Path < mm.States[j].Path })
 		sort.Slice(mm.Transitions, func(i, j int) bool { return mm.Transitions[i].ID < mm.Transitions[j].ID })
 		sort.Slice(mm.Ignores, func(i, j int) bool { return mm.Ignores[i].ID < mm.Ignores[j].ID })

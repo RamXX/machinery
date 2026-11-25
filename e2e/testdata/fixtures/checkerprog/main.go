@@ -136,6 +136,12 @@ func projectionIDs(data []byte) []string {
 			Ignores []struct {
 				ID string `json:"id"`
 			} `json:"ignores"`
+			Refusals []struct {
+				ID string `json:"id"`
+			} `json:"refusals"`
+			Clauses []struct {
+				ID string `json:"id"`
+			} `json:"clauses"`
 		} `json:"machines"`
 		FailureModes []struct {
 			ID string `json:"id"`
@@ -164,6 +170,12 @@ func projectionIDs(data []byte) []string {
 		}
 		for _, i := range m.Ignores {
 			ids = append(ids, i.ID)
+		}
+		for _, r := range m.Refusals {
+			ids = append(ids, r.ID)
+		}
+		for _, c := range m.Clauses {
+			ids = append(ids, c.ID)
 		}
 	}
 	for _, f := range p.FailureModes {

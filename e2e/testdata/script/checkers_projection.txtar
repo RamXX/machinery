@@ -78,6 +78,29 @@ cp machinery.factsonly.yaml machinery.yaml
 exec machinery gen
 grep '"predicate": "handles-payment-data"' design/gen/projection.json
 
+# a machine with a refusal and a guard clause: both are listed, after the ignores, with their tc ids
+cp machinery.ck.yaml machinery.yaml
+cp both.json design/machines/Order.machine.json
+exec sh -c 'echo "  - subject: tc:ORDE-f3dfea" >> design/facts.yaml; echo "    predicate: operator-visible" >> design/facts.yaml; echo "    value: yes-visible" >> design/facts.yaml'
+exec machinery gen
+grep '"refusals": \[' design/gen/projection.json
+grep '"id": "tc:ORDE-f3dfea"' design/gen/projection.json
+grep '"handler": "cancel"' design/gen/projection.json
+grep '"clauses": \[' design/gen/projection.json
+grep '"id": "tc:ORDE-1457d2"' design/gen/projection.json
+grep '"id": "tc:ORDE-e85f15"' design/gen/projection.json
+grep '"transition": "tc:ORDE-2e883d"' design/gen/projection.json
+grep '"clause": "cardOnFile"' design/gen/projection.json
+grep '"subject": "tc:ORDE-f3dfea"' design/gen/projection.json
+exec sh -c 'grep -n "\"ignores\"\|\"refusals\"\|\"clauses\"\|\"invokes\"" design/gen/projection.json | cut -d: -f2 | tr -d " ,[" | tr "\n" " " | grep "^\"ignores\" \"refusals\" \"clauses\" \"invokes\" $"'
+# the stage accepts a fact about a refusal case; a checker may be asked to cover them all
+exec mrun 1 check --stage checkers
+stdout 'ERROR  rules: no evidence'
+! stdout 'facts.yaml'
+# a machine without them lists them empty
+cp machinery.ck.yaml machinery.yaml
+exec machinery gen
+
 -- machinery.ck.yaml --
 version: 2
 design:
@@ -164,3 +187,90 @@ constraints:
     max_func_lines: 40
 waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- both.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": {
+    "orderId": null,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          {
+            "target": "paying",
+            "guard": "hasPaymentMethod",
+            "actions": "stampAttempt"
+          },
+          {
+            "actions": "recordPayRefused"
+          }
+        ],
+        "cancel": {
+          "target": "Cancelled",
+          "actions": "recordCancellation",
+          "guard": "canCancel"
+        }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID"
+      },
+      "_refusal": {
+        "cancel": "canCancel is false once a charge is in flight: the API answers ORDER_NOT_CANCELLABLE and the order stays Pending"
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid",
+          "actions": "recordCharge"
+        },
+        "onError": {
+          "target": "Pending",
+          "actions": "recordPaymentFailure"
+        }
+      },
+      "after": {
+        "payTimeout": {
+          "target": "Pending",
+          "actions": "recordPaymentTimeout"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": {
+          "target": "Shipped",
+          "actions": "recordShipment"
+        },
+        "cancel": {
+          "target": "Cancelled",
+          "actions": [
+            "refundPayment",
+            "recordCancellation"
+          ]
+        }
+      },
+      "_ignores": {
+        "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID"
+      }
+    },
+    "Shipped": {
+      "type": "final",
+      "entry": "notifyCustomer"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  },
+  "_guards": {
+    "hasPaymentMethod": ["cardOnFile", "cardNotExpired"]
+  }
+}

@@ -56,3 +56,13 @@ state's entry actions.
 
 A tiny Go program that emits receipts with `pkg/receipt`. Added by the story that builds
 `machinery run`.
+
+## `checkerprog`
+
+A tiny Go program (its own module, standard library only) that stands in for an external
+checker: `checkerprog [flags] <projection path> <evidence path>` reads the projection and writes
+valid evidence. Scripts build it with `go build` into `.machinery/bin` and register it in
+`.machinery/checkers.local.yaml`, or call it directly. Flags: `-id`, `-covers` (ids or
+`prefix*` patterns, default every id), `-extra-cover`, `-finding error|warn`, `-subject`,
+`-obligation a,b`, `-wrong-hash`, `-invalid-json`, `-bad-verdict`, `-extra-key`, `-exit N`,
+`-sleep SECONDS` and `-no-write`.

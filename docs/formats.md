@@ -1705,7 +1705,8 @@ checkers:
 ```
 
 A `covers` entry is a full id or a prefix ending in `*`. It selects among the ids of the
-projection: `act`, `inv`, `sc`, `tc`, `fm` and `entity:<Name>`.
+projection: `act`, `inv`, `sc`, `tc` (every transition, ignore, refusal and guard-clause case of every
+machine), `fm` and `entity:<Name>`.
 
 ### 21.2 Declared facts
 
@@ -1746,6 +1747,8 @@ checker reads; a checker never reads the project's sources. Every list is sorted
      "states": [{"path": "Pending", "kind": "atomic", "resting": true}],
      "transitions": [{"id": "tc:ORDE-2e883d", "source": "Pending", "kind": "on", "event": "pay", "guard": "hasPaymentMethod", "target": "paying", "effects": ["stampAttempt"]}],
      "ignores": [{"id": "tc:ORDE-2fa2af", "state": "Pending", "event": "ship"}],
+     "refusals": [{"id": "tc:ORDE-f3dfea", "state": "Pending", "handler": "cancel"}],
+     "clauses": [{"id": "tc:ORDE-1457d2", "transition": "tc:ORDE-2e883d", "guard": "hasPaymentMethod", "clause": "cardOnFile"}],
      "invokes": [{"state": "paying", "src": "chargePayment"}]}
   ],
   "operations": [{"contract": "contracts/openapi.yaml", "id": "payOrder", "method": "POST", "path": "/orders/{id}/pay", "actions": ["act:Order.pay"]}],
@@ -1756,7 +1759,8 @@ checker reads; a checker never reads the project's sources. Every list is sorted
 ```
 
 An invariant's `entity` is empty for a top-level invariant. A machine's `role` is `lifecycle` or
-`operational`. Lists that have nothing are empty lists, never absent. The projection does not
+`operational`. A machine lists, after its `ignores`, its `refusals` and its guard `clauses` (section 7.2),
+each with its `tc` id. Lists that have nothing are empty lists, never absent. The projection does not
 contain `ck` obligations: it is the input of the checkers, not their output.
 
 ### 21.4 The evidence
