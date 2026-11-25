@@ -1,0 +1,31 @@
+version: 1
+areas:
+  - name: deal-win
+    tier: critical
+    why: "winning a deal is final and audited exactly once, even when callers act at the same time"
+    questions: [concurrency]
+    ids:
+      - "act:Deal.win"
+      - "inv:deal-won-is-final"
+      - "inv:deal-won-needs-amount"
+      - "inv:every-change-audited"
+      - "tc:DEAL-346352"
+      - "tc:DEAL-559572"
+      - "tc:DEAL-81d0ab"
+      - "tc:DEAL-d09c4d"
+  - name: record-ownership
+    tier: critical
+    why: "who may write which record must hold for every shape of data"
+    questions: [structure]
+    ids:
+      - "inv:deal-owner-or-admin-writes"
+      - "inv:deal-reopen-admin-only"
+      - "inv:task-assignee-or-admin-writes"
+  - name: permissions
+    tier: consequential
+    why: "authorization of every other write"
+    ids:
+      - "act:Deal.lose"
+      - "act:Deal.qualify"
+      - "act:Deal.reopen"
+      - "act:Task.*"

@@ -1,2 +1,138 @@
 version: 1
-owed: []
+owed:
+  - id: act:Deal.create
+    reason: "no handler yet"
+  - id: act:Deal.lose
+    reason: "no handler yet"
+  - id: act:Deal.qualify
+    reason: "no handler yet"
+  - id: act:Deal.reopen
+    reason: "no handler yet"
+  - id: act:Deal.win
+    reason: "no handler yet"
+  - id: act:Task.cancel
+    reason: "no handler yet"
+  - id: act:Task.complete
+    reason: "no handler yet"
+  - id: act:Task.create
+    reason: "no handler yet"
+  - id: act:Task.start
+    reason: "no handler yet"
+  - id: fm:database-unreachable
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:deal-lose-by-non-owner
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:deal-qualify-by-non-owner
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:deal-reopen-by-rep
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:deal-win-by-non-owner
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:deal-win-store-failure
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:task-cancel-by-non-assignee
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:task-complete-by-non-assignee
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:task-create-without-user
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fm:task-start-by-non-assignee
+    reason: "skeleton: not built yet; no test provokes this failure"
+  - id: fv:deal-win
+    reason: "formal model not written yet"
+  - id: fv:record-ownership
+    reason: "formal model not written yet"
+  - id: inv:audit-append-only
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:deal-owner-or-admin-writes
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:deal-reopen-admin-only
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:deal-won-is-final
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:deal-won-needs-amount
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:every-change-audited
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:lifecycle-single-writer
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:refusals-are-audited
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:task-assignee-or-admin-writes
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:task-terminal-is-final
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: inv:user-email-unique
+    reason: "skeleton: not built yet; no test observes this invariant"
+  - id: sc:admin-reopens-a-lost-deal
+    reason: "skeleton: not built yet; no test walks this scenario"
+  - id: sc:rep-cannot-change-another-rep-s-deal
+    reason: "skeleton: not built yet; no test walks this scenario"
+  - id: sc:rep-qualifies-and-wins-a-deal
+    reason: "skeleton: not built yet; no test walks this scenario"
+  - id: sc:rep-works-a-task-to-completion
+    reason: "skeleton: not built yet; no test walks this scenario"
+  - id: tc:DEAL-062b75
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-23efa8
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-2c0b2a
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-3080d9
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-346352
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-3545e5
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-4a25db
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-559572
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-55eecd
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-59fcd3
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-701b01
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-776ffd
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-7bb594
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-81d0ab
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-9369a6
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-9597fe
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-9f48af
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-a627f4
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-d09c4d
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-fdd582
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-fdf795
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:DEAL-fe513e
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-067fe3
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-2a7cdb
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-36d38a
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-67d9f6
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-7d91c2
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-ac3aa3
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-d159c9
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-d307aa
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-f7ab1e
+    reason: "skeleton: not built yet; no handler fires this case"
+  - id: tc:TASK-fcd596
+    reason: "skeleton: not built yet; no handler fires this case"

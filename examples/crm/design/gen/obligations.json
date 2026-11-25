@@ -8,10 +8,70 @@
       "title": "The database does not answer."
     },
     {
+      "id": "fm:deal-lose-by-non-owner",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep who is not the Owner of an open deal asks to lose it."
+    },
+    {
+      "id": "fm:deal-qualify-by-non-owner",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep who is not the Owner of a lead asks to qualify it."
+    },
+    {
+      "id": "fm:deal-reopen-by-rep",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep, even the Owner, asks to reopen a lost deal."
+    },
+    {
+      "id": "fm:deal-win-by-non-owner",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep who is not the Owner of a qualified deal asks to win it."
+    },
+    {
       "id": "fm:deal-win-store-failure",
       "kind": "fm",
       "source": "design/failure-modes.yaml",
       "title": "The store write that records a won deal fails or does not finish in time."
+    },
+    {
+      "id": "fm:task-cancel-by-non-assignee",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep who is not the Assignee of an open task asks to cancel it."
+    },
+    {
+      "id": "fm:task-complete-by-non-assignee",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep who is not the Assignee of a task in progress asks to complete it."
+    },
+    {
+      "id": "fm:task-create-without-user",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A caller without a known User (X-User-Id missing or naming no User) asks to create a task."
+    },
+    {
+      "id": "fm:task-start-by-non-assignee",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "A Rep who is not the Assignee of an open task asks to start it."
+    },
+    {
+      "id": "fv:deal-win",
+      "kind": "fv",
+      "source": "design/risk.yaml",
+      "title": "Formal model of deal-win: winning a deal is final and audited exactly once, even when callers act at the same time"
+    },
+    {
+      "id": "fv:record-ownership",
+      "kind": "fv",
+      "source": "design/risk.yaml",
+      "title": "Formal model of record-ownership: who may write which record must hold for every shape of data"
     },
     {
       "id": "inv:audit-append-only",

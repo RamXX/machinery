@@ -10,3 +10,51 @@ failure_modes:
     failure: "The store write that records a won deal fails or does not finish in time."
     required: fail-closed
     behavior: "The deal returns to Qualified, the caller sees 503 with code STORE_UNAVAILABLE, and no deal is Won without its audit entry."
+  - id: deal-qualify-by-non-owner
+    kind: abuse
+    subject: act:Deal.qualify
+    failure: "A Rep who is not the Owner of a lead asks to qualify it."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the deal stays a Lead, and exactly one AuditEntry with outcome refused is written."
+  - id: deal-win-by-non-owner
+    kind: abuse
+    subject: act:Deal.win
+    failure: "A Rep who is not the Owner of a qualified deal asks to win it."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the deal stays Qualified, and exactly one AuditEntry with outcome refused is written."
+  - id: deal-lose-by-non-owner
+    kind: abuse
+    subject: act:Deal.lose
+    failure: "A Rep who is not the Owner of an open deal asks to lose it."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the deal keeps its stage, and exactly one AuditEntry with outcome refused is written."
+  - id: deal-reopen-by-rep
+    kind: abuse
+    subject: act:Deal.reopen
+    failure: "A Rep, even the Owner, asks to reopen a lost deal."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the deal stays Lost, and exactly one AuditEntry with outcome refused is written."
+  - id: task-create-without-user
+    kind: abuse
+    subject: act:Task.create
+    failure: "A caller without a known User (X-User-Id missing or naming no User) asks to create a task."
+    required: refuse
+    behavior: "The request is refused with 401 UNAUTHENTICATED and no task is created."
+  - id: task-start-by-non-assignee
+    kind: abuse
+    subject: act:Task.start
+    failure: "A Rep who is not the Assignee of an open task asks to start it."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the task stays Open, and exactly one AuditEntry with outcome refused is written."
+  - id: task-complete-by-non-assignee
+    kind: abuse
+    subject: act:Task.complete
+    failure: "A Rep who is not the Assignee of a task in progress asks to complete it."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the task stays InProgress, and exactly one AuditEntry with outcome refused is written."
+  - id: task-cancel-by-non-assignee
+    kind: abuse
+    subject: act:Task.cancel
+    failure: "A Rep who is not the Assignee of an open task asks to cancel it."
+    required: refuse
+    behavior: "The request is refused with 403 FORBIDDEN, the task stays Open, and exactly one AuditEntry with outcome refused is written."

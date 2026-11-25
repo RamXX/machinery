@@ -4,6 +4,7 @@ design:
     - design/model/crm.modelith.yaml
   machines: design/machines
   failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
 contracts:
   - kind: openapi
     path: contracts/openapi.yaml
@@ -13,6 +14,12 @@ dependencies:
 trace:
   code: ["cmd/**/*.go", "internal/**/*.go"]
   tests: ["e2e/**/*.go"]
+tests:
+  e2e: ["e2e/**"]
+commands:
+  e2e: ["env", "GOMAXPROCS=2", "go", "test", "./e2e/...", "-count=1", "-p", "1"]
+tools:
+  xstate: true
 constraints:
   layers:
     - {name: fsm, paths: ["internal/fsm/**"]}
