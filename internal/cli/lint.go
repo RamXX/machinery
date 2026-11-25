@@ -39,6 +39,9 @@ func runStageCommand(e *Env, name string, args []string, all []string, withBase 
 	if !ok {
 		return 2
 	}
+	if base != "" && !e.CheckRef(p, base) {
+		return 2
+	}
 	return e.RunStages(name, &stages.Context{P: p, Base: base}, sel)
 }
 

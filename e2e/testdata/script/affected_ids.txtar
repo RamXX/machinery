@@ -1,0 +1,161 @@
+# affected: the ids a change touches, by the four rules of section 12.1
+fixture shop
+cp refund.sh.in e2e/refund.sh
+cp ship.go.in internal/api/ship.go
+cp pay.go.in internal/api/pay.go
+cp cancel.go.in internal/api/cancel.go
+cp place.go.in internal/api/place.go
+exec machinery gen
+gitinit
+exec git branch base
+
+# nothing touched prints nothing and exits 0
+exec mrun 0 affected --base base
+! stdout .
+! stderr .
+
+# a file that no tag and no machine mentions touches nothing
+exec sh -c 'echo notes >> README.md'
+exec mrun 0 affected --base base
+! stdout .
+gitcommit notes
+exec git branch -f base HEAD
+
+# rule 1: an obligation whose title differs, and one that is new
+exec sed -i.bak 's/never changes status again/never changes status once it is final/' design/model/shop.modelith.yaml
+exec rm design/model/shop.modelith.yaml.bak
+exec machinery gen
+exec mrun 0 affected --base base
+cmp stdout want_rule1.txt
+exec sh -c 'awk -f add.awk design/model/shop.modelith.yaml > m.tmp && mv m.tmp design/model/shop.modelith.yaml'
+exec machinery gen
+exec mrun 0 affected --base base
+cmp stdout want_rule1_new.txt
+gitcommit 'retitle and add an invariant'
+exec git branch -f base HEAD
+
+# a base without generated files has every obligation new
+exec git checkout -q -b nogen
+exec git rm -rq design/gen
+exec git -c user.name=t -c user.email=t@t commit -q -m 'no generated files'
+exec git checkout -q main
+exec mrun 0 affected --base nogen
+stdout -count=17 '^(inv|sc|tc|fm):'
+
+# rule 2: a changed test file names ids with machinery:verifies, patterns included
+exec sh -c 'echo "# touched" >> e2e/refund.sh'
+exec mrun 0 affected --base base
+cmp stdout want_rule2.txt
+gitcommit 'touch the refund test'
+exec git branch -f base HEAD
+
+# rule 3: a changed code file names acts with machinery:serves
+exec sh -c 'echo "// touched" >> internal/api/ship.go'
+exec mrun 0 affected --base base
+cmp stdout want_ship.txt
+exec sh -c 'echo "// touched" >> internal/api/pay.go'
+exec mrun 0 affected --base base
+cmp stdout want_ship_pay.txt
+gitcommit 'touch the ship and pay code'
+exec git branch -f base HEAD
+exec sh -c 'echo "// touched" >> internal/api/cancel.go'
+exec mrun 0 affected --base base
+cmp stdout want_cancel.txt
+gitcommit 'touch the cancel code'
+exec git branch -f base HEAD
+
+# an action no machine event answers and no invariant is preserved by touches nothing
+exec sh -c 'echo "// touched" >> internal/api/place.go'
+exec mrun 0 affected --base base
+! stdout .
+gitcommit 'touch the place code'
+exec git branch -f base HEAD
+
+# rule 4: every case of a machine whose file changed
+exec sh -c 'echo >> design/machines/Order.machine.json'
+exec mrun 0 affected --base base
+cmp stdout want_rule4.txt
+gitcommit 'touch the machine file'
+exec git branch -f base HEAD
+
+# a deleted test file is not read
+rm e2e/refund.sh
+exec mrun 0 affected --base base
+! stdout .
+
+# usage
+exec mrun 2 affected
+stderr 'usage: machinery affected --base <ref>'
+exec mrun 2 affected --base base extra
+stderr 'usage: machinery affected --base <ref>'
+
+-- refund.sh.in --
+#!/bin/sh
+# machinery:verifies sc:cancelled-order-refuses-payment tc:ORDE-8*
+true
+-- ship.go.in --
+package api
+
+// Ship serves the ship action.
+//
+// machinery:serves act:Order.ship
+func Ship() {}
+-- pay.go.in --
+package api
+
+// Pay serves the pay action.
+//
+// machinery:serves act:Order.pay
+func Pay() {}
+-- cancel.go.in --
+package api
+
+// Cancel serves the cancel action.
+//
+// machinery:serves act:Order.cancel
+func Cancel() {}
+-- place.go.in --
+package api
+
+// Place serves the place action.
+//
+// machinery:serves act:Order.place
+func Place() {}
+-- add.awk --
+{ print }
+/^invariants:$/ { print "  - {id: refunds-are-whole, statement: \"A refund returns the full amount.\"}" }
+-- want_rule1.txt --
+inv:terminal-is-final
+-- want_rule1_new.txt --
+inv:refunds-are-whole
+inv:terminal-is-final
+-- want_rule2.txt --
+sc:cancelled-order-refuses-payment
+tc:ORDE-8799a1
+tc:ORDE-8bd6e7
+-- want_ship.txt --
+inv:paid-before-shipped
+tc:ORDE-2fa2af
+tc:ORDE-e6d28f
+-- want_ship_pay.txt --
+inv:paid-before-shipped
+tc:ORDE-2e883d
+tc:ORDE-2fa2af
+tc:ORDE-70d94f
+tc:ORDE-8799a1
+tc:ORDE-e6d28f
+-- want_cancel.txt --
+inv:terminal-is-final
+tc:ORDE-1ded14
+tc:ORDE-507e4f
+-- want_rule4.txt --
+tc:ORDE-1ded14
+tc:ORDE-267d12
+tc:ORDE-2e883d
+tc:ORDE-2fa2af
+tc:ORDE-507e4f
+tc:ORDE-70d94f
+tc:ORDE-8799a1
+tc:ORDE-8bd6e7
+tc:ORDE-ad945c
+tc:ORDE-e6d28f

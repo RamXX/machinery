@@ -44,6 +44,11 @@ func Load(p *project.Project, rel string) (entries []Entry, problems []string) {
 	if err != nil {
 		return nil, []string{fmt.Sprintf("%s: cannot read: %v", rel, err)}
 	}
+	return Parse(rel, data)
+}
+
+// Parse reads baseline file bytes; rel names the file in problem messages.
+func Parse(rel string, data []byte) (entries []Entry, problems []string) {
 	var f file
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)

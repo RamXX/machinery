@@ -1,0 +1,55 @@
+# the ratchet: a proven obligation may not become owed; a new obligation may be owed
+fixture shop
+exec machinery gen
+gitinit
+exec git branch base
+exec git checkout -q -b nogen
+exec git rm -rq design/gen
+exec git -c user.name=t -c user.email=t@t commit -q -m 'no generated files'
+exec git checkout -q main
+
+# nothing changed: the base and the tree agree
+exec mrun 0 check --stage ratchet --base base
+stdout '== ratchet =='
+stdout 'checked: 16 obligations, 1 scope globs, 0 tiered ids, 0 baseline entries'
+stdout '^passed$'
+stdout 'machinery check: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# an id that was an obligation and not owed at the base is owed now
+cp design/owed.yaml owed.keep
+exec sh -c 'printf "  - id: inv:terminal-is-final\n    reason: \"not observed any more\"\n" >> design/owed.yaml'
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: inv:terminal-is-final was proven at base and is owed now'
+stdout 'failed: 1 finding\(s\)'
+! stdout 'ORDE-8bd6e7'
+
+# a base without generated files has nothing proven
+exec mrun 0 check --stage ratchet --base nogen
+stdout 'checked: 0 obligations, 1 scope globs'
+
+# an id that was already owed at the base stays owed without a finding
+cp owed.keep design/owed.yaml
+exec mrun 0 check --stage ratchet --base base
+
+# a new obligation may be owed
+exec sh -c 'awk -f add.awk design/model/shop.modelith.yaml > m.tmp && mv m.tmp design/model/shop.modelith.yaml'
+exec machinery gen
+exec sh -c 'printf "  - id: inv:refunds-are-whole\n    reason: \"no test refunds yet\"\n" >> design/owed.yaml'
+exec mrun 0 check --stage ratchet --base base
+stdout 'checked: 16 obligations'
+stdout '^passed$'
+
+# the ref may be any commit, and the tree is compared as it is on disk
+exec git add -A
+exec git -c user.name=t -c user.email=t@t commit -q -m owe
+exec git branch owing
+exec sh -c 'printf "  - id: inv:paid-before-shipped\n    reason: \"drop\"\n" >> design/owed.yaml'
+exec mrun 1 check --stage ratchet --base owing
+stdout 'ERROR  ratchet: inv:paid-before-shipped was proven at owing and is owed now'
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: inv:paid-before-shipped was proven at base and is owed now'
+! stdout 'refunds-are-whole'
+
+-- add.awk --
+{ print }
+/^invariants:$/ { print "  - {id: refunds-are-whole, statement: \"A refund returns the full amount.\"}" }

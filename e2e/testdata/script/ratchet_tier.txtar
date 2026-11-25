@@ -1,0 +1,145 @@
+# a tier may not be lowered quietly: an error, or a warn when the why changed too
+fixture shop
+cp machinery_risk.yaml machinery.yaml
+cp risk_base.yaml design/risk.yaml
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 0 check --stage ratchet --base base
+stdout 'checked: 17 obligations, 1 scope globs, 3 tiered ids, 0 baseline entries'
+stdout '^passed$'
+
+# raising a tier or adding an area is free
+cp risk_raised.yaml design/risk.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout '^passed$'
+
+# lowering a tier is an error for every id of the area, even when the area still exists
+cp risk_lowered.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: tier lowered: act:Order.pay critical -> consequential'
+stdout 'ERROR  ratchet: tier lowered: tc:ORDE-2e883d critical -> consequential'
+! stdout 'tc:ORDE-8bd6e7'
+stdout 'failed: 2 finding\(s\)'
+
+# the same lowering with a new why is a warn that carries the new reason
+cp risk_lowered_why.yaml design/risk.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout 'warn   ratchet: tier lowered: act:Order.pay critical -> consequential \(card payments moved to the hosted page\)'
+stdout 'warn   ratchet: tier lowered: tc:ORDE-2e883d critical -> consequential \(card payments moved to the hosted page\)'
+stdout '^passed$'
+
+# dropping the id from the area, or the area, lowers the tier to routine
+cp risk_dropped.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: tier lowered: tc:ORDE-2e883d critical -> routine'
+stdout 'ERROR  ratchet: tier lowered: act:Order.pay critical -> consequential'
+stdout 'failed: 2 finding\(s\)'
+cp risk_none.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: tier lowered: act:Order.pay critical -> routine'
+stdout 'ERROR  ratchet: tier lowered: inv:paid-before-shipped consequential -> routine'
+
+# an id in two areas keeps the higher tier
+cp risk_two.yaml design/risk.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout '^passed$'
+
+-- machinery_risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- risk_base.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: critical
+    why: "money moves here"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+    questions: [ordering]
+  - name: shipping
+    tier: consequential
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]
+-- risk_raised.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: critical
+    why: "money moves here"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+    questions: [ordering]
+  - name: shipping
+    tier: critical
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]
+    questions: [recovery]
+  - name: cancelling
+    tier: consequential
+    why: "a refund is owed"
+    ids: ["tc:ORDE-507e4f"]
+-- risk_lowered.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: consequential
+    why: "money moves here"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+  - name: shipping
+    tier: consequential
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]
+-- risk_lowered_why.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: consequential
+    why: "card payments moved to the hosted page"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+  - name: shipping
+    tier: consequential
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]
+-- risk_dropped.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: consequential
+    why: "money moves here"
+    ids: ["act:Order.pay"]
+  - name: shipping
+    tier: consequential
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]
+-- risk_none.yaml --
+version: 1
+areas: []
+-- risk_two.yaml --
+version: 1
+areas:
+  - name: payments
+    tier: critical
+    why: "money moves here"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+    questions: [ordering]
+  - name: payments-all
+    tier: consequential
+    why: "every order action"
+    ids: ["act:Order.*", "tc:*"]
+  - name: shipping
+    tier: consequential
+    why: "a wrong shipment costs a return"
+    ids: ["inv:paid-before-shipped"]

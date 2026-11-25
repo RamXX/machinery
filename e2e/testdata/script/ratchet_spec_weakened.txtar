@@ -1,0 +1,45 @@
+# a deliberate weakening of a formal model shows against the base
+fixture shop
+fixture shop-formal
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec sh -c 'printf "  - id: fv:order-payment\n    reason: \"the payment model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+exec mrun 1 formal check order-ownership
+exec machinery formal baseline
+gitcommit 'formal baseline'
+exec git branch base
+
+# nothing accepted: nothing to report
+exec mrun 0 check --stage ratchet --base base
+stdout '== ratchet =='
+stdout '^passed$'
+! stdout 'weakened'
+
+# a lowered bound, accepted with a reason, shows as a warn against the base
+exec sed -i.bak 's/constants: {scope: 4}/constants: {scope: 3}/' design/formal/order-ownership.spec.yaml
+exec machinery formal baseline --accept --reason 'ownership may be shared in the next release'
+exec mrun 0 check --stage ratchet --base base
+stdout 'warn   ratchet: weakened since base: order-ownership: run strict: constant scope lowered from 4 to 3 \(ownership may be shared in the next release\)'
+stdout '^passed$'
+stdout 'checked: .*, 1 baseline entries'
+
+# the base is whatever ref is asked for: once committed, the next base sees it as old
+gitcommit 'accept the weakening'
+exec git branch accepted
+exec mrun 0 check --stage ratchet --base accepted
+! stdout 'weakened'
+exec mrun 0 check --stage ratchet --base base
+stdout 'weakened since base: order-ownership: run strict: constant scope lowered from 4 to 3'
+
+# a second weakening shows next to the first one only when it is new
+exec sed -i.bak 's/constants: {scope: 3}/constants: {scope: 2}/' design/formal/order-ownership.spec.yaml
+exec machinery formal baseline --accept --reason 'smaller still'
+exec mrun 0 check --stage ratchet --base accepted
+stdout 'weakened since accepted: order-ownership: run strict: constant scope lowered from 3 to 2 \(smaller still\)'
+! stdout 'lowered from 4 to 3'
+
+# removing a spec is a weakening too
+rm design/formal/order-ownership.spec.yaml
+exec machinery formal baseline --accept --reason 'ownership is out of scope'
+exec mrun 0 check --stage ratchet --base accepted
+stdout 'weakened since accepted: order-ownership: spec removed \(ownership is out of scope\)'

@@ -1,0 +1,27 @@
+# an unknown ref is a usage error for every command that takes --base
+fixture shop
+exec machinery gen
+gitinit
+
+exec mrun 2 check --base nowhere
+stderr '^usage: unknown git ref nowhere$'
+! stdout .
+exec mrun 2 check --stage ratchet --base v9.9
+stderr '^usage: unknown git ref v9.9$'
+exec mrun 2 affected --base nowhere
+stderr '^usage: unknown git ref nowhere$'
+exec mrun 2 run --affected --base nowhere -- true
+stderr '^usage: unknown git ref nowhere$'
+exec mrun 2 verify --affected --base nowhere
+stderr '^usage: unknown git ref nowhere$'
+exec mrun 2 landing --base nowhere -- true
+stderr '^usage: unknown git ref nowhere$'
+
+# the ratchet needs a base: it is not part of check without --base
+exec mrun 2 check --stage ratchet
+stderr 'usage: unknown stage "ratchet" for machinery check'
+
+# a ref that exists, and a missing flag value
+exec mrun 0 check --stage ratchet --base HEAD
+stdout '^passed$'
+exec mrun 2 check --base

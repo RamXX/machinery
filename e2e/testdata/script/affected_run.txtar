@@ -1,0 +1,117 @@
+# run --affected exports MACHINERY_ONLY; verify --affected judges only those ids
+fixture shop
+cp ship.go.in internal/api/ship.go
+cp pay.go.in internal/api/pay.go
+cp only.sh.in e2e/only.sh
+exec machinery gen
+gitinit
+exec git branch base
+exec sh -c 'echo "// touched" >> internal/api/ship.go'
+gitcommit 'touch the ship code'
+
+exec mrun 0 affected --base base
+cmp stdout want_ship.txt
+
+# the command sees the ids, comma separated, and writes receipts for them only
+exec machinery run --affected --base base -- sh e2e/only.sh
+stderr 'machinery run: .machinery/receipts/.*\.jsonl \(exit 0\)'
+grep '^inv:paid-before-shipped,tc:ORDE-2fa2af,tc:ORDE-e6d28f$' .machinery/only.txt
+exec sh -c 'cat .machinery/receipts/*.jsonl > .machinery/seen.txt'
+grep -count=3 '"type":"receipt"' .machinery/seen.txt
+
+# the targeted verify passes with only those ids proven; the full verify does not
+exec mrun 0 verify --affected --base base
+stdout 'checked: 16 obligations, 3 proven, 0 partial, 2 owed, 3 receipts'
+stdout '^passed$'
+exec mrun 1 verify
+stdout 'ERROR  unproven: tc:ORDE-2e883d'
+stdout 'ERROR  unproven: sc:customer-pays-and-the-order-ships'
+
+# nothing affected: no command runs, no receipts are written
+exec git branch -f base HEAD
+rm .machinery/only.txt
+exec machinery run --affected --base base -- sh e2e/only.sh
+stderr 'machinery run: nothing affected since base; no command run'
+! exists .machinery/only.txt
+exec mrun 0 verify --affected --base base
+stdout '^passed$'
+
+# a new change: evidence of the old commit no longer counts; the affected ids must be proven again
+exec sh -c 'echo "// touched" >> internal/api/pay.go'
+gitcommit 'touch the pay code'
+exec mrun 0 affected --base base
+cmp stdout want_pay.txt
+env ONLY_SKIP=tc:ORDE-70d94f
+exec machinery run --affected --base base -- sh e2e/only.sh
+grep '^inv:paid-before-shipped,tc:ORDE-2e883d,tc:ORDE-70d94f,tc:ORDE-8799a1$' .machinery/only.txt
+exec mrun 1 verify --affected --base base
+stdout 'checked: 16 obligations, 3 proven'
+stdout 'ERROR  unproven: tc:ORDE-70d94f'
+! stdout 'unproven: tc:ORDE-2fa2af'
+! stdout 'unproven: sc:'
+stdout 'failed: 1 finding\(s\)'
+
+# a failure always prints, affected or not
+env ONLY_SKIP=
+env ONLY_FAIL=tc:ORDE-1ded14
+exec machinery run --affected --base base -- sh e2e/only.sh
+exec mrun 1 verify --affected --base base
+stdout 'ERROR  failed: tc:ORDE-1ded14 \(only.sh\)'
+! stdout 'unproven: tc:ORDE-70d94f'
+
+# the flags go together
+exec mrun 2 run --affected -- true
+stderr 'usage: --affected and --base go together'
+exec mrun 2 run --base base -- true
+stderr 'usage: --affected and --base go together'
+exec mrun 2 verify --affected
+stderr 'usage: --affected and --base go together'
+exec mrun 2 verify --base base
+stderr 'usage: --affected and --base go together'
+
+-- ship.go.in --
+package api
+
+// Ship serves the ship action.
+//
+// machinery:serves act:Order.ship
+func Ship() {}
+-- pay.go.in --
+package api
+
+// Pay serves the pay action.
+//
+// machinery:serves act:Order.pay
+func Pay() {}
+-- only.sh.in --
+#!/bin/sh
+# Emits a receipt for each id in MACHINERY_ONLY that it knows, like a suite that honors the variable.
+set -eu
+mkdir -p .machinery
+printf '%s\n' "${MACHINERY_ONLY-unset}" > .machinery/only.txt
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+emit() {
+  printf '{"v":1,"type":"receipt","id":"%s","outcome":"%s","test":"only.sh","effects":%s,"observed":"seen"}\n' "$1" "$2" "$3" >> "$MACHINERY_RECEIPTS"
+}
+want() {
+  case ",${MACHINERY_ONLY:-}," in
+    *",$1,"*) [ "${ONLY_SKIP:-}" != "$1" ] ;;
+    *) return 1 ;;
+  esac
+}
+want inv:paid-before-shipped && emit inv:paid-before-shipped pass '[]'
+want tc:ORDE-2fa2af && emit tc:ORDE-2fa2af pass '[]'
+want tc:ORDE-e6d28f && emit tc:ORDE-e6d28f pass '["recordShipment","notifyCustomer"]'
+want tc:ORDE-2e883d && emit tc:ORDE-2e883d pass '["stampAttempt"]'
+want tc:ORDE-70d94f && emit tc:ORDE-70d94f pass '["recordPayRefused"]'
+want tc:ORDE-8799a1 && emit tc:ORDE-8799a1 pass '[]'
+[ -z "${ONLY_FAIL:-}" ] || emit "$ONLY_FAIL" fail '[]'
+-- want_ship.txt --
+inv:paid-before-shipped
+tc:ORDE-2fa2af
+tc:ORDE-e6d28f
+-- want_pay.txt --
+inv:paid-before-shipped
+tc:ORDE-2e883d
+tc:ORDE-70d94f
+tc:ORDE-8799a1

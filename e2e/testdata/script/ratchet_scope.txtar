@@ -1,0 +1,225 @@
+# scope only widens: a glob of the base that is missing now is an error
+fixture shop
+cp machinery_base.yaml machinery.yaml
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 0 check --stage ratchet --base base
+stdout 'checked: 16 obligations, 2 scope globs, 0 tiered ids, 0 baseline entries'
+stdout '^passed$'
+
+# narrowing drops a glob
+cp machinery_narrow.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: scope narrowed: e2e/\*\*'
+! stdout 'scope narrowed: internal'
+stdout 'failed: 1 finding\(s\)'
+
+# swapping a glob for another is a narrowing of the one that went
+cp machinery_swap.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: scope narrowed: e2e/\*\*'
+
+# widening is free
+cp machinery_wide.yaml machinery.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout '^passed$'
+
+# a base that had no scope key covered everything: any explicit scope narrows it
+cp machinery_none.yaml machinery.yaml
+gitcommit unscoped
+exec git branch unscoped
+cp machinery_narrow.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base unscoped
+stdout 'ERROR  ratchet: scope narrowed: \*\*'
+
+-- machinery_base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "e2e/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_swap.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "contracts/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_wide.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "e2e/**", "contracts/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_none.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+
+
+# narrowing drops a glob
+cp machinery_narrow.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: scope narrowed: e2e/\*\*'
+! stdout 'scope narrowed: internal'
+stdout 'failed: 1 finding\(s\)'
+
+# swapping a glob for another is a narrowing of the one that went
+cp machinery_swap.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: scope narrowed: e2e/\*\*'
+
+# widening is free
+cp machinery_wide.yaml machinery.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout '^passed$'
+
+# a base that had no scope key covered everything: any explicit scope narrows it
+cp machinery_base.yaml machinery.yaml
+exec git add -A
+exec git -c user.name=t -c user.email=t@t commit -q -m 'scoped'
+cp machinery_none.yaml machinery.yaml
+exec git add -A
+exec git -c user.name=t -c user.email=t@t commit -q -m 'unscoped'
+exec git branch unscoped
+cp machinery_narrow.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base unscoped
+stdout 'ERROR  ratchet: scope narrowed: \*\*'
+
+-- machinery_base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "e2e/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_swap.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "contracts/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_wide.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "e2e/**", "contracts/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_none.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

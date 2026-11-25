@@ -1,0 +1,116 @@
+# a baseline may shrink; growing it needs a wider scope in the same change
+fixture shop
+cp machinery_base.yaml machinery.yaml
+cp orders_test.go.in e2e/orders_test.go
+exec machinery arch --write-baseline
+exec machinery tests --write-baseline
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 0 check --stage ratchet --base base
+stdout 'checked: 16 obligations, 2 scope globs, 0 tiered ids, 0 baseline entries'
+stdout '^passed$'
+
+# a new violation recorded in the architecture baseline
+cp bad.go.in internal/domain/bad.go
+exec machinery arch --write-baseline
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: baseline grew: layer internal/domain/bad.go -> internal/api'
+stdout 'checked: 16 obligations, 2 scope globs, 0 tiered ids, 1 baseline entries'
+stdout 'failed: 1 finding\(s\)'
+
+# the same for the tests baseline
+cp calc_test.go.in internal/domain/calc_test.go
+exec machinery tests --write-baseline
+exec mrun 1 check --stage ratchet --base base
+stdout 'ERROR  ratchet: baseline grew: unit-test internal/domain/calc_test.go'
+stdout 'failed: 2 finding\(s\)'
+
+# a wider scope in the same change lets the baseline grow
+cp machinery_wide.yaml machinery.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout '^passed$'
+stdout 'checked: 16 obligations, 2 scope globs, 0 tiered ids, 2 baseline entries'
+
+# a baseline that only shrinks is free
+exec git add -A
+exec git -c user.name=t -c user.email=t@t commit -q -m grown
+exec git branch grown
+rm internal/domain/bad.go
+exec machinery arch --write-baseline
+exec mrun 0 check --stage ratchet --base grown
+stdout '^passed$'
+
+-- machinery_base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "e2e/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  baseline: design/arch-baseline.yaml
+tests:
+  e2e: ["e2e/**"]
+  baseline: design/tests-baseline.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_wide.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/**", "e2e/**", "contracts/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  baseline: design/arch-baseline.yaml
+tests:
+  e2e: ["e2e/**"]
+  baseline: design/tests-baseline.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}
+-- bad.go.in --
+package domain
+
+import "example.test/shop/internal/api"
+
+func Bad() string { return api.Handle("x") }
+-- calc_test.go.in --
+package domain
+
+import "testing"
+
+func TestCalc(t *testing.T) {}
