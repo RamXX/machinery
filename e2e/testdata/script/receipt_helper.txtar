@@ -1,0 +1,83 @@
+# pkg/receipt emits receipts for Go suites (section 10)
+fixture shop shop
+fixture receiptprog prog
+cd prog
+exec go mod edit -replace github.com/RamXX/machinery=$REPO
+exec go build -o $WORK/bin/receiptprog .
+cd $WORK/shop
+exec machinery gen
+gitinit
+
+# without MACHINERY_RECEIPTS every emit is a no-op and the program still runs
+exec $WORK/bin/receiptprog enabled
+stdout '^enabled=false$'
+exec $WORK/bin/receiptprog pass tc:ORDE-2e883d 'Pending -> paying' stampAttempt
+! stdout .
+! exists .machinery/receipts
+
+# through machinery run: one line per receipt in the shape of section 10
+exec machinery run -- sh $WORK/emit.sh
+stdout '^enabled=true$'
+exec sh -c 'cat .machinery/receipts/*.jsonl'
+stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"receiptprog","effects":\["stampAttempt"\],"observed":"Pending -> paying"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-e6d28f","outcome":"pass","test":"receiptprog","effects":\["recordShipment","notifyCustomer"\],"observed":"Paid -> Shipped"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2fa2af","outcome":"pass","test":"receiptprog","observed":"ship refused, still Pending"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"skip","test":"receiptprog","observed":"no outage induced"\}$'
+# observed is cut at 300 characters
+stdout '"id":"inv:customer-email-unique","outcome":"pass","test":"receiptprog","observed":"x{300}"\}$'
+# 200 parallel emits do not interleave
+exec sh -c 'grep -c "\"id\":\"inv:terminal-is-final\"" .machinery/receipts/*.jsonl'
+stdout '^201$'
+exec machinery verify
+stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 216 receipts$'
+stdout '^passed$'
+
+# fail receipts
+rm .machinery/receipts
+exec machinery run -- sh -c 'sh $WORK/emit.sh && $WORK/bin/receiptprog fail tc:ORDE-2e883d "stayed Pending"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: tc:ORDE-2e883d \(receiptprog\)$'
+
+# replay receipts for cx ids, and refusals of bad values
+env MACHINERY_RECEIPTS=$WORK/direct.jsonl
+exec $WORK/bin/receiptprog replay cx:order-payment:race refuted 'second commit refused'
+grep '^\{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"receiptprog","observed":"second commit refused","replay":"refuted"\}$' $WORK/direct.jsonl
+! exec $WORK/bin/receiptprog replay cx:order-payment:race maybe 'x'
+stderr 'receipt: cx:order-payment:race: replay must be reproduced or refuted, got "maybe"'
+! exec $WORK/bin/receiptprog outcome tc:ORDE-2e883d passed
+stderr 'receipt: tc:ORDE-2e883d: outcome must be pass, fail or skip, got "passed"'
+env MACHINERY_RECEIPTS=
+
+# MACHINERY_ONLY: Only lists the ids, Wanted says whether to run a test
+exec $WORK/bin/receiptprog only
+stdout '^only=$'
+exec $WORK/bin/receiptprog wanted tc:ORDE-2e883d
+stdout '^wanted tc:ORDE-2e883d: true$'
+env MACHINERY_ONLY=tc:ORDE-2e883d,sc:customer-pays-and-the-order-ships
+exec $WORK/bin/receiptprog only
+stdout '^only=tc:ORDE-2e883d,sc:customer-pays-and-the-order-ships$'
+exec $WORK/bin/receiptprog wanted sc:customer-pays-and-the-order-ships
+stdout ': true$'
+exec $WORK/bin/receiptprog wanted inv:terminal-is-final
+stdout '^wanted inv:terminal-is-final: false$'
+
+-- emit.sh --
+rp=$WORK/bin/receiptprog
+$rp enabled
+$rp pass tc:ORDE-2e883d 'Pending -> paying' stampAttempt
+$rp pass tc:ORDE-70d94f 'pay refused, still Pending' recordPayRefused
+$rp pass tc:ORDE-1ded14 'Pending -> Cancelled' recordCancellation
+$rp pass tc:ORDE-ad945c 'paying -> Pending after timeout' recordPaymentTimeout
+$rp pass tc:ORDE-8bd6e7 'paying -> Paid; charge record not observed'
+$rp pass tc:ORDE-267d12 'paying -> Pending on provider error' recordPaymentFailure
+$rp pass tc:ORDE-e6d28f 'Paid -> Shipped' recordShipment notifyCustomer
+$rp pass tc:ORDE-507e4f 'Paid -> Cancelled' refundPayment recordCancellation
+$rp pass tc:ORDE-2fa2af 'ship refused, still Pending'
+$rp pass tc:ORDE-8799a1 'pay refused, still Paid'
+$rp pass sc:customer-pays-and-the-order-ships 'order placed, paid and shipped'
+$rp pass sc:cancelled-order-refuses-payment 'pay refused on a cancelled order'
+$rp pass inv:paid-before-shipped 'ship from Pending refused'
+$rp pass inv:terminal-is-final 'no event changes a Shipped or Cancelled order'
+$rp pass inv:customer-email-unique "$(printf 'x%.0s' $(seq 1 350))"
+$rp skip fm:payment-provider-down 'no outage induced'
+$rp many inv:terminal-is-final 200
