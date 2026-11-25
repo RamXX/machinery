@@ -227,15 +227,22 @@ func (d *Design) Tier(id string) (string, []Area) {
 	default:
 		return TierOf(d.Areas, id)
 	}
-	tier := Routine
-	var in []Area
+	// an area may also list the id itself
+	tier, in := TierOf(d.Areas, id)
 	for _, a := range d.Areas {
 		for _, n := range names {
-			if a.Name == n {
+			if a.Name != n {
+				continue
+			}
+			dup := false
+			for _, have := range in {
+				dup = dup || have.Name == a.Name
+			}
+			if !dup {
 				in = append(in, a)
-				if TierRank(a.Tier) > TierRank(tier) {
-					tier = a.Tier
-				}
+			}
+			if TierRank(a.Tier) > TierRank(tier) {
+				tier = a.Tier
 			}
 		}
 	}

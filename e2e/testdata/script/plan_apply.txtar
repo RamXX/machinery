@@ -10,9 +10,9 @@ gitinit
 exec bd init --stealth --non-interactive -p shop
 exec bd create --id shop-ep --title 'Order lifecycle' --type epic --silent
 
-# twelve stories, six edges, every story under the parent
+# twelve stories, seven edges, every story under the parent
 exec machinery plan --apply --parent shop-ep
-stdout '^plan: 12 created, 0 existing, 6 edge\(s\)$'
+stdout '^plan: 12 created, 0 existing, 7 edge\(s\)$'
 exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
 stdout '^13$'
 exec bd list --all --json --limit 0
@@ -22,7 +22,7 @@ stdout '"title": "Prove order pay"'
 stdout '"title": "Prove order internal transitions"'
 stdout '"title": "Serve Order actions"'
 exec sh -c 'bd list --all --json --limit 0 | grep -c "\"type\": \"blocks\""'
-stdout '^6$'
+stdout '^7$'
 
 # the stories carry the plan's description, labels, criteria, edges and parent
 exec sh -c '. ./lib.sh; bd show $(sid "Prove order pay") --json'

@@ -36,6 +36,7 @@ grep '"title": "Serve Order actions",$' plan.json
 grep '"acceptance_criteria": "- Each listed obligation is proven' plan.json
 grep '"description": "Owed ids:\\n- tc:ORDE-2e883d: Pending on:pay \[hasPaymentMethod\] -> paying \(effects: stampAttempt\)' plan.json
 exec sh -c 'tr -d " \n" < plan.json | grep -o "\"edges\":.*"'
+stdout '"from_key":"prove-cx-order-payment-race","to_key":"model-order-payment-tla","type":"blocks"'
 stdout '"from_key":"prove-cx-order-payment-race","to_key":"prove-order-pay","type":"blocks"'
 stdout '"from_key":"prove-fm-payment-provider-down","to_key":"prove-order-internal-transitions","type":"blocks"'
 stdout '"from_key":"prove-order-cancel","to_key":"model-order-payment-tla","type":"blocks"'
@@ -43,7 +44,7 @@ stdout '"from_key":"prove-order-internal-transitions","to_key":"model-order-paym
 stdout '"from_key":"prove-order-pay","to_key":"model-order-payment-tla","type":"blocks"'
 stdout '"from_key":"prove-order-ship","to_key":"model-order-payment-tla","type":"blocks"'
 exec sh -c 'grep -c "\"from_key\":" plan.json'
-stdout '^6$'
+stdout '^7$'
 
 # an edge needs both stories in the plan: without the Model story there is none to it
 cp owed-nomodel.yaml design/owed.yaml
@@ -229,22 +230,24 @@ machinery:ids fv:order-payment
 task
 
 ### Priority
-2
+0
 
 ### Labels
-machinery, tier:routine
+machinery, tier:critical
 
 ### Description
 Owed ids:
 - cx:order-payment:race: Replay ChargedOnce (order-payment run race)
 
 Needs:
+- Model order-payment (tla): the formal model the tier requires
 - Prove order pay: the transitions the replay drives
 
 machinery:ids cx:order-payment:race
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
 
 ## Prove fm:payment-provider-down
 

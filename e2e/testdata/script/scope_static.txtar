@@ -7,8 +7,8 @@ exec mrun 0 arch
 stdout 'checked: 1 files, 0 imports, 1 functions'
 exec mrun 0 trace
 stdout 'checked: 1 code files, 1 test files, 4 act ids, 16 obligations'
-exec mrun 1 tests
-stdout 'not demonstrated: nothing to check'
+exec mrun 0 tests
+stdout 'checked: 0 test files, 1 files under e2e roots, 12 markers'
 
 # violations outside the scope are not reported by arch, tests or trace
 cp long.go.in internal/api/long.go
@@ -18,8 +18,8 @@ cp api_tag.go.in internal/api/tag.go
 exec mrun 0 arch
 stdout 'checked: 1 files, 0 imports, 1 functions'
 ! stdout 'long.go'
-exec mrun 1 tests
-stdout 'not demonstrated: nothing to check'
+exec mrun 0 tests
+stdout 'checked: 0 test files, 1 files under e2e roots, 12 markers'
 ! stdout 'unit_test'
 exec mrun 0 trace
 ! stdout 'Bogus'
