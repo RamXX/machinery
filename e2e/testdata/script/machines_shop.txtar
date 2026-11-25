@@ -1,0 +1,7 @@
+# the shop machine passes the machines stage
+fixture shop
+exec machinery lint --stage machines
+stdout '^== machines ==$'
+stdout '^checked: 1 machines, 5 states, 8 transitions$'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'

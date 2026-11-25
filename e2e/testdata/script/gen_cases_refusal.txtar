@@ -1,0 +1,190 @@
+# a fully guarded handler with _refusal yields a refusal case
+fixture shop
+cp refusal.json design/machines/Order.machine.json
+exec machinery gen
+stdout 'gen: wrote 4 file\(s\)'
+
+grep '"id": "tc:ORDE-f3dfea"' design/gen/obligations.json
+grep '"title": "Pending refusal:cancel -> \(unchanged\)"' design/gen/obligations.json
+grep '"id": "tc:ORDE-9253f0"' design/gen/obligations.json
+grep '"title": "Pending on:cancel \[canCancel\] -> Cancelled"' design/gen/obligations.json
+grep -count=17 '"kind": "' design/gen/obligations.json
+
+# the runtime table carries the refusal and its disposition
+grep '"handler": "cancel"' design/gen/tables/order.table.json
+grep '"disposition": "canCancel is false once a charge is in flight' design/gen/tables/order.table.json
+grep '## Refusals' design/gen/tables/order.table.md
+grep 'tc:ORDE-f3dfea \| Pending \| cancel' design/gen/tables/order.table.md
+
+# no disposition, no refusal case: the stage refuses and gen writes nothing
+cp $WORK/undeclared.json design/machines/Order.machine.json
+rm -r design/gen
+exec mrun 1 gen
+stdout 'ERROR  design/machines/Order.machine.json: state Pending on:cancel is fully guarded'
+! exists design/gen
+
+-- refusal.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": {
+    "orderId": null,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          {
+            "target": "paying",
+            "guard": "hasPaymentMethod",
+            "actions": "stampAttempt"
+          },
+          {
+            "actions": "recordPayRefused"
+          }
+        ],
+        "cancel": {
+          "target": "Cancelled",
+          "actions": "recordCancellation",
+          "guard": "canCancel"
+        }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID"
+      },
+      "_refusal": {
+        "cancel": "canCancel is false once a charge is in flight: the API answers ORDER_NOT_CANCELLABLE and the order stays Pending"
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid",
+          "actions": "recordCharge"
+        },
+        "onError": {
+          "target": "Pending",
+          "actions": "recordPaymentFailure"
+        }
+      },
+      "after": {
+        "payTimeout": {
+          "target": "Pending",
+          "actions": "recordPaymentTimeout"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": {
+          "target": "Shipped",
+          "actions": "recordShipment"
+        },
+        "cancel": {
+          "target": "Cancelled",
+          "actions": [
+            "refundPayment",
+            "recordCancellation"
+          ]
+        }
+      },
+      "_ignores": {
+        "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID"
+      }
+    },
+    "Shipped": {
+      "type": "final",
+      "entry": "notifyCustomer"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- undeclared.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": {
+    "orderId": null,
+    "lastError": null
+  },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          {
+            "target": "paying",
+            "guard": "hasPaymentMethod",
+            "actions": "stampAttempt"
+          },
+          {
+            "actions": "recordPayRefused"
+          }
+        ],
+        "cancel": {
+          "target": "Cancelled",
+          "actions": "recordCancellation",
+          "guard": "canCancel"
+        }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID"
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid",
+          "actions": "recordCharge"
+        },
+        "onError": {
+          "target": "Pending",
+          "actions": "recordPaymentFailure"
+        }
+      },
+      "after": {
+        "payTimeout": {
+          "target": "Pending",
+          "actions": "recordPaymentTimeout"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": {
+          "target": "Shipped",
+          "actions": "recordShipment"
+        },
+        "cancel": {
+          "target": "Cancelled",
+          "actions": [
+            "refundPayment",
+            "recordCancellation"
+          ]
+        }
+      },
+      "_ignores": {
+        "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID"
+      }
+    },
+    "Shipped": {
+      "type": "final",
+      "entry": "notifyCustomer"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
