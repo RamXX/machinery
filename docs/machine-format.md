@@ -22,8 +22,12 @@ enforces everything below, and an unknown key is an error, never silently skippe
 - **Strict target resolution.** See "Targets and state ids".
 - **Declared delays.** Every `after` key is a name declared in `_delays`, and every declared delay
   is used by an `after`.
-- **Reachability.** Every state can be reached from the initial state. A non-final leaf must have a
-  transition that leaves it (no dead ends, no absorbing states). A final state has no transitions.
+- **Reachability.** Every state can be reached from the initial state or from an entry state
+  (`_entries`). A non-final leaf must have a transition that leaves it (no dead ends, no
+  absorbing states), unless it declares `_terminal`. A final state has no transitions.
+- **Entries.** `_entries` names existing top-level states other than `initial`, each once.
+- **Terminal states.** `_terminal` is a reason on a non-final leaf state that has transitions and
+  none that leaves it.
 - **Invokes.** Every `invoke` has a `src`, an `onError`, and its state has a non-empty `after`.
 - **Branch order.** An unguarded branch is last, no two branches of a list share a guard, and no
   branch list is empty.
@@ -33,7 +37,13 @@ enforces everything below, and an unknown key is an error, never silently skippe
   `always` list declares `_exhaustive`.
 - **Guard clauses.** `_guards` is well formed and names guards the machine uses.
 - **Fail-closed tags.** Not-checked states never reach an accepting state.
+- **Failure states and events.** No state is tagged both `failure` and `accepting`.
+  `_failure_events` names events some state handles or ignores, none of them also in
+  `_external_events`.
+- **Callers.** `_requires` is a non-empty list of distinct, non-empty names.
 - **Collisions.** Two machines may not share a case-id tag or a machine id.
+
+Name hints print as `warn   <file>: <message>` and never fail the stage (see "Failure idioms").
 
 The stage prints `checked: <n> machines, <n> states, <n> transitions`. It is not applicable when
 `design.machines` is absent, and not demonstrated (`nothing to check`) when the directory holds no
@@ -42,11 +52,12 @@ machine file. A file that cannot be parsed is an ERROR.
 ## The subset
 
 - **Root keys:** `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, and the
-  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_oracle_tag`, `_guards`, `_external_events`.
+  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_oracle_tag`, `_guards`, `_external_events`,
+  `_failure_events`, `_entries`.
 - **State keys:** `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`, `id`,
   `meta`, `description`, `tags`, `onDone`, `output`, and the annotations `_comment`, `_exhaustive`,
-  `_ignores`, `_refusal`.
-- **Transition keys:** `target`, `guard`, `actions`, `description`, `_comment`. A typo such as
+  `_ignores`, `_refusal`, `_terminal`.
+- **Transition keys:** `target`, `guard`, `actions`, `description`, `_comment`, `_requires`. A typo such as
   `tagret` is an error: it would otherwise become a silent internal transition.
 - **Invoke keys:** `src` (mandatory, a non-empty string naming the actor), `input`, `id`, `onDone`,
   `onError`, `_comment`.
@@ -157,6 +168,42 @@ model actions, for example events that arrive from a bus or a peer subsystem (`d
 section 6.4 reads it). Each entry is a non-empty string. An entry that no state handles or ignores
 is a stale marker and an error: remove it, or wire the event.
 
+**`_failure_events`** (root, optional). An array of event names that report a failure arriving
+from outside: a dependency failed, a crash was detected, a lease was lost. The shape and the
+staleness rule are those of `_external_events`, and an event may not be in both lists: a failure
+event is external already. See "Failure idioms".
+
+**`_entries`** (root, optional). A non-empty array of top-level state names, besides `initial`, in
+which an instance may be created directly: an imported or migrated instance. Each names an
+existing top-level state, none is the initial state, none appears twice. Reachability starts from
+the initial state and from every entry. The runtime table lists them under `entries`, and the TLA+
+skeleton lets an instance start in any of them (`docs/formats.md` sections 7.3 and 16.2).
+
+```json
+"_entries": ["Active"]
+```
+
+**`_terminal`** (state). A reason string on a non-final leaf state that is never left by design but
+still answers events: a durable resource keeps refusing after its end. Without it such a state is
+an absorbing state, an error. The claim is checked: `_terminal` on a final state, on a compound
+state, on a state a transition leaves, or on a state with no transition at all (a dead end) is an
+error, and so is an empty reason. Event completeness applies to it as to any resting state.
+
+```json
+"Closed": {
+  "_terminal": "a closed account is kept for audit; every later request is refused with ACCOUNT_CLOSED",
+  "on": {"deposit": {"actions": "recordRefusal"}, "close": {"actions": "recordRefusal"}}
+}
+```
+
+**`_requires`** (transition branch, optional). A non-empty array of distinct, non-empty strings
+naming who may cause the transition: an actor or a role, or `system/<name>` for an internal
+caller. The lint checks the shape only. The runtime table row carries it, sorted, as `requires`.
+
+```json
+"approve": {"target": "Approved", "_requires": ["Manager", "system/autoApprover"]}
+```
+
 **`_comment`** (any level). Free text.
 
 ## Event completeness
@@ -242,15 +289,92 @@ an atomic state runs only its own actions. `docs/formats.md` section 7.2 has the
 
 ## Failure idioms
 
-Every side effect is an `invoke`. Listing its outcomes is how failure modes get named.
+A failure reaches a machine in one of two ways, and each has an idiom. In both, tag the state that
+records the failure with the XState tag `failure`. Stage `xref-failure` (`docs/formats.md` section
+6.6) then asks for a failure mode for each failure state and each failure event: what the system
+must do when it happens. A state tagged both `failure` and `accepting` is an error: a state that
+records that something went wrong cannot report caller-facing success.
+
+**The invoke idiom.** The machine calls out itself. Every side effect is an `invoke`, and listing
+its outcomes is how failure modes get named.
 
 - **Async operation:** `invoke` with `onDone` and `onError`. A missing `onError` is an error.
 - **Timeout:** an `after` on the invoking state. Every invoking state needs one.
 - **Retry with backoff:** `onError` to a `retrying` state, an `after` back to the operation, and a
-  guard such as `retriesExhausted` that routes to a terminal failure.
+  guard such as `retriesExhausted` that routes to a failure state.
 - **Compensation:** `onError` to a `compensating` state that invokes the rollback, then to a stable
   state.
 - **Degrade:** route to a `degraded` state that serves a fallback rather than failing hard.
+
+```json
+"charging": {
+  "invoke": {
+    "src": "chargePayment",
+    "onDone": {"target": "Paid", "actions": "recordCharge"},
+    "onError": {"target": "PaymentFailed", "actions": "recordPaymentFailure"}
+  },
+  "after": {"payTimeout": {"target": "PaymentFailed", "actions": "recordPaymentTimeout"}}
+},
+"PaymentFailed": {
+  "tags": "failure",
+  "on": {"retry": {"target": "charging"}, "cancel": {"target": "Cancelled"}}
+}
+```
+
+The failure modes name `invoke:order.chargePayment` and `state:order.PaymentFailed`.
+
+**The event idiom.** Someone else does the work and reports back: a worker, a supervisor or a lease
+manager sends an event into a resting state (`jobFailed`, `crashDetected`, `leaseLost`). List
+those events in `_failure_events` and tag the state they lead to `failure`:
+
+```json
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": ["jobFailed"],
+  "states": {
+    "Queued": {
+      "on": {"claim": {"target": "Running", "actions": "grantLease", "_requires": ["system/worker"]}},
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {"target": "Done", "actions": "recordResult", "_requires": ["system/worker"]},
+        "jobFailed": {"target": "Failed", "actions": "recordFailure", "_requires": ["system/worker"]}
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {"retry": {"target": "Queued", "actions": "recordRetry", "_requires": ["Operator"]}},
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {"type": "final"}
+  }
+}
+```
+
+The failure modes name `event:job.jobFailed` (what arrives) and `state:job.Failed` (what is
+recorded). A failure event arrives from outside, so it needs no model action
+(`docs/formats.md` section 6.4), and a test makes it happen in each state that handles or ignores
+it.
+
+**Name hints.** The lint warns about a state whose name contains `fail`, `error`, `abort`,
+`crash` or `timeout` (in any case) and is not tagged `failure`, and about an event with such a
+name that is neither in `_failure_events` nor an action of the lifecycle entity. A warning never
+fails the stage; tag the state, list the event, or leave it when the name means something else.
 
 A per-state `after` is cancelled when its state exits. A bound that must hold across several
 states needs a timer on each of them.
@@ -273,7 +397,8 @@ The lint reports an ERROR for:
 - a `tags` value that is neither a string nor an array of non-empty strings.
 
 Route a not-checked path to a failing outcome, or to an explicit not-checked state the caller sees
-as such. Other tags are inert, and a machine without these tags is unaffected.
+as such. The tag `failure` is described in "Failure idioms". Other tags are inert, and a machine
+without these tags is unaffected.
 
 ## Named units
 

@@ -235,7 +235,7 @@ configuration file is the versioned declaration; this command renders it.
 | `risk` | Each risk area names real design ids, so tier gates attach to real behavior. |
 | `xref-model-machine` | The lifecycle a machine implements is the lifecycle the model promises. |
 | `xref-contract` | Every action is reachable through a published operation. |
-| `xref-failure` | Every side effect, dependency and tiered action has a declared failure behavior. |
+| `xref-failure` | Every side effect, dependency, failure state, failure event and tiered action has a declared failure behavior. |
 | `xstate` | A generated table means what XState would execute for the same machine. |
 | `gen-drift` | Tables and obligations in the tree are the ones the design produces. |
 | `formal` | The formal model of a critical area is current, not vacuous and not weakened. |
@@ -302,6 +302,20 @@ Every machine is one of:
 In a lifecycle machine, top-level states whose name starts with an uppercase letter are **domain
 states**. States whose name starts with a lowercase letter are transient overlay states.
 
+A machine also declares, with annotations XState ignores and a tag XState carries:
+
+- **entry states**: the root `_entries` lists top-level states, besides `initial`, in which an
+  instance may be created directly (an imported or migrated instance);
+- **terminal states**: a non-final leaf state with `_terminal: "<reason>"` is never left by design
+  but still answers events (a durable resource keeps refusing after its end);
+- **failure states**: a state with the XState tag `failure` records that something went wrong;
+- **failure events**: the root `_failure_events` lists the events that report a failure arriving
+  from outside (a dependency failed, a crash was detected, a lease was lost);
+- **callers**: a transition branch with `_requires` names who may cause it, an actor or role, or
+  `system/<name>` for an internal caller.
+
+`docs/machine-format.md` has their rules; stage `machines` (section 6.2) holds them.
+
 ### 5.3 Contracts
 
 - `kind: openapi`: an OpenAPI 3.x document in YAML or JSON. An operation binds to a model action
@@ -336,8 +350,9 @@ failure_modes:
 `id`, `subject`, `failure`, `required` and `behavior` are required. Unknown keys are an ERROR.
 
 Subject forms: `invoke:<machine id>.<src>`, `dependency:<name>`, `act:<Entity>.<action>`,
-`entity:<Name>`. `required: refuse` is only valid with `kind: abuse`, and `kind: abuse` needs an
-`act` or `entity` subject.
+`entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path)
+and `event:<machine id>.<event>` (a failure event). `required: refuse` is only valid with
+`kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject.
 
 ### 5.5 Risk file
 
@@ -365,10 +380,19 @@ For each configured model file:
 
 Lints every `*.machine.json` in the machines directory with the rules in
 `docs/machine-format.md`: subset conformance, name patterns, strict target resolution, declared
-delays, reachability, dead ends, every invoke has `onError` and a timeout, event completeness on
-resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`), fail-closed
-tags. Two machines whose id tags collide (section 7.2), or that share a machine `id`, are an
-ERROR.
+delays, reachability from the initial state and from every entry state (`_entries`), dead ends,
+absorbing states unless declared `_terminal`, every invoke has `onError` and a timeout, event
+completeness on resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`),
+fail-closed tags, no state tagged both `failure` and `accepting`, and the shape of `_requires`,
+`_entries`, `_terminal`, `_external_events` and `_failure_events`. Two machines whose id tags
+collide (section 7.2), or that share a machine `id`, are an ERROR.
+
+Name hints are warnings and never fail the stage. A state whose name contains, case-insensitively,
+`fail`, `error`, `abort`, `crash` or `timeout` and that is not tagged `failure` prints
+`warn   <file>: state <S> looks like a failure state and is not tagged failure` (`<S>` is the
+dotted path). An event the machine handles or ignores whose name contains one of those words, and
+that is neither in `_failure_events` nor an action of the machine's lifecycle entity, prints
+`warn   <file>: event <e> looks like a failure event and is not in _failure_events`.
 
 `checked:` counts machines, states and transitions. Not applicable when `design.machines` is
 absent.
@@ -387,7 +411,7 @@ For every machine:
 |---|---|
 | `machine-binding` | The machine is a lifecycle machine of an existing entity, or operational (section 5.2). |
 | `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). |
-| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events`. |
+| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). |
 | `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine. |
 
 `checked:` counts machines, domain states, events and actions.
@@ -410,13 +434,20 @@ Operations without a binding are counted and are not an error (reads and queries
 
 | Rule | Check |
 |---|---|
-| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action or a model entity. |
+| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
 | `invoke-failure-mode` | Every `invoke` `src` of every machine is the subject of at least one failure mode. |
 | `dependency-failure-mode` | Every configured dependency is the subject of at least one failure mode. |
 | `tiered-action-abuse` | Every action that belongs to a consequential or critical area (section 22) is the subject of at least one failure mode of kind `abuse`. |
+| `failure-state-mode` | Every state tagged `failure` of every machine is the subject (`state:<machine id>.<State>`) of at least one failure mode. |
+| `failure-event-mode` | Every `_failure_events` entry of every machine is the subject (`event:<machine id>.<event>`) of at least one failure mode. |
 
-`checked:` counts failure modes, invokes, dependencies and tiered actions. Not applicable when
-`design.failure_modes` is absent.
+The stage applies when `design.failure_modes` is configured, or when any machine declares a
+failure state or a failure event (section 5.2). `checked:` counts failure modes, invokes,
+dependencies, tiered actions, failure states and failure events. With no failure-mode file
+configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
+event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
+states and failure events only. Not applicable when there is neither a failure-mode file nor a
+failure state or failure event.
 
 ### 6.7 Waivers
 
@@ -430,7 +461,8 @@ waivers:
 `rule` is a rule name from the tables above. `id` is the subject the finding names: an `act:` id;
 `<machine id>.<event>` for `event-action`; the machine id for `machine-binding` and `state-enum`;
 `<METHOD> <path>` or `RPC <Service>/<Rpc>` for `operation-id`; the failure-mode subject for
-`subject-resolves`; `invoke:<machine id>.<src>` or `dependency:<name>` for the failure rules. A
+`subject-resolves`; `invoke:<machine id>.<src>`, `dependency:<name>`, `state:<machine id>.<State>`
+or `event:<machine id>.<event>` for the failure rules. A
 finding prints as `<rule>: <subject>: <what is wrong>`. `reason` is
 required. A waived finding prints as `warn   waived: <message> (<reason>)`. A waiver that matches
 no finding is an ERROR `stale waiver`, so the list only shrinks. Only cross-reference rules can be
@@ -602,13 +634,16 @@ transitions up in this table; it does not hard-code them.
 }
 ```
 
+- `entries`, the key after `initial`, lists the `_entries` states, sorted. It is present only
+  when the machine declares `_entries`.
 - `states` lists every state in document order, nested states by dotted path. `kind` is `atomic`,
   `compound` or `final`. `resting` is true for a top-level, non-final state with no `invoke` and
   no `always`.
 - `transitions` keeps document order, because branch order is evaluation order: the first branch
   whose guard holds wins. `event` is the event name, the delay name, or the invoke `src`; it is
   `""` for `always` and `stateDone`. `guard` and `target` are `""` when absent. `target` is the
-  resolved dotted path.
+  resolved dotted path. `requires`, the last key of a row, lists the branch's `_requires`,
+  sorted; it is present only when the branch declares `_requires`.
 - `clauses` lists the clause cases in the order of their transitions, then of the declaration. It
   is an empty list when the machine declares no `_guards`. (The example line comes from another
   machine; the fixture machine has none.)
@@ -1307,7 +1342,10 @@ exactly when the table does. The module is named after the machine file. It decl
   `fx[i][e]` counts how often effect `e` ran for `i`, saturating at 2 (0, 1, more than once).
   `pend` is the set of steps in flight, records `[c, i, id]`. `last` is the step just taken, a
   record `[id, i, c, step]` of strings; traces are read from it.
-- `States`, `Effects`, `Final` (leaf paths of top-level final states), `Resting`, `TypeOK`, `Init`.
+- `States`, `Effects`, `Final` (leaf paths of top-level final states), `Resting`, `InitialState`
+  (the initial leaf), `TypeOK`, `Init`. When the machine declares `_entries`, `EntryStates` holds
+  the initial leaf of each entry state and `Init` starts each instance in `InitialState` or in a
+  state of `EntryStates`; otherwise every instance starts in `InitialState`.
 - For each transition row, in table order, with the suffix `<TAG>_<hex>` of its id:
   `Apply_<s>(i)` sets the target (the leaf reached through `initial` for a compound target; the
   state is unchanged for an internal transition) and bumps the row's effects. A row of kind `on`
@@ -1666,14 +1704,21 @@ next:
    is added, with the reason `unproven at adoption (<short sha>)`. It never removes an entry
    and never changes a reason. When a stage fails the config and the baselines are still
    written, the findings print, no owed entry is written and the exit code is 1.
+4. **Failure waivers.** Findings of `failure-state-mode` and `failure-event-mode` (section 6.6)
+   must not block day one: a failure state or failure event the design already has is
+   unmodeled, not new. For each such finding no waiver covers, it adds a waiver to
+   `machinery.yaml` (written with step 1) with the reason `unmodeled at adoption (<short sha>)`.
+   It never removes or rewrites a waiver, so the list only shrinks as failure modes are written:
+   a waiver whose finding is gone is an ERROR `stale waiver` (section 6.7). Without `--write`,
+   the `machinery.yaml` line under `would write:` says `new waivers: <n>`.
 
 `adopt` never creates, changes or deletes a file outside `machinery.yaml` and the design
 directory. That includes `.gitignore`: when the receipts directory is not ignored it prints
 `note: add .machinery/ to .gitignore` and leaves the edit to the team. It prints `adopt: wrote <n> file(s)` and the paths. Running it twice with the same
 arguments writes nothing the second time.
 
-After `adopt --write`, `machinery check` passes: what exists is baselined or owed, and anything new
-in scope is held to the rules. From there:
+After `adopt --write`, `machinery check` passes: what exists is baselined, owed or waived, and
+anything new in scope is held to the rules. From there:
 
 - the area's design is written or extended a piece at a time (the riskiest stateful resource
   first), and each `machinery gen` plus `machinery adopt --write` owes the new obligations;

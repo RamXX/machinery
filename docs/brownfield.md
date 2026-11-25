@@ -62,6 +62,15 @@ The second `adopt --write` finds the new design sources, adds them to `machinery
 adoption`. That list is your baseline of what was never proven. Nothing fails; nothing is
 claimed.
 
+**Mark the failures.** The code you model already fails somewhere: a status value such as
+`failed`, a worker that reports a crash, a lease that runs out. Tag the state that records it with
+`"tags": "failure"` and list the events that report it in the root `_failure_events`
+(`docs/machine-format.md`, "Failure idioms"); `machinery lint` warns about a state or event whose
+name looks like a failure and is not marked. Each failure state and failure event then needs a
+failure mode in `design.failure_modes`. The next `adopt --write` waives the ones that have none,
+with the reason `unmodeled at adoption`, so the check still passes; when you write a failure mode
+for one, its waiver becomes a `stale waiver` ERROR and you delete it. The list only shrinks.
+
 ## 4. Turn what is owed into stories, beside the ones you have
 
 ```sh
