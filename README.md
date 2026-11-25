@@ -47,7 +47,7 @@ make tools && make build        # in this repository: pinned tools into .bin/, t
 | Existing code and a backlog | [docs/brownfield.md](docs/brownfield.md): adopt one area at a time, no rewrite |
 | A backlog to plan and schedule | [docs/pm.md](docs/pm.md) |
 | A critical area to model | [docs/formal.md](docs/formal.md) |
-| A deterministic checker of your own | [docs/formats.md](docs/formats.md) section 21 |
+| A deterministic checker of your own | [docs/external-checkers.md](docs/external-checkers.md) |
 | A question about any format or output line | [docs/formats.md](docs/formats.md), the contract |
 
 The reference project, a small CRM on a real Postgres built with this method from the design up,

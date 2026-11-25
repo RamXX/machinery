@@ -910,10 +910,15 @@ the difference between `<ref>` and the working tree:
    action `preserves`;
 4. every `tc` id of a machine whose file changed.
 
+Rule 1 compares the design as it is now with `obligations.json` at the base, so it is right
+before `machinery gen` ran. In rule 3 the cases of an action are its `on:<action>` transitions,
+their guard-clause cases and the `ignore:<action>` cases.
+
 With nothing touched it prints nothing and exits 0.
 
 `machinery run --affected --base <ref> -- <command>` computes the same list and exports it as
-`MACHINERY_ONLY`. `machinery verify --affected --base <ref>` reports `unproven` only for those
+`MACHINERY_ONLY`; when the list is empty it runs nothing and exits 0. `--affected` and `--base`
+go together. `machinery verify --affected --base <ref>` reports `unproven` only for those
 ids. A targeted verify is a check for one change; only a full `verify` supports a landing.
 
 ### 12.2 The end gate: `machinery landing`
@@ -934,7 +939,9 @@ The whole suite runs once, at the head that is ready, not per story. machinery c
 per branch in `<git common dir>/machinery/landing.json`: an attempt at a new head after a failed
 attempt is a fix-forward. After two fix-forwards a further failure also prints
 `stop: two fix-forwards used; return the failing stories to the backlog`. The count is a report:
-it never turns a passing landing into a failing one. A passed landing resets it.
+it never turns a passing landing into a failing one. A passed landing resets it. A repeated
+attempt at the same head raises the attempt number only. With neither a command after `--` nor
+`commands.e2e` it is a config error and nothing is counted.
 
 ## 13. Proof
 
@@ -1038,6 +1045,9 @@ Groups:
 - one story per owed `fv` id, titled `Model <area> (<tool>)`;
 - one story `Serve <Entity> actions` per entity with owed `act` ids.
 
+Every story has type `task` and a priority from its tier: 2 routine, 1 consequential, 0
+critical. The Markdown form lists a story's edges in its description under `Needs:`.
+
 A story title is `Prove <machine> <event>` or `Prove <id>` unless given above. Its description
 lists the owed ids with their titles and effects and carries the `machinery:ids` line. Its labels
 are `tier:<tier>` and `machinery`. Its acceptance criteria say that each listed id is proven by
@@ -1058,7 +1068,8 @@ Edges are only created between stories of the same plan.
 group whose ids all carry a `story` that exists in the backlog, writes the new story ids into the
 `story` field of the owed entries, and prints `plan: <n> created, <n> existing, <n> edge(s)`.
 `machinery plan --link <story> <id>...` attaches ids to an existing story instead: it appends a
-`machinery:ids` note to the story and sets the `story` field of those owed entries.
+`machinery:ids` note to the story, sets the `story` field of those owed entries and prints
+`plan: <n> id(s) linked to <story>`.
 
 Output is sorted and deterministic. With nothing owed it prints nothing and exits 0.
 
@@ -1089,7 +1100,13 @@ Findings:
   the other's). Add an edge or split the story;
 - `warn   no scope declared: <story>`.
 
-`--json` prints the same data as one JSON document. The exit code follows section 3.3.
+Two scopes overlap when they are equal or when one glob's fixed directory prefix (the path
+before its first wildcard segment) contains the other's. With no open story the stage is
+`not demonstrated: nothing to check`. bd refuses to store a blocking cycle, so the cycle finding
+guards against a backlog edited by other means.
+
+`--json` prints the same data as one JSON document: `{contract, design_files, waves: [{wave,
+stories: [{id, tier, title, route, scope}]}], stage}`. The exit code follows section 3.3.
 
 ### 15.4 Contract freeze
 
@@ -1108,7 +1125,10 @@ Generated files, the owed list and formal models are not part of it.
 Stage `contract` (part of `machinery check`) is `not applicable: no wave is frozen` without that
 file. With it, a design source whose hash differs from the frozen one is
 `ERROR  contract changed during fan-out: <path>`. A contract change is its own story: land it
-alone, then freeze again. `machinery waves --thaw` removes the file when the wave has landed.
+alone, then freeze again. `machinery waves --thaw` removes the file when the wave has landed (`wave: thawed`, or
+`wave: none frozen`). `--freeze` prints `wave: frozen <12 hex> at <short sha>, <n> stories` and
+refuses when stage `gen-drift` or the waves stage itself does not pass. A design source that was
+added or removed since the freeze counts as changed.
 `checked:` counts design files.
 
 ### 15.5 `machinery brief`
@@ -1148,7 +1168,8 @@ done when: <one line>
 - For a modeler, `read` is the machine or model the formal model is derived from and the manifest;
   `run` is `machinery formal gen`, `machinery formal check <spec>`, `machinery formal baseline`.
 
-A brief for a routine story fits in 40 lines.
+An empty section prints `none`. Without `commands.e2e` the run lines say `<the end-to-end
+command>`. A brief for a routine story fits in 40 lines.
 
 ### 15.6 Tier gates: `predict`, `accept`, `story`
 
@@ -1160,6 +1181,10 @@ the current commit.
 | routine | Every id of the story is `proven` by evidence valid for the current commit (section 12) and is not owed. A `machinery:proof` line exists for a commit the evidence is valid for. |
 | consequential | The routine gate. A `machinery:prediction` for that commit by an actor other than the proof's actor. A `machinery:verdict accept` for that commit by the predicting actor, recorded after the prediction. |
 | critical | The consequential gate. Every `fv` id of the areas the story's ids belong to is `proven`, and every `cx` id of the formal models covering them is `proven`. |
+
+An `act` id of the story only has to be not owed. A reject verdict is recorded and fails the gate
+(`machinery accept --verdict reject` itself exits 0; `--close` with `reject` is a usage error).
+The verifier must differ from every actor who posted a proof the evidence is valid for.
 
 Findings name what is missing, for example `ERROR  no prediction for <short sha>: a verifier runs
 machinery predict before reading the proof`, `ERROR  verifier is the builder: <actor>`,
@@ -1594,9 +1619,9 @@ next:
 
 `backlog:` is `none found` when the project has no `.beads` directory. With `--write`:
 
-1. **Config.** Without a `machinery.yaml`, writes one: `scope` from `--paths`, `trace.code` equal
-   to the scope, `trace.tests` and `tests.e2e` from `--e2e` (default `e2e/**`), the model,
-   machine and contract files found (`*.modelith.yaml`, `*.machine.json`, `openapi.{yaml,yml,json}`),
+1. **Config.** Without a `machinery.yaml`, writes one: `scope` from `--paths`, `tests.e2e` from
+   `--e2e` (default `e2e/**`), and, once design sources exist, `trace.code` equal to the scope
+   and `trace.tests` equal to the e2e roots, with the model, machine and contract files found (`*.modelith.yaml`, `*.machine.json`, `openapi.{yaml,yml,json}`),
    `tests.baseline`, and `backlog.tool: bd` when a backlog was found. With an existing file, adds
    the new `--paths` to `scope`, adds design sources it finds that are not configured yet (so a
    model written after the first adoption is picked up), and changes nothing else in it;
@@ -1604,11 +1629,12 @@ next:
 2. **Baselines.** Writes the tests baseline with every unit test and test double now in scope
    (section 9.4), and the architecture baseline when `constraints` are configured. Existing
    entries are kept; entries are added only for paths newly in scope.
-3. **Owed.** When design sources exist and stages `model`, `machines` and `failure-modes` pass:
-   runs `machinery gen` and adds to `owed.yaml` every obligation and every unserved `act` id that
+3. **Owed.** Runs `machinery gen` (with no design yet it writes an empty obligation list). When
+   design sources exist and stages `model`, `machines` and `failure-modes` pass, it adds to
+   `owed.yaml` every obligation and every unserved `act` id that
    is not there, with the reason `unproven at adoption (<short sha>)`. It never removes an entry
-   and never changes a reason. When a stage fails it prints the findings and writes no owed
-   entries.
+   and never changes a reason. When a stage fails the config and the baselines are still
+   written, the findings print, no owed entry is written and the exit code is 1.
 
 `adopt` never creates, changes or deletes a file outside `machinery.yaml` and the design
 directory. It prints `adopt: wrote <n> file(s)` and the paths. Running it twice with the same
