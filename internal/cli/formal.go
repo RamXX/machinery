@@ -203,6 +203,7 @@ func runFormalGen(e *Env, args []string) int {
 func runFormalCheck(e *Env, args []string) int {
 	fs := e.Flags("formal check")
 	workers := fs.Int("workers", 2, "TLC worker threads")
+	verify := fs.Bool("verify", false, "run the tools, write nothing, and compare with the committed results")
 	pos, ok := e.ParseMixed(fs, args)
 	if !ok {
 		return 2
@@ -219,6 +220,9 @@ func runFormalCheck(e *Env, args []string) int {
 	specs, err := selectSpecs(all, pos)
 	if err != nil {
 		return e.Fail(err)
+	}
+	if *verify {
+		return report.PrintAll(e.Stdout, "formal check", []*report.Stage{formal.VerifyStage(p, d, specs, *workers)})
 	}
 	var runErrs []string
 	for _, s := range specs {

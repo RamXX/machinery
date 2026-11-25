@@ -1,4 +1,4 @@
-// Package formal implements formal models with their honesty checks
+// Package formal implements formal models and the checks that keep them sound
 // (docs/formats.md section 16).
 package formal
 

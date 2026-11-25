@@ -2,12 +2,14 @@ package formal
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 )
 
@@ -377,4 +379,30 @@ func Counts(d *design.Design, fvID string) (runs, detected int) {
 		}
 	}
 	return
+}
+
+// VerifyStage re-runs the tools for the given specs, writes nothing, and
+// reports every committed result or trace file that a fresh run does not
+// reproduce (section 16.9). It is how a landing knows the committed results
+// were produced by the tools.
+func VerifyStage(p *project.Project, d *design.Design, specs []*Spec, workers int) *report.Stage {
+	st := report.New("formal-verify")
+	if len(specs) == 0 {
+		return st.NotApplicable("no formal model")
+	}
+	st.Count(len(specs), "specs")
+	for _, s := range specs {
+		differ, err := Recheck(p, d, s, workers)
+		var te *ToolError
+		switch {
+		case errors.As(err, &te):
+			return st.NotDemonstrated(te.Reason)
+		case err != nil:
+			st.Errorf("%v", err)
+		}
+		for _, f := range differ {
+			st.Errorf("%s: a fresh run of the tools does not reproduce the committed file; run machinery formal check", f)
+		}
+	}
+	return st
 }

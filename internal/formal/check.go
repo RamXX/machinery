@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/gen"
 	"github.com/RamXX/machinery/internal/project"
 )
 
@@ -49,28 +50,54 @@ func expectOf(r *Run) string {
 
 // Check runs one spec for real and writes its result and trace files.
 func Check(p *project.Project, d *design.Design, s *Spec, workers int) (*Result, error) {
+	res, _, err := run(p, d, s, workers, true)
+	return res, err
+}
+
+// Recheck runs one spec for real, writes nothing, and returns the committed
+// files that differ from the fresh run. Committed results are data anyone can
+// edit; a fresh run is what makes them trustworthy.
+func Recheck(p *project.Project, d *design.Design, s *Spec, workers int) (differ []string, err error) {
+	_, differ, err = run(p, d, s, workers, false)
+	return differ, err
+}
+
+func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool) (_ *Result, differ []string, _ error) {
+	put := func(rel string, v any) error {
+		if write {
+			return writeJSON(p, rel, v)
+		}
+		want, err := gen.JSON(v)
+		if err != nil {
+			return err
+		}
+		if got, rerr := p.Read(rel); rerr != nil || !bytes.Equal(got, want) {
+			differ = append(differ, rel)
+		}
+		return nil
+	}
 	if len(s.Problems) > 0 {
-		return nil, fmt.Errorf("%s", s.Problems[0])
+		return nil, nil, fmt.Errorf("%s", s.Problems[0])
 	}
 	want, err := Skeleton(d, s)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	skeleton, rerr := p.Read(s.SkeletonPath())
 	if rerr != nil || !bytes.Equal(skeleton, want) {
-		return nil, fmt.Errorf("%s: skeleton is stale or missing: run machinery formal gen first", s.SkeletonPath())
+		return nil, nil, fmt.Errorf("%s: skeleton is stale or missing: run machinery formal gen first", s.SkeletonPath())
 	}
 	props, perr := p.Read(s.PropsPath())
 	if perr != nil {
-		return nil, fmt.Errorf("%s: property file is missing", s.PropsPath())
+		return nil, nil, fmt.Errorf("%s: property file is missing", s.PropsPath())
 	}
 	tool := ToolFor(s.Tool)
 	if err := Ready(p, tool); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	tmp, err := os.MkdirTemp("", "machinery-formal-")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer os.RemoveAll(tmp)
 	res := &Result{Version: 1, Spec: s.Spec, Tool: s.Tool, ToolVersion: tool.Label(),
@@ -109,7 +136,7 @@ func Check(p *project.Project, d *design.Design, s *Spec, workers int) (*Result,
 		run := &s.Runs[i]
 		dir, err := stage("run-"+run.Name, nil)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		rr, trace := chk.run(dir, run)
 		tracePath := s.TracePath(run.Name)
@@ -122,12 +149,16 @@ func Check(p *project.Project, d *design.Design, s *Spec, workers int) (*Result,
 			if trace.Instance == nil {
 				trace.Instance = map[string]map[string][]string{}
 			}
-			if err := writeJSON(p, tracePath, trace); err != nil {
-				return nil, err
+			if err := put(tracePath, trace); err != nil {
+				return nil, nil, err
 			}
 			rr.Trace = strings.TrimPrefix(tracePath, s.Dir+"/")
 		} else if p.Exists(tracePath) {
-			os.Remove(p.Abs(tracePath))
+			if write {
+				os.Remove(p.Abs(tracePath))
+			} else {
+				differ = append(differ, tracePath)
+			}
 		}
 		if rr.Reach == nil {
 			rr.Reach = map[string]bool{}
@@ -141,7 +172,7 @@ func Check(p *project.Project, d *design.Design, s *Spec, workers int) (*Result,
 			mutated := bytes.Replace(src, []byte(m.From), []byte(m.To), 1)
 			dir, err := stage("mut-"+m.ID, map[string][]byte{fn: mutated})
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if run := s.RunByName(m.Run); run != nil {
 				outcome = chk.mutation(dir, run, m.Detects)
@@ -149,10 +180,10 @@ func Check(p *project.Project, d *design.Design, s *Spec, workers int) (*Result,
 		}
 		res.Mutations = append(res.Mutations, MutationResult{ID: m.ID, Outcome: outcome})
 	}
-	if err := writeJSON(p, s.ResultPath(), res); err != nil {
-		return nil, err
+	if err := put(s.ResultPath(), res); err != nil {
+		return nil, nil, err
 	}
-	return res, nil
+	return res, differ, nil
 }
 
 // checker runs one tool.

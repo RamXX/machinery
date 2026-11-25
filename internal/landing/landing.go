@@ -9,8 +9,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/evidence"
+	"github.com/RamXX/machinery/internal/formal"
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/probe"
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
@@ -24,6 +27,9 @@ type Options struct {
 	Base           string
 	Stack          string
 	Command        []string // after --; empty means commands.e2e
+	Probe          bool     // also probe the proven transition cases
+	ProbeMax       int      // with Probe: keep the first n mutations (0: all)
+	Workers        int      // TLC worker threads for the formal re-run
 	Stdout, Stderr io.Writer
 }
 
@@ -162,6 +168,17 @@ func gate(p *project.Project, o Options, argv []string) bool {
 	if report.PrintAll(o.Stdout, "check", stages.Run(&stages.Context{P: p, Base: o.Base}, names)) != 0 {
 		return false
 	}
+	// committed formal results are only data until the tools reproduce them
+	if specs, err := formal.Load(p); err == nil && len(specs) > 0 {
+		workers := o.Workers
+		if workers <= 0 {
+			workers = 2
+		}
+		st := formal.VerifyStage(p, design.Load(p), specs, workers)
+		if report.PrintAll(o.Stdout, "formal check", []*report.Stage{st}) != 0 {
+			return false
+		}
+	}
 	exit, file, err := evidence.Run(p, evidence.RunOptions{Stack: o.Stack, Stdout: o.Stdout, Stderr: o.Stderr}, argv)
 	if err != nil {
 		fmt.Fprintf(o.Stderr, "machinery: run: %v\n", err)
@@ -172,5 +189,12 @@ func gate(p *project.Project, o Options, argv []string) bool {
 		return false
 	}
 	ctx := &stages.Context{P: p}
-	return report.PrintAll(o.Stdout, "verify", []*report.Stage{stages.Verify(ctx, false)}) == 0
+	if report.PrintAll(o.Stdout, "verify", []*report.Stage{stages.Verify(ctx, false)}) != 0 {
+		return false
+	}
+	if !o.Probe {
+		return true
+	}
+	st := stages.Probe(ctx, probe.Options{Max: o.ProbeMax, Argv: argv, Stack: o.Stack, Stdout: o.Stdout, Stderr: o.Stderr})
+	return report.PrintAll(o.Stdout, "probe", []*report.Stage{st}) == 0
 }

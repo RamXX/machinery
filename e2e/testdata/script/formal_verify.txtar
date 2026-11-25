@@ -1,0 +1,41 @@
+# Committed formal results are data anyone can edit. A fresh run settles them.
+fixture shop
+fixture shop-formal
+rm design/formal/order-payment.spec.yaml design/formal/OrderProps.tla
+exec sh -c 'printf "  - id: fv:order-payment\n    reason: \"the payment model is not written yet\"\n" >> design/owed.yaml'
+exec shopformal
+exec mrun 1 formal check order-ownership
+exec machinery formal baseline
+gitcommit 'formal models'
+
+# the committed results are what the tools produce
+exec machinery formal check --verify
+stdout '== formal-verify =='
+stdout 'checked: 1 specs'
+stdout '^passed$'
+exec git status --short
+! stdout .
+
+# add a reach predicate nothing satisfies, and forge the result instead of fixing the model
+exec sh -c 'printf "\npred Impossible { some o: Order | no o.customer }\n" >> design/formal/shop_props.als'
+exec sed -i.bak 's/reach: \[SomeOrder, TwoBusyCustomers\]/reach: [SomeOrder, TwoBusyCustomers, Impossible]/' design/formal/order-ownership.spec.yaml
+rm design/formal/order-ownership.spec.yaml.bak
+exec mrun 1 formal check order-ownership
+stdout 'reach Impossible not reached: the pass is vacuous'
+exec sed -i.bak 's/"Impossible": false/"Impossible": true/' design/formal/order-ownership.result.json
+rm design/formal/order-ownership.result.json.bak
+exec machinery formal baseline
+
+# the pure stage cannot tell: it reads committed files only
+exec machinery check --stage formal
+stdout '^passed$'
+
+# a fresh run can, and it writes nothing
+exec mrun 1 formal check --verify
+stdout 'ERROR  design/formal/order-ownership.result.json: a fresh run of the tools does not reproduce the committed file; run machinery formal check'
+grep '"Impossible": true' design/formal/order-ownership.result.json
+
+# without the tools the verification is not demonstrated
+env MACHINERY_TOOLS=$WORK/no-tools
+exec mrun 1 formal check --verify
+stdout 'not demonstrated: jars/alloy.jar: missing'

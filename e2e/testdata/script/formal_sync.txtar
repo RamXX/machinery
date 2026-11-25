@@ -28,6 +28,8 @@ exec mrun 1 formal sync order-ownership --class model-drift
 stderr 'model-drift needs a change to the spec since'
 exec mrun 2 formal sync order-ownership --class promise-change
 stderr 'config: promise-change needs --evidence naming the decision'
+exec mrun 2 formal sync order-ownership --class no-effect
+stderr 'config: no-effect needs --evidence saying why'
 exec mrun 2 formal sync order-ownership --class nonsense
 stderr 'unknown class'
 

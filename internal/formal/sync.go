@@ -90,6 +90,10 @@ func Classify(p *project.Project, s *Spec, class, evidence, story string) error 
 		if strings.TrimSpace(evidence) == "" {
 			return project.Errf("promise-change needs --evidence naming the decision")
 		}
+	case "no-effect":
+		if strings.TrimSpace(evidence) == "" {
+			return project.Errf("no-effect needs --evidence saying why the change does not touch what the model describes")
+		}
 	case "possible-bug":
 		if strings.TrimSpace(story) == "" {
 			return project.Errf("possible-bug needs --story")

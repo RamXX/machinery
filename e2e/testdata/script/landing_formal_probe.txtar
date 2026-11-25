@@ -1,0 +1,59 @@
+# The landing re-runs the formal tools against the committed results, and can end with the probe.
+fixture shop
+fixture shop-formal
+cp emit.sh e2e/emit.sh
+cp machinery.land.yaml machinery.yaml
+exec shopformal
+exec mrun 1 formal check
+exec machinery formal baseline
+gitcommit 'formal models'
+exec git branch base
+exec machinery run -- sh e2e/emit.sh
+
+# check, the formal re-run, the suite, verify
+exec machinery landing --base base
+stdout '== formal-verify =='
+stdout 'checked: 2 specs'
+stdout 'machinery formal check: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+stdout 'machinery verify: 1 passed'
+stdout 'landing: passed at [0-9a-f]+ \(attempt 1, fix-forward 0 of 2\)'
+
+# a result edited by hand stops the landing before the suite runs
+exec sed -i.bak 's/"SomeOrder": true/"SomeOrder": false/' design/formal/order-ownership.result.json
+rm design/formal/order-ownership.result.json.bak
+gitcommit 'tampered result'
+exec mrun 1 landing --base base
+stdout 'reach SomeOrder not reached'
+exec git checkout -q HEAD~1 -- design/formal/order-ownership.result.json
+gitcommit 'restore the result'
+
+# --probe: this emitter only prints receipts, so every mutation survives and the landing fails
+exec mrun 1 landing --base base --probe --probe-max 2
+stdout '== probe =='
+stdout 'checked: 2 mutations, 0 killed, 2 survived'
+stdout 'landing: failed'
+
+-- emit.sh --
+#!/bin/sh
+# machinery:verifies cx:order-payment:race
+set -eu
+sh e2e/orders.sh
+sh e2e/replay.sh
+-- machinery.land.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+commands:
+  e2e: ["sh", "e2e/emit.sh"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
