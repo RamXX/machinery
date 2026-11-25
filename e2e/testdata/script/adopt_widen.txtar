@@ -1,0 +1,107 @@
+# widening the scope: the config keeps its comments, and the baseline grows only for the new paths
+fixture brownfield
+gitinit
+exec sh backlog.sh
+cp machinery-existing.yaml machinery.yaml
+gitcommit config
+
+exec machinery adopt --write
+cmp machinery.yaml want-first.yaml
+cmp design/tests-baseline.yaml want-tests-first.yaml
+cmp design/arch-baseline.yaml want-arch-first.yaml
+exec mrun 0 check --stage model --stage machines --stage failure-modes --stage risk --stage xref-model-machine --stage xref-contract --stage xref-failure --stage xstate --stage gen-drift --stage formal --stage checkers --stage arch --stage tests --stage trace
+gitcommit adopted
+
+# a unit test written after adoption, inside the scope, is not baselined by a later widening
+exec sh -c 'printf "package shipping\n" > internal/shipping/later_test.go'
+exec machinery adopt --paths 'internal/billing/**' --write
+cmp stdout want-wrote.txt
+cmp machinery.yaml want-widened.yaml
+cmp design/tests-baseline.yaml want-tests-widened.yaml
+cmp design/arch-baseline.yaml want-arch-widened.yaml
+exec mrun 1 check --stage tests
+stdout 'ERROR  unit-test: internal/shipping/later_test.go'
+rm internal/shipping/later_test.go
+exec mrun 0 check --stage model --stage machines --stage failure-modes --stage risk --stage xref-model-machine --stage xref-contract --stage xref-failure --stage xstate --stage gen-drift --stage formal --stage checkers --stage arch --stage tests --stage trace
+stdout 'warn   baselined: unit-test: internal/billing/invoice_test.go'
+
+# a new unit test in the widened scope fails the check
+exec sh -c 'printf "package billing\n" > internal/billing/later_test.go'
+exec mrun 1 check --stage tests
+stdout 'ERROR  unit-test: internal/billing/later_test.go'
+stdout 'failed: 1 finding\(s\)'
+rm internal/billing/later_test.go
+
+# the same arguments again, and a path the scope already covers, write nothing
+exec machinery adopt --paths 'internal/billing/**' --write
+cmp stdout want-wrote-nothing.txt
+exec machinery adopt --paths 'internal/shipping/**' --paths 'internal/billing/**' --write
+cmp stdout want-wrote-nothing.txt
+cmp machinery.yaml want-widened.yaml
+
+-- machinery-existing.yaml --
+# owned by the platform team
+version: 2
+scope: ["internal/shipping/**"]  # the riskiest area first
+constraints:
+  size:
+    max_func_lines: 8  # the team's own size rule
+-- want-first.yaml --
+# owned by the platform team
+version: 2
+scope: ["internal/shipping/**"] # the riskiest area first
+constraints:
+  size:
+    max_func_lines: 8 # the team's own size rule
+  baseline: design/arch-baseline.yaml
+tests:
+  e2e: ["e2e/**"]
+  baseline: design/tests-baseline.yaml
+backlog:
+  tool: bd
+-- want-widened.yaml --
+# owned by the platform team
+version: 2
+scope: ["internal/shipping/**", "internal/billing/**"] # the riskiest area first
+constraints:
+  size:
+    max_func_lines: 8 # the team's own size rule
+  baseline: design/arch-baseline.yaml
+tests:
+  e2e: ["e2e/**"]
+  baseline: design/tests-baseline.yaml
+backlog:
+  tool: bd
+-- want-tests-first.yaml --
+version: 1
+baseline:
+  - {rule: unit-test, subject: "internal/shipping/shipment_test.go"}
+-- want-tests-widened.yaml --
+version: 1
+baseline:
+  - {rule: unit-test, subject: "internal/billing/invoice_test.go"}
+  - {rule: unit-test, subject: "internal/shipping/shipment_test.go"}
+-- want-arch-first.yaml --
+version: 1
+baseline:
+  - {rule: func-size, subject: "internal/shipping/shipment_test.go:TestLifecycle"}
+  - {rule: func-size, subject: "internal/shipping/shipment_test.go:TestStoreRoundTrip"}
+  - {rule: func-size, subject: "internal/shipping/store.go:Store.Add"}
+  - {rule: func-size, subject: "internal/shipping/store.go:Store.Get"}
+  - {rule: func-size, subject: "internal/shipping/store.go:Store.load"}
+-- want-arch-widened.yaml --
+version: 1
+baseline:
+  - {rule: func-size, subject: "internal/billing/invoice_test.go:TestTaxRoundsHalfUp"}
+  - {rule: func-size, subject: "internal/shipping/shipment_test.go:TestLifecycle"}
+  - {rule: func-size, subject: "internal/shipping/shipment_test.go:TestStoreRoundTrip"}
+  - {rule: func-size, subject: "internal/shipping/store.go:Store.Add"}
+  - {rule: func-size, subject: "internal/shipping/store.go:Store.Get"}
+  - {rule: func-size, subject: "internal/shipping/store.go:Store.load"}
+-- want-wrote.txt --
+adopt: wrote 3 file(s)
+  design/arch-baseline.yaml
+  design/tests-baseline.yaml
+  machinery.yaml
+-- want-wrote-nothing.txt --
+adopt: wrote 0 file(s)

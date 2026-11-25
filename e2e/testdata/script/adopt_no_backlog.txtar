@@ -1,0 +1,26 @@
+# without a .beads directory the report says so and no backlog key is written
+fixture brownfield
+gitinit
+
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^backlog: none found$'
+exec machinery adopt --paths 'internal/shipping/**' --write
+! grep 'backlog' machinery.yaml
+exec mrun 0 check --stage model --stage machines --stage failure-modes --stage risk --stage xref-model-machine --stage xref-contract --stage xref-failure --stage xstate --stage gen-drift --stage formal --stage checkers --stage arch --stage tests --stage trace
+
+# a .beads directory that bd cannot read is reported, and is not an error
+rm machinery.yaml
+rm -rf design
+mkdir .beads
+cp machinery-nobd.yaml machinery.yaml
+exec machinery adopt
+stdout '^backlog: bd not runnable$'
+exec machinery adopt --write
+grep 'tool: bd' machinery.yaml
+grep 'bd: ./no-such-bd' machinery.yaml
+
+-- machinery-nobd.yaml --
+version: 2
+scope: ["internal/shipping/**"]
+tools:
+  bd: ./no-such-bd

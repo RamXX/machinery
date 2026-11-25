@@ -1,0 +1,49 @@
+# a broken machine: the findings are printed, no owed entry is written, exit 1
+fixture brownfield
+gitinit
+exec sh backlog.sh
+exec machinery adopt --paths 'internal/shipping/**' --write
+gitcommit adopted
+
+fixture brownfield-design
+cp .machinery/broken.machine.json design/machines/Shipment.machine.json
+
+# the dry run prints the findings and does not offer to owe anything
+exec mrun 1 adopt --paths 'internal/shipping/**'
+stdout '^design: 1 model\(s\), 1 machine\(s\), 0 contract\(s\)$'
+stdout '^== machines ==$'
+stdout 'ERROR  design/machines/Shipment.machine.json: '
+stdout '^failed: [0-9]+ finding\(s\)$'
+stdout 'fix the findings below'
+! stdout 'design/owed.yaml'
+! stdout 'new owed entries'
+
+# --write still edits the config and baselines, but gen does not run and nothing is owed
+exec mrun 1 adopt --paths 'internal/shipping/**' --write
+stdout '^adopt: wrote 1 file\(s\)$'
+stdout '^  machinery.yaml$'
+stdout '^== machines ==$'
+stdout 'ERROR  design/machines/Shipment.machine.json: '
+grep 'design/model/depot.modelith.yaml' machinery.yaml
+! exists design/owed.yaml
+! exists design/gen/tables
+! exists design/model/depot.modelith.md
+
+# repairing the machine lets the next run owe everything
+fixture brownfield-design
+exec sh -c 'cat waiver.yaml >> machinery.yaml'
+exec machinery adopt --paths 'internal/shipping/**' --write
+stdout '^  design/owed.yaml$'
+grep -count=21 'reason: "unproven at adoption' design/owed.yaml
+
+-- waiver.yaml --
+waivers:
+  - {rule: action-event, id: "act:Shipment.create", reason: "creation enters the initial state Created"}
+-- .machinery/broken.machine.json --
+{
+  "id": "shipment",
+  "initial": "Created",
+  "states": {
+    "Created": { "on": { "pack": { "target": "Nowhere" } } }
+  }
+}

@@ -1,0 +1,85 @@
+# adopt --write: the config, the baseline of the scope only, no tracked file changed
+fixture brownfield
+gitinit
+exec sh backlog.sh
+
+exec machinery adopt --paths 'internal/shipping/**' --write
+cmp stdout want-wrote.txt
+cmp machinery.yaml want-machinery.yaml
+cmp design/tests-baseline.yaml want-baseline.yaml
+exists design/gen/obligations.json
+
+# the unit tests of the scope only: billing is outside; the gomock comment is in a unit test, so it
+# is baselined as a unit test, and the test-double rule (end-to-end tests only) has nothing to list
+! grep 'billing' design/tests-baseline.yaml
+! grep 'test-double' design/tests-baseline.yaml
+
+# no tracked file changed: everything adopt wrote is new
+exec git diff --stat
+! stdout .
+exec git status --short
+stdout '^\?\? design/$'
+stdout '^\?\? machinery.yaml$'
+! stdout '^ M'
+
+# machinery check passes afterwards
+exec mrun 0 check --stage model --stage machines --stage failure-modes --stage risk --stage xref-model-machine --stage xref-contract --stage xref-failure --stage xstate --stage gen-drift --stage formal --stage checkers --stage arch --stage tests --stage trace
+stdout 'warn   baselined: unit-test: internal/shipping/shipment_test.go'
+stdout 'checked: 1 test files, 1 files under e2e roots, 12 markers'
+
+# running it again with the same arguments writes nothing
+cp machinery.yaml machinery.first
+cp design/tests-baseline.yaml baseline.first
+exec machinery adopt --paths 'internal/shipping/**' --write
+cmp stdout want-wrote-nothing.txt
+cmp machinery.yaml machinery.first
+cmp design/tests-baseline.yaml baseline.first
+
+# code added later is held to the rules: a new unit test in scope fails, and so does a test double
+# in an end-to-end test, which the baseline never listed
+exec sh -c 'printf "package shipping\n" > internal/shipping/later_test.go'
+exec mrun 1 check --stage tests
+stdout 'ERROR  unit-test: internal/shipping/later_test.go'
+rm internal/shipping/later_test.go
+exec sh -c 'printf "package e2e\n// gomock\n" > e2e/api_test.go'
+exec mrun 1 check --stage tests
+stdout 'ERROR  test-double: e2e/api_test.go: gomock'
+
+# a test double that already lives in an end-to-end test is baselined with the unit tests
+rm -rf design machinery.yaml e2e/api_test.go
+exec sh -c 'printf "package e2e\n// gomock\n" > e2e/legacy_test.go'
+exec machinery adopt --paths 'internal/shipping/**' --write
+cmp design/tests-baseline.yaml want-baseline-legacy.yaml
+exec mrun 0 check --stage tests
+stdout 'warn   baselined: test-double: e2e/legacy_test.go: gomock'
+
+# --e2e names the end-to-end roots
+rm -rf design machinery.yaml e2e/legacy_test.go
+exec machinery adopt --paths 'internal/**' --e2e 'smoke/**' --e2e 'e2e/**' --write
+grep 'e2e: \["smoke/\*\*", "e2e/\*\*"\]' machinery.yaml
+grep -count=2 'unit-test' design/tests-baseline.yaml
+
+-- want-wrote.txt --
+adopt: wrote 3 file(s)
+  design/gen/obligations.json
+  design/tests-baseline.yaml
+  machinery.yaml
+-- want-wrote-nothing.txt --
+adopt: wrote 0 file(s)
+-- want-machinery.yaml --
+version: 2
+scope: ["internal/shipping/**"]
+tests:
+  e2e: ["e2e/**"]
+  baseline: design/tests-baseline.yaml
+backlog:
+  tool: bd
+-- want-baseline.yaml --
+version: 1
+baseline:
+  - {rule: unit-test, subject: "internal/shipping/shipment_test.go"}
+-- want-baseline-legacy.yaml --
+version: 1
+baseline:
+  - {rule: test-double, subject: "e2e/legacy_test.go: gomock"}
+  - {rule: unit-test, subject: "internal/shipping/shipment_test.go"}
