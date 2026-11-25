@@ -1,16 +1,8 @@
 version: 1
 owed:
-  - id: fm:database-unreachable
-    reason: "no test yet: no test takes the database away during requests and brings it back"
-  - id: fm:deal-win-store-failure
-    reason: "no test yet: recordWin is simulated, so no store write of a won deal can be made to fail or time out"
   - id: fv:deal-win
     reason: "formal model not written yet"
   - id: fv:record-ownership
     reason: "formal model not written yet"
   - id: inv:lifecycle-single-writer
     reason: "no test yet: crm_app may still UPDATE deals.stage and tasks.status outside the transition path"
-  - id: tc:DEAL-23efa8
-    reason: "failure path not induced yet: recordWin is simulated and never fails"
-  - id: tc:DEAL-55eecd
-    reason: "failure path not induced yet: recordWin is simulated and never outlasts closeTimeout"
