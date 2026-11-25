@@ -1,0 +1,75 @@
+# evidence describes a commit, not a dirty tree (section 12)
+fixture shop
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+
+# an uncommitted change: the evidence does not describe what is on disk
+exec sh -c 'echo "// wip" >> internal/api/handlers.go'
+exec mrun 1 verify
+stdout '^  ERROR  working tree has uncommitted changes$'
+stdout '^failed: 1 finding\(s\)$'
+
+# --allow-dirty accepts it; the run itself was clean, so no warning
+exec machinery verify --allow-dirty
+stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
+! stdout 'dirty evidence'
+stdout '^passed$'
+
+# a run made on the dirty tree is dirty evidence: only with --allow-dirty, and with a warning
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 verify
+stdout 'ERROR  working tree has uncommitted changes'
+stdout '^failed: 1 finding\(s\)$'
+exec machinery verify --allow-dirty
+stdout '^  warn   dirty evidence: not valid for acceptance$'
+stdout '^passed$'
+
+# back on a clean tree the dirty run is not used
+exec git checkout -- internal/api/handlers.go
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+! stdout 'ERROR'
+
+# the owed file and the receipts directory do not count as changes
+exec machinery run -- sh e2e/orders.sh
+cp owed-reordered.yaml design/owed.yaml
+exec sh -c 'echo scratch > .machinery/receipts/scratch.txt'
+exec machinery verify
+stdout '^passed$'
+! stdout 'ERROR'
+
+-- owed-reordered.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+
+exec machinery verify --allow-dirty
+stdout '^  warn   dirty evidence: not valid for acceptance$'
+stdout '^passed$'
+
+# back on a clean tree the dirty run is not used
+exec git checkout -- internal/api/handlers.go
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+! stdout 'ERROR'
+
+# the owed file and the receipts directory do not count as changes
+exec machinery run -- sh e2e/orders.sh
+cp owed-reordered.yaml design/owed.yaml
+exec sh -c 'echo scratch > .machinery/receipts/scratch.txt'
+exec machinery verify
+stdout '^passed$'
+! stdout 'ERROR'
+
+-- owed-reordered.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"

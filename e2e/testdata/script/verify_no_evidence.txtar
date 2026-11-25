@@ -1,0 +1,27 @@
+# without a complete run at this commit verify is not demonstrated (section 12)
+fixture shop
+exec machinery gen
+gitinit
+exec mrun 1 verify
+stdout '^== verify ==$'
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+! stdout 'checked:'
+! stdout 'ERROR'
+stdout '^machinery verify: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable$'
+exec sh -c 'machinery verify | grep "no evidence at $(git rev-parse --short=7 HEAD)"'
+
+# an empty receipts directory and a file that is not a receipts file are no evidence
+mkdir .machinery/receipts
+exec sh -c 'echo "not json" > .machinery/receipts/x.jsonl'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+! stdout 'ERROR'
+
+# a run of a command that emits nothing is evidence: every obligation not owed is unproven
+exec machinery run -- true
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
+stdout 'ERROR  unproven: inv:customer-email-unique'
+stdout 'ERROR  unproven: tc:ORDE-2e883d'
+! stdout 'unproven: tc:ORDE-8bd6e7'
+stdout '^failed: 14 finding\(s\)$'

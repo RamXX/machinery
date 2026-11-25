@@ -1,0 +1,23 @@
+# the shop fixture with its emitter: 16 obligations, 14 proven, 1 partial, 2 owed (section 12)
+fixture shop
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+cmp stdout want.txt
+
+# receipts of every valid run count together
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 30 receipts$'
+stdout '^passed$'
+
+# verify takes no arguments
+exec mrun 2 verify extra
+stderr 'usage: machinery verify takes no arguments'
+
+-- want.txt --
+== verify ==
+checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts
+passed
+machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable

@@ -1,0 +1,78 @@
+# owed list prints the entries sorted by id, then a count (sections 3.1, 11.1)
+fixture shop
+exec machinery owed list
+cmp stdout want-shop.txt
+
+# hand-edited order is printed sorted; the story is printed when present
+cp owed-story.yaml design/owed.yaml
+exec machinery owed list
+cmp stdout want-story.txt
+
+# one entry, none, and a missing file
+cp owed-one.yaml design/owed.yaml
+exec machinery owed list
+stdout '^owed: 1 entry$'
+cp owed-none.yaml design/owed.yaml
+exec machinery owed list
+cmp stdout want-none.txt
+rm design/owed.yaml
+exec machinery owed list
+cmp stdout want-none.txt
+
+# a bad owed file: the problems on stderr and exit 1
+cp owed-bad.yaml design/owed.yaml
+exec mrun 1 owed list
+stderr '^ERROR  design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+stderr '^ERROR  unknown owed id: inv:nope$'
+cp owed-key.yaml design/owed.yaml
+exec mrun 1 owed list
+stderr '^ERROR  design/owed.yaml: .*field when not found'
+exec mrun 2 owed list extra
+stderr 'usage: machinery owed list takes no arguments'
+exec mrun 2 owed
+stderr 'usage: machinery owed needs a subcommand: owed list, owed sync'
+
+-- want-shop.txt --
+fm:payment-provider-down  no test induces a provider outage yet
+tc:ORDE-8bd6e7  effect recordCharge is a noop in the skeleton
+owed: 2 entries
+-- owed-story.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+    story: bd-12
+  - id: act:Order.place
+    reason: "no handler places orders yet"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+-- want-story.txt --
+act:Order.place  no handler places orders yet
+fm:payment-provider-down  no test induces a provider outage yet
+tc:ORDE-8bd6e7  effect recordCharge is a noop in the skeleton  bd-12
+owed: 3 entries
+-- owed-one.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- owed-none.yaml --
+version: 1
+owed: []
+-- want-none.txt --
+owed: 0 entries
+-- owed-bad.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "one"
+  - id: tc:ORDE-8bd6e7
+    reason: "two"
+  - id: inv:nope
+    reason: "a typo"
+-- owed-key.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "one"
+    when: tomorrow

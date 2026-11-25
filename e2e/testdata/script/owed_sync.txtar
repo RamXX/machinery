@@ -1,0 +1,81 @@
+# owed sync rewrites owed.yaml from the evidence (section 11.2)
+fixture shop
+cp owed-story.yaml design/owed.yaml
+exec machinery gen
+gitinit
+
+# refuses without a complete run valid for the current commit, and writes nothing
+exec mrun 1 owed sync
+stdout '^ERROR  no complete run valid for [0-9a-f]{7}: run the tests through machinery run first$'
+cmp design/owed.yaml owed-story.yaml
+mkdir .machinery/receipts
+exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,\"command\":[\"sh\"],\"stack\":\"\",\"started\":\"2026-01-02T03:04:05Z\"}\n" "$(git rev-parse HEAD)" > .machinery/receipts/20260102T030405.000Z-cut.jsonl'
+exec mrun 1 owed sync
+stdout '^ERROR  no complete run valid for'
+rm .machinery/receipts
+
+# this emitter observes recordCharge and no longer checks the email invariant
+exec machinery run -- sh e2e/sync.sh
+
+# --prune-only removes proven entries and never adds
+exec machinery owed sync --prune-only
+stdout '^owed: 1 kept, 0 added, 1 removed$'
+cmp design/owed.yaml want-pruned.yaml
+
+# a full sync also adds what is neither proven nor listed, keeping reasons and stories
+cp owed-story.yaml design/owed.yaml
+exec machinery owed sync
+stdout '^owed: 1 kept, 1 added, 1 removed$'
+exec machinery owed list
+stdout '^fm:payment-provider-down  no test induces a provider outage yet  bd-7$'
+stdout '^inv:customer-email-unique  unproven at [0-9a-f]{7}$'
+! stdout 'tc:ORDE-8bd6e7'
+exec sh -c 'grep -q "reason: \"unproven at $(git rev-parse --short=7 HEAD)\"" design/owed.yaml && echo reason-ok'
+stdout reason-ok
+
+# nothing left to do
+exec machinery owed sync
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+
+# run, sync, commit, verify: the run stays valid, no second run is needed
+gitcommit 'sync owed'
+exec machinery verify
+stdout '^checked: 16 obligations, 14 proven, 0 partial, 2 owed, 14 receipts$'
+stdout '^passed$'
+exec mrun 2 owed sync extra
+
+-- owed-story.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+    story: bd-7
+-- want-pruned.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+    story: bd-7
+-- e2e/sync.sh --
+#!/bin/sh
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+pass() {
+  printf '{"v":1,"type":"receipt","id":"%s","outcome":"pass","test":"sync.sh","effects":%s,"observed":"%s"}\n' "$1" "$2" "$3" >> "$MACHINERY_RECEIPTS"
+}
+pass tc:ORDE-2e883d '["stampAttempt"]' 'Pending -> paying'
+pass tc:ORDE-70d94f '["recordPayRefused"]' 'pay refused, still Pending'
+pass tc:ORDE-1ded14 '["recordCancellation"]' 'Pending -> Cancelled'
+pass tc:ORDE-ad945c '["recordPaymentTimeout"]' 'paying -> Pending after timeout'
+pass tc:ORDE-8bd6e7 '["recordCharge"]' 'paying -> Paid; charge row written'
+pass tc:ORDE-267d12 '["recordPaymentFailure"]' 'paying -> Pending on provider error'
+pass tc:ORDE-e6d28f '["recordShipment","notifyCustomer"]' 'Paid -> Shipped'
+pass tc:ORDE-507e4f '["refundPayment","recordCancellation"]' 'Paid -> Cancelled'
+pass tc:ORDE-2fa2af '[]' 'ship refused with ORDER_NOT_PAID, still Pending'
+pass tc:ORDE-8799a1 '[]' 'pay refused with ORDER_ALREADY_PAID, still Paid'
+pass sc:customer-pays-and-the-order-ships '[]' 'order placed, paid and shipped'
+pass sc:cancelled-order-refuses-payment '[]' 'pay refused on a cancelled order'
+pass inv:paid-before-shipped '[]' 'ship from Pending refused'
+pass inv:terminal-is-final '[]' 'no event changes a Shipped or Cancelled order'

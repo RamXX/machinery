@@ -1,0 +1,40 @@
+# tc ids need a pass receipt whose effects equal the case's effects as a set (section 12)
+fixture shop
+cp owed-fm.yaml design/owed.yaml
+exec machinery gen
+gitinit
+exec machinery run -- sh emit.sh some.jsonl
+exec mrun 1 verify
+# order and repetition do not matter: tc:ORDE-e6d28f is proven
+! stdout 'tc:ORDE-e6d28f'
+# a pass without every effect is partial, and partial is unproven unless owed
+stdout '^  ERROR  unproven: tc:ORDE-2e883d$'
+stdout '^  ERROR  unproven: tc:ORDE-8bd6e7$'
+# an effect the case does not have is an ERROR; the case is partial
+stdout '^  ERROR  unexpected effect: tc:ORDE-1ded14 observed bogus$'
+stdout '^  ERROR  unproven: tc:ORDE-1ded14$'
+stdout '^checked: 16 obligations, 1 proven, 3 partial, 1 owed, 4 receipts$'
+stdout '^failed: 15 finding\(s\)$'
+exec machinery status
+stdout '^proven: 1  partial: 3  failed: 0  owed: 1  unproven and not owed: 14$'
+
+# a later run at the same commit that observes every effect makes the case proven
+exec machinery run -- sh emit.sh more.jsonl
+exec mrun 1 verify
+! stdout 'unproven: tc:ORDE-8bd6e7'
+stdout '^checked: 16 obligations, 2 proven, 2 partial, 1 owed, 5 receipts$'
+
+-- emit.sh --
+cat "$1" >> "$MACHINERY_RECEIPTS"
+-- owed-fm.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+-- some.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-e6d28f","outcome":"pass","test":"TestShip","effects":["notifyCustomer","recordShipment","notifyCustomer"],"observed":"Paid -> Shipped"}
+{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"TestPay","observed":"Pending -> paying; no attempt stamp"}
+{"v":1,"type":"receipt","id":"tc:ORDE-1ded14","outcome":"pass","test":"TestCancel","effects":["recordCancellation","bogus"],"observed":"Pending -> Cancelled"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge","effects":[],"observed":"paying -> Paid"}
+-- more.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}

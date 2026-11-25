@@ -1,0 +1,61 @@
+# receipts and owed entries must name known ids; the owed file must be well formed (sections 11.1, 12)
+fixture shop
+cp owed-extra.yaml design/owed.yaml
+exec machinery gen
+gitinit
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat extra.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  unknown id in receipt: tc:ORDE-ffffff$'
+stdout '^  ERROR  unknown id in receipt: act:Order.pay$'
+stdout '^  ERROR  unknown owed id: inv:nope$'
+# an act id no code serves yet may be owed
+! stdout 'act:Order.place'
+stdout '^failed: 3 finding\(s\)$'
+
+# a duplicate id in the owed file
+cp owed-dup.yaml design/owed.yaml
+exec mrun 1 verify
+stdout '^  ERROR  design/owed.yaml: duplicate id fm:payment-provider-down$'
+
+# a malformed receipt line is an ERROR naming the file and the line
+cp design/owed.yaml.orig design/owed.yaml
+rm .machinery/receipts
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat bad.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/[^ ]+\.jsonl: line 17: inv:terminal-is-final: outcome must be pass, fail or skip, got "maybe"$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/[^ ]+\.jsonl: line 18: not a JSON object$'
+stdout '^failed: 2 finding\(s\)$'
+
+-- extra.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-ffffff","outcome":"pass","test":"TestGhost","observed":"nothing"}
+{"v":1,"type":"receipt","id":"act:Order.pay","outcome":"pass","test":"TestGhost","observed":"actions are served, not proven"}
+-- bad.jsonl --
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"maybe","test":"TestX","observed":"?"}
+not json
+-- owed-extra.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+  - id: act:Order.place
+    reason: "no handler places orders yet"
+  - id: inv:nope
+    reason: "a typo"
+-- design/owed.yaml.orig --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- owed-dup.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: fm:payment-provider-down
+    reason: "twice"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"

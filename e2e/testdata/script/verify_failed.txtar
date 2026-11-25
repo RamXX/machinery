@@ -1,0 +1,35 @@
+# a fail receipt fails its obligation; skip receipts never count (section 12)
+fixture shop
+exec machinery gen
+gitinit
+
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat fail.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: tc:ORDE-2e883d \(TestPay\)$'
+stdout '^checked: 16 obligations, 13 proven, 1 partial, 2 owed, 16 receipts$'
+stdout '^failed: 1 finding\(s\)$'
+exec mrun 1 proof --ids tc:ORDE-2e883d
+stdout '^  tc:ORDE-2e883d -> TestPay -> FAIL: stayed Pending$'
+stdout '^result:   1 passed / 1 failed / 0 skipped$'
+
+# a failed id prints even when it is owed
+rm .machinery/receipts
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat fail-owed.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: tc:ORDE-8bd6e7 \(TestCharge\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a skip receipt proves nothing: the owed id stays unproven, so its entry is not stale
+rm .machinery/receipts
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat skip.jsonl >> "$MACHINERY_RECEIPTS"'
+exec machinery verify
+stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 16 receipts$'
+! stdout 'stale owed entry'
+stdout '^passed$'
+
+-- fail.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"fail","test":"TestPay","observed":"stayed Pending"}
+-- fail-owed.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"fail","test":"TestCharge","observed":"no charge row"}
+-- skip.jsonl --
+{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"skip","test":"TestOutage","observed":"no outage induced"}
