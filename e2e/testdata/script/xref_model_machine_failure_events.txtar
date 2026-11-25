@@ -1,0 +1,128 @@
+# rule event-action: a failure event arrives from outside, so it counts as external
+cp failure-event.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 1 machines, 3 domain states, 3 events, 2 actions'
+! stdout 'event-action'
+stdout '^passed$'
+
+# not listed: the event is not an action of Order
+cp unlisted.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  event-action: order.paymentFailed: event is not an action of Order; add the action to the model or list the event in _external_events \(or in _failure_events when it reports a failure\)'
+stdout 'failed: 1 finding\(s\)'
+
+# _failure_events must be a list of event names
+cp bad.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  event-action: order: _failure_events must be a list of event names'
+stdout 'ERROR  event-action: order.paymentFailed: event is not an action of Order'
+stdout 'failed: 2 finding\(s\)'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/.keep --
+
+-- failure-event.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_failure_events": [
+    "paymentFailed"
+  ],
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        },
+        "paymentFailed": {
+          "target": "Pending"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- unlisted.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        },
+        "paymentFailed": {
+          "target": "Pending"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- bad.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_failure_events": "paymentFailed",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        },
+        "paymentFailed": {
+          "target": "Pending"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}

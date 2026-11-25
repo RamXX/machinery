@@ -50,9 +50,17 @@ func XrefModelMachine(ctx *Context) *report.Stage {
 		states += len(domain)
 		checkStateEnum(s, w, d, m, e, domain)
 
-		external, ok := externalEvents(m)
+		external, ok := eventSet(m, "_external_events")
 		if !ok {
 			w.find(s, "event-action", m.ID, "_external_events must be a list of event names")
+		}
+		// a failure event arrives from outside: it is external
+		failure, ok := eventSet(m, "_failure_events")
+		if !ok {
+			w.find(s, "event-action", m.ID, "_failure_events must be a list of event names")
+		}
+		for ev := range failure {
+			external[ev] = true
 		}
 		acts := map[string]bool{}
 		for _, a := range e.Actions {
@@ -65,7 +73,7 @@ func XrefModelMachine(ctx *Context) *report.Stage {
 		for _, ev := range evs {
 			evSet[ev] = true
 			if !acts[ev] && !external[ev] {
-				w.find(s, "event-action", m.ID+"."+ev, "event is not an action of %s; add the action to the model or list the event in _external_events", ent)
+				w.find(s, "event-action", m.ID+"."+ev, "event is not an action of %s; add the action to the model or list the event in _external_events (or in _failure_events when it reports a failure)", ent)
 			}
 		}
 		for _, a := range e.Actions {
@@ -97,11 +105,11 @@ func domainStates(m *machine.Machine) []string {
 	return res
 }
 
-// externalEvents reads the root _external_events list. ok is false when it is
-// present and not a list of strings.
-func externalEvents(m *machine.Machine) (set map[string]bool, ok bool) {
+// eventSet reads a root list of event names (_external_events,
+// _failure_events). ok is false when it is present and not a list of strings.
+func eventSet(m *machine.Machine, key string) (set map[string]bool, ok bool) {
 	set = map[string]bool{}
-	v := m.Root.AsObject().Get2("_external_events")
+	v := m.Root.AsObject().Get2(key)
 	if v == nil {
 		return set, true
 	}

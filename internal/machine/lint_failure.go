@@ -1,0 +1,160 @@
+package machine
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/RamXX/machinery/internal/ir"
+)
+
+// tagFailure marks a state that records that something went wrong
+// (docs/formats.md section 5.2).
+const tagFailure = "failure"
+
+// failureWords are the name fragments of the name hints (section 6.2).
+var failureWords = []string{"fail", "error", "abort", "crash", "timeout"}
+
+// FailureStates returns the dotted paths of the states tagged failure, in
+// document order.
+func (m *Machine) FailureStates() []string {
+	ro := m.Root.AsObject()
+	if ro == nil {
+		return nil
+	}
+	var res []string
+	for _, s := range ir.WalkStates(ro.Get2("states"), "") {
+		if tags, _ := stateTags(s.Node); tags[tagFailure] {
+			res = append(res, s.Path)
+		}
+	}
+	return res
+}
+
+// FailureEvents returns the root _failure_events: the events that report a
+// failure arriving from outside, in declaration order, without duplicates.
+func (m *Machine) FailureEvents() []string { return eventList(m.Root.AsObject(), "_failure_events") }
+
+// eventList reads a root list of event names, keeping the non-empty strings
+// in declaration order, each once. Shape errors are lintEventList's.
+func eventList(ro *ir.Object, key string) []string {
+	if ro == nil {
+		return nil
+	}
+	var res []string
+	seen := map[string]bool{}
+	for _, e := range ro.Get2(key).AsArray() {
+		name := strings.TrimSpace(e.AsString())
+		if name != "" && !seen[name] {
+			seen[name] = true
+			res = append(res, name)
+		}
+	}
+	return res
+}
+
+// lintEventList holds a root list of event names (_external_events,
+// _failure_events): an array of non-empty names, each of which some state
+// handles or ignores. An entry nothing answers is a stale marker.
+func lintEventList(base string, ro *ir.Object, states []ir.StateEntry, key, purpose string) (errs []string) {
+	ev := ro.Get2(key)
+	if ev == nil {
+		return nil
+	}
+	if ev.Kind != ir.KindArray {
+		return []string{base + ": " + key + " must be an array of event-name strings " + purpose}
+	}
+	handled := map[string]bool{}
+	for _, s := range states {
+		if o := s.Node.AsObject(); o != nil {
+			for _, k := range o.GetObject("on").Keys() {
+				handled[k] = true
+			}
+			for _, k := range o.GetObject("_ignores").Keys() {
+				handled[k] = true
+			}
+		}
+	}
+	for _, e := range ev.AsArray() {
+		name := ""
+		if e != nil && e.Kind == ir.KindString {
+			name = strings.TrimSpace(e.AsString())
+		}
+		if name == "" {
+			errs = append(errs, base+": "+key+" entries must be non-empty event-name strings")
+			continue
+		}
+		if !handled[name] {
+			errs = append(errs, fmt.Sprintf("%s: %s names %s but no state handles or ignores it; the marker is stale (remove it, or wire the event)", base, key, ir.Repr(name)))
+		}
+	}
+	return errs
+}
+
+// lintFailure holds the failure states and events: no state is tagged both
+// failure and accepting, _failure_events is a well-formed list of answered
+// events, and no event is in both _external_events and _failure_events.
+func lintFailure(base string, ro *ir.Object, states []ir.StateEntry) (errs []string) {
+	for _, s := range states {
+		if tags, ok := stateTags(s.Node); ok && tags[tagFailure] && tags[tagAccepting] {
+			errs = append(errs, fmt.Sprintf("%s: state %s is tagged both failure and accepting; a state that records that something went wrong cannot report caller-facing success", base, s.Path))
+		}
+	}
+	errs = append(errs, lintEventList(base, ro, states, "_failure_events", "that report a failure arriving from outside")...)
+	external := map[string]bool{}
+	for _, e := range eventList(ro, "_external_events") {
+		external[e] = true
+	}
+	for _, e := range eventList(ro, "_failure_events") {
+		if external[e] {
+			errs = append(errs, fmt.Sprintf("%s: event %s is in both _external_events and _failure_events; a failure event is external already (keep it in _failure_events only)", base, ir.Repr(e)))
+		}
+	}
+	return errs
+}
+
+func looksLikeFailure(name string) bool {
+	l := strings.ToLower(name)
+	for _, w := range failureWords {
+		if strings.Contains(l, w) {
+			return true
+		}
+	}
+	return false
+}
+
+// Hints returns the name hints of section 6.2, warnings that never fail the
+// stage: a state whose name looks like a failure and is not tagged failure,
+// and an event the machine answers whose name looks like a failure and that
+// is neither a failure event nor one of actions (the actions of the
+// machine's lifecycle entity).
+func (m *Machine) Hints(actions map[string]bool) (hints []string) {
+	ro := m.Root.AsObject()
+	if ro == nil {
+		return nil
+	}
+	states := ir.WalkStates(ro.Get2("states"), "")
+	events := map[string]bool{}
+	for _, s := range states {
+		if tags, _ := stateTags(s.Node); looksLikeFailure(s.Name) && !tags[tagFailure] {
+			hints = append(hints, fmt.Sprintf("%s: state %s looks like a failure state and is not tagged failure", m.Path, s.Path))
+		}
+		if o := s.Node.AsObject(); o != nil {
+			for _, k := range o.GetObject("on").Keys() {
+				events[k] = true
+			}
+			for _, k := range o.GetObject("_ignores").Keys() {
+				events[k] = true
+			}
+		}
+	}
+	failure := map[string]bool{}
+	for _, e := range m.FailureEvents() {
+		failure[e] = true
+	}
+	for _, ev := range sortedSet(events) {
+		if looksLikeFailure(ev) && !failure[ev] && !actions[ev] {
+			hints = append(hints, fmt.Sprintf("%s: event %s looks like a failure event and is not in _failure_events", m.Path, ev))
+		}
+	}
+	return hints
+}

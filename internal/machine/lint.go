@@ -14,7 +14,7 @@ import (
 var (
 	rootKeys = setOf("id", "initial", "context", "states", "description", "meta", "version",
 		"_comment", "_delays", "_lifecycle_of", "_role", "_oracle_tag", "_guards", "_external_events",
-		"_entries")
+		"_failure_events", "_entries")
 	stateKeys = setOf("on", "after", "always", "invoke", "entry", "exit", "states", "initial",
 		"type", "id", "meta", "description", "tags", "onDone", "output", "_comment",
 		"_exhaustive", "_ignores", "_refusal", "_terminal")
@@ -244,6 +244,7 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 	}
 	errs = append(errs, lintGuards(base, ro, m.Table.Units.Guards)...)
 	errs = append(errs, lintFailClosed(base, ro, states, res)...)
+	errs = append(errs, lintFailure(base, ro, states)...)
 	return errs, counts
 }
 

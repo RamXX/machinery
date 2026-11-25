@@ -3,6 +3,7 @@ package stages
 import (
 	"sort"
 
+	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/machine"
 	"github.com/RamXX/machinery/internal/report"
 )
@@ -25,6 +26,9 @@ func Machines(ctx *Context) *report.Stage {
 		for _, e := range errs {
 			s.Errorf("%s", e)
 		}
+		for _, h := range m.Hints(lifecycleActions(d, m)) {
+			s.Warnf("%s", h)
+		}
 		states += counts.States
 		transitions += counts.Transitions
 	}
@@ -34,6 +38,18 @@ func Machines(ctx *Context) *report.Stage {
 		s.NotDemonstrated("nothing to check")
 	}
 	return s
+}
+
+// lifecycleActions returns the action names of the entity a machine is the
+// lifecycle of (none for an operational machine), for the name hints.
+func lifecycleActions(d *design.Design, m *machine.Machine) map[string]bool {
+	res := map[string]bool{}
+	if e, _ := design.FindEntity(d.Models, d.LifecycleEntity(m)); e != nil {
+		for _, a := range e.Actions {
+			res[a.Name] = true
+		}
+	}
+	return res
 }
 
 // collisions reports machines that share a case-id tag or a machine id: their

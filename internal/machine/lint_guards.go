@@ -2,7 +2,6 @@ package machine
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
 )
@@ -55,37 +54,6 @@ func lintGuards(base string, ro *ir.Object, used []string) (errs []string) {
 // lifecycle machine receives that are not model actions. Each entry must be a
 // non-empty event name that some state handles or ignores; an entry nothing
 // answers is a stale marker.
-func lintExternalEvents(base string, ro *ir.Object, states []ir.StateEntry) (errs []string) {
-	ev := ro.Get2("_external_events")
-	if ev == nil {
-		return nil
-	}
-	if ev.Kind != ir.KindArray {
-		return []string{base + ": _external_events must be an array of event-name strings this machine receives from outside its component"}
-	}
-	handled := map[string]bool{}
-	for _, s := range states {
-		if o := s.Node.AsObject(); o != nil {
-			for _, k := range o.GetObject("on").Keys() {
-				handled[k] = true
-			}
-			for _, k := range o.GetObject("_ignores").Keys() {
-				handled[k] = true
-			}
-		}
-	}
-	for _, e := range ev.AsArray() {
-		name := ""
-		if e != nil && e.Kind == ir.KindString {
-			name = strings.TrimSpace(e.AsString())
-		}
-		if name == "" {
-			errs = append(errs, base+": _external_events entries must be non-empty event-name strings")
-			continue
-		}
-		if !handled[name] {
-			errs = append(errs, fmt.Sprintf("%s: _external_events names %s but no state handles or ignores it; the marker is stale (remove it, or wire the event)", base, ir.Repr(name)))
-		}
-	}
-	return errs
+func lintExternalEvents(base string, ro *ir.Object, states []ir.StateEntry) []string {
+	return lintEventList(base, ro, states, "_external_events", "this machine receives from outside its component")
 }

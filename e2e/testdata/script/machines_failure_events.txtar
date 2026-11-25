@@ -1,0 +1,386 @@
+# _failure_events: the events that report a failure arriving from outside (the event idiom of docs/machine-format.md)
+mkdir design/machines
+
+# the event idiom: a worker reports a failure into a resting state
+cp valid.json design/machines/Job.machine.json
+exec machinery lint --stage machines
+stdout '^checked: 1 machines, 4 states, 4 transitions$'
+! stdout 'warn'
+stdout '^passed$'
+
+# the annotation is an array
+cp not_array.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _failure_events must be an array of event-name strings that report a failure arriving from outside$'
+stdout '^failed: 1 finding\(s\)$'
+
+# entries are non-empty strings
+cp bad_entries.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _failure_events entries must be non-empty event-name strings$'
+stdout '^failed: 2 finding\(s\)$'
+
+# an event no state handles or ignores makes the marker stale
+cp stale.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _failure_events names ''leaseLost'' but no state handles or ignores it; the marker is stale \(remove it, or wire the event\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a failure event is external already: it is not listed twice
+cp both.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: event ''jobFailed'' is in both _external_events and _failure_events; a failure event is external already \(keep it in _failure_events only\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- valid.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- not_array.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": "jobFailed",
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- bad_entries.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "",
+    5
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- stale.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed",
+    "leaseLost"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- both.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running",
+          "actions": "grantLease",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING",
+        "jobFailed": "nothing runs yet; a stray report is refused with JOB_NOT_RUNNING",
+        "retry": "the job is already queued"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done",
+          "actions": "recordResult",
+          "_requires": [
+            "system/worker"
+          ]
+        },
+        "jobFailed": {
+          "target": "Failed",
+          "actions": "recordFailure",
+          "_requires": [
+            "system/worker"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED",
+        "retry": "the job is running; refused with JOB_RUNNING"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "retry": {
+          "target": "Queued",
+          "actions": "recordRetry",
+          "_requires": [
+            "Operator"
+          ]
+        }
+      },
+      "_ignores": {
+        "claim": "a failed job is retried first; refused with JOB_FAILED",
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed; the repeated report is dropped"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  },
+  "_external_events": [
+    "jobFailed"
+  ]
+}

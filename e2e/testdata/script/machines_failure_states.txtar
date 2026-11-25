@@ -1,0 +1,295 @@
+# failure states: the tag failure, the failure-and-accepting refusal, and the name hints
+mkdir design/machines
+
+# a failure state may not report caller-facing success
+cp failure-accepting.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: state Failed is tagged both failure and accepting; a state that records that something went wrong cannot report caller-facing success$'
+stdout '^failed: 1 finding\(s\)$'
+
+# names that look like failures are hinted, case-insensitively; a hint never fails the stage.
+# Failed is tagged failure, jobFailed is a failure event and abort is an action of Job: no hint for them.
+cp hints.json design/machines/Job.machine.json
+exec machinery lint --stage machines
+stdout '^checked: 1 machines, 5 states, 10 transitions$'
+stdout '^  warn   design/machines/Job\.machine\.json: event workerError looks like a failure event and is not in _failure_events$'
+stdout '^  warn   design/machines/Job\.machine\.json: state CrashLoop looks like a failure state and is not tagged failure$'
+stdout -count=2 '^  warn   '
+! stdout 'state Failed looks'
+! stdout 'event jobFailed looks'
+! stdout 'event abort looks'
+stdout '^passed$'
+
+# without the tag the failure state is hinted too
+cp untagged.json design/machines/Job.machine.json
+exec machinery lint --stage machines
+stdout '^  warn   design/machines/Job\.machine\.json: state Failed looks like a failure state and is not tagged failure$'
+stdout -count=3 '^  warn   '
+stdout '^passed$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/jobs.modelith.yaml
+  machines: design/machines
+-- design/model/jobs.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Jobs
+enums:
+  JobStatus:
+    values:
+      - {name: Queued, definition: "Waiting for a worker."}
+      - {name: Running, definition: "A worker holds it."}
+      - {name: CrashLoop, definition: "Its worker keeps crashing."}
+      - {name: Failed, definition: "Its last run failed."}
+      - {name: Done, definition: "Finished or aborted."}
+entities:
+  Job:
+    definition: "A unit of background work."
+    attributes:
+      - {name: status, type: JobStatus}
+    actions:
+      - {name: claim, actor: Worker}
+      - {name: finish, actor: Worker}
+      - {name: abort, actor: Operator}
+-- failure-accepting.json --
+{
+  "id": "job",
+  "_lifecycle_of": "Job",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet",
+        "jobFailed": "nothing runs yet",
+        "workerError": "nothing runs yet"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done"
+        },
+        "jobFailed": {
+          "target": "Failed"
+        },
+        "workerError": {
+          "target": "CrashLoop"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED"
+      }
+    },
+    "CrashLoop": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "no run is in flight",
+        "jobFailed": "no run is in flight",
+        "workerError": "no run is in flight"
+      }
+    },
+    "Failed": {
+      "tags": [
+        "failure",
+        "accepting"
+      ],
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed",
+        "workerError": "already failed"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- hints.json --
+{
+  "id": "job",
+  "_lifecycle_of": "Job",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet",
+        "jobFailed": "nothing runs yet",
+        "workerError": "nothing runs yet"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done"
+        },
+        "jobFailed": {
+          "target": "Failed"
+        },
+        "workerError": {
+          "target": "CrashLoop"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED"
+      }
+    },
+    "CrashLoop": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "no run is in flight",
+        "jobFailed": "no run is in flight",
+        "workerError": "no run is in flight"
+      }
+    },
+    "Failed": {
+      "tags": "failure",
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed",
+        "workerError": "already failed"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- untagged.json --
+{
+  "id": "job",
+  "_lifecycle_of": "Job",
+  "initial": "Queued",
+  "_failure_events": [
+    "jobFailed"
+  ],
+  "states": {
+    "Queued": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "nothing runs yet",
+        "jobFailed": "nothing runs yet",
+        "workerError": "nothing runs yet"
+      }
+    },
+    "Running": {
+      "on": {
+        "finish": {
+          "target": "Done"
+        },
+        "jobFailed": {
+          "target": "Failed"
+        },
+        "workerError": {
+          "target": "CrashLoop"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "claim": "already claimed; a second worker is refused with JOB_CLAIMED"
+      }
+    },
+    "CrashLoop": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "no run is in flight",
+        "jobFailed": "no run is in flight",
+        "workerError": "no run is in flight"
+      }
+    },
+    "Failed": {
+      "on": {
+        "claim": {
+          "target": "Running"
+        },
+        "abort": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "finish": "a late result of a failed run is dropped",
+        "jobFailed": "already failed",
+        "workerError": "already failed"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
