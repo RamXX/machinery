@@ -606,7 +606,7 @@ func javaFeature(version string) int {
 }
 
 // latestJava returns the newest GA Temurin build of one feature line, in
-// the pin's spelling ("21.0.13+9").
+// the pin's spelling ("21.0.13.1+2").
 func latestJava(ctx context.Context, f fetcher, urlPattern string, feature int) (string, error) {
 	body, err := f.get(ctx, fmt.Sprintf(urlPattern, feature, feature+1))
 	if err != nil {

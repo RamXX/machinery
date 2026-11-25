@@ -27,12 +27,12 @@ import (
 // .java-runtime-pin plus the archive table are tested against them.
 const (
 	// pinnedJavaVersion is the exact java.version the pinned build reports.
-	pinnedJavaVersion = "21.0.13"
+	pinnedJavaVersion = "21.0.13.1"
 	// pinnedJavaBuild is the Temurin build number after the "+".
-	pinnedJavaBuild = "9"
+	pinnedJavaBuild = "2"
 	// pinnedJavaReleaseDate is the release date the pinned build prints in
 	// its canonical `java -version` banner.
-	pinnedJavaReleaseDate = "2026-10-20"
+	pinnedJavaReleaseDate = "2026-11-17"
 
 	PinnedJavaRuntimeVersion = pinnedJavaVersion + "+" + pinnedJavaBuild
 	PinnedJavaProbeVersion   = PinnedJavaRuntimeVersion + "-LTS"
@@ -88,11 +88,11 @@ type javaArchivePin struct {
 }
 
 var javaArchivePins = map[string]javaArchivePin{
-	"linux/arm64":   {"OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.13_9.tar.gz", "e3522e707fc7dbe2a72c30746b1e7068301a0213ecd213d4491f35a14eb55578", false},
-	"darwin/arm64":  {"OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.13_9.tar.gz", "bf036b35b071bfb2f54f2c0af8ee8d88afa95ee6eb3dce02c0f94cfc2524d04a", false},
-	"linux/amd64":   {"OpenJDK21U-jdk_x64_linux_hotspot_21.0.13_9.tar.gz", "d7f5d5cf865a2902b70ff549b97586a7d3f234e016f041ab447ea740c7d66d1c", false},
-	"darwin/amd64":  {"OpenJDK21U-jdk_x64_mac_hotspot_21.0.13_9.tar.gz", "9aa1d1c17ae5467a022679e7e0af5c00797d94ac462ed1a46f4db07a8a34a6dd", false},
-	"windows/amd64": {"OpenJDK21U-jdk_x64_windows_hotspot_21.0.13_9.zip", "a4dbaa05fca4bd89d84584e58c459bd732efebb1722af80ab13c6516832004f9", true},
+	"linux/arm64":   {"OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.13.1_2.tar.gz", "8c72816a6b308842d5ed1f13e5826b69c567da4784f7238d7e800efa71fe54b1", false},
+	"darwin/arm64":  {"OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.13.1_2.tar.gz", "48067f2b7c958ed104a9d8a5749be7d25220b0a356b4d2d1bcfaab3e16ad0b14", false},
+	"linux/amd64":   {"OpenJDK21U-jdk_x64_linux_hotspot_21.0.13.1_2.tar.gz", "bb8a93f9ae6e7a693b2b721e85dbeff26ae1a77447985a8d7afcdd9c7cf6222e", false},
+	"darwin/amd64":  {"OpenJDK21U-jdk_x64_mac_hotspot_21.0.13.1_2.tar.gz", "1b5eff1741bb83d32e2e19aade71452bb42e40f047c01d3e178d438304c9a26d", false},
+	"windows/amd64": {"OpenJDK21U-jdk_x64_windows_hotspot_21.0.13.1_2.zip", "bbebea1469996b276683c9299c227b294f85c847039c82633218186a4ad4fbf2", true},
 }
 
 // javaProvisionLockName is the provisioning lock inside the Java cache base.

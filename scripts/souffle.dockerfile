@@ -12,14 +12,14 @@
 #     installed (its sha512 is the one upstream publishes in sha512sum.txt);
 #   - its runtime dependencies from the Ubuntu snapshot archive at a fixed
 #     timestamp, so a rebuild resolves the same package versions;
-#   - the Go toolchain copied from the golang image by digest, the Go 1.27.3
+#   - the Go toolchain copied from the golang image by digest, the Go 1.27.4
 #     identity scripts/ci-linux.dockerfile pins.
 #
 # To repin: change a digest, the sha256, or the snapshot below, rebuild with
 # `docker build --platform linux/amd64 -f scripts/souffle.dockerfile .`, and
 # check `souffle --version` still reports the version the host runs.
 
-ARG GO_IMAGE=golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385
+ARG GO_IMAGE=golang:1.27.4-trixie@sha256:430985542100b871e108ccc00e8dcc5eef08ca14ee5825e98ebf563d8ffec4ee
 ARG BASE_IMAGE=ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3
 
 FROM ${GO_IMAGE} AS go

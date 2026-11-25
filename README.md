@@ -4,7 +4,7 @@
 [![Formal Verification](https://github.com/RamXX/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/formal.yml)
 [![Security](https://github.com/RamXX/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/security.yml)
 [![Nightly](https://github.com/RamXX/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/nightly.yml)
-[![CI: Dagger](https://img.shields.io/badge/CI-Dagger%20v0.21.10-131226)](.dagger/main.go)
+[![CI: Dagger](https://img.shields.io/badge/CI-Dagger%20v0.21.12-131226)](.dagger/main.go)
 [![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery.svg)](https://pkg.go.dev/github.com/RamXX/machinery)
 [![Go Report Card](https://goreportcard.com/badge/github.com/RamXX/machinery)](https://goreportcard.com/report/github.com/RamXX/machinery)
 
@@ -1038,7 +1038,7 @@ versions and release checks. Neither command installs anything.
   guarantees are not claimed: process custody, formal verification, and the assurance lanes are
   unix-only and refuse on Windows. Use Linux or macOS for the full toolchain.
 
-  **Build from source** (with [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.3). This is
+  **Build from source** (with [Go](https://go.dev/dl/) 1.27+; `go.mod` pins 1.27.4). This is
   also how you run a change before it is released:
   ```bash
   go build -o machinery ./cmd/machinery    # then: machinery install --from .
@@ -1046,7 +1046,7 @@ versions and release checks. Neither command installs anything.
 
 **Optional**
 
-- **[Java](https://adoptium.net/) 21.0.13+9**, only for `machinery verify-formal` and
+- **[Java](https://adoptium.net/) 21.0.13.1+2**, only for `machinery verify-formal` and
   `machinery verify-c4`. machinery accepts distributor-independent OpenJDK/HotSpot builds of this
   exact checksum-pinned Temurin build, fingerprints the complete runtime closure, and runs it in a
   minimal fixed environment. `verify-formal` runs [TLC](https://github.com/tlaplus/tlaplus) to
@@ -1064,7 +1064,7 @@ versions and release checks. Neither command installs anything.
   deterministic gate. With it you add the machine-checked proofs.
 - **[Structurizr CLI](https://github.com/structurizr/cli)**, only to export C4 diagrams from
   `workspace.dsl` (the [Structurizr DSL](https://github.com/structurizr/dsl) text and every gate
-  need no export). It needs the same Java 21.0.13+9 runtime. Download a
+  need no export). It needs the same Java 21.0.13.1+2 runtime. Download a
   [release zip](https://github.com/structurizr/cli/releases), unzip it, and add it to `PATH`
   (`structurizr.sh` on macOS and Linux, `structurizr.bat` on Windows), or run the
   [container](https://hub.docker.com/r/structurizr/cli): `docker pull structurizr/cli`. The pure G2
@@ -1475,11 +1475,11 @@ The [Dagger](https://dagger.io/) module in `.dagger/` is how CI runs, not a loca
 Linux job in `ci.yml`, `formal.yml`, and `security.yml` is a `dagger call` of the function named
 after it, so each gate has one definition and `make dagger-ci` runs what the runner runs. Run one
 job with `make dagger-job JOB=lint`; `dagger functions` lists them. The hosted runner installs the
-Dagger CLI at the version `dagger.json` owns (v0.21.10), verified against a committed checksum.
+Dagger CLI at the version `dagger.json` owns (v0.21.12), verified against a committed checksum.
 
 The module does not restate the runtime pins. Its base container is built from
-`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.3), Node (26.13.0) with TypeScript
-(7.0.2), CPython (3.15.2), and Elixir (1.20.5) on OTP (29.1.2) identities, shared with
+`scripts/ci-linux.dockerfile`, the single owner of the Go (1.27.4), Node (26.13.1) with TypeScript
+(7.0.2), CPython (3.15.2), and Elixir (1.20.5) on OTP (29.1.3) identities, shared with
 `make ci-linux`. The race sweep runs as an unprivileged user inside the container, because root
 bypasses permission bits and would turn the custody tests that assert an unwritable path is refused
 into silent passes. The wiring guards in `cmd/machinery/repository_contract_test.go` and

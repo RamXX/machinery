@@ -22,6 +22,14 @@ under their version heading when a release is cut.
   published a Windows arm64 JDK for 21.0.13, so the Java pin table no longer carries
   `windows/arm64`; Windows amd64 and the macOS and Linux platforms are unchanged.
 - Dependency updates: `github.com/spf13/pflag` 1.1.0 and `softprops/action-gh-release` 3.0.4.
+- Runtime and tool pins follow their latest upstream releases again: Node 26.13.1, Erlang/OTP 29.1.3
+  (erts 17.1.2, `hexpm/elixir:1.20.5-erlang-29.1.3-debian-trixie-20261123-slim`), Temurin Java
+  21.0.13.1+2 (release date 2026-11-17; the Windows arm64 JDK is still unpublished), the Dagger
+  engine v0.21.12, govulncheck v1.10.0, gitleaks v8.30.1 and Docker 29.10.1. Actions: `setup-go`,
+  `setup-node` and `setup-python` 7.1.0, `dependency-review-action` 5.0.1, `erlef/setup-beam` 1.24.1.
+  Go modules: `golang.org/x/sys` 0.50.0, and in the Dagger module gqlgen 0.17.98, grpc 1.85.0 and
+  the x/ libraries. The Dagger module drops the codegen `replace` lines that held the OTel log
+  packages on v0.16.0, which no longer build against OTel 1.47.
 
 ### Security
 
@@ -33,6 +41,13 @@ under their version heading when a release is cut.
 - `github.com/klauspost/compress` moves to v1.20.3 in the go-crm example, clearing the high-severity
   s2 out-of-bounds write advisory (fixed in 1.18.7). `golang.org/x/sys` 0.49.0, `golang.org/x/crypto`
   0.58.0 and `actions/upload-artifact` 7.0.2 / `download-artifact` 8.0.2 follow.
+- Pinned Go moves to 1.27.4, which fixes GO-2026-6859 (`net/http`), the vulnerability that failed the
+  nightly and security `govulncheck` runs from 2026-11-23.
+- The Dagger module moves to `go.opentelemetry.io/otel/sdk` 1.47.0 (and the rest of OTel to 1.47.0),
+  clearing Dependabot alerts 16 and 17 (`AttributeValueLengthLimit` bypass with U+FFFD runes).
+- The go-crm example moves to `golang.org/x/crypto` 0.59.0, `golang.org/x/sys` 0.50.0 and
+  `github.com/klauspost/compress` 1.20.5 (with arrow-go 18.9.0 and the other indirect modules);
+  its `gt.conformance-test-shape` and `g4.zero-context` attestations are renewed over the bump.
 
 ## [0.11.2] - 2026-10-06
 

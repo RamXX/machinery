@@ -26,10 +26,10 @@ import (
 // repository already owns in a file are read from that file at run time
 // instead of being repeated here.
 const (
-	dindImage       = "docker:29.7.2-dind"
+	dindImage       = "docker:29.10.1-dind"
 	goTestTimeout   = "30m"
 	sharedTmpPath   = "/shared"
-	gitleaksImage   = "zricethezav/gitleaks:v8.30.0"
+	gitleaksImage   = "zricethezav/gitleaks:v8.30.1"
 	ciUser          = "ci"
 	shellcheckPlatf = dagger.Platform("linux/amd64")
 )
@@ -583,7 +583,7 @@ func (m *Machinery) DatalogParity(ctx context.Context) (string, error) {
 // Govulncheck scans the toolchain and every registered example module.
 func (m *Machinery) Govulncheck(ctx context.Context) (string, error) {
 	return sh(ctx, m.Base(), `
-go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
+go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
 export PATH="$(go env GOPATH)/bin:$PATH"
 govulncheck ./...
 scripts/example-inventory.sh security | while IFS=$'\t' read -r impl module; do

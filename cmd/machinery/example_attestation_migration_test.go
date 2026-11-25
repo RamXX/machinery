@@ -57,15 +57,15 @@ const (
 	// golang.org/x/crypto (0.55.0 to 0.56.0, then 0.56.0 to 0.57.0) staled the
 	// pin text BUILD.md quotes from the authoritative impl/go.mod, forcing a
 	// re-review of the corrected document and of the bumped implementation root.
-	// The latest bump re-review (x/crypto 0.58.0, x/sys 0.49.0,
-	// klauspost/compress 1.20.3) is crmDepsDate: the current gt row and the
+	// The latest bump re-review (x/crypto 0.59.0, x/sys 0.50.0,
+	// klauspost/compress 1.20.5) is crmDepsDate: the current gt row and the
 	// BUILD.md plan row. The g3 rows keep crmThreatDate.
-	crmDepsDate = "2026-10-29"
+	crmDepsDate = "2026-11-24"
 	// crmThreatDate is the go-crm re-review after its threat ledger added
 	// threat invariants to the Session matrix and two negative tests to
 	// the session contract suite (the four g3 rows and the current gt row).
 	crmThreatDate      = "2026-10-05"
-	crmBumpPrefix      = "Re-reviewed 2026-10-29 over the corrected BUILD"
+	crmBumpPrefix      = "Re-reviewed 2026-11-24 over the corrected BUILD"
 	portfolioRenewal   = "Renews the 2026-09-02 Codex deterministic design review"
 	nextGateAttestor   = "Codex lane/next-gates"
 	nextGateDate       = "2026-09-22"
