@@ -1,0 +1,133 @@
+# the layer rule reads imports of Python, TypeScript, Elixir and Rust by pattern
+cp machinery.yaml.src machinery.yaml
+mkdir py/domain py/api web/domain web/api lib/shop/domain lib/shop/api rs/src/domain rs/src/api
+cp py_order.py.in py/domain/order.py
+cp py_handlers.py.in py/api/handlers.py
+cp ts_order.ts.in web/domain/order.ts
+cp ts_handlers.ts.in web/api/handlers.ts
+cp ex_order.ex.in lib/shop/domain/order.ex
+cp ex_handlers.ex.in lib/shop/api/handlers.ex
+cp rs_order.rs.in rs/src/domain/order.rs
+cp rs_handlers.rs.in rs/src/api/handlers.rs
+exec mrun 1 arch
+stdout 'ERROR  layer: lib/shop/domain/order.ex \(domain\) imports lib/shop/api/handlers.ex \(api\)'
+stdout 'ERROR  layer: py/domain/order.py \(domain\) imports py/api/handlers.py \(api\)'
+stdout 'ERROR  layer: rs/src/domain/order.rs \(domain\) imports rs/src/api/handlers.rs \(api\)'
+stdout 'ERROR  layer: web/domain/order.ts \(domain\) imports web/api/handlers.ts \(api\)'
+stdout 'failed: 4 finding\(s\)'
+# external imports are ignored and not counted; the api files import the domain downward
+stdout 'checked: 8 files, 8 imports, 0 functions'
+
+# a project-rooted Python import, a TypeScript require, an Elixir multi alias and a Rust use of a function resolve too
+cp py_rooted.py.in py/domain/order.py
+cp ts_require.ts.in web/domain/order.ts
+cp ex_multi.ex.in lib/shop/domain/order.ex
+cp rs_mod.rs.in rs/src/domain/order.rs
+exec mrun 1 arch
+stdout 'ERROR  layer: lib/shop/domain/order.ex \(domain\) imports lib/shop/api/handlers.ex \(api\)'
+stdout 'ERROR  layer: py/domain/order.py \(domain\) imports py/api/handlers.py \(api\)'
+stdout 'ERROR  layer: rs/src/domain/order.rs \(domain\) imports rs/src/api/handlers.rs \(api\)'
+stdout 'ERROR  layer: web/domain/order.ts \(domain\) imports web/api/handlers.ts \(api\)'
+
+# clean domain files pass
+cp py_clean.py.in py/domain/order.py
+cp ts_clean.ts.in web/domain/order.ts
+cp ex_clean.ex.in lib/shop/domain/order.ex
+cp rs_clean.rs.in rs/src/domain/order.rs
+exec mrun 0 arch
+stdout '^passed$'
+
+-- machinery.yaml.src --
+version: 2
+scope: ["py/**", "web/**", "lib/**", "rs/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["**/domain/**"]}
+    - {name: api, paths: ["**/api/**"]}
+-- py_order.py.in --
+import os
+from ..api import handlers
+
+def apply(event):
+    return handlers.handle(event)
+-- py_handlers.py.in --
+from ..domain import order
+
+def handle(event):
+    return order.apply(event)
+-- py_rooted.py.in --
+import py.api.handlers
+
+def apply(event):
+    return py.api.handlers.handle(event)
+-- py_clean.py.in --
+import os
+
+def apply(event):
+    return os.sep + event
+-- ts_order.ts.in --
+import fs from "fs";
+import { handle } from "../api/handlers";
+
+export const apply = (e: string) => handle(e);
+-- ts_handlers.ts.in --
+import { apply } from "../domain/order";
+
+export const handle = (e: string) => apply(e);
+-- ts_require.ts.in --
+const { handle } = require("../api/handlers.js");
+
+export const apply = (e: string) => handle(e);
+-- ts_clean.ts.in --
+import path from "path";
+
+export const apply = (e: string) => path.sep + e;
+-- ex_order.ex.in --
+defmodule Shop.Domain.Order do
+  alias Shop.Api.Handlers
+
+  def apply(event), do: Handlers.handle(event)
+end
+-- ex_handlers.ex.in --
+defmodule Shop.Api.Handlers do
+  alias Shop.Domain.Order
+
+  def handle(event), do: Order.apply(event)
+end
+-- ex_multi.ex.in --
+defmodule Shop.Domain.Order do
+  alias Shop.Api.{Handlers, Router}
+
+  def apply(event), do: Handlers.handle(event)
+end
+-- ex_clean.ex.in --
+defmodule Shop.Domain.Order do
+  alias Enum, as: E
+
+  def apply(event), do: E.join([event], "")
+end
+-- rs_order.rs.in --
+use crate::api::handlers;
+use std::fmt;
+
+pub fn apply(e: &str) -> String {
+    handlers::handle(e)
+}
+-- rs_handlers.rs.in --
+use crate::domain::order;
+
+pub fn handle(e: &str) -> String {
+    order::apply(e)
+}
+-- rs_mod.rs.in --
+use crate::api::handlers::handle;
+
+pub fn apply(e: &str) -> String {
+    handle(e)
+}
+-- rs_clean.rs.in --
+use std::fmt;
+
+pub fn apply(e: &str) -> String {
+    e.to_string()
+}

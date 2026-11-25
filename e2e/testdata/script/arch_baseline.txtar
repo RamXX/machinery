@@ -1,0 +1,125 @@
+# existing violations are listed in the baseline: they warn, and a stale entry is an error
+fixture shop
+cp machinery_baseline.yaml machinery.yaml
+cp order_up.go.in internal/domain/order.go
+
+# without a baseline file the violation is an error
+exec mrun 1 arch
+stdout 'ERROR  layer: internal/domain/order.go \(domain\) imports internal/api \(api\)'
+
+# --write-baseline records the current violations and the stage then passes
+exec mrun 0 arch --write-baseline
+stdout 'arch: wrote 1 baseline entries to design/arch-baseline.yaml'
+stdout 'warn   baselined: layer: internal/domain/order.go \(domain\) imports internal/api \(api\)'
+stdout '^passed$'
+cmp design/arch-baseline.yaml want-baseline.yaml
+exec mrun 0 arch
+stdout 'warn   baselined: layer: internal/domain/order.go'
+stdout '^passed$'
+
+# a new violation next to the baselined one is still an error
+cp order_up.go.in internal/domain/second.go
+exec mrun 1 arch
+stdout 'ERROR  layer: internal/domain/second.go \(domain\) imports internal/api \(api\)'
+stdout 'warn   baselined: layer: internal/domain/order.go'
+rm internal/domain/second.go
+
+# fixing the violation makes the entry stale
+cp order_ok.go.in internal/domain/order.go
+exec mrun 1 arch
+stdout 'ERROR  stale baseline entry: layer internal/domain/order.go -> internal/api'
+stdout 'failed: 1 finding\(s\)'
+
+# writing the baseline again shrinks it
+exec mrun 0 arch --write-baseline
+stdout 'arch: wrote 0 baseline entries'
+exec mrun 0 arch
+cmp design/arch-baseline.yaml empty-baseline.yaml
+
+# a malformed baseline is an error
+cp bad-baseline.yaml design/arch-baseline.yaml
+exec mrun 1 arch
+stdout 'ERROR  design/arch-baseline.yaml: version must be 1'
+
+# --write-baseline needs a baseline file in the config
+cp machinery_nobaseline.yaml machinery.yaml
+exec mrun 2 arch --write-baseline
+stderr 'config: constraints.baseline is not set'
+
+-- order_up.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+import "example.test/shop/internal/api"
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel
+func Apply(event string) string {
+	return api.Handle(event)
+}
+-- order_ok.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel
+func Apply(event string) string {
+	return event
+}
+-- want-baseline.yaml --
+version: 1
+baseline:
+  - {rule: layer, subject: "internal/domain/order.go -> internal/api"}
+-- empty-baseline.yaml --
+version: 1
+baseline: []
+-- bad-baseline.yaml --
+version: 2
+baseline: []
+-- machinery_baseline.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  baseline: design/arch-baseline.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_nobaseline.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

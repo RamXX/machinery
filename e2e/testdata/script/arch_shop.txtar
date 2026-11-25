@@ -1,0 +1,14 @@
+# arch passes on the shop fixture: the api layer imports the domain layer, never the reverse
+fixture shop
+exec mrun 0 arch
+stdout '== arch =='
+stdout 'checked: 2 files, 1 imports, 2 functions'
+stdout '^passed$'
+stdout 'machinery arch: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# check runs the same stage
+exec mrun 0 check --stage arch
+stdout 'checked: 2 files, 1 imports, 2 functions'
+
+exec mrun 2 arch extra
+stderr 'usage: machinery arch takes no arguments'

@@ -1,0 +1,134 @@
+# size limits apply only when constraints.size is set
+fixture shop
+cp small.yaml machinery.yaml
+cp long.go.in internal/domain/long.go
+exec mrun 1 arch
+stdout 'ERROR  file-size: internal/domain/long.go has 29 lines \(max 20\)'
+stdout 'ERROR  func-size: internal/domain/long.go:Long has 6 lines \(max 5\)'
+stdout 'ERROR  func-size: internal/domain/long.go:Thing.Method has 7 lines \(max 5\)'
+stdout 'ERROR  func-size: internal/domain/long.go:Generic.Method has 6 lines \(max 5\)'
+! stdout 'func-size: internal/domain/long.go:Short'
+! stdout 'handlers.go'
+stdout 'failed: 4 finding\(s\)'
+stdout 'checked: 3 files, 1 imports, 6 functions'
+
+# size paths narrows the files, and a missing limit is not enforced
+cp narrow.yaml machinery.yaml
+exec mrun 1 arch
+stdout 'ERROR  func-size: internal/domain/long.go:Long has 6 lines \(max 5\)'
+! stdout 'file-size'
+stdout 'checked: 3 files, 0 imports, 4 functions'
+
+# without a size block nothing is measured
+cp nosize.yaml machinery.yaml
+exec mrun 0 arch
+stdout 'checked: 3 files, 1 imports, 0 functions'
+
+# a constraints block with no rule has nothing to check
+cp norules.yaml machinery.yaml
+exec mrun 1 arch
+stdout 'not demonstrated: nothing to check'
+
+-- long.go.in --
+package domain
+
+func Short() {}
+
+func Long() {
+	a := 1
+	b := 2
+	c := 3
+	_ = a + b + c
+}
+
+type Thing struct{}
+
+func (t *Thing) Method() {
+	a := 1
+	b := 2
+	c := 3
+	_ = a + b + c
+	_ = a
+}
+
+type Generic[T any] struct{}
+
+func (g Generic[T]) Method() {
+	a := 1
+	b := 2
+	c := 3
+	_ = a + b + c
+}
+-- small.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 20
+    max_func_lines: 5
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  size:
+    paths: ["internal/domain/long.go"]
+    max_func_lines: 5
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- nosize.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- norules.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+constraints: {}
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

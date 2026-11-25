@@ -1,0 +1,30 @@
+# without a constraints block the stage is not applicable
+fixture shop
+cp bare.yaml machinery.yaml
+exec mrun 0 arch
+stdout '== arch =='
+stdout 'not applicable: no constraints configured'
+! stdout 'checked:'
+stdout 'machinery arch: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+# --write-baseline on a project without constraints writes nothing
+exec mrun 0 arch --write-baseline
+stdout 'not applicable: no constraints configured'
+! exists design/arch-baseline.yaml
+
+# the declaration of applicable checks says so
+exec mrun 0 checks
+stdout 'arch  +not applicable: no constraints configured'
+
+-- bare.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

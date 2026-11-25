@@ -1,0 +1,49 @@
+# a file in a lower layer must not import a package of a higher layer
+fixture shop
+cp order_up.go.in internal/domain/order.go
+exec mrun 1 arch
+stdout 'ERROR  layer: internal/domain/order.go \(domain\) imports internal/api \(api\)'
+stdout 'failed: 1 finding\(s\)'
+stdout 'checked: 2 files, 2 imports, 2 functions'
+
+# the same import in the same layer, or downward, is fine; an external import is ignored
+cp order_ext.go.in internal/domain/order.go
+exec mrun 0 arch
+stdout 'checked: 2 files, 1 imports, 2 functions'
+
+# a file in no layer is counted and not checked
+cp order_up.go.in internal/other.go
+exec mrun 0 arch
+stdout 'checked: 3 files, 1 imports, 3 functions'
+
+# a Go file with imports and no go.mod cannot be mapped
+cp order_up.go.in internal/domain/order.go
+rm go.mod
+exec mrun 1 arch
+stdout 'ERROR  go-mod: internal/api/handlers.go: no go.mod found'
+stdout 'ERROR  go-mod: internal/domain/order.go: no go.mod found'
+
+-- order_up.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+import "example.test/shop/internal/api"
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel
+func Apply(event string) string {
+	return api.Handle(event)
+}
+-- order_ext.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+import "strings"
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel
+func Apply(event string) string {
+	return strings.ToLower(event)
+}
