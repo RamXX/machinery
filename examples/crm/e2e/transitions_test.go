@@ -5,6 +5,8 @@ package e2e
 // HTTP and checking the real database. The tests always read
 // design/gen/tables, never MACHINERY_TABLES_DIR: during a probe the service
 // follows a mutated table while the tests still expect the committed one.
+// The onError and after cases are induced on the real database by the
+// hooks of failure_test.go.
 //
 // machinery:verifies tc:DEAL-* tc:TASK-*
 
@@ -37,6 +39,7 @@ type caseTable struct {
 	Clauses []struct {
 		ID, Transition, Guard, Clause string
 	} `json:"clauses"`
+	Delays map[string]int `json:"delays"`
 }
 
 type tcase struct {
@@ -75,16 +78,18 @@ type observer func(t *testing.T, a arranged) error
 
 // observers maps each real effect to its check: the audit row it writes.
 var observers = map[string]observer{
-	"auditQualify":    auditRow("qualify", "applied"),
-	"auditLose":       auditRow("lose", "applied"),
-	"auditReopen":     auditRow("reopen", "applied"),
-	"auditWin":        auditRow("win", "applied"),
-	"stampWinAttempt": auditRow("win-attempt", "applied"),
-	"auditDealDenied": auditRow("dealdenied", "refused"),
-	"auditStart":      auditRow("start", "applied"),
-	"auditComplete":   auditRow("complete", "applied"),
-	"auditCancel":     auditRow("cancel", "applied"),
-	"auditTaskDenied": auditRow("taskdenied", "refused"),
+	"auditQualify":      auditRow("qualify", "applied"),
+	"auditLose":         auditRow("lose", "applied"),
+	"auditReopen":       auditRow("reopen", "applied"),
+	"auditWin":          auditRow("win", "applied"),
+	"stampWinAttempt":   auditRow("win-attempt", "applied"),
+	"auditDealDenied":   auditRow("dealdenied", "refused"),
+	"auditStart":        auditRow("start", "applied"),
+	"auditComplete":     auditRow("complete", "applied"),
+	"auditCancel":       auditRow("cancel", "applied"),
+	"auditTaskDenied":   auditRow("taskdenied", "refused"),
+	"auditCloseFailure": auditRow("closefailure", "failed"),
+	"auditCloseTimeout": auditRow("closetimeout", "failed"),
 }
 
 // auditRow observes an effect that writes one audit row: exactly one row
@@ -150,7 +155,8 @@ func TestTransitions(t *testing.T) {
 				n++
 				t.Run(c.ID, func(t *testing.T) { driveCase(t, c.ID, func() (string, []string) { return runOnDone(t, tb, c) }) })
 			case "onError", "after":
-				// The failure paths cannot be induced yet; nothing is claimed.
+				n++
+				t.Run(c.ID, func(t *testing.T) { driveCase(t, c.ID, func() (string, []string) { return runFailure(t, tb, c) }) })
 			default:
 				t.Errorf("%s: no driver for transition kind %q", c.ID, c.Kind)
 			}
@@ -317,6 +323,11 @@ func runOnDone(t *testing.T, tb caseTable, c tcase) (string, []string) {
 		t.Fatalf("POST %s = %+v, want state %s cases %v", a.path(in.Event), ans, final, want)
 	}
 	wantRow(t, tb.Machine+"s", a.id, final)
+	if hooks, ok := actors[c.Event]; ok {
+		if n := hooks.rows(t, a); n != 1 {
+			t.Fatalf("%s: %s wrote %d rows for %s, want 1", c.ID, c.Event, n, a.subject())
+		}
+	}
 	return in.Source + " " + in.Event + " entered " + c.Source + "; " + c.Event + " done: cases " + strings.Join(want, " ") + ", the row is " + final, observe(t, a, c.Effects)
 }
 

@@ -25,12 +25,16 @@ func scanDeal(r pgx.Row) (Deal, error) {
 
 // CreateDeal inserts a deal.
 func (s *Store) CreateDeal(ctx context.Context, d Deal) (Deal, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	return scanDeal(s.pool.QueryRow(ctx, `INSERT INTO deals (title, stage, amount_cents, owner_id)
 		VALUES ($1, $2, $3, $4::uuid) RETURNING `+dealCols, d.Title, d.Stage, d.AmountCents, d.OwnerID))
 }
 
 // ListDeals returns every deal, ordered by id.
 func (s *Store) ListDeals(ctx context.Context) ([]Deal, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	rows, err := s.pool.Query(ctx, "SELECT "+dealCols+" FROM deals ORDER BY id")
 	if err != nil {
 		return nil, err
@@ -51,5 +55,7 @@ func (t *Tx) SetDealStage(id, stage string) error {
 
 // GetDeal loads a deal; an unknown id is ErrNotFound.
 func (s *Store) GetDeal(ctx context.Context, id string) (Deal, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	return scanDeal(s.pool.QueryRow(ctx, "SELECT "+dealCols+" FROM deals WHERE id = $1::uuid", id))
 }

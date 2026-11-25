@@ -7,9 +7,9 @@ import (
 )
 
 // dealUnits implements every unit the deal table names. Every action writes
-// its audit row; stampWinAttempt writes win-attempt. The recordWin actor is
-// still simulated: it succeeds and does nothing, under the closeTimeout
-// deadline the engine gives it.
+// its audit row; stampWinAttempt writes win-attempt. The recordWin actor
+// writes the deal_wins row under the closeTimeout deadline the engine gives
+// it; a failed or late write is undone and selects onError or after.
 func dealUnits() fsm.Units {
 	actions := audits(map[string]string{
 		"auditQualify":      applied,
@@ -29,9 +29,14 @@ func dealUnits() fsm.Units {
 		},
 		Actions: actions,
 		Actors: map[string]fsm.Actor{
-			"recordWin": {Run: func(context.Context, fsm.Ctx) error { return nil }, Simulated: true},
+			"recordWin": {Run: recordWin},
 		},
 	}
+}
+
+func recordWin(ctx context.Context, c fsm.Ctx) error {
+	u := unit(c)
+	return u.tx.RecordWin(ctx, u.deal.ID, u.deal.AmountCents)
 }
 
 // canWriteDeal: the caller is the owner or an Admin.

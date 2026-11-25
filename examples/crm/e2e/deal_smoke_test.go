@@ -43,7 +43,7 @@ func TestDealHappyPath(t *testing.T) {
 	qualify(t, id, rep)
 	pass(t, "tc:DEAL-4a25db", "Lead qualify by the owner: 200, Qualified in the answer and the row")
 	c := fire(t, "/deals/"+id+"/win", rep)
-	wantChange(t, c, "Won", []string{"tc:DEAL-d09c4d", "tc:DEAL-701b01"}, []string{"stampWinAttempt", "auditWin"}, []string{"recordWin"})
+	wantChange(t, c, "Won", []string{"tc:DEAL-d09c4d", "tc:DEAL-701b01"}, []string{"stampWinAttempt", "recordWin", "auditWin"}, []string{})
 	wantRow(t, "deals", id, "Won")
 	pass(t, "tc:DEAL-d09c4d", "Qualified win by the owner with an amount: the walk entered closing")
 	pass(t, "tc:DEAL-701b01", "closing: recordWin done, Won in the answer and the row")

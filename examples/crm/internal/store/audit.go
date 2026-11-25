@@ -27,6 +27,8 @@ func (t *Tx) Audit(actorID, action, subject, outcome string) error {
 
 // ListAudit returns the audit trail, oldest first.
 func (s *Store) ListAudit(ctx context.Context) ([]AuditEntry, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	rows, err := s.pool.Query(ctx, "SELECT id::text, actor_id::text, action, subject, outcome, at FROM audit_entries ORDER BY id")
 	if err != nil {
 		return nil, err

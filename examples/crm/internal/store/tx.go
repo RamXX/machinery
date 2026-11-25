@@ -25,13 +25,20 @@ type Tx struct {
 // Context is the context the transaction runs under.
 func (t *Tx) Context() context.Context { return t.ctx }
 
-// InTx runs fn in one transaction and commits when fn returns nil.
+// InTx runs fn in one transaction, under one Timeout, and commits when fn
+// returns nil.
 func (s *Store) InTx(ctx context.Context, fn func(*Tx) error) error {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
-	defer tx.Rollback(context.Background())
+	defer func() {
+		ctx, cancel := bound(context.Background())
+		defer cancel()
+		_ = tx.Rollback(ctx)
+	}()
 	if err := fn(&Tx{ctx: ctx, tx: tx}); err != nil {
 		return err
 	}

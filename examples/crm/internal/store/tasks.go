@@ -25,17 +25,23 @@ func scanTask(r pgx.Row) (Task, error) {
 
 // CreateTask inserts a task; an unknown deal is ErrBadReference.
 func (s *Store) CreateTask(ctx context.Context, t Task) (Task, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	return scanTask(s.pool.QueryRow(ctx, `INSERT INTO tasks (title, status, deal_id, assignee_id)
 		VALUES ($1, $2, $3::uuid, $4::uuid) RETURNING `+taskCols, t.Title, t.Status, t.DealID, t.AssigneeID))
 }
 
 // GetTask loads a task; an unknown id is ErrNotFound.
 func (s *Store) GetTask(ctx context.Context, id string) (Task, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	return scanTask(s.pool.QueryRow(ctx, "SELECT "+taskCols+" FROM tasks WHERE id = $1::uuid", id))
 }
 
 // ListTasks returns every task, ordered by id.
 func (s *Store) ListTasks(ctx context.Context) ([]Task, error) {
+	ctx, cancel := bound(ctx)
+	defer cancel()
 	rows, err := s.pool.Query(ctx, "SELECT "+taskCols+" FROM tasks ORDER BY id")
 	if err != nil {
 		return nil, err

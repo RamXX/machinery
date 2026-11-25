@@ -9,11 +9,21 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgconn/ctxwatch"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// HealthTimeout bounds the health probe.
-const HealthTimeout = 2 * time.Second
+// Timeouts. Every database call of the service runs under Timeout (a
+// transaction under one Timeout as a whole). A call whose context ends is
+// cancelled on the server, and the connection is given up CancelGrace
+// later if the server does not answer the cancel: so a database that does
+// not answer costs a request at most Timeout plus CancelGrace.
+const (
+	Timeout       = 2 * time.Second
+	CancelGrace   = 500 * time.Millisecond
+	HealthTimeout = Timeout
+)
 
 // ErrNotMigrated means the migrations have not been applied yet.
 var ErrNotMigrated = errors.New("migrations not applied yet")
@@ -30,11 +40,22 @@ func Open(url string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
+	cfg.ConnConfig.ConnectTimeout = Timeout
+	// A cancel request, not a closed connection: a statement cancelled by
+	// its deadline leaves the transaction usable after ROLLBACK TO SAVEPOINT.
+	cfg.ConnConfig.BuildContextWatcherHandler = func(c *pgconn.PgConn) ctxwatch.Handler {
+		return &pgconn.CancelRequestContextWatcherHandler{Conn: c, DeadlineDelay: CancelGrace}
+	}
 	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
 	if err != nil {
 		return nil, fmt.Errorf("create pool: %w", err)
 	}
 	return &Store{pool: pool}, nil
+}
+
+// bound gives a database call its Timeout.
+func bound(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, Timeout)
 }
 
 // Close releases the pool.
@@ -43,7 +64,7 @@ func (s *Store) Close() { s.pool.Close() }
 // Health answers nil when SELECT 1 answers within HealthTimeout and the
 // migrations are applied.
 func (s *Store) Health(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, HealthTimeout)
+	ctx, cancel := bound(ctx)
 	defer cancel()
 	var one int
 	if err := s.pool.QueryRow(ctx, "SELECT 1").Scan(&one); err != nil {
