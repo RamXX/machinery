@@ -22,8 +22,6 @@ owed:
     reason: "formal model not written yet"
   - id: fv:record-ownership
     reason: "formal model not written yet"
-  - id: inv:audit-append-only
-    reason: "no test yet"
   - id: inv:deal-owner-or-admin-writes
     reason: "no test yet"
   - id: inv:deal-reopen-admin-only
@@ -32,11 +30,7 @@ owed:
     reason: "no test yet"
   - id: inv:deal-won-needs-amount
     reason: "no test yet"
-  - id: inv:every-change-audited
-    reason: "no test yet"
   - id: inv:lifecycle-single-writer
-    reason: "no test yet"
-  - id: inv:refusals-are-audited
     reason: "no test yet"
   - id: inv:task-assignee-or-admin-writes
     reason: "no test yet"
@@ -46,43 +40,5 @@ owed:
     reason: "no test yet"
   - id: tc:DEAL-23efa8
     reason: "failure path not induced yet: no test makes the recordWin actor fail"
-  - id: tc:DEAL-4a25db
-    reason: "effect auditQualify is a noop"
   - id: tc:DEAL-55eecd
     reason: "failure path not induced yet: no test makes recordWin outlast closeTimeout"
-  - id: tc:DEAL-701b01
-    reason: "effect auditWin is a noop"
-  - id: tc:DEAL-776ffd
-    reason: "effect auditLose is a noop"
-  - id: tc:DEAL-7bb594
-    reason: "effect auditDealDenied is a noop"
-  - id: tc:DEAL-81d0ab
-    reason: "effect auditDealDenied is a noop"
-  - id: tc:DEAL-9f48af
-    reason: "effect auditDealDenied is a noop"
-  - id: tc:DEAL-a627f4
-    reason: "effect auditLose is a noop"
-  - id: tc:DEAL-d09c4d
-    reason: "effect stampWinAttempt is a noop"
-  - id: tc:DEAL-fdd582
-    reason: "effect auditDealDenied is a noop"
-  - id: tc:DEAL-fdf795
-    reason: "effect auditDealDenied is a noop"
-  - id: tc:DEAL-fe513e
-    reason: "effect auditReopen is a noop"
-  - id: tc:TASK-067fe3
-    reason: "effect auditStart is a noop"
-  - id: tc:TASK-2a7cdb
-    reason: "effect auditTaskDenied is a noop"
-  - id: tc:TASK-36d38a
-    reason: "effect auditTaskDenied is a noop"
-  - id: tc:TASK-67d9f6
-    reason: "effect auditCancel is a noop"
-  - id: tc:TASK-7d91c2
-    reason: "effect auditTaskDenied is a noop"
-  - id: tc:TASK-d159c9
-    reason: "effect auditTaskDenied is a noop"
-  - id: tc:TASK-d307aa
-    reason: "effect auditComplete is a noop"
-  - id: tc:TASK-f7ab1e
-    reason: "effect auditCancel is a noop"
