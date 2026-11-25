@@ -38,7 +38,8 @@ func Ratchet(ctx *Context) *report.Stage {
 	p, ref := ctx.P, ctx.Base
 	raw, ok := gitx.Show(p.Root, ref, project.ConfigName)
 	if !ok {
-		return s.NotDemonstrated("no " + project.ConfigName + " at " + ref)
+		// the project did not exist at the base: nothing was established there
+		return s.NotApplicable("no " + project.ConfigName + " at " + ref + ": nothing was established there")
 	}
 	bcfg, err := project.Parse(raw)
 	if err != nil {

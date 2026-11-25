@@ -838,7 +838,12 @@ that was established at the base may quietly stop being established:
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the scope widened in the same change. |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
 
-`checked:` counts obligations, scope globs, tiered ids and baseline entries compared.
+`checked:` counts obligations, scope globs, tiered ids and baseline entries compared. An unknown
+ref is a usage error. A base at which the project has no `machinery.yaml` established nothing:
+the stage is `not applicable: no machinery.yaml at <ref>: nothing was established there`.
+
+The paths of the obligations, the owed list, the risk file and the baselines at the base come
+from the base's own `machinery.yaml`.
 
 ## 12. Verify
 

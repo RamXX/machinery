@@ -1,0 +1,11 @@
+# A project that did not exist at the base established nothing there.
+mkdir repo
+cd repo
+exec sh -c 'echo hello > README.md'
+gitinit
+fixture shop
+exec machinery gen
+gitcommit 'add the project'
+exec machinery check --base HEAD~1 --stage ratchet
+stdout '== ratchet =='
+stdout 'not applicable: no machinery.yaml at HEAD~1: nothing was established there'
