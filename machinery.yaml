@@ -1,0 +1,15 @@
+# machinery checks itself: no unit tests, no test doubles, and the layering below.
+version: 2
+scope: ["cmd/**", "internal/**", "pkg/**"]
+tests:
+  e2e: ["e2e/*.go", "e2e/testdata/script/**", "examples/crm/e2e/**"]
+constraints:
+  layers:   # lowest first: a package never imports one that is listed after it
+    - {name: foundation, paths: ["internal/version/**", "internal/report/**", "internal/project/**", "internal/gitx/**", "internal/ir/**"]}
+    - {name: design, paths: ["internal/machine/**", "internal/design/**", "internal/modelith/**", "internal/contract/**", "internal/baseline/**"]}
+    - {name: engines, paths: ["internal/gen/**", "internal/tags/**", "internal/arch/**", "internal/testpolicy/**", "internal/evidence/**", "internal/formal/**", "internal/checkers/**", "internal/xstate/**", "internal/backlog/**", "internal/probe/**", "internal/affected/**"]}
+    - {name: planning, paths: ["internal/pm/**"]}
+    - {name: stages, paths: ["internal/stages/**"]}
+    - {name: flows, paths: ["internal/pm/**", "internal/adopt/**", "internal/landing/**"]}
+    - {name: cli, paths: ["internal/cli/**"]}
+    - {name: cmd, paths: ["cmd/**"]}

@@ -18,10 +18,10 @@ tools: ## Install the pinned external tools into .bin (modelith, xstate, formal 
 build: ## Build .bin/machinery
 	go build -o $(TOOLS)/machinery ./cmd/machinery
 
-check: build ## Formatting, go vet, build, and no unit tests in this repository
+check: build ## Formatting, go vet, build, and machinery checking itself (layers, end-to-end tests only)
 	@out="$$(gofmt -l $$(git ls-files '*.go' | grep -v testdata/))"; if [ -n "$$out" ]; then echo "gofmt: $$out"; exit 1; fi
 	go vet ./...
-	@out="$$(git ls-files '*_test.go' | grep -v -E '^(e2e|examples/[^/]+/e2e)/' || true)"; if [ -n "$$out" ]; then echo "unit test outside e2e: $$out"; exit 1; fi
+	$(TOOLS)/machinery check
 
 e2e: build ## The whole end-to-end suite against the real binary
 	GOMAXPROCS=$(JOBS) go test ./e2e/... -count=1 -p $(JOBS) -parallel $(JOBS) -timeout 30m

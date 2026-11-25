@@ -1,0 +1,18 @@
+# machinery checks itself: its own layering, and end-to-end tests only.
+exec machinery -C $REPO check
+stdout '== arch =='
+stdout 'checked: [0-9]+ files, [0-9]+ imports, 0 functions'
+stdout '== tests =='
+stdout 'checked: [0-9]+ test files, [0-9]+ files under e2e roots, 12 markers'
+stdout 'machinery check: 2 passed, 0 failed, 0 not demonstrated, 13 not applicable'
+
+# the rule it holds itself to: a unit test in the tool's own tree fails the gate
+mkdir copy/internal/report copy/e2e
+exec cp $REPO/machinery.yaml copy/machinery.yaml
+exec cp $REPO/e2e/e2e_test.go copy/e2e/e2e_test.go
+exec sh -c 'printf "package report\n" > copy/internal/report/report.go'
+exec machinery -C copy check --stage tests
+stdout '^passed$'
+exec sh -c 'printf "package report\n" > copy/internal/report/report_test.go'
+exec mrun 1 -C copy check --stage tests
+stdout 'ERROR  unit-test: internal/report/report_test.go'
