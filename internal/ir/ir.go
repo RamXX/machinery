@@ -51,6 +51,7 @@ type Transition struct {
 	Guard    string // guard name or "" (empty) when guard is None
 	HasGuard bool   // true when a guard key was present and string
 	Actions  []string
+	Requires []string // the branch's _requires, as written (nil when absent)
 }
 
 // ActionNames mirrors machine_lint.action_names: a transition/actions/entry/exit
@@ -112,7 +113,7 @@ func whereSuffix(where string) string {
 // mirrors this list for its docs); validated here so every consumer that
 // passes a problems slice sees the finding.
 var transitionKeys = map[string]bool{
-	"target": true, "guard": true, "actions": true, "description": true, "_comment": true,
+	"target": true, "guard": true, "actions": true, "description": true, "_comment": true, "_requires": true,
 }
 
 // normTransitions mirrors machine_lint._norm: normalize a transition value into
@@ -124,6 +125,41 @@ type normBranch struct {
 	Guard    string
 	HasGuard bool
 	Actions  []string
+	Requires []string
+}
+
+// requiresOf reads a branch's _requires: a non-empty array of distinct,
+// non-empty strings naming who may cause the transition. Shape problems are
+// recorded; the valid names are returned in the order written.
+func requiresOf(v *Value, problems *[]string, where string) []string {
+	if v == nil {
+		return nil
+	}
+	report := func(format string, a ...any) {
+		if problems != nil {
+			*problems = append(*problems, fmt.Sprintf(format, a...)+whereSuffix(where))
+		}
+	}
+	if v.Kind != KindArray || len(v.AsArray()) == 0 {
+		report("_requires must be a non-empty array naming who may cause the transition (an actor or role, or system/<name>)")
+		return nil
+	}
+	var names []string
+	seen := map[string]bool{}
+	for _, e := range v.AsArray() {
+		if e == nil || e.Kind != KindString || strings.TrimSpace(e.AsString()) == "" {
+			report("_requires entries must be non-empty strings")
+			continue
+		}
+		name := e.AsString()
+		if seen[name] {
+			report("_requires names %s twice", pyReprStr(name))
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	return names
 }
 
 func normTransition(t *Value, problems *[]string, where string) []normBranch {
@@ -195,7 +231,8 @@ func normTransition(t *Value, problems *[]string, where string) []normBranch {
 				}
 			}
 			acts := ActionNames(o.Get2("actions"), problems, where)
-			out = append(out, normBranch{Target: tgt, HasTgt: hasTgt, Guard: guard, HasGuard: hasGuard, Actions: acts})
+			req := requiresOf(o.Get2("_requires"), problems, where)
+			out = append(out, normBranch{Target: tgt, HasTgt: hasTgt, Guard: guard, HasGuard: hasGuard, Actions: acts, Requires: req})
 		default:
 			if problems != nil {
 				*problems = append(*problems, fmt.Sprintf("unsupported transition value %s%s", goRepr(it), whereSuffix(where)))
@@ -238,7 +275,7 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 			for _, ev := range on.AsObject().Keys() {
 				for _, b := range normTransition(on.AsObject().Get2(ev), problems, state+" on:"+ev) {
 					res = append(res, Transition{Kind: "on", Event: ev,
-						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions, Requires: b.Requires})
 				}
 			}
 		}
@@ -252,7 +289,7 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 			for _, delay := range after.AsObject().Keys() {
 				for _, b := range normTransition(after.AsObject().Get2(delay), problems, state+" after:"+delay) {
 					res = append(res, Transition{Kind: "after", Event: delay,
-						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+						Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions, Requires: b.Requires})
 				}
 			}
 		}
@@ -260,13 +297,13 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 	if always := o.Get2("always"); always != nil {
 		for _, b := range normTransition(always, problems, state+" always") {
 			res = append(res, Transition{Kind: "always", Event: "",
-				Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+				Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions, Requires: b.Requires})
 		}
 	}
 	if od := o.Get2("onDone"); od != nil {
 		for _, b := range normTransition(od, problems, state+" onDone") {
 			res = append(res, Transition{Kind: "stateDone", Event: "",
-				Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+				Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions, Requires: b.Requires})
 		}
 	}
 	if inv := o.Get2("invoke"); inv != nil {
@@ -292,7 +329,7 @@ func TransitionsOf(node *Value, problems *[]string, state string) []Transition {
 					}
 					for _, b := range normTransition(ivObj.Get2(key), problems, state+" invoke."+key) {
 						res = append(res, Transition{Kind: key, Event: src,
-							Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions})
+							Target: b.Target, HasTgt: b.HasTgt, Guard: b.Guard, HasGuard: b.HasGuard, Actions: b.Actions, Requires: b.Requires})
 					}
 				}
 			}

@@ -53,6 +53,9 @@ type Transition struct {
 	Target  string   `json:"target"`
 	Actions []string `json:"actions"`
 	Effects []string `json:"effects"`
+	// Requires lists who may cause the transition (_requires), sorted;
+	// absent when the branch names nobody.
+	Requires []string `json:"requires,omitempty"`
 }
 
 // Ignore is an ignore case.
@@ -285,7 +288,7 @@ func buildTable(m *Machine) *Table {
 				guards[tr.Guard] = true
 			}
 			row := Transition{Source: s.Path, Kind: tr.Kind, Event: tr.Event, Guard: tr.Guard, Target: target,
-				Actions: stringsOrEmpty(tr.Actions), Effects: stringsOrEmpty(effects)}
+				Actions: stringsOrEmpty(tr.Actions), Effects: stringsOrEmpty(effects), Requires: sortedCopy(tr.Requires)}
 			t.Transitions = append(t.Transitions, row)
 			idx := len(t.Transitions) - 1
 			trig := Trigger(tr.Kind, tr.Event)
@@ -488,6 +491,16 @@ func assignIDs(tag string, raws []rawCase) {
 		}
 		r.set(id)
 	}
+}
+
+// sortedCopy returns the names sorted, or nil when there are none.
+func sortedCopy(names []string) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	res := append([]string(nil), names...)
+	sort.Strings(res)
+	return res
 }
 
 func sortedKeys(m map[string]bool) []string {
