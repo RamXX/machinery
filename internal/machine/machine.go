@@ -228,8 +228,6 @@ func buildTable(m *Machine) *Table {
 		Clauses: []Clause{}, Delays: map[string]int{},
 	}
 	states := ir.WalkStates(ro.Get2("states"), "")
-	entryOf := map[string][]string{}
-	exitOf := map[string][]string{}
 	guards, actions, actors := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, s := range states {
 		o := s.Node.AsObject()
@@ -244,7 +242,6 @@ func buildTable(m *Machine) *Table {
 		}
 		entry := ir.ActionNames(o.Get2("entry"), nil, "")
 		exit := ir.ActionNames(o.Get2("exit"), nil, "")
-		entryOf[s.Path], exitOf[s.Path] = entry, exit
 		var invokes []string
 		for _, iv := range ir.InvokesOf(s.Node) {
 			if iv != nil && iv.Kind == ir.KindObject {
@@ -280,23 +277,7 @@ func buildTable(m *Machine) *Table {
 					target = tr.Target // unresolved: the machines stage reports it
 				}
 			}
-			var effects []string
-			seen := map[string]bool{}
-			add := func(names []string) {
-				for _, n := range names {
-					if !seen[n] {
-						seen[n] = true
-						effects = append(effects, n)
-					}
-				}
-			}
-			if target != "" {
-				add(exitOf[s.Path])
-			}
-			add(tr.Actions)
-			if target != "" {
-				add(entryOf[target])
-			}
+			effects := m.Step(activeLeaf(m, s.Path, tr.Kind), s.Path, target, tr.Actions)
 			for _, a := range tr.Actions {
 				actions[a] = true
 			}
@@ -364,6 +345,110 @@ func buildTable(m *Machine) *Table {
 		}
 	}
 	return t
+}
+
+// activeLeaf is the state taken as active when a row of the given kind fires
+// from source: the source's initial leaf, or for a state onDone the source's
+// first final child, since only a final child completes it.
+func activeLeaf(m *Machine, source, kind string) string {
+	if kind == "stateDone" {
+		if n := m.Resolver.NodeOf[source]; n != nil && n.Kind == ir.KindObject {
+			if ch := n.AsObject().Get2("states"); ch != nil && ch.Kind == ir.KindObject {
+				for _, name := range ch.AsObject().Keys() {
+					c := ch.AsObject().Get2(name)
+					if c != nil && c.Kind == ir.KindObject && c.AsObject().GetString("type") == "final" {
+						return source + "." + name
+					}
+				}
+			}
+		}
+	}
+	return m.Resolver.Leaf(source)
+}
+
+// Step returns the named actions XState 5 executes, in order and deduplicated,
+// when a transition defined on source, with the given target ("" for an
+// internal transition) and actions, fires while active is the active leaf:
+// the exit actions of the states left, innermost first; the transition's
+// actions; the entry actions of the states entered, outermost first, down
+// through initial children; and, when a top-level final state is entered, its
+// exit actions, because the machine stops. A target that is the source or one
+// of its descendants does not exit and re-enter the source.
+func (m *Machine) Step(active, source, target string, actions []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(names []string) {
+		for _, n := range names {
+			if !seen[n] {
+				seen[n] = true
+				out = append(out, n)
+			}
+		}
+	}
+	if target == "" {
+		add(actions)
+		return stringsOrEmpty(out)
+	}
+	domain := source
+	if target != source && !IsDescendant(target, source) {
+		domain = ""
+		for anc := Parent(target); anc != ""; anc = Parent(anc) {
+			if IsDescendant(source, anc) {
+				domain = anc
+				break
+			}
+		}
+	}
+	for p := active; p != ""; p = Parent(p) {
+		if IsDescendant(p, domain) {
+			add(m.actionsOf(p, "exit"))
+		}
+	}
+	add(actions)
+	leaf := m.Resolver.Leaf(target)
+	var chain []string
+	for p := leaf; p != ""; p = Parent(p) {
+		chain = append([]string{p}, chain...)
+	}
+	for _, p := range chain {
+		if IsDescendant(p, domain) {
+			add(m.actionsOf(p, "entry"))
+		}
+	}
+	if !strings.Contains(leaf, ".") && m.isFinal(leaf) {
+		add(m.actionsOf(leaf, "exit"))
+	}
+	return stringsOrEmpty(out)
+}
+
+func (m *Machine) actionsOf(path, key string) []string {
+	n := m.Resolver.NodeOf[path]
+	if n == nil || n.Kind != ir.KindObject {
+		return nil
+	}
+	return ir.ActionNames(n.AsObject().Get2(key), nil, "")
+}
+
+func (m *Machine) isFinal(path string) bool {
+	n := m.Resolver.NodeOf[path]
+	return n != nil && n.Kind == ir.KindObject && n.AsObject().GetString("type") == "final"
+}
+
+// Parent returns the dotted path of a state's parent, "" for a top-level state.
+func Parent(path string) string {
+	if i := strings.LastIndex(path, "."); i >= 0 {
+		return path[:i]
+	}
+	return ""
+}
+
+// IsDescendant reports whether path is a proper descendant of anc; every state
+// descends from the root, written "".
+func IsDescendant(path, anc string) bool {
+	if anc == "" {
+		return path != ""
+	}
+	return strings.HasPrefix(path, anc+".")
 }
 
 // assignIDs gives every case its tc id: the 6-hex prefix, extended two

@@ -536,11 +536,27 @@ yields one clause case per clause. A test proves a clause case by arranging exac
 to be false and every other clause true, firing the trigger, and observing that the guarded
 branch's case did not fire. Declare `_guards` for every guard that checks more than one thing.
 
-**Effects.** Clause cases have no effects. For a transition case: the exit actions of the source state when the transition has
-a target, then the transition's own actions, then the entry actions of the target state when the
-transition has a target. Names are deduplicated, first occurrence wins. Only the source and target
-states themselves are considered, not their ancestors. For ignore and refusal cases the list is
-empty.
+**Effects.** Clause cases have no effects. For ignore and refusal cases the list is empty. For a
+transition case the effects are the named actions XState 5 executes when the transition fires,
+taking the initial leaf of the source as the active state (for a state `onDone`, the source's first
+final child):
+
+1. the exit actions of the states left, innermost first;
+2. the transition's own actions;
+3. the entry actions of the states entered, outermost first, down through the initial children of
+   the target;
+4. when the target leaf is a top-level final state, its exit actions, because the machine stops.
+
+The states left and entered are the active states and the target's chain below the transition's
+domain. The domain is the source itself when the target is the source or one of its descendants
+(XState does not exit and re-enter the source; `reenter` is outside the subset); otherwise it is
+the nearest ancestor of the target that contains the source, or the machine root. So a transition
+with a target exits the active leaf and every ancestor up to the domain and enters the target's
+ancestors below the domain, the target and its initial children; a self-target on an atomic state
+exits and enters nothing; a self-target on a compound state exits and re-enters only its children;
+an internal transition (no target) runs only its own actions. Names are deduplicated, first
+occurrence wins. Effects stop at the row: the `always` and `onDone` rows XState may take next are
+their own cases.
 
 ### 7.3 Runtime tables
 

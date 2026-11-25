@@ -230,8 +230,11 @@ Their ids, titles and effects are defined in `docs/formats.md` section 7.2.
 | `clause` | Each clause of the guard of each guarded transition | With only that clause false and every other true, the guarded branch does not fire. |
 
 Branch order is evaluation order: the first branch whose guard holds wins. The effects of a
-transition case are the exit actions of the source (when there is a target), the transition's own
-actions, then the entry actions of the target (when there is a target).
+transition case are the named actions XState executes for it, from the source's initial leaf: the
+exit actions of the states left (innermost first), the transition's own actions, then the entry
+actions of the states entered (outermost first, down through the target's initial children). A
+target that is the source or one of its descendants does not exit the source, so a self-target on
+an atomic state runs only its own actions. `docs/formats.md` section 7.2 has the exact rule.
 
 `machinery gen` writes the cases to `obligations.json` and the runtime table of each machine to
 `tables/<machine id>.table.json` (section 7.3). A service looks transitions up in that table. The
