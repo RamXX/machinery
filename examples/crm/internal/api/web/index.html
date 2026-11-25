@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>crm</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+{{define "notice"}}{{with .N}}{{if .Code}}<span class="refusal" data-testid="refusal-{{$.On}}">{{.Code}}: {{.Message}}</span>{{end}}{{if .Simulated}}<span class="simulated" data-testid="simulated-{{$.On}}">simulated: {{join .Simulated ", "}}</span>{{end}}{{end}}{{end}}
+<h1>crm</h1>
+{{if .Error}}<p class="error" data-testid="page-error">{{.Error.Code}}: {{.Error.Message}}</p>{{end}}
+
+<section>
+<h2>User</h2>
+<form method="get" action="/">
+<select name="as" data-testid="user-select">
+<option value="">(choose a user)</option>
+{{range .Users}}<option value="{{.ID}}"{{if and $.As (eq .ID $.As.ID)}} selected{{end}}>{{.Email}} ({{.Role}})</option>
+{{end}}</select>
+<button data-testid="user-use">Use</button>
+</form>
+{{if .As}}acting as <span data-testid="user-current">{{.As.Email}}</span> ({{.As.Role}}){{else}}<span class="muted">choose a user to see and change deals</span>{{end}}
+<p>
+<form method="post" action="/ui/users">
+<input type="hidden" name="as" value="{{with .As}}{{.ID}}{{end}}">
+<input name="email" placeholder="email" data-testid="user-create-email">
+<select name="role" data-testid="user-create-role"><option>Rep</option><option>Admin</option></select>
+<button data-testid="user-create-submit">Create user</button>
+</form>
+{{template "notice" (wrap "user-create" (index .Notices "user-create"))}}
+</p>
+</section>
+
+{{if .As}}
+<section>
+<h2>Deals</h2>
+<p>
+<form method="post" action="/ui/deals">
+<input type="hidden" name="as" value="{{.As.ID}}">
+<input name="title" placeholder="title" data-testid="deal-create-title">
+<input name="amount" placeholder="amount in cents" data-testid="deal-create-amount">
+<button data-testid="deal-create-submit">Create deal</button>
+</form>
+{{template "notice" (wrap "deal-create" (index .Notices "deal-create"))}}
+</p>
+<table>
+<tr><th>Deal</th><th>Amount (cents)</th><th>Owner</th><th>Stage</th><th></th></tr>
+{{range .Deals}}{{$d := .}}
+<tr data-testid="deal-{{.ID}}">
+<td>{{.Title}}</td><td>{{.AmountCents}}</td><td>{{.Owner}}</td>
+<td><span class="stage" data-testid="deal-{{.ID}}-stage">{{.Stage}}</span></td>
+<td>{{range $.DealEvt}}<form method="post" action="/ui/deals/{{$d.ID}}/{{.}}"><input type="hidden" name="as" value="{{$.As.ID}}"><button data-testid="deal-{{$d.ID}}-{{.}}">{{.}}</button></form>{{end}}
+{{template "notice" (wrap .ID (index $.Notices .ID))}}
+<ul class="tasks">
+{{range .Tasks}}{{$t := .}}<li data-testid="task-{{.ID}}">{{.Title}} ({{.Assignee}}): <span class="stage" data-testid="task-{{.ID}}-status">{{.Status}}</span>
+{{range $.TaskEvt}}<form method="post" action="/ui/tasks/{{$t.ID}}/{{.}}"><input type="hidden" name="as" value="{{$.As.ID}}"><button data-testid="task-{{$t.ID}}-{{.}}">{{.}}</button></form>{{end}}
+{{template "notice" (wrap .ID (index $.Notices .ID))}}</li>
+{{end}}<li><form method="post" action="/ui/tasks"><input type="hidden" name="as" value="{{$.As.ID}}"><input type="hidden" name="dealId" value="{{.ID}}"><input name="title" placeholder="new task" data-testid="task-create-{{.ID}}-title"><button data-testid="task-create-{{.ID}}-submit">Add task</button></form>
+{{template "notice" (wrap (printf "task-create-%s" .ID) (index $.Notices (printf "task-create-%s" .ID)))}}</li>
+</ul>
+</td>
+</tr>
+{{else}}<tr><td colspan="5" class="muted">no deals yet</td></tr>
+{{end}}</table>
+</section>
+
+<section data-testid="audit">
+<h2>Audit trail</h2>
+<table>
+<tr><th>At</th><th>Actor</th><th>Action</th><th>Subject</th><th>Outcome</th></tr>
+{{range .Audit}}<tr><td>{{.At.UTC.Format "2006-01-02 15:04:05"}}</td><td>{{.Actor}}</td><td>{{.Action}}</td><td>{{.Subject}}</td><td>{{.Outcome}}</td></tr>
+{{else}}<tr><td colspan="5" class="muted">no entries yet</td></tr>
+{{end}}</table>
+</section>
+{{end}}
+</body>
+</html>

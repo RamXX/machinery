@@ -53,6 +53,7 @@ func (s *Server) routes() {
 	m.HandleFunc("POST /deals/{id}/lose", s.authed(s.fire(deals, "lose")))       // machinery:serves act:Deal.lose
 	m.HandleFunc("POST /deals/{id}/reopen", s.authed(s.fire(deals, "reopen")))   // machinery:serves act:Deal.reopen
 	m.HandleFunc("GET /audit", s.authed(s.listAudit))
+	s.webRoutes(m) // the UI: GET / and the forms of its pages
 	m.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "NO_ROUTE", r.Method+" "+r.URL.Path+" is not an operation of this service")
 	})

@@ -1,0 +1,13 @@
+body { font-family: system-ui, sans-serif; margin: 1.5rem; color: #1a1a1a; max-width: 70rem; }
+h1 { font-size: 1.4rem; }
+h2 { font-size: 1.1rem; margin-top: 1.5rem; }
+section { border-top: 1px solid #ccc; padding-top: 0.5rem; }
+form { display: inline; margin-right: 0.5rem; }
+table { border-collapse: collapse; width: 100%; }
+td, th { text-align: left; padding: 0.25rem 0.5rem; border-bottom: 1px solid #eee; vertical-align: top; }
+.stage { font-weight: bold; }
+.refusal { color: #a00; margin-left: 0.5rem; }
+.simulated { color: #805b00; margin-left: 0.5rem; }
+.error { color: #a00; border: 1px solid #a00; padding: 0.5rem; }
+.muted { color: #666; }
+ul.tasks { margin: 0.25rem 0; padding-left: 1rem; }
