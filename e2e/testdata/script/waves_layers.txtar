@@ -1,0 +1,140 @@
+# waves layers the open backlog graph by its blocking edges (section 15.3)
+fixture shop
+cp machinery-bd.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+
+# no open story: nothing to check
+exec mrun 1 waves
+stdout '^checked: 0 stories, 0 edges, 0 waves$'
+stdout '^not demonstrated: nothing to check$'
+
+exec bd create --id shop-a --title 'Prove order pay' --body-file a.txt --silent
+exec bd create --id shop-b --title 'Prove order ship' --body-file b.txt --deps shop-a --silent
+exec bd create --id shop-c --title 'Prove the terminal invariant' --body-file c.txt -l tier:critical --silent
+exec bd create --id shop-d --title 'Document shipping' --body-file d.txt -l tier:consequential --deps shop-b --silent
+exec bd create --id shop-e --title 'Done already' --body-file f.txt --silent
+exec bd create --id shop-f --title 'Write the release notes' --body-file f.txt --deps shop-e --silent
+exec bd create --id shop-g --title 'Later' --body-file f.txt --silent
+exec bd create --id shop-ep --title 'Order lifecycle' --type epic --silent
+exec bd close shop-e --reason done
+exec bd defer shop-g
+
+# closed, deferred and epic stories are left out; a closed blocker does not block
+exec machinery waves
+stdout '^contract: [0-9a-f]{12} \(5 design file\(s\)\)$'
+exec sh -c 'machinery waves | sed 1d'
+cmp stdout want.txt
+
+# the contract hash is the sha256 over the sorted <path> <sha256> lines of the design sources
+exec sh -c 'for f in contracts/openapi.yaml design/failure-modes.yaml design/machines/Order.machine.json design/model/shop.modelith.yaml design/risk.yaml; do printf "%s %s\n" "$f" "$(shasum -a 256 "$f" | cut -c1-64)"; done | shasum -a 256 | cut -c1-12 > want-hash.txt; machinery waves | sed -n "1s/^contract: \([0-9a-f]*\) .*/\1/p" > got-hash.txt; cmp want-hash.txt got-hash.txt'
+
+# --json carries the same data
+exec machinery waves --json
+stdout '"contract": "[0-9a-f]{64}",'
+stdout '"design_files": 5,'
+stdout '"wave": 1,'
+stdout '"wave": 3,'
+stdout '"id": "shop-d",'
+stdout '"tier": "consequential",'
+stdout '"route": "small model, one pass",'
+stdout '"internal/domain/\*\*"'
+stdout '"outcome": "passed"'
+stdout '"noun": "edges"'
+! stdout 'shop-e'
+! stdout 'shop-g'
+! stdout 'shop-ep'
+
+# closing a story moves the ones it blocked forward
+exec bd close shop-a --reason done
+exec machinery waves
+stdout '^checked: 4 stories, 1 edges, 2 waves$'
+stdout '^wave 1$'
+stdout '^  shop-b  consequential  Prove order ship$'
+! stdout '^wave 3$'
+
+# usage errors
+exec mrun 2 waves extra
+stderr '^usage: machinery waves takes no arguments$'
+exec mrun 2 waves --thaw --freeze
+stderr '^usage: --thaw takes no other flag$'
+
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+routing:
+  routine: "small model, one pass"
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]
+-- a.txt --
+The pay transition with a payment method.
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**
+-- b.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**
+-- c.txt --
+The label says critical; the ids say routine, and the ids win.
+machinery:ids inv:terminal-is-final
+machinery:scope e2e/terminal.sh
+-- d.txt --
+machinery:scope docs/**
+-- f.txt --
+machinery:scope NOTES.md
+-- want.txt --
+wave 1
+  shop-a  critical  Prove order pay
+    route: strongest model for the formal model; standard model for code; fresh verifier
+    scope: internal/domain/**
+  shop-c  routine  Prove the terminal invariant
+    route: small model, one pass
+    scope: e2e/terminal.sh
+  shop-f  routine  Write the release notes
+    route: small model, one pass
+    scope: NOTES.md
+wave 2
+  shop-b  consequential  Prove order ship
+    route: standard model; fresh verifier
+    scope: internal/api/**
+wave 3
+  shop-d  consequential  Document shipping
+    route: standard model; fresh verifier
+    scope: docs/**
+== waves ==
+checked: 5 stories, 2 edges, 3 waves
+passed
+machinery waves: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable

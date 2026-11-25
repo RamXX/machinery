@@ -1,0 +1,175 @@
+# plan --apply creates the stories and edges in the real backlog and links the owed entries (section 15.2)
+fixture shop
+fixture shop-formal
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+cp owed-all.yaml design/owed.yaml
+mkdir design/formal/traces
+cp race.trace.json design/formal/traces/order-payment.race.trace.json
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-ep --title 'Order lifecycle' --type epic --silent
+
+# twelve stories, six edges, every story under the parent
+exec machinery plan --apply --parent shop-ep
+stdout '^plan: 12 created, 0 existing, 6 edge\(s\)$'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
+stdout '^13$'
+exec bd list --all --json --limit 0
+stdout '"title": "Model order-payment \(tla\)"'
+stdout '"title": "Model order-ownership \(alloy\)"'
+stdout '"title": "Prove order pay"'
+stdout '"title": "Prove order internal transitions"'
+stdout '"title": "Serve Order actions"'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"type\": \"blocks\""'
+stdout '^6$'
+
+# the stories carry the plan's description, labels, criteria, edges and parent
+exec sh -c '. ./lib.sh; bd show $(sid "Prove order pay") --json'
+stdout 'machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f tc:ORDE-8799a1'
+stdout '"acceptance_criteria": "- Each listed obligation is proven by machinery verify'
+stdout '"tier:critical"'
+stdout '"title": "Model order-payment \(tla\)"'
+stdout '"dependency_type": "blocks"'
+stdout '"parent": "shop-ep"'
+exec sh -c '. ./lib.sh; bd show $(sid "Prove cx:order-payment:race") --json'
+stdout '"title": "Prove order pay"'
+stdout '"dependency_type": "blocks"'
+exec sh -c '. ./lib.sh; bd show $(sid "Prove fm:payment-provider-down") --json'
+stdout '"title": "Prove order internal transitions"'
+exec sh -c '. ./lib.sh; bd show $(sid "Prove inv:terminal-is-final") --json'
+! stdout '"dependency_type": "blocks"'
+
+# every owed entry now names its story; only the owed file changed
+exec sh -c 'grep -c "^    story: shop-" design/owed.yaml'
+stdout '^19$'
+exec sh -c '. ./lib.sh; grep -A2 "id: tc:ORDE-2e883d$" design/owed.yaml | grep -c "story: $(sid "Prove order pay")$"'
+stdout '^1$'
+exec git status --short
+stdout '^ M design/owed.yaml$'
+exec machinery owed list
+stdout '^owed: 19 entries$'
+
+# a second apply creates nothing
+exec machinery plan --apply
+stdout '^plan: 0 created, 12 existing, 0 edge\(s\)$'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
+stdout '^13$'
+
+# --link attaches ids to an existing story
+exec sh -c 'printf "  - id: inv:paid-before-shipped\n    reason: \"new\"\n" >> design/owed.yaml'
+exec bd create --id shop-l1 --title 'Prove the shipping invariant' --silent
+exec machinery plan --link shop-l1 inv:paid-before-shipped
+stdout '^plan: 1 id\(s\) linked to shop-l1$'
+exec bd show shop-l1 --json
+stdout '"notes": "machinery:ids inv:paid-before-shipped"'
+grep -count=1 'story: shop-l1$' design/owed.yaml
+exec machinery plan --apply
+stdout '^plan: 0 created, 13 existing, 0 edge\(s\)$'
+
+# a group whose story is gone from the backlog is created again
+exec sed -i.bak 's/story: shop-l1$/story: shop-gone/' design/owed.yaml
+exec machinery plan --apply
+stdout '^plan: 1 created, 12 existing, 0 edge\(s\)$'
+! grep 'story: shop-gone' design/owed.yaml
+exec bd list --all --json --limit 0
+stdout '"title": "Prove inv:paid-before-shipped"'
+
+# refusals
+exec mrun 2 plan --link shop-l1 tc:ORDE-ffffff
+stderr '^usage: tc:ORDE-ffffff is not a design id$'
+exec mrun 2 plan --link shop-nope inv:paid-before-shipped
+stderr '^usage: no story shop-nope in the backlog: bd show: '
+exec mrun 2 plan --link shop-l1 --apply inv:paid-before-shipped
+stderr '^usage: machinery plan --link takes no other flag$'
+# a parent bd does not know: bd refuses, nothing is created or linked
+exec sh -c 'printf "  - id: inv:customer-email-unique\n    reason: \"new\"\n" >> design/owed.yaml'
+exec mrun 1 plan --apply --parent shop-nope
+stderr '^machinery: bd create: '
+! stdout .
+exec bd list --all --json --limit 0
+! stdout '"title": "Prove inv:customer-email-unique"'
+exec sh -c 'grep -A2 "id: inv:customer-email-unique$" design/owed.yaml'
+! stdout 'story:'
+
+-- lib.sh --
+# sid <title>: the id of the story with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
+-- owed-all.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-2e883d
+    reason: "not yet"
+  - id: tc:ORDE-70d94f
+    reason: "not yet"
+  - id: tc:ORDE-8799a1
+    reason: "not yet"
+  - id: tc:ORDE-1ded14
+    reason: "not yet"
+  - id: tc:ORDE-507e4f
+    reason: "not yet"
+  - id: tc:ORDE-e6d28f
+    reason: "not yet"
+  - id: tc:ORDE-2fa2af
+    reason: "not yet"
+  - id: tc:ORDE-ad945c
+    reason: "not yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "not yet"
+  - id: tc:ORDE-267d12
+    reason: "not yet"
+  - id: sc:customer-pays-and-the-order-ships
+    reason: "not yet"
+  - id: inv:terminal-is-final
+    reason: "not yet"
+  - id: fm:payment-provider-down
+    reason: "not yet"
+  - id: fm:ship-by-non-clerk
+    reason: "not yet"
+  - id: act:Order.cancel
+    reason: "not yet"
+  - id: act:Order.ship
+    reason: "not yet"
+  - id: fv:order-payment
+    reason: "not yet"
+  - id: fv:order-ownership
+    reason: "not yet"
+  - id: cx:order-payment:race
+    reason: "not yet"
+-- race.trace.json --
+{
+  "version": 1,
+  "id": "cx:order-payment:race",
+  "spec": "order-payment",
+  "run": "race",
+  "tool": "tla",
+  "violates": "ChargedOnce",
+  "expect": "refuted",
+  "machine": "order",
+  "steps": [
+    {
+      "n": 1,
+      "case": "tc:ORDE-2e883d",
+      "instance": "i1",
+      "caller": "c2",
+      "step": "begin",
+      "state": {
+        "i1": "Pending"
+      }
+    },
+    {
+      "n": 2,
+      "case": "tc:ORDE-2e883d",
+      "instance": "i1",
+      "caller": "c1",
+      "step": "commit",
+      "state": {
+        "i1": "paying"
+      }
+    }
+  ],
+  "loop": 0,
+  "instance": {}
+}

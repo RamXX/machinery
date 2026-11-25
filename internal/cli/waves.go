@@ -49,6 +49,11 @@ func runWaves(e *Env, args []string) int {
 		}
 		return 0
 	}
+	if *freeze {
+		if _, err := pm.WavePath(p); err != nil {
+			return e.Fail(fmt.Errorf("cannot freeze: %v", err))
+		}
+	}
 	issues, err := c.List()
 	if err != nil {
 		return e.Fail(err)
@@ -69,9 +74,6 @@ func runWaves(e *Env, args []string) int {
 // passing waves stage (section 15.4).
 func freezeWave(e *Env, ctx *stages.Context, d *design.Design, w *pm.Waves, asJSON bool) int {
 	p := ctx.P
-	if _, err := pm.WavePath(p); err != nil {
-		return e.Fail(fmt.Errorf("cannot freeze: %v", err))
-	}
 	head, err := gitx.Head(p.Root)
 	if err != nil {
 		return e.Fail(fmt.Errorf("cannot freeze: no commit: %v", err))

@@ -1,0 +1,97 @@
+# waves findings: competing writers in one wave and stories without a scope (section 15.3)
+fixture shop
+cp machinery-bd.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a --title 'Rework the domain' --body-file a.txt --silent
+exec bd create --id shop-b --title 'Fix the handler' --body-file b.txt --silent
+exec bd create --id shop-c --title 'Extend the suite' --body-file c.txt --silent
+exec bd create --id shop-d --title 'Unscoped' --body-file d.txt --silent
+exec bd create --id shop-e --title 'Web' --body-file e.txt --silent
+exec bd create --id shop-f --title 'Web app' --body-file f.txt --silent
+
+# overlapping scopes in one wave: a prefix that contains the other glob, or the same glob
+exec mrun 1 waves
+stdout '^checked: 6 stories, 0 edges, 1 waves$'
+stdout '^  ERROR  competing writers in wave 1: shop-a and shop-b both write internal/api/handlers.go$'
+stdout '^  ERROR  competing writers in wave 1: shop-b and shop-c both write e2e/orders.sh$'
+stdout '^  warn   no scope declared: shop-d$'
+stdout '^failed: 2 finding\(s\)$'
+! stdout 'shop-e and shop-f'
+! stdout 'shop-a and shop-c'
+exec mrun 1 waves --json
+stdout '"severity": "ERROR",'
+stdout '"message": "competing writers in wave 1: shop-a and shop-b both write internal/api/handlers.go"'
+stdout '"outcome": "failed: 2 finding\(s\)"'
+
+# an edge separates the writers: shop-b moves to wave 2 and the wave passes
+exec bd dep add shop-b shop-a
+exec machinery waves
+stdout '^checked: 6 stories, 1 edges, 2 waves$'
+stdout '^wave 2$'
+stdout '^  shop-b  routine  Fix the handler$'
+! stdout 'ERROR'
+stdout '^  warn   no scope declared: shop-d$'
+stdout '^passed$'
+
+# bd refuses every blocking cycle, so waves never sees one from bd
+! exec bd dep add shop-a shop-b
+stderr 'would create a cycle'
+! exec bd dep add shop-a shop-b --no-cycle-check
+stderr 'would create a cycle'
+exec machinery waves
+! stdout 'cycle'
+
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+routing:
+  routine: "small model, one pass"
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]
+-- a.txt --
+machinery:scope internal/**
+-- b.txt --
+machinery:scope internal/api/handlers.go e2e/orders.sh
+-- c.txt --
+machinery:scope e2e/orders.sh
+-- d.txt --
+No scope line.
+-- e.txt --
+machinery:scope web/*.ts
+-- f.txt --
+machinery:scope webapp/**

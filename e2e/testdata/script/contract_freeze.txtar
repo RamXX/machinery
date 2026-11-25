@@ -1,0 +1,135 @@
+# the contract freeze: waves --freeze, stage contract, a second worktree, --thaw (section 15.4)
+fixture shop
+cp machinery-bd.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+
+# outside a git repository no wave can be frozen
+exec machinery check --stage contract
+stdout '^not applicable: no wave is frozen$'
+exec mrun 1 waves --freeze
+stderr '^machinery: cannot freeze: the project is not in a git repository$'
+
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a --title 'Prove order pay' --body-file a.txt --silent
+exec bd create --id shop-b --title 'Prove order ship' --body-file b.txt --deps shop-a --silent
+
+# nothing frozen yet
+exec machinery check --stage contract
+stdout '^not applicable: no wave is frozen$'
+exec machinery waves --thaw
+stdout '^wave: none frozen$'
+
+# freeze: the wave file in the git common directory
+exec machinery waves --freeze
+stdout '^wave 1$'
+stdout '^passed$'
+stdout '^wave: frozen [0-9a-f]{12} at [0-9a-f]{7}, 1 stories$'
+exists .git/machinery/wave.json
+grep '"version": 1,' .git/machinery/wave.json
+grep '"design/machines/Order.machine.json": "[0-9a-f]{64}"' .git/machinery/wave.json
+grep -count=6 '": "[0-9a-f]{64}"' .git/machinery/wave.json
+exec sh -c 'tr -d " \n" < .git/machinery/wave.json'
+stdout '"stories":\["shop-a"\]'
+exec sh -c 'grep -c "\"commit\": \"$(git rev-parse HEAD)\"" .git/machinery/wave.json'
+stdout '^1$'
+exec sh -c 'test "$(sed -n "s/.*\"contract\": \"\([0-9a-f]\{12\}\).*/\1/p" .git/machinery/wave.json)" = "$(machinery waves | sed -n "1s/^contract: \([0-9a-f]*\) .*/\1/p")"'
+exec machinery check --stage contract
+stdout '^checked: 5 design files$'
+stdout '^passed$'
+
+# a second worktree of the same repository sees the same freeze
+exec git worktree add -q wt2 -b other
+exec machinery -C wt2 check --stage contract
+stdout '^checked: 5 design files$'
+stdout '^passed$'
+exec sed -i.bak 's/Order lifecycle/The order lifecycle/' wt2/design/machines/Order.machine.json
+exec mrun 1 -C wt2 check --stage contract
+stdout '^  ERROR  contract changed during fan-out: design/machines/Order.machine.json$'
+stdout '^failed: 1 finding\(s\)$'
+exec machinery check --stage contract
+stdout '^passed$'
+
+# a changed design source in this worktree, also inside the whole check
+exec sed -i.bak 's/Order lifecycle/The order lifecycle/' design/machines/Order.machine.json
+exec sh -c 'printf "# a note\n" >> design/failure-modes.yaml'
+exec mrun 1 check --stage contract
+stdout '^  ERROR  contract changed during fan-out: design/failure-modes.yaml$'
+stdout '^  ERROR  contract changed during fan-out: design/machines/Order.machine.json$'
+exec mrun 1 check
+stdout '^== contract ==$'
+stdout 'contract changed during fan-out: design/machines/Order.machine.json'
+
+# thaw from the other worktree; the file is gone for both
+exec machinery -C wt2 waves --thaw
+stdout '^wave: thawed$'
+! exists .git/machinery/wave.json
+exec machinery check --stage contract
+stdout '^not applicable: no wave is frozen$'
+
+# freeze refuses while generated files drift, and writes nothing
+exec mrun 1 waves --freeze
+stdout '^== gen-drift ==$'
+stdout 'DRIFT  design/gen/tables/order.table.json: stale'
+stderr '^machinery: cannot freeze: stage gen-drift does not pass; run machinery gen and commit$'
+! exists .git/machinery/wave.json
+exec machinery gen
+exec machinery waves --freeze
+stdout '^wave: frozen [0-9a-f]{12} at [0-9a-f]{7}, 1 stories$'
+exec machinery check --stage contract
+stdout '^passed$'
+
+# freeze refuses a wave that does not pass
+exec machinery waves --thaw
+exec bd create --id shop-c --title 'Also the domain' --body-file a.txt --silent
+exec mrun 1 waves --freeze
+stdout 'ERROR  competing writers in wave 1: shop-a and shop-c both write internal/domain/\*\*'
+stderr '^machinery: cannot freeze: stage waves does not pass$'
+! exists .git/machinery/wave.json
+
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+routing:
+  routine: "small model, one pass"
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]
+-- a.txt --
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**
+-- b.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**
