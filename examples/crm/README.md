@@ -14,19 +14,20 @@ names a unit the service does not implement stops it at start.
 |---|---|
 | `make` | Lists the targets. |
 | `make up` | Starts Postgres 17 (container `machinery-crm-pg`, empty on every start) and waits until healthy. |
-| `make serve` | Builds `.bin/crm` and runs it against that database. |
+| `make serve` | Builds `.bin/crm` and runs it against that database; the UI is at `http://127.0.0.1:18080/`. |
 | `make e2e` | The end-to-end suite: the real binary over HTTP against the real Postgres. Needs `make up`. |
 | `make check` | gofmt, `go vet`, `machinery check`. |
 | `make evidence` | The suite through `machinery run`: a receipts file for the current commit. |
-| `make verify` | The end gate: `machinery landing --base $(BASE)` (check with the ratchet, the whole suite through `run`, `verify`). `BASE` is the ref the change started from (default `HEAD~1`); it must contain this project. |
-| `make formal` | `machinery formal gen --check`, then `machinery formal check`: TLC and Alloy for real (needs Java; `FORMAL_WORKERS`, default 1). |
+| `make verify` | The end gate: `machinery landing --base $(BASE) --probe` (check with the ratchet, the formal tools re-run against the committed results, the whole suite once through `run`, `verify`, the probe). `BASE` is the ref the change started from (default `HEAD~1`); it must contain this project. |
+| `make formal` | `machinery formal gen --check`, then `machinery formal check`: TLC and Alloy for real (needs Java; `FORMAL_WORKERS`, default 2). |
 | `make demo-pm` | The planner's loop on a throwaway copy with its own bd backlog (`demo/pm.sh`; needs `make up`). |
 | `make probe` | `machinery probe`: mutates every proven transition in the tables the service reads and expects the suite to notice (`MAX=n` keeps the first n). |
 | `make psql` | A psql shell as the admin role. |
 | `make down` | Stops Postgres and removes the container and its data. |
 
-`MACHINERY_TOOLS` names the directory of the pinned tools (modelith, xstate); it defaults to the
-repository's `.bin`, where `machinery` itself is expected too (`make build` at the root).
+`MACHINERY_TOOLS` names the directory of the pinned tools (modelith, xstate, the formal jars); it
+defaults to the repository's `.bin`, where `machinery` itself is expected too (`make build` at the
+root). `DEMO.md` walks through all of it, one command at a time.
 
 ## Ports and configuration
 
@@ -38,7 +39,20 @@ repository's `.bin`, where `machinery` itself is expected too (`make build` at t
 ## Identity
 
 The caller is named by the `X-User-Id` header: a missing, malformed or unknown id is 401. This is
-enough for an example and is not authentication.
+enough for an example and is not authentication: anyone who can reach the service can name any
+user. Do not use it in production.
+
+## The UI
+
+`make serve`, then open `http://127.0.0.1:18080/`. The pages are rendered by the service itself
+(`internal/api/web.go`, `internal/api/web/`: standard library templates, embedded in the binary,
+no script, no build step, no external URL). Choose a user (or create one), then create deals and
+tasks and press the buttons of their events. Every button posts a form to `/ui/...`, which sends
+the same request an API client would send, as the selected user, through the same routes: a click
+takes the transition path of the API and nothing else. A refusal shows its code and message next
+to the record (`refusal-<id>`); effects an answer lists as `simulated` would show as a note
+(`simulated-<id>`), and none are left. The audit trail is at the bottom. The UI has no
+operations of its own, so the design and the OpenAPI contract are unchanged.
 
 ## The suite and the owed list
 
@@ -52,7 +66,14 @@ from `crm_app`, and an ACCESS EXCLUSIVE lock on it held past the `closeTimeout` 
 cleanup) to prove that a database that does not answer yields 503 `STORE_UNAVAILABLE` within three
 seconds. These tests change the database for every client, so no test of the suite runs in
 parallel. `audit_test.go`, `adversary_test.go`, `single_writer_test.go` and `scenarios_test.go`
-prove the invariants, the abuse failure modes and the scenarios. The suite honors `MACHINERY_ONLY`; under `machinery probe` it runs only the
+prove the invariants, the abuse failure modes and the scenarios.
+`scenario_win_test.go` walks two scenarios again in a real headless Chrome (chromedp, helpers in
+`browser_test.go`): `sc:rep-qualifies-and-wins-a-deal` is proven by `TestScenarioRepQualifiesAndWins`
+(HTTP) and `TestScenarioRepQualifiesAndWinsInBrowser`, `sc:rep-cannot-change-another-rep-s-deal` by
+`TestScenarioRepCannotChangeAnotherRepsDeal` (HTTP) and `TestUIRefusalShown`; each emits its own
+receipt. The browser is `CRM_CHROME` when set, else Google Chrome at its macOS path, else
+`chromium` or `google-chrome` on PATH; without one these tests fail and say to set `CRM_CHROME`.
+Each test starts one browser and closes it when it ends. The suite honors `MACHINERY_ONLY`; under `machinery probe` it runs only the
 subtest of `MACHINERY_PROBE_CASE`.
 
 After a change: `make up`, `make evidence`, `machinery owed sync --prune-only`, commit,

@@ -22,9 +22,9 @@ E2E := env GOMAXPROCS=2 go test ./e2e/... -count=1 -p 1
 # What the receipts say the suite ran against.
 STACK := postgres 17 in docker, crm over http
 BASE ?= HEAD~1
-# TLC workers. One keeps the counterexample traces byte for byte: with more,
-# TLC may report another trace of the same length.
-FORMAL_WORKERS ?= 1
+# TLC workers. A violated run's trace is always taken with one worker, so the
+# committed traces do not depend on this.
+FORMAL_WORKERS ?= 2
 # MAX keeps the first MAX probe mutations; empty probes them all.
 MAX ?=
 
@@ -51,7 +51,7 @@ down: ## Stop Postgres and remove its container and data
 build: ## Build the service into .bin/crm
 	go build -o .bin/crm ./cmd/crm
 
-serve: build ## Build and run the service (127.0.0.1:18080) against the local Postgres
+serve: build ## Build and run the service and its UI (http://127.0.0.1:18080/) against the local Postgres
 	./.bin/crm
 
 psql: ## Open a psql shell as the admin role
@@ -68,8 +68,8 @@ e2e: ## The end-to-end suite: the real service over HTTP against the real Postgr
 evidence: ## Run the e2e suite through machinery run: receipts for this commit (needs make up)
 	$(MACHINERY) run --stack "$(STACK)" -- $(E2E)
 
-verify: ## The end gate: machinery landing (check --base BASE, the whole suite through run, verify)
-	$(MACHINERY) landing --base $(BASE) --stack "$(STACK)" -- $(E2E)
+verify: ## The end gate: machinery landing (check --base BASE, formal re-run, the whole suite, verify, probe)
+	$(MACHINERY) landing --base $(BASE) --probe --workers $(FORMAL_WORKERS) --stack "$(STACK)" -- $(E2E)
 
 formal: ## Formal models: skeletons current, then TLC and Alloy for real (needs Java)
 	$(MACHINERY) formal gen --check
