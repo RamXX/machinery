@@ -19,7 +19,7 @@ names a unit the service does not implement stops it at start.
 | `make check` | gofmt, `go vet`, `machinery check`. |
 | `make evidence` | The suite through `machinery run`: a receipts file for the current commit. |
 | `make verify` | The end gate: `machinery landing --base $(BASE)` (check with the ratchet, the whole suite through `run`, `verify`). `BASE` is the ref the change started from (default `HEAD~1`); it must contain this project. |
-| `make probe` | `machinery probe --max $(MAX)`: mutates the tables the service reads and expects the suite to notice. |
+| `make probe` | `machinery probe`: mutates every proven transition in the tables the service reads and expects the suite to notice (`MAX=n` keeps the first n). |
 | `make psql` | A psql shell as the admin role. |
 | `make down` | Stops Postgres and removes the container and its data. |
 
@@ -43,13 +43,35 @@ enough for an example and is not authentication.
 `e2e/transitions_test.go` walks the committed tables (`design/gen/tables`, never
 `MACHINERY_TABLES_DIR`): one subtest per transition, ignore and clause case, which arranges a
 record in the source state, fires the event over HTTP, checks the answer and the row, and claims
-only the effects it observed (each audit effect as exactly one audit row). `audit_test.go`,
-`adversary_test.go` and `scenarios_test.go` prove the invariants, the abuse failure modes and
-the scenarios. The suite honors `MACHINERY_ONLY`; under `machinery probe` it runs only the
+only the effects it observed (each audit effect as exactly one audit row). The `onError` and `after` cases
+are induced on the real database by the hooks of `failure_test.go`: INSERT on `deal_wins` revoked
+from `crm_app`, and an ACCESS EXCLUSIVE lock on it held past the `closeTimeout` deadline.
+`failure_test.go` also pauses the container (`docker pause machinery-crm-pg`, always unpaused in a
+cleanup) to prove that a database that does not answer yields 503 `STORE_UNAVAILABLE` within three
+seconds. These tests change the database for every client, so no test of the suite runs in
+parallel. `audit_test.go`, `adversary_test.go`, `single_writer_test.go` and `scenarios_test.go`
+prove the invariants, the abuse failure modes and the scenarios. The suite honors `MACHINERY_ONLY`; under `machinery probe` it runs only the
 subtest of `MACHINERY_PROBE_CASE`.
 
 After a change: `make up`, `make evidence`, `machinery owed sync --prune-only`, commit,
 `machinery verify`. `machinery owed list` says what is still unproven and why.
+
+## Probing the tests
+
+```
+make probe        # machinery probe -- env GOMAXPROCS=2 go test ./e2e/... -count=1 -p 1
+```
+
+`machinery probe` copies the committed tables, changes one proven transition (`retarget`: another
+target state; `drop-effect`: its first action removed), points the service at the copy with
+`MACHINERY_TABLES_DIR` and runs the suite once per mutation. The tests keep reading the committed
+tables, and `probe_filter_test.go` runs only the subtest of `MACHINERY_PROBE_CASE`, so one run
+takes about a second. A mutation is killed when that case is no longer proven. A survivor means a
+test that claims what it did not look at, or a path in the service that does not go through its
+table: fix the test (or the service), never the probe.
+
+Last result: `checked: 33 mutations, 33 killed, 0 survived` (12 `retarget`, 21 `drop-effect`: every
+transition case of both tables, the `onError` and `after` cases of `closing` included).
 
 ## Single writer
 
