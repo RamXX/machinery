@@ -83,30 +83,3 @@ modes, a TLA+ spec of the order payment (`order-payment`) and an Alloy spec of o
 (`order-ownership`), and `e2e/replay.sh`, which emits the replay receipt of the race
 counterexample. The helper `shopformal` (`e2e/testdata/bin`) generates, commits, stamps
 `sources.read_at` and writes the skeletons.
-
-## `nested`
-
-One operational machine `job` (tag `JOB`) with a compound state `Running` (children `warming`,
-`working`), entry and exit actions on every state, and `tools.xstate: true`. Its 7 `on` rows cover a
-transition into the compound state, a deep target, one out of it, a sibling inside it, a compound
-self-target and an atomic self-target. No model; generated files are not part of the fixture.
-
-## `receiptprog`
-
-A tiny Go program that emits receipts with `pkg/receipt`. Added by the story that builds
-`machinery run`.
-
-## `checkerprog`
-
-A tiny Go program (its own module, standard library only) that stands in for an external
-checker: `checkerprog [flags] <projection path> <evidence path>` reads the projection and writes
-valid evidence. Scripts build it with `go build` into `.machinery/bin` and register it in
-`.machinery/checkers.local.yaml`, or call it directly. Flags: `-id`, `-covers` (ids or
-`prefix*` patterns, default every id), `-extra-cover`, `-finding error|warn`, `-subject`,
-`-obligation a,b`, `-wrong-hash`, `-invalid-json`, `-bad-verdict`, `-extra-key`, `-exit N`,
-`-sleep SECONDS` and `-no-write`.
-
-A tiny Go program, its own module, that emits receipts with `pkg/receipt` from its arguments
-(`pass`, `fail`, `skip`, `replay`, `outcome`, `many`) and prints what `Enabled`, `Only` and
-`Wanted` return. Its `go.mod` requires `github.com/RamXX/machinery`; a script adds the `replace`
-directive pointing at `$REPO` and builds it.
