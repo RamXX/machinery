@@ -1,0 +1,60 @@
+# a suite whose system ignores MACHINERY_TABLES_DIR survives every mutation (section 19)
+fixture shop
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/tables.sh
+
+exec mrun 1 probe --max 3 -- sh e2e/tables.sh ignore
+stdout '^  ERROR  survived: tc:ORDE-1ded14 retarget \(target Cancelled -> paying\)$'
+stdout '^  ERROR  survived: tc:ORDE-1ded14 drop-effect \(dropped recordCancellation\)$'
+stdout '^  ERROR  survived: tc:ORDE-267d12 retarget \(target Pending -> Paid\)$'
+stdout '^checked: 3 mutations, 0 killed, 3 survived$'
+stdout '^failed: 3 finding\(s\)$'
+
+exec mrun 1 probe -- sh e2e/tables.sh ignore
+stdout '^checked: 15 mutations, 0 killed, 15 survived$'
+stdout '^  ERROR  survived: tc:ORDE-2e883d retarget \(target paying -> Paid\)$'
+stdout '^  ERROR  survived: tc:ORDE-2e883d drop-effect \(dropped stampAttempt\)$'
+stdout '^  ERROR  survived: tc:ORDE-507e4f drop-effect \(dropped refundPayment\)$'
+stdout '^  ERROR  survived: tc:ORDE-70d94f drop-effect \(dropped recordPayRefused\)$'
+! stdout 'tc:ORDE-70d94f retarget'
+stdout '^  ERROR  survived: tc:ORDE-e6d28f retarget \(target Shipped -> Pending\)$'
+stdout '^failed: 15 finding\(s\)$'
+
+-- e2e/tables.sh --
+#!/bin/sh
+# A stand-in system and its test. The system takes its transitions from
+# MACHINERY_TABLES_DIR when set (unless "ignore" is given); the test expects the
+# committed table and emits what it observed. "silent" emits nothing during a probe.
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+mode=${1:-}
+if [ "$mode" = silent ] && [ -n "${MACHINERY_TABLES_DIR:-}" ]; then exit 0; fi
+rows() {
+  awk '
+    /^  "transitions": \[/ { on = 1; next }
+    on && /^  \]/ { on = 0 }
+    !on { next }
+    /"id":/ { v = $0; sub(/.*"id": "/, "", v); sub(/".*/, "", v); id = v }
+    /"target":/ { v = $0; sub(/.*"target": "/, "", v); sub(/".*/, "", v); tgt = (v == "" ? "-" : v) }
+    /"effects": \[\]/ { print id, tgt, "-"; next }
+    /"effects": \[/ { eff = ""; ineff = 1; next }
+    ineff && /^ *\]/ { ineff = 0; print id, tgt, (eff == "" ? "-" : eff); next }
+    ineff { v = $0; gsub(/[ ",]/, "", v); eff = (eff == "" ? v : eff "," v) }
+  ' "$1"
+}
+dir=${MACHINERY_TABLES_DIR:-design/gen/tables}
+if [ "$mode" = ignore ]; then dir=design/gen/tables; fi
+want=$(mktemp)
+got=$(mktemp)
+rows design/gen/tables/order.table.json > "$want"
+rows "$dir/order.table.json" > "$got"
+paste -d ' ' "$want" "$got" | while read -r id t e id2 t2 e2; do
+  if [ "$t" = "$t2" ]; then
+    effs=$(printf '%s' "$e2" | sed -e 's/^-$//' -e 's/[^,][^,]*/"&"/g')
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"pass","test":"tables.sh","effects":[%s],"observed":"target %s"}\n' "$id" "$effs" "$t2" >> "$MACHINERY_RECEIPTS"
+  else
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"fail","test":"tables.sh","observed":"expected %s, got %s"}\n' "$id" "$t" "$t2" >> "$MACHINERY_RECEIPTS"
+  fi
+done
+rm -f "$want" "$got"

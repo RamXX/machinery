@@ -1,0 +1,138 @@
+# a suite whose system follows MACHINERY_TABLES_DIR kills every mutation (section 19)
+fixture shop
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/tables.sh
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 8 proven, 0 partial, 2 owed, 8 receipts$'
+stdout 'stale owed entry: tc:ORDE-8bd6e7 is proven'
+
+# 8 proven transition cases: 7 retargets (one is internal) and 8 dropped effects
+exec machinery probe -- sh e2e/tables.sh
+stdout '^== probe ==$'
+stdout '^checked: 15 mutations, 15 killed, 0 survived$'
+stdout '^passed$'
+stdout '^machinery probe: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
+
+# nothing in the project changed, and probe runs are not evidence
+exec git status --porcelain
+! stdout .
+exec sh -c 'ls .machinery/receipts | wc -l'
+stdout '^ *1$'
+exec mrun 1 verify
+stdout '8 receipts'
+
+# a run that writes no receipt proves nothing either way
+exec mrun 1 probe --max 2 -- sh e2e/tables.sh silent
+stdout '^  ERROR  probe run produced no receipts: tc:ORDE-1ded14 retarget$'
+stdout '^  ERROR  probe run produced no receipts: tc:ORDE-1ded14 drop-effect$'
+stdout '^checked: 2 mutations, 0 killed, 0 survived$'
+stdout '^failed: 2 finding\(s\)$'
+
+# the probe exports the case id and runs at the project root
+exec machinery probe --max 1 -- sh -c 'echo "case=$MACHINERY_PROBE_CASE" >&2; sh e2e/tables.sh'
+stderr '^case=tc:ORDE-1ded14$'
+
+-- e2e/tables.sh --
+#!/bin/sh
+# A stand-in system and its test. The system takes its transitions from
+# MACHINERY_TABLES_DIR when set (unless "ignore" is given); the test expects the
+# committed table and emits what it observed. "silent" emits nothing during a probe.
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+mode=${1:-}
+if [ "$mode" = silent ] && [ -n "${MACHINERY_TABLES_DIR:-}" ]; then exit 0; fi
+rows() {
+  awk '
+    /^  "transitions": \[/ { on = 1; next }
+    on && /^  \]/ { on = 0 }
+    !on { next }
+    /"id":/ { v = $0; sub(/.*"id": "/, "", v); sub(/".*/, "", v); id = v }
+    /"target":/ { v = $0; sub(/.*"target": "/, "", v); sub(/".*/, "", v); tgt = (v == "" ? "-" : v) }
+    /"effects": \[\]/ { print id, tgt, "-"; next }
+    /"effects": \[/ { eff = ""; ineff = 1; next }
+    ineff && /^ *\]/ { ineff = 0; print id, tgt, (eff == "" ? "-" : eff); next }
+    ineff { v = $0; gsub(/[ ",]/, "", v); eff = (eff == "" ? v : eff "," v) }
+  ' "$1"
+}
+dir=${MACHINERY_TABLES_DIR:-design/gen/tables}
+if [ "$mode" = ignore ]; then dir=design/gen/tables; fi
+want=$(mktemp)
+got=$(mktemp)
+rows design/gen/tables/order.table.json > "$want"
+rows "$dir/order.table.json" > "$got"
+paste -d ' ' "$want" "$got" | while read -r id t e id2 t2 e2; do
+  if [ "$t" = "$t2" ]; then
+    effs=$(printf '%s' "$e2" | sed -e 's/^-$//' -e 's/[^,][^,]*/"&"/g')
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"pass","test":"tables.sh","effects":[%s],"observed":"target %s"}\n' "$id" "$effs" "$t2" >> "$MACHINERY_RECEIPTS"
+  else
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"fail","test":"tables.sh","observed":"expected %s, got %s"}\n' "$id" "$t" "$t2" >> "$MACHINERY_RECEIPTS"
+  fi
+done
+rm -f "$want" "$got"
+
+stdout 'stale owed entry: tc:ORDE-8bd6e7 is proven'
+
+# 8 proven transition cases: 7 retargets (one is internal) and 8 dropped effects
+exec machinery probe -- sh e2e/tables.sh
+stdout '^== probe ==$'
+stdout '^checked: 15 mutations, 15 killed, 0 survived$'
+stdout '^passed$'
+stdout '^machinery probe: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
+
+# nothing in the project changed, and probe runs are not evidence
+exec git status --porcelain
+! stdout .
+exec sh -c 'ls .machinery/receipts | wc -l'
+stdout '^ *1$'
+exec mrun 1 verify
+stdout '8 receipts'
+
+# a run that writes no receipt proves nothing either way
+exec mrun 1 probe --max 2 -- sh e2e/tables.sh silent
+stdout '^  ERROR  probe run produced no receipts: tc:ORDE-1ded14 retarget$'
+stdout '^  ERROR  probe run produced no receipts: tc:ORDE-1ded14 drop-effect$'
+stdout '^checked: 2 mutations, 0 killed, 0 survived$'
+stdout '^failed: 2 finding\(s\)$'
+
+# the probe exports the case id and runs at the project root
+exec machinery probe --max 1 -- sh -c 'echo "case=$MACHINERY_PROBE_CASE" >&2; sh e2e/tables.sh'
+stderr '^case=tc:ORDE-1ded14$'
+
+-- e2e/tables.sh --
+#!/bin/sh
+# A stand-in system and its test. The system takes its transitions from
+# MACHINERY_TABLES_DIR when set (unless "ignore" is given); the test expects the
+# committed table and emits what it observed. "silent" emits nothing during a probe.
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+mode=${1:-}
+if [ "$mode" = silent ] && [ -n "${MACHINERY_TABLES_DIR:-}" ]; then exit 0; fi
+rows() {
+  awk '
+    /^  "transitions": \[/ { on = 1; next }
+    on && /^  \]/ { on = 0 }
+    !on { next }
+    /"id":/ { v = $0; sub(/.*"id": "/, "", v); sub(/".*/, "", v); id = v }
+    /"target":/ { v = $0; sub(/.*"target": "/, "", v); sub(/".*/, "", v); tgt = (v == "" ? "-" : v) }
+    /"effects": \[\]/ { print id, tgt, "-"; next }
+    /"effects": \[/ { eff = ""; ineff = 1; next }
+    ineff && /^ *\]/ { ineff = 0; print id, tgt, (eff == "" ? "-" : eff); next }
+    ineff { v = $0; gsub(/[ ",]/, "", v); eff = (eff == "" ? v : eff "," v) }
+  ' "$1"
+}
+dir=${MACHINERY_TABLES_DIR:-design/gen/tables}
+if [ "$mode" = ignore ]; then dir=design/gen/tables; fi
+want=$(mktemp)
+got=$(mktemp)
+rows design/gen/tables/order.table.json > "$want"
+rows "$dir/order.table.json" > "$got"
+paste -d ' ' "$want" "$got" | while read -r id t e id2 t2 e2; do
+  if [ "$t" = "$t2" ]; then
+    effs=$(printf '%s' "$e2" | sed -e 's/^-$//' -e 's/[^,][^,]*/"&"/g')
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"pass","test":"tables.sh","effects":[%s],"observed":"target %s"}\n' "$id" "$effs" "$t2" >> "$MACHINERY_RECEIPTS"
+  else
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"fail","test":"tables.sh","observed":"expected %s, got %s"}\n' "$id" "$t" "$t2" >> "$MACHINERY_RECEIPTS"
+  fi
+done
+rm -f "$want" "$got"

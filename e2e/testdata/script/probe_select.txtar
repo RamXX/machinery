@@ -1,0 +1,71 @@
+# --ids, --prefix and --max choose what to probe (section 19)
+fixture shop
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/tables.sh
+
+exec machinery probe --ids tc:ORDE-2e883d -- sh e2e/tables.sh
+stdout '^checked: 2 mutations, 2 killed, 0 survived$'
+exec machinery probe --ids tc:ORDE-2e883d,tc:ORDE-e6d28f -- sh e2e/tables.sh
+stdout '^checked: 4 mutations, 4 killed, 0 survived$'
+exec machinery probe --prefix tc:ORDE-70 -- sh e2e/tables.sh
+stdout '^checked: 1 mutations, 1 killed, 0 survived$'
+exec machinery probe --max 3 -- sh e2e/tables.sh
+stdout '^checked: 3 mutations, 3 killed, 0 survived$'
+exec mrun 1 probe --max 1 --ids tc:ORDE-2e883d -- sh e2e/tables.sh ignore
+stdout '^  ERROR  survived: tc:ORDE-2e883d retarget \(target paying -> Paid\)$'
+stdout '^checked: 1 mutations, 0 killed, 1 survived$'
+
+# nothing selectable: an ignore case, a non-tc prefix, an unknown id
+exec mrun 1 probe --ids tc:ORDE-2fa2af -- sh e2e/tables.sh
+stdout '^not demonstrated: nothing to check$'
+exec mrun 1 probe --prefix inv: -- sh e2e/tables.sh
+stdout '^not demonstrated: nothing to check$'
+exec mrun 1 probe --ids tc:ORDE-ffffff -- sh e2e/tables.sh
+stdout '^not demonstrated: nothing to check$'
+
+# only proven transition cases are probed: with the shop emitter tc:ORDE-8bd6e7 is partial
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 probe --ids tc:ORDE-8bd6e7 -- sh e2e/tables.sh
+stdout '^not demonstrated: nothing to check$'
+exec machinery probe -- sh e2e/tables.sh
+stdout '^checked: 13 mutations, 13 killed, 0 survived$'
+
+-- e2e/tables.sh --
+#!/bin/sh
+# A stand-in system and its test. The system takes its transitions from
+# MACHINERY_TABLES_DIR when set (unless "ignore" is given); the test expects the
+# committed table and emits what it observed. "silent" emits nothing during a probe.
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+mode=${1:-}
+if [ "$mode" = silent ] && [ -n "${MACHINERY_TABLES_DIR:-}" ]; then exit 0; fi
+rows() {
+  awk '
+    /^  "transitions": \[/ { on = 1; next }
+    on && /^  \]/ { on = 0 }
+    !on { next }
+    /"id":/ { v = $0; sub(/.*"id": "/, "", v); sub(/".*/, "", v); id = v }
+    /"target":/ { v = $0; sub(/.*"target": "/, "", v); sub(/".*/, "", v); tgt = (v == "" ? "-" : v) }
+    /"effects": \[\]/ { print id, tgt, "-"; next }
+    /"effects": \[/ { eff = ""; ineff = 1; next }
+    ineff && /^ *\]/ { ineff = 0; print id, tgt, (eff == "" ? "-" : eff); next }
+    ineff { v = $0; gsub(/[ ",]/, "", v); eff = (eff == "" ? v : eff "," v) }
+  ' "$1"
+}
+dir=${MACHINERY_TABLES_DIR:-design/gen/tables}
+if [ "$mode" = ignore ]; then dir=design/gen/tables; fi
+want=$(mktemp)
+got=$(mktemp)
+rows design/gen/tables/order.table.json > "$want"
+rows "$dir/order.table.json" > "$got"
+paste -d ' ' "$want" "$got" | while read -r id t e id2 t2 e2; do
+  if [ "$t" = "$t2" ]; then
+    effs=$(printf '%s' "$e2" | sed -e 's/^-$//' -e 's/[^,][^,]*/"&"/g')
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"pass","test":"tables.sh","effects":[%s],"observed":"target %s"}\n' "$id" "$effs" "$t2" >> "$MACHINERY_RECEIPTS"
+  else
+    printf '{"v":1,"type":"receipt","id":"%s","outcome":"fail","test":"tables.sh","observed":"expected %s, got %s"}\n' "$id" "$t" "$t2" >> "$MACHINERY_RECEIPTS"
+  fi
+done
+rm -f "$want" "$got"
