@@ -42,7 +42,7 @@ machine file. A file that cannot be parsed is an ERROR.
 ## The subset
 
 - **Root keys:** `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, and the
-  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_oracle_tag`, `_guards`.
+  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_oracle_tag`, `_guards`, `_external_events`.
 - **State keys:** `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`, `id`,
   `meta`, `description`, `tags`, `onDone`, `output`, and the annotations `_comment`, `_exhaustive`,
   `_ignores`, `_refusal`.
@@ -151,6 +151,11 @@ the case ids, which is otherwise the machine `id` uppercased and cut to four cha
 machines whose tags collide (`Deal` and `DealAggregate` both give `DEAL`) are an error that names both
 files: set `_oracle_tag` on one. Changing a tag changes every case id of that machine, so choose it
 once.
+
+**`_external_events`** (root, optional). An array of event names this machine receives that are not
+model actions, for example events that arrive from a bus or a peer subsystem (`docs/formats.md`
+section 6.4 reads it). Each entry is a non-empty string. An entry that no state handles or ignores
+is a stale marker and an error: remove it, or wire the event.
 
 **`_comment`** (any level). Free text.
 

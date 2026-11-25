@@ -5,13 +5,12 @@ fixture shop
 cp root_keys.json design/machines/Order.machine.json
 exec mrun 1 lint --stage machines
 stdout '^== machines ==$'
-stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_counters'' \(supported: _comment, _delays, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
-stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_io'' \(supported: _comment, _delays, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
-stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_invariants'' \(supported: _comment, _delays, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
-stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_component'' \(supported: _comment, _delays, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
-stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_max_retries'' \(supported: _comment, _delays, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
-stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_external_events'' \(supported: _comment, _delays, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
-stdout '^failed: 6 finding\(s\)$'
+stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_counters'' \(supported: _comment, _delays, _external_events, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
+stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_io'' \(supported: _comment, _delays, _external_events, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
+stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_invariants'' \(supported: _comment, _delays, _external_events, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
+stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_component'' \(supported: _comment, _delays, _external_events, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
+stdout '^  ERROR  design/machines/Order\.machine\.json: unsupported root key ''_max_retries'' \(supported: _comment, _delays, _external_events, _guards, _lifecycle_of, _oracle_tag, _role, context, description, id, initial, meta, states, version\)$'
+stdout '^failed: 5 finding\(s\)$'
 
 # an unknown state key
 cp state_key.json design/machines/Order.machine.json
@@ -177,10 +176,7 @@ stdout '^failed: 1 finding\(s\)$'
   "_io": {},
   "_invariants": [],
   "_component": "x",
-  "_max_retries": 3,
-  "_external_events": [
-    "pay"
-  ]
+  "_max_retries": 3
 }
 -- state_key.json --
 {
