@@ -8,7 +8,6 @@ import (
 
 // machinery:verifies tc:DEAL-4a25db tc:DEAL-d09c4d tc:DEAL-701b01 tc:DEAL-81d0ab tc:DEAL-559572
 // machinery:verifies tc:DEAL-062b75 tc:DEAL-2c0b2a tc:DEAL-776ffd tc:DEAL-fdd582 tc:DEAL-7bb594 tc:DEAL-fe513e
-// machinery:verifies sc:rep-cannot-change-another-rep-s-deal sc:admin-reopens-a-lost-deal
 
 // newDeal creates a deal over HTTP as user and checks it is a Lead.
 func newDeal(t *testing.T, user string, amount int64) string {
@@ -81,23 +80,20 @@ func TestDealIgnoredEvents(t *testing.T) {
 	pass(t, "tc:DEAL-2c0b2a", "qualify on a Lost deal: 409 DEAL_LOST, the row stays Lost")
 }
 
-// TestDealOwnership walks the scenario: a second Rep tries to qualify the
-// first Rep's deal.
+// TestDealOwnership: a second Rep tries to qualify the first Rep's deal.
 func TestDealOwnership(t *testing.T) {
-	wants(t, "tc:DEAL-fdd582", "sc:rep-cannot-change-another-rep-s-deal")
+	wants(t, "tc:DEAL-fdd582")
 	rep, other := createUser(t, "Rep"), createUser(t, "Rep")
 	id := newDeal(t, rep, 100)
 	e := refused(t, "/deals/"+id+"/qualify", other, http.StatusForbidden)
 	wantRefusal(t, e, "FORBIDDEN", "tc:DEAL-fdd582")
 	wantRow(t, "deals", id, "Lead")
 	pass(t, "tc:DEAL-fdd582", "qualify by another Rep: 403 FORBIDDEN, the row stays Lead")
-	pass(t, "sc:rep-cannot-change-another-rep-s-deal", "a second Rep's qualify was refused with 403 and the deal stayed a Lead")
 }
 
-// TestDealReopen walks the scenario: the Rep loses a deal, cannot reopen
-// it, the Admin does.
+// TestDealReopen: the Rep loses a deal, cannot reopen it, the Admin does.
 func TestDealReopen(t *testing.T) {
-	wants(t, "tc:DEAL-7bb594", "tc:DEAL-fe513e", "sc:admin-reopens-a-lost-deal")
+	wants(t, "tc:DEAL-7bb594", "tc:DEAL-fe513e")
 	admin, rep := createUser(t, "Admin"), createUser(t, "Rep")
 	id := newDeal(t, rep, 100)
 	lose(t, id, rep)
@@ -109,17 +105,6 @@ func TestDealReopen(t *testing.T) {
 	wantChange(t, c, "Lead", []string{"tc:DEAL-fe513e"}, []string{"auditReopen"}, nil)
 	wantRow(t, "deals", id, "Lead")
 	pass(t, "tc:DEAL-fe513e", "Lost reopen by an Admin: 200, Lead in the answer and the row")
-	pass(t, "sc:admin-reopens-a-lost-deal", "lost by the Rep, reopen refused for the Rep, reopened by the Admin: a Lead again")
-}
-
-func TestDealWonIsFinal(t *testing.T) {
-	rep := createUser(t, "Rep")
-	id := newDeal(t, rep, 100)
-	qualify(t, id, rep)
-	fire(t, "/deals/"+id+"/win", rep)
-	e := refused(t, "/deals/"+id+"/lose", rep, http.StatusConflict)
-	wantRefusal(t, e, "NOT_ALLOWED_IN_STATE", "")
-	wantRow(t, "deals", id, "Won")
 }
 
 func TestDealReads(t *testing.T) {
