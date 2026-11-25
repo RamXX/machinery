@@ -29,7 +29,8 @@ e2e: build ## The whole end-to-end suite against the real binary
 e2e-one: build ## One script: make e2e-one S=<script name without .txtar>
 	GOMAXPROCS=$(JOBS) go test ./e2e/... -count=1 -run 'TestScripts/$(S)$$' -timeout 10m
 
-crm: build ## The reference project: its own check and landing (needs Docker)
-	$(MAKE) -C examples/crm verify
+crm: build ## The reference project on a real Postgres: check, then its landing with the probe (needs Docker)
+	$(MAKE) -C examples/crm up
+	$(MAKE) -C examples/crm check verify; status=$$?; $(MAKE) -C examples/crm down; exit $$status
 
 verify: check e2e crm ## Full verification: check, the e2e suite, the reference project

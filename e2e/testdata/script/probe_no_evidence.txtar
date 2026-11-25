@@ -11,7 +11,7 @@ stdout '^machinery probe: 0 passed, 0 failed, 1 not demonstrated, 0 not applicab
 exec machinery run -- sh e2e/tables.sh
 exec sh -c 'echo "// wip" >> internal/api/handlers.go'
 exec mrun 1 probe -- sh e2e/tables.sh
-stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+stdout '^not demonstrated: working tree has uncommitted changes: the probe needs the evidence of a clean tree$'
 exec git checkout -- internal/api/handlers.go
 
 # evidence from another commit

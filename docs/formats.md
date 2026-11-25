@@ -1734,7 +1734,8 @@ probe reports.
 
 Precondition: evidence valid for the current commit (section 10.1) and a clean working tree, as
 for `verify` without `--allow-dirty`. Otherwise the stage is
-`not demonstrated: no evidence at <short sha>` and the command exits 1.
+`not demonstrated: no evidence at <short sha>`, or `not demonstrated: working tree has uncommitted
+changes: the probe needs the evidence of a clean tree`, and the command exits 1.
 
 For every selected `tc` id of kind `transition` that is `proven` by the current evidence
 (section 12), in id order, and for each mutation that applies to it:

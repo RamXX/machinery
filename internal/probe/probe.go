@@ -125,7 +125,10 @@ func Stage(p *project.Project, d *design.Design, opts Options) *report.Stage {
 		s.Errorf("%v", err)
 		return s
 	}
-	if !ev.HasEvidence || ev.Dirty {
+	if ev.Dirty {
+		return s.NotDemonstrated("working tree has uncommitted changes: the probe needs the evidence of a clean tree")
+	}
+	if !ev.HasEvidence {
 		return s.NotDemonstrated(ev.NoEvidence())
 	}
 	muts := Mutations(d, ev, opts)
