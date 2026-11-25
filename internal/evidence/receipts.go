@@ -177,6 +177,11 @@ type validity struct {
 	cache map[string]bool
 }
 
+// ValidFor reports whether evidence from commit is valid for head (section 10.1).
+func ValidFor(p *project.Project, head, commit string) bool {
+	return newValidity(p, head).valid(commit)
+}
+
 func newValidity(p *project.Project, head string) *validity {
 	return &validity{p: p, head: head, cache: map[string]bool{head: true}}
 }

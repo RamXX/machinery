@@ -1029,8 +1029,11 @@ Prints one story per group of owed ids, as Markdown (one `##` heading per story 
 
 Groups:
 
-- owed `tc` ids are grouped by machine and trigger event: one story per `(machine, event)` for
-  `on` triggers, and one story per machine named `internal transitions` for every other trigger;
+- owed `tc` ids are grouped by machine and trigger event: one story per `(machine, event)` holds
+  every case about that event (the `on:<event>` transition cases, the `ignore:<event>` cases,
+  the guard-clause cases of those transitions and the refusal cases whose handler names the
+  event); one story per machine named `internal transitions` holds the cases with no caller
+  event (`after`, `always`, `onDone`, `onError`, `stateDone`);
 - one story per owed `sc`, `fm`, `inv`, `cx` and `ck` id;
 - one story per owed `fv` id, titled `Model <area> (<tool>)`;
 - one story `Serve <Entity> actions` per entity with owed `act` ids.

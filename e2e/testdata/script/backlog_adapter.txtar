@@ -1,0 +1,73 @@
+# the backlog commands need backlog.tool and a runnable bd (section 15.1)
+fixture shop
+exec machinery gen
+gitinit
+
+# no backlog configured: a config error, exit 2, for every command that needs it
+exec mrun 2 plan
+stderr '^config: no backlog configured: set backlog.tool: bd in machinery.yaml$'
+exec mrun 2 plan --apply
+stderr '^config: no backlog configured'
+exec mrun 2 waves
+stderr '^config: no backlog configured'
+exec mrun 2 waves --freeze
+stderr '^config: no backlog configured'
+exec mrun 2 brief shop-a1
+stderr '^config: no backlog configured'
+exec mrun 2 story shop-a1
+stderr '^config: no backlog configured'
+exec mrun 2 predict shop-a1 --observation x --expect y
+stderr '^config: no backlog configured'
+exec mrun 2 accept shop-a1 --verdict accept --observed x
+stderr '^config: no backlog configured'
+exec mrun 2 proof --story shop-a1
+stderr '^config: no backlog configured'
+exec mrun 2 verify --story shop-a1
+stderr '^config: no backlog configured'
+! stdout .
+
+# only bd is supported
+cp machinery.yaml machinery.orig
+exec sh -c 'printf "backlog:\n  tool: jira\n" >> machinery.yaml'
+exec mrun 2 waves
+stderr '^config: backlog.tool: only bd is supported, got "jira"$'
+
+# a bd that cannot run
+cp machinery.orig machinery.yaml
+exec sh -c 'printf "backlog:\n  tool: bd\ntools:\n  bd: /nonexistent\n" >> machinery.yaml'
+exec mrun 2 waves
+stderr '^config: bd not runnable: fork/exec /nonexistent: no such file or directory$'
+exec mrun 2 story shop-a1
+stderr '^config: bd not runnable: '
+exec mrun 2 plan --apply
+stderr '^config: bd not runnable: '
+exec mrun 2 proof --story shop-a1 --post
+stderr '^config: bd not runnable: '
+
+# the real bd, run in the project directory
+cp machinery.orig machinery.yaml
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+gitcommit 'backlog'
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a1 --title 'Prove the terminal invariant' --body-file a1.txt --silent
+exec machinery brief shop-a1
+stdout '^BRIEF shop-a1 \(builder\)$'
+stdout '^title: Prove the terminal invariant$'
+
+# a story bd does not know is a usage error
+exec mrun 2 brief shop-zzz
+stderr '^usage: no story shop-zzz in the backlog: bd show: '
+exec mrun 2 story shop-zzz
+stderr '^usage: no story shop-zzz in the backlog'
+
+# usage errors
+exec mrun 2 story
+stderr '^usage: machinery story takes one story id$'
+exec mrun 2 story shop-a1 shop-a2
+stderr '^usage: machinery story takes one story id$'
+exec mrun 2 brief shop-a1 --role tester
+stderr '^usage: --role must be builder, verifier or modeler, got "tester"$'
+
+-- a1.txt --
+The terminal states are final.
+machinery:ids inv:terminal-is-final

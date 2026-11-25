@@ -49,7 +49,11 @@ func New(p *project.Project, actor string) (*Client, error) {
 	}
 	c := &Client{p: p, exe: p.Cfg.Tools.BD, Actor: ResolveActor(p, actor)}
 	if out, err := exec.Command(c.exe, "--version").CombinedOutput(); err != nil {
-		return nil, project.Errf("bd not runnable: %s", firstLine(strings.TrimSpace(string(out))+" "+err.Error()))
+		reason := err.Error()
+		if msg := strings.TrimSpace(string(out)); msg != "" {
+			reason = firstLine(msg) + ": " + reason
+		}
+		return nil, project.Errf("bd not runnable: %s", reason)
 	}
 	return c, nil
 }
@@ -117,8 +121,8 @@ func (r rawIssue) issue() Issue {
 	return is
 }
 
-// List returns every issue, closed ones included, sorted by id. Notes are not
-// filled in: use Show for one issue.
+// List returns every issue, closed ones included, sorted by id, with the
+// notes bd list reports.
 func (c *Client) List() ([]Issue, error) {
 	out, err := c.run("list", "--all", "--json", "--limit", "0")
 	if err != nil {

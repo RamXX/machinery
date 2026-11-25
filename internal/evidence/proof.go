@@ -104,6 +104,12 @@ func HighestTier(d *design.Design, ids []string) (string, []string) {
 // Proof writes the proof block of section 13 for the given obligation ids and
 // returns 0 when every one is proven, 1 otherwise.
 func Proof(w io.Writer, d *design.Design, ev *Evaluation, ids []string) int {
+	return ProofWith(w, d, ev, ids, nil)
+}
+
+// ProofWith is Proof with extra lines under not proven (the unproven
+// assumptions of the formal models covering the ids).
+func ProofWith(w io.Writer, d *design.Design, ev *Evaluation, ids, extra []string) int {
 	fmt.Fprintln(w, "PROOF")
 	fmt.Fprintf(w, "commit:   %s\n", ev.Head)
 	tier, areas := HighestTier(d, ids)
@@ -155,7 +161,7 @@ func Proof(w io.Writer, d *design.Design, ev *Evaluation, ids []string) int {
 		}
 	}
 	fmt.Fprintln(w, "not proven:")
-	for _, l := range notProven {
+	for _, l := range append(notProven, extra...) {
 		fmt.Fprintf(w, "  %s\n", l)
 	}
 	fmt.Fprintln(w, "learnings:")

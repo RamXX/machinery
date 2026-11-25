@@ -1,0 +1,247 @@
+package pm
+
+import (
+	"sort"
+	"strings"
+
+	"github.com/RamXX/machinery/internal/backlog"
+	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/evidence"
+	"github.com/RamXX/machinery/internal/formal"
+	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/report"
+)
+
+// StoryGate is stage story (section 15.6): the tier gate of one story at the
+// current commit.
+func StoryGate(d *design.Design, is *backlog.Issue) (*report.Stage, error) {
+	s := report.New("story")
+	t := backlog.ParseTags(is)
+	if len(t.IDs) == 0 {
+		return s.NotDemonstrated("story names no design ids"), nil
+	}
+	p := d.P
+	ev, err := evidence.Evaluate(p, d, false)
+	if err != nil {
+		return nil, err
+	}
+	s.Count(len(t.IDs), "ids").Count(len(t.Proofs), "proofs").Count(len(t.Predictions), "predictions").Count(len(t.Verdicts), "verdicts")
+	valid := func(commit string) bool { return commit != "" && evidence.ValidFor(p, ev.Head, commit) }
+	short := gitx.Short(ev.Head)
+	if ev.Dirty {
+		s.Errorf("working tree has uncommitted changes")
+	}
+	tier, _ := StoryTier(d, is, t.IDs)
+	if l := LabelTier(is); l != "" && l != tier {
+		s.Warnf("label tier:%s disagrees with the ids: the story is %s", l, tier)
+	}
+	owed := d.OwedSet()
+	for _, id := range t.IDs {
+		judgeID(s, d, ev, owed, id)
+	}
+
+	// routine: a proof for a commit the evidence is valid for
+	builders := map[string]bool{}
+	for _, pr := range t.Proofs {
+		if valid(pr.Commit) {
+			builders[pr.Actor] = true
+		}
+	}
+	switch {
+	case len(builders) > 0:
+	case len(t.Proofs) > 0:
+		last := t.Proofs[len(t.Proofs)-1]
+		s.Errorf("proof is for another commit: %s; post a proof at %s with machinery proof --story %s --post", gitx.Short(last.Commit), short, is.ID)
+	default:
+		s.Errorf("no proof for %s: the builder runs machinery proof --story %s --post", short, is.ID)
+	}
+	if tier == design.Routine {
+		return s, nil
+	}
+
+	// consequential: a prediction by a fresh actor, then that actor's accept
+	var preds []backlog.Stamp
+	for _, pr := range t.Predictions {
+		if valid(pr.Commit) {
+			preds = append(preds, pr)
+		}
+	}
+	var fresh []backlog.Stamp
+	for _, pr := range preds {
+		if builders[pr.Actor] {
+			s.Errorf("verifier is the builder: %s", pr.Actor)
+			continue
+		}
+		fresh = append(fresh, pr)
+	}
+	if len(preds) == 0 {
+		s.Errorf("no prediction for %s: a verifier runs machinery predict before reading the proof", short)
+	}
+	if len(fresh) > 0 {
+		judgeVerdict(s, t, fresh, valid, short, is.ID)
+	}
+	if tier != design.Critical {
+		return s, nil
+	}
+
+	// critical: the formal models of the story's areas and their replays
+	areas := CriticalAreas(d, t.IDs)
+	proven := formal.ProvenAreas(d)
+	specs, err := formal.Load(p)
+	if err != nil {
+		return nil, err
+	}
+	want := setOf(areas)
+	for _, a := range areas {
+		if !proven["fv:"+a] {
+			s.Errorf("unproven: fv:%s", a)
+		}
+	}
+	for _, sp := range specs {
+		covers := false
+		for _, a := range sp.Areas {
+			covers = covers || want[a]
+		}
+		if !covers {
+			continue
+		}
+		for _, tr := range d.Traces {
+			if tr.Spec != sp.Spec {
+				continue
+			}
+			id := "cx:" + sp.Spec + ":" + tr.Run
+			if ev.State(id) != evidence.Proven {
+				s.Errorf("unproven: %s", id)
+			}
+		}
+	}
+	return s, nil
+}
+
+func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed map[string]design.OwedEntry, id string) {
+	_, isOwed := owed[id]
+	switch {
+	case !d.Known(id):
+		s.Errorf("unknown id: %s", id)
+		return
+	case isOwed:
+		s.Errorf("owed: %s", id)
+	}
+	if d.IsAct(id) {
+		return
+	}
+	switch ev.State(id) {
+	case evidence.Proven:
+	case evidence.Failed:
+		s.Errorf("failed: %s", id)
+	default:
+		s.Errorf("unproven: %s", id)
+	}
+}
+
+// judgeVerdict requires an accept by a predicting actor, recorded after that
+// actor's prediction; the actor's last verdict counts.
+func judgeVerdict(s *report.Stage, t backlog.Tags, fresh []backlog.Stamp, valid func(string) bool, short, story string) {
+	firstPred := map[string]int{}
+	for _, pr := range fresh {
+		if seq, ok := firstPred[pr.Actor]; !ok || pr.Seq < seq {
+			firstPred[pr.Actor] = pr.Seq
+		}
+	}
+	last := map[string]backlog.Stamp{}
+	early := map[string]bool{}
+	for _, v := range t.Verdicts {
+		seq, predicted := firstPred[v.Actor]
+		if !predicted || !valid(v.Commit) {
+			continue
+		}
+		if v.Seq < seq {
+			early[v.Actor] = true
+			continue
+		}
+		if cur, ok := last[v.Actor]; !ok || v.Seq > cur.Seq {
+			last[v.Actor] = v
+		}
+	}
+	for _, v := range last {
+		if v.Verdict == "accept" {
+			return
+		}
+	}
+	var actors []string
+	for a := range last {
+		actors = append(actors, a)
+	}
+	sort.Strings(actors)
+	for _, a := range actors {
+		v := last[a]
+		s.Errorf("verdict %s by %s at %s: %s", v.Verdict, a, short, v.Fields["observed"])
+	}
+	if len(last) > 0 {
+		return
+	}
+	var earlyActors []string
+	for a := range early {
+		earlyActors = append(earlyActors, a)
+	}
+	sort.Strings(earlyActors)
+	for _, a := range earlyActors {
+		s.Errorf("verdict before prediction: %s; the verifier predicts first, then runs machinery accept", a)
+	}
+	if len(early) == 0 {
+		s.Errorf("no verdict for %s: the verifier runs machinery accept %s", short, story)
+	}
+}
+
+// StoryVerify renders stage verify for the ids of one story (section 12):
+// findings about other obligations are dropped, except failed ones.
+func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *report.Stage {
+	s := report.New("verify")
+	sel := setOf(ids)
+	for _, f := range ev.Findings {
+		if keepFinding(f.Msg, sel) {
+			s.Findings = append(s.Findings, f)
+		}
+	}
+	for _, id := range ids {
+		if !d.Known(id) {
+			s.Errorf("unknown id in story: %s", id)
+		}
+	}
+	if !ev.HasEvidence {
+		return s.NotDemonstrated(ev.NoEvidence())
+	}
+	owed := d.OwedSet()
+	var n, proven, partial, nOwed, receipts int
+	for _, id := range ObligationIDs(d, ids) {
+		n++
+		switch ev.State(id) {
+		case evidence.Proven:
+			proven++
+		case evidence.Partial:
+			partial++
+		}
+		if _, ok := owed[id]; ok {
+			nOwed++
+		}
+		receipts += len(ev.Receipts(id))
+	}
+	s.Count(n, "obligations").Count(proven, "proven").Count(partial, "partial").Count(nOwed, "owed").Count(receipts, "receipts")
+	if n == 0 {
+		s.NotDemonstrated("story names no obligation")
+	}
+	return s
+}
+
+// per-id findings of stage verify; failed ones always print
+var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: "}
+
+func keepFinding(msg string, sel map[string]bool) bool {
+	for _, pre := range idFindings {
+		if rest, ok := strings.CutPrefix(msg, pre); ok {
+			id, _, _ := strings.Cut(rest, " ")
+			return sel[id]
+		}
+	}
+	return true
+}

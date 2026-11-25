@@ -1,0 +1,454 @@
+# plan prints one story per group of owed ids, as Markdown or as a bd graph plan (section 15.2)
+fixture shop
+fixture shop-formal
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+
+# nothing owed prints nothing and exits 0
+cp owed-none.yaml design/owed.yaml
+exec machinery plan
+! stdout .
+exec machinery plan --json
+! stdout .
+
+# every kind of group, every kind of edge
+cp owed-all.yaml design/owed.yaml
+mkdir design/formal/traces
+cp race.trace.json design/formal/traces/order-payment.race.trace.json
+exec machinery plan
+cmp stdout want.md
+
+# deterministic: the same bytes again
+cp stdout first.md
+exec machinery plan
+cmp stdout first.md
+
+# --json is a bd create --graph plan with the same stories and the edges
+exec machinery plan --json
+cp stdout plan.json
+exec sh -c 'grep -c "\"key\":" plan.json'
+stdout '^12$'
+! stdout 'u003e'
+grep '"key": "prove-order-pay",$' plan.json
+grep '"title": "Model order-payment \(tla\)",$' plan.json
+grep '"title": "Model order-ownership \(alloy\)",$' plan.json
+grep '"title": "Serve Order actions",$' plan.json
+grep '"acceptance_criteria": "- Each listed obligation is proven' plan.json
+grep '"description": "Owed ids:\\n- tc:ORDE-2e883d: Pending on:pay \[hasPaymentMethod\] -> paying \(effects: stampAttempt\)' plan.json
+exec sh -c 'tr -d " \n" < plan.json | grep -o "\"edges\":.*"'
+stdout '"from_key":"prove-cx-order-payment-race","to_key":"prove-order-pay","type":"blocks"'
+stdout '"from_key":"prove-fm-payment-provider-down","to_key":"prove-order-internal-transitions","type":"blocks"'
+stdout '"from_key":"prove-order-cancel","to_key":"model-order-payment-tla","type":"blocks"'
+stdout '"from_key":"prove-order-internal-transitions","to_key":"model-order-payment-tla","type":"blocks"'
+stdout '"from_key":"prove-order-pay","to_key":"model-order-payment-tla","type":"blocks"'
+stdout '"from_key":"prove-order-ship","to_key":"model-order-payment-tla","type":"blocks"'
+exec sh -c 'grep -c "\"from_key\":" plan.json'
+stdout '^6$'
+
+# an edge needs both stories in the plan: without the Model story there is none to it
+cp owed-nomodel.yaml design/owed.yaml
+exec machinery plan
+! stdout 'Model order-payment'
+! stdout 'the formal model the tier requires'
+stdout '^- Prove order internal transitions: the invoke path the failure is induced on$'
+
+# usage errors
+exec mrun 2 plan extra
+stderr '^usage: machinery plan takes no arguments$'
+exec mrun 2 plan --parent shop-1
+stderr '^usage: --parent needs --apply$'
+exec mrun 2 plan --apply --json
+stderr '^usage: --apply and --json do not go together$'
+exec mrun 2 plan --link shop-1
+stderr '^usage: machinery plan --link <story> needs at least one id$'
+
+-- owed-none.yaml --
+version: 1
+owed: []
+-- owed-all.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-2e883d
+    reason: "not yet"
+  - id: tc:ORDE-70d94f
+    reason: "not yet"
+  - id: tc:ORDE-8799a1
+    reason: "not yet"
+  - id: tc:ORDE-1ded14
+    reason: "not yet"
+  - id: tc:ORDE-507e4f
+    reason: "not yet"
+  - id: tc:ORDE-e6d28f
+    reason: "not yet"
+  - id: tc:ORDE-2fa2af
+    reason: "not yet"
+  - id: tc:ORDE-ad945c
+    reason: "not yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "not yet"
+  - id: tc:ORDE-267d12
+    reason: "not yet"
+  - id: sc:customer-pays-and-the-order-ships
+    reason: "not yet"
+  - id: inv:terminal-is-final
+    reason: "not yet"
+  - id: fm:payment-provider-down
+    reason: "not yet"
+  - id: fm:ship-by-non-clerk
+    reason: "not yet"
+  - id: act:Order.cancel
+    reason: "not yet"
+  - id: act:Order.ship
+    reason: "not yet"
+  - id: fv:order-payment
+    reason: "not yet"
+  - id: fv:order-ownership
+    reason: "not yet"
+  - id: cx:order-payment:race
+    reason: "not yet"
+-- owed-nomodel.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-2e883d
+    reason: "not yet"
+  - id: tc:ORDE-70d94f
+    reason: "not yet"
+  - id: tc:ORDE-8799a1
+    reason: "not yet"
+  - id: tc:ORDE-1ded14
+    reason: "not yet"
+  - id: tc:ORDE-507e4f
+    reason: "not yet"
+  - id: tc:ORDE-e6d28f
+    reason: "not yet"
+  - id: tc:ORDE-2fa2af
+    reason: "not yet"
+  - id: tc:ORDE-ad945c
+    reason: "not yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "not yet"
+  - id: tc:ORDE-267d12
+    reason: "not yet"
+  - id: sc:customer-pays-and-the-order-ships
+    reason: "not yet"
+  - id: inv:terminal-is-final
+    reason: "not yet"
+  - id: fm:payment-provider-down
+    reason: "not yet"
+  - id: fm:ship-by-non-clerk
+    reason: "not yet"
+  - id: act:Order.cancel
+    reason: "not yet"
+  - id: act:Order.ship
+    reason: "not yet"
+  - id: fv:order-ownership
+    reason: "not yet"
+  - id: cx:order-payment:race
+    reason: "not yet"
+-- race.trace.json --
+{
+  "version": 1,
+  "id": "cx:order-payment:race",
+  "spec": "order-payment",
+  "run": "race",
+  "tool": "tla",
+  "violates": "ChargedOnce",
+  "expect": "refuted",
+  "machine": "order",
+  "steps": [
+    {
+      "n": 1,
+      "case": "tc:ORDE-2e883d",
+      "instance": "i1",
+      "caller": "c2",
+      "step": "begin",
+      "state": {
+        "i1": "Pending"
+      }
+    },
+    {
+      "n": 2,
+      "case": "tc:ORDE-2e883d",
+      "instance": "i1",
+      "caller": "c1",
+      "step": "commit",
+      "state": {
+        "i1": "paying"
+      }
+    }
+  ],
+  "loop": 0,
+  "instance": {}
+}
+-- want.md --
+## Model order-ownership (alloy)
+
+### Type
+task
+
+### Priority
+0
+
+### Labels
+machinery, tier:critical
+
+### Description
+Owed ids:
+- fv:order-ownership: Formal model of order-ownership: an order belongs to exactly one customer, whatever the data looks like
+
+machinery:ids fv:order-ownership
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
+
+## Model order-payment (tla)
+
+### Type
+task
+
+### Priority
+0
+
+### Labels
+machinery, tier:critical
+
+### Description
+Owed ids:
+- fv:order-payment: Formal model of order-payment: money moves; a double charge cannot be undone
+
+machinery:ids fv:order-payment
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
+
+## Prove cx:order-payment:race
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Owed ids:
+- cx:order-payment:race: Replay ChargedOnce (order-payment run race)
+
+Needs:
+- Prove order pay: the transitions the replay drives
+
+machinery:ids cx:order-payment:race
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+
+## Prove fm:payment-provider-down
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Owed ids:
+- fm:payment-provider-down: The payment provider does not answer or answers with an error.
+
+Needs:
+- Prove order internal transitions: the invoke path the failure is induced on
+
+machinery:ids fm:payment-provider-down
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+
+## Prove fm:ship-by-non-clerk
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Owed ids:
+- fm:ship-by-non-clerk: A caller who is not a Clerk asks to ship an order.
+
+machinery:ids fm:ship-by-non-clerk
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+
+## Prove inv:terminal-is-final
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Owed ids:
+- inv:terminal-is-final: A shipped or cancelled Order never changes status again.
+
+machinery:ids inv:terminal-is-final
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+
+## Prove order cancel
+
+### Type
+task
+
+### Priority
+0
+
+### Labels
+machinery, tier:critical
+
+### Description
+Owed ids:
+- tc:ORDE-1ded14: Pending on:cancel -> Cancelled (effects: recordCancellation)
+- tc:ORDE-507e4f: Paid on:cancel -> Cancelled (effects: refundPayment, recordCancellation)
+
+Needs:
+- Model order-payment (tla): the formal model the tier requires
+
+machinery:ids tc:ORDE-1ded14 tc:ORDE-507e4f
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
+
+## Prove order internal transitions
+
+### Type
+task
+
+### Priority
+0
+
+### Labels
+machinery, tier:critical
+
+### Description
+Owed ids:
+- tc:ORDE-267d12: paying onError:chargePayment -> Pending (effects: recordPaymentFailure)
+- tc:ORDE-8bd6e7: paying onDone:chargePayment -> Paid (effects: recordCharge)
+- tc:ORDE-ad945c: paying after:payTimeout -> Pending (effects: recordPaymentTimeout)
+
+Needs:
+- Model order-payment (tla): the formal model the tier requires
+
+machinery:ids tc:ORDE-267d12 tc:ORDE-8bd6e7 tc:ORDE-ad945c
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
+
+## Prove order pay
+
+### Type
+task
+
+### Priority
+0
+
+### Labels
+machinery, tier:critical
+
+### Description
+Owed ids:
+- tc:ORDE-2e883d: Pending on:pay [hasPaymentMethod] -> paying (effects: stampAttempt)
+- tc:ORDE-70d94f: Pending on:pay -> (internal) (effects: recordPayRefused)
+- tc:ORDE-8799a1: Paid ignore:pay -> (unchanged) (effects: none)
+
+Needs:
+- Model order-payment (tla): the formal model the tier requires
+
+machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f tc:ORDE-8799a1
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
+
+## Prove order ship
+
+### Type
+task
+
+### Priority
+0
+
+### Labels
+machinery, tier:critical
+
+### Description
+Owed ids:
+- tc:ORDE-2fa2af: Pending ignore:ship -> (unchanged) (effects: none)
+- tc:ORDE-e6d28f: Paid on:ship -> Shipped (effects: recordShipment, notifyCustomer)
+
+Needs:
+- Model order-payment (tla): the formal model the tier requires
+
+machinery:ids tc:ORDE-2fa2af tc:ORDE-e6d28f
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+- machinery story passes for this story.
+
+## Prove sc:customer-pays-and-the-order-ships
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Owed ids:
+- sc:customer-pays-and-the-order-ships: Customer pays and the order ships
+
+machinery:ids sc:customer-pays-and-the-order-ships
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+
+## Serve Order actions
+
+### Type
+task
+
+### Priority
+1
+
+### Labels
+machinery, tier:consequential
+
+### Description
+Owed ids:
+- act:Order.cancel: action cancel of Order
+- act:Order.ship: action ship of Order
+
+machinery:ids act:Order.cancel act:Order.ship
+
+### Acceptance Criteria
+- Each listed action is served by code (stage trace) and removed from owed.yaml.
+- machinery story passes for this story.
