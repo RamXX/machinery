@@ -17,7 +17,7 @@ var (
 		"_entries")
 	stateKeys = setOf("on", "after", "always", "invoke", "entry", "exit", "states", "initial",
 		"type", "id", "meta", "description", "tags", "onDone", "output", "_comment",
-		"_exhaustive", "_ignores", "_refusal")
+		"_exhaustive", "_ignores", "_refusal", "_terminal")
 	invokeKeys = setOf("src", "input", "id", "onDone", "onError", "_comment")
 	stateTypes = setOf("", "atomic", "compound", "final")
 )
@@ -164,14 +164,19 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 					break
 				}
 			}
-			if !exits {
-				if len(trs) == 0 {
-					errs = append(errs, base+": dead-end non-final leaf state "+p)
-				} else {
-					errs = append(errs, base+": absorbing non-final leaf state "+p+" (transitions exist but none leaves the state; add an exiting transition or make it final)")
-				}
+			_, terminal := o.Get("_terminal")
+			switch {
+			case !exits && len(trs) == 0 && terminal:
+				errs = append(errs, base+": dead-end non-final leaf state "+p+" (_terminal is declared, but a terminal state still answers events and this one has no transition)")
+			case !exits && len(trs) == 0:
+				errs = append(errs, base+": dead-end non-final leaf state "+p)
+			case !exits && !terminal:
+				errs = append(errs, base+": absorbing non-final leaf state "+p+" (transitions exist but none leaves the state; add an exiting transition, make it final, or declare _terminal with the reason)")
+			case exits && terminal:
+				errs = append(errs, base+": state "+p+" declares _terminal but a transition leaves it; the claim is stale (drop _terminal, or the exiting transition)")
 			}
 		}
+		errs = append(errs, lintTerminal(base, p, o, isFinal)...)
 		for _, iv := range ir.InvokesOf(node) {
 			if iv == nil || iv.Kind != ir.KindObject {
 				errs = append(errs, fmt.Sprintf("%s: state %s: invoke entries must be objects, got %s", base, p, ir.Repr(iv)))
