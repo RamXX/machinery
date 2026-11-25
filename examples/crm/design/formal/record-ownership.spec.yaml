@@ -6,7 +6,7 @@ questions: [structure]
 model: design/model/crm.modelith.yaml
 properties: crm_props
 sources:
-  read_at: cbd39da3c040be049d9b1fc0ceadb41339d09651
+  read_at: 73c82bda960d5ecde07040e6c50e19fc2112eda5
   paths:
     - "design/model/crm.modelith.yaml"
     - "internal/api/units_deal.go"
