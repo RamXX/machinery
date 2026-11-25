@@ -1,0 +1,94 @@
+# existing violations are listed in the baseline: they warn, and a stale entry is an error
+fixture shop
+cp machinery_baseline.yaml machinery.yaml
+cp orders_double_test.go.in e2e/orders_test.go
+cp calc_test.go.in internal/domain/calc_test.go
+exec mrun 1 tests
+stdout 'ERROR  unit-test: internal/domain/calc_test.go'
+stdout 'ERROR  test-double: e2e/orders_test.go: gomock'
+
+# --write-baseline records the current violations and the stage then passes
+exec mrun 0 tests --write-baseline
+stdout 'tests: wrote 2 baseline entries to design/tests-baseline.yaml'
+stdout 'warn   baselined: test-double: e2e/orders_test.go: gomock'
+stdout 'warn   baselined: unit-test: internal/domain/calc_test.go'
+stdout '^passed$'
+cmp design/tests-baseline.yaml want-baseline.yaml
+exec mrun 0 tests
+stdout '^passed$'
+
+# a new violation is still an error
+cp calc_test.go.in internal/api/more_test.go
+exec mrun 1 tests
+stdout 'ERROR  unit-test: internal/api/more_test.go'
+rm internal/api/more_test.go
+
+# removing a violation makes its entry stale
+rm internal/domain/calc_test.go
+exec mrun 1 tests
+stdout 'ERROR  stale baseline entry: unit-test internal/domain/calc_test.go'
+stdout 'failed: 1 finding\(s\)'
+
+# writing the baseline again shrinks it
+exec mrun 0 tests --write-baseline
+stdout 'tests: wrote 1 baseline entries'
+exec mrun 0 tests
+stdout 'warn   baselined: test-double: e2e/orders_test.go: gomock'
+
+# --write-baseline needs a baseline file in the config
+fixture shop
+cp machinery_nobaseline.yaml machinery.yaml
+exec mrun 2 tests --write-baseline
+stderr 'config: tests.baseline is not set'
+
+-- orders_double_test.go.in --
+package e2e
+
+import "github.com/golang/mock/gomock"
+
+func use() { _ = gomock.NewController }
+-- calc_test.go.in --
+package domain
+
+import "testing"
+
+func TestCalc(t *testing.T) {}
+-- want-baseline.yaml --
+version: 1
+baseline:
+  - {rule: test-double, subject: "e2e/orders_test.go: gomock"}
+  - {rule: unit-test, subject: "internal/domain/calc_test.go"}
+-- machinery_baseline.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+tests:
+  baseline: design/tests-baseline.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery_nobaseline.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

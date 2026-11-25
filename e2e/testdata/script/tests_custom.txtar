@@ -1,0 +1,45 @@
+# tests.files and tests.doubles replace the defaults
+fixture shop
+cp machinery_custom.yaml machinery.yaml
+cp a.check.sh.in e2e/a.check.sh
+cp b_test.go.in e2e/b_test.go
+cp a.check.sh.in internal/x.check.sh
+exec mrun 1 tests
+stdout 'ERROR  test-double: e2e/a.check.sh: fakeit'
+stdout 'ERROR  test-double: e2e/a.check.sh: STUB:'
+stdout 'ERROR  unit-test: internal/x.check.sh'
+# the default patterns and markers no longer apply
+! stdout 'b_test.go'
+! stdout 'gomock'
+stdout 'failed: 3 finding\(s\)'
+stdout 'checked: 2 test files, 3 files under e2e roots, 2 markers'
+
+-- a.check.sh.in --
+#!/bin/sh
+# fakeit is a marker here, STUB: too
+true
+-- b_test.go.in --
+package e2e
+
+import "github.com/golang/mock/gomock"
+
+func use() { _ = gomock.NewController }
+-- machinery_custom.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["e2e/**"]
+  files: ["**/*.check.sh"]
+  doubles: ["fakeit", "STUB:"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

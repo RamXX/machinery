@@ -1,0 +1,49 @@
+# a test double in a file under an e2e root is an error, one per marker
+fixture shop
+cp orders_double_test.go.in e2e/orders_test.go
+exec mrun 1 tests
+stdout 'ERROR  test-double: e2e/orders_test.go: gomock'
+stdout 'ERROR  test-double: e2e/orders_test.go: sinon'
+stdout 'ERROR  test-double: e2e/orders_test.go: MagicMock'
+! stdout 'sqlmock'
+stdout 'failed: 3 finding\(s\)'
+stdout 'checked: 1 test files, 2 files under e2e roots, 12 markers'
+
+# the markers are plain substrings
+cp orders_markers_test.go.in e2e/orders_test.go
+exec mrun 1 tests
+stdout 'ERROR  test-double: e2e/orders_test.go: jest.mock\('
+stdout 'ERROR  test-double: e2e/orders_test.go: Mox\.'
+stdout 'ERROR  test-double: e2e/orders_test.go: nock\('
+stdout 'failed: 3 finding\(s\)'
+
+# a file under the e2e roots that is not a test file is not read
+cp orders_double_test.go.in e2e/helper.sh
+cp orders_ok_test.go.in e2e/orders_test.go
+exec mrun 0 tests
+stdout '^passed$'
+
+-- orders_double_test.go.in --
+package e2e
+
+import (
+	"testing"
+
+	"github.com/golang/mock/gomock"
+)
+
+// sinon and MagicMock are named only to be found
+func TestOrders(t *testing.T) { _ = gomock.NewController }
+-- orders_markers_test.go.in --
+package e2e
+
+import "testing"
+
+// jest.mock( Mox. nock(
+func TestOrders(t *testing.T) {}
+-- orders_ok_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}

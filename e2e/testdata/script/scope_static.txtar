@@ -1,0 +1,95 @@
+# scope bounds the static stages: a file outside it is not looked at, one inside it is
+fixture shop
+cp machinery_scope.yaml machinery.yaml
+
+# in scope the clean fixture passes; only the domain file is read
+exec mrun 0 arch
+stdout 'checked: 1 files, 0 imports, 1 functions'
+exec mrun 0 trace
+stdout 'checked: 1 code files, 1 test files, 4 act ids, 16 obligations'
+exec mrun 1 tests
+stdout 'not demonstrated: nothing to check'
+
+# violations outside the scope are not reported by arch, tests or trace
+cp long.go.in internal/api/long.go
+cp long.go.in internal/other_long.go
+cp api_unit_test.go.in internal/api/unit_test.go
+cp api_tag.go.in internal/api/tag.go
+exec mrun 0 arch
+stdout 'checked: 1 files, 0 imports, 1 functions'
+! stdout 'long.go'
+exec mrun 1 tests
+stdout 'not demonstrated: nothing to check'
+! stdout 'unit_test'
+exec mrun 0 trace
+! stdout 'Bogus'
+stdout 'checked: 1 code files'
+
+# the same violations inside the scope are reported
+cp long.go.in internal/domain/long.go
+cp api_unit_test.go.in internal/domain/unit_test.go
+cp api_tag.go.in internal/domain/tag.go
+exec mrun 1 arch
+stdout 'ERROR  file-size: internal/domain/long.go has 16 lines \(max 12\)'
+exec mrun 1 tests
+stdout 'ERROR  unit-test: internal/domain/unit_test.go'
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: internal/domain/tag.go:2: act:Bogus.thing'
+
+# test roots are read even when outside the scope
+cp e2e_tag.sh.in e2e/tag.sh
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/tag.sh:2: inv:bogus'
+stdout 'checked: 4 code files, 2 test files'
+
+-- long.go.in --
+package x
+// filler 1
+// filler 2
+// filler 3
+// filler 4
+// filler 5
+// filler 6
+// filler 7
+// filler 8
+// filler 9
+// filler 10
+// filler 11
+// filler 12
+// filler 13
+// filler 14
+// filler 15
+-- api_unit_test.go.in --
+package api
+
+import "testing"
+
+func TestX(t *testing.T) {}
+-- api_tag.go.in --
+package api
+// machinery:serves act:Bogus.thing
+-- e2e_tag.sh.in --
+#!/bin/sh
+# machinery:verifies inv:bogus
+-- machinery_scope.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+scope: ["internal/domain/**"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 12
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

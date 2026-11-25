@@ -1,0 +1,37 @@
+# tests passes when every test file is under an e2e root and holds no test double
+fixture shop
+cp orders_test.go.in e2e/orders_test.go
+exec mrun 0 tests
+stdout '== tests =='
+stdout 'checked: 1 test files, 2 files under e2e roots, 12 markers'
+stdout '^passed$'
+stdout 'machinery tests: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# check runs the same stage
+exec mrun 0 check --stage tests
+stdout 'checked: 1 test files, 2 files under e2e roots, 12 markers'
+
+# a test file in another language under the e2e root, with no marker
+cp orders.test.ts.in e2e/orders.test.ts
+cp test_orders.py.in e2e/test_orders.py
+exec mrun 0 tests
+stdout 'checked: 3 test files, 4 files under e2e roots, 12 markers'
+
+exec mrun 2 tests extra
+stderr 'usage: machinery tests takes no arguments'
+
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {
+	t.Log("runs the real binary")
+}
+-- orders.test.ts.in --
+import { test } from "node:test";
+test("orders", () => {});
+-- test_orders.py.in --
+import subprocess
+def test_orders():
+    subprocess.run(["true"], check=True)

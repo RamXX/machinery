@@ -1,0 +1,42 @@
+# a test file outside the e2e roots is a unit test
+fixture shop
+cp orders_test.go.in e2e/orders_test.go
+cp calc_test.go.in internal/domain/calc_test.go
+cp calc.spec.ts.in internal/api/calc.spec.ts
+cp test_calc.py.in internal/test_calc.py
+exec mrun 1 tests
+stdout 'ERROR  unit-test: internal/api/calc.spec.ts'
+stdout 'ERROR  unit-test: internal/domain/calc_test.go'
+stdout 'ERROR  unit-test: internal/test_calc.py'
+! stdout 'unit-test: e2e/'
+stdout 'failed: 3 finding\(s\)'
+stdout 'checked: 4 test files, 2 files under e2e roots, 12 markers'
+
+# a unit test with a double is only a unit test
+cp calc_mock_test.go.in internal/domain/calc_test.go
+exec mrun 1 tests
+! stdout 'test-double'
+
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}
+-- calc_test.go.in --
+package domain
+
+import "testing"
+
+func TestCalc(t *testing.T) {}
+-- calc_mock_test.go.in --
+package domain
+
+import "github.com/golang/mock/gomock"
+
+func use() { _ = gomock.NewController }
+-- calc.spec.ts.in --
+test("calc", () => {});
+-- test_calc.py.in --
+def test_calc():
+    pass

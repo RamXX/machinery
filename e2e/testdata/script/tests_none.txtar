@@ -1,0 +1,71 @@
+# without a tests block and without trace.tests the stage is not applicable
+fixture shop
+cp bare.yaml machinery.yaml
+exec mrun 0 tests
+stdout '== tests =='
+stdout 'not applicable: no tests or trace.tests configured'
+! stdout 'checked:'
+stdout 'machinery tests: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+exec mrun 0 tests --write-baseline
+stdout 'not applicable'
+! exists design/tests-baseline.yaml
+
+# trace.tests is enough to apply it; with e2e roots and no test file there is nothing to check
+cp trace_only.yaml machinery.yaml
+exec mrun 1 tests
+stdout 'checked: 0 test files, 1 files under e2e roots, 12 markers'
+stdout 'not demonstrated: nothing to check'
+stdout 'machinery tests: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+
+# a tests block with no e2e roots makes every test file a unit test
+cp tests_block.yaml machinery.yaml
+cp calc_test.go.in internal/domain/calc_test.go
+exec mrun 1 tests
+stdout 'ERROR  unit-test: internal/domain/calc_test.go'
+
+-- calc_test.go.in --
+package domain
+
+import "testing"
+
+func TestCalc(t *testing.T) {}
+-- bare.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- trace_only.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- tests_block.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+tests: {}
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
