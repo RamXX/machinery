@@ -22,7 +22,8 @@ E2E := env GOMAXPROCS=2 go test ./e2e/... -count=1 -p 1
 # What the receipts say the suite ran against.
 STACK := postgres 17 in docker, crm over http
 BASE ?= HEAD~1
-MAX ?= 6
+# MAX keeps the first MAX probe mutations; empty probes them all.
+MAX ?=
 
 .PHONY: help up down build serve psql check e2e evidence verify probe
 
@@ -67,5 +68,5 @@ evidence: ## Run the e2e suite through machinery run: receipts for this commit (
 verify: ## The end gate: machinery landing (check --base BASE, the whole suite through run, verify)
 	$(MACHINERY) landing --base $(BASE) --stack "$(STACK)" -- $(E2E)
 
-probe: ## Mutate the tables and expect the suite to notice (the first MAX mutations, default 6)
-	$(MACHINERY) probe --max $(MAX) -- $(E2E)
+probe: ## Mutate the tables and expect the suite to notice (every proven transition; MAX=n keeps n)
+	$(MACHINERY) probe $(if $(MAX),--max $(MAX)) -- $(E2E)
