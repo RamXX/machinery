@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/gitx"
@@ -337,4 +338,30 @@ func ProvenAreas(d *design.Design) map[string]bool {
 		return nil
 	}
 	return j.Proven
+}
+
+// Counts returns the runs and detected mutations of the specs that model the
+// area of an fv id, for the proof block.
+func Counts(d *design.Design, fvID string) (runs, detected int) {
+	j, err := Judge(d)
+	if err != nil {
+		return 0, 0
+	}
+	area := strings.TrimPrefix(fvID, "fv:")
+	for _, s := range j.Specs {
+		if !contains(s.Areas, area) {
+			continue
+		}
+		res := j.Results[s.Spec]
+		if res == nil {
+			continue
+		}
+		runs += len(res.Runs)
+		for _, m := range res.Mutations {
+			if m.Outcome == "detected" {
+				detected++
+			}
+		}
+	}
+	return
 }
