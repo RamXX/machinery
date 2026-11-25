@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "spec": "record-ownership",
+  "tool": "alloy",
+  "tool_version": "alloy v6.2.0",
+  "input_sha256": "a4b1129b8e534b2d7bca0dc77af065b3971a9855969fc0339ff116fcb24d3315",
+  "runs": [
+    {
+      "name": "strict",
+      "outcome": "passed",
+      "violated": "",
+      "reach": {
+        "IdleAdminWrites": true,
+        "RepOwnsDeal": true
+      }
+    }
+  ],
+  "mutations": [
+    {
+      "id": "M1",
+      "outcome": "detected"
+    },
+    {
+      "id": "M2",
+      "outcome": "detected"
+    },
+    {
+      "id": "M3",
+      "outcome": "detected"
+    },
+    {
+      "id": "M4",
+      "outcome": "detected"
+    },
+    {
+      "id": "M5",
+      "outcome": "detected"
+    },
+    {
+      "id": "M6",
+      "outcome": "detected"
+    }
+  ]
+}

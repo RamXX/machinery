@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "specs": {
+    "deal-win": {
+      "properties": {
+        "ClosingEnds": "48d4310ff15b60d389bc33430ca0d0fe50fcb63bde0cd3b42cffe84df007265f",
+        "SomeReopened": "8eafa40d9a8cbbf29d634f0e16356ee14152b860c1442f57159fae53ea99ea25",
+        "SomeWon": "f3d6f8c60de09ecd2b5b20cb48ac3df2d8eec956438eb834647437d94813d713",
+        "TypeOK": "99e979963d45a16ac20f059a7ca4dedad8b0c03dd2b1e6cfc4455e736d2b4e5d",
+        "WinAuditedOnce": "481048bc87926232b32da42dc5d2e1164499538ca9ea53db033ff885b9605f98",
+        "WonIsAudited": "7c1eac6dfd83f2d72268780cf1b9a9482bbf131eb6a5650a4ccb6780117ced84",
+        "WonStaysWon": "f91483a393f6f645cbdb71f142b0a25ab1fcb6adfe9597f97690f12ccd67293c"
+      },
+      "fairness": "1136fe1b81644bd71fca4db232247a0e654a4c78a04836e86b8e9ab9c853d246",
+      "runs": {
+        "race": {
+          "expect": "finding",
+          "constants": {
+            "Atomic": false,
+            "Callers": 2,
+            "Instances": 1
+          }
+        },
+        "strict": {
+          "expect": "pass",
+          "constants": {
+            "Atomic": true,
+            "Callers": 2,
+            "Instances": 2
+          }
+        }
+      }
+    },
+    "record-ownership": {
+      "properties": {
+        "DealHasOneOwner": "04357bf083c9a1cf3725c73dafe6daa448b11bf344b3247786c8ff43ad30f655",
+        "IdleAdminWrites": "1bd0eb4bfff5aa1b54a089f9508cc56a2aa55f46fadbdee9bd024ffd26bb300c",
+        "OnlyAdminReopens": "a567f8351b3f7ee39a9b231b0d76049db5ca39c1295101acfc1b724208c23ab8",
+        "OnlyAssigneeOrAdminWritesTask": "d8163a70fd8f87d65d63fb28763f7bb4830ed55975f57ae40bf676be1da5c600",
+        "OnlyOwnerOrAdminWritesDeal": "749afb614464c969f9c8846198fe64420a854a9973703f1fb0ae475e09cbd1b5",
+        "RepOwnsDeal": "0ae8f6df5dd60faed04d5c61968b26b114baa764171f2c90c24571da9bb4eb64",
+        "TaskHasOneAssignee": "dc6146b2f86eeacfabe7ad99d9116deda92f4922963d6e85f2af4384773e2c50",
+        "TaskInOneDeal": "389d487257d64a2c96630e7b20e78ef17b34f83c913266ece1985d97cd7365cb"
+      },
+      "fairness": "",
+      "runs": {
+        "strict": {
+          "expect": "pass",
+          "constants": {
+            "scope": 4
+          }
+        }
+      }
+    }
+  }
+}

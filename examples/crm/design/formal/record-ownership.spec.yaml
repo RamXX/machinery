@@ -1,0 +1,63 @@
+version: 1
+spec: record-ownership
+tool: alloy
+areas: [record-ownership]
+questions: [structure]
+model: design/model/crm.modelith.yaml
+properties: crm_props
+sources:
+  read_at: cbd39da3c040be049d9b1fc0ceadb41339d09651
+  paths:
+    - "design/model/crm.modelith.yaml"
+    - "internal/api/units_deal.go"
+    - "internal/api/units_task.go"
+assumptions:
+  - {id: A1, text: "The service decides a write on a Deal as mayWriteDeal does: canWriteDeal and the clause callerMayWriteDeal hold for the owner and for an Admin only.", status: proven, evidence: "inv:deal-owner-or-admin-writes"}
+  - {id: A2, text: "The service decides a write on a Task as mayWriteTask does: canWriteTask holds for the assignee and for an Admin only.", status: proven, evidence: "inv:task-assignee-or-admin-writes"}
+  - {id: A3, text: "The service decides a reopen as mayReopen does: isAdmin guards the only transition out of Lost.", status: proven, evidence: "inv:deal-reopen-admin-only"}
+runs:
+  - name: strict
+    constants: {scope: 4}
+    invariants: [DealHasOneOwner, TaskInOneDeal, TaskHasOneAssignee, OnlyOwnerOrAdminWritesDeal, OnlyAssigneeOrAdminWritesTask, OnlyAdminReopens]
+    reach: [RepOwnsDeal, IdleAdminWrites]
+    expect: pass
+mutations:
+  - id: M1
+    bug: "A deal can be created without an owner, or with several."
+    from: "owner: one User"
+    to: "owner: set User"
+    detects: DealHasOneOwner
+    run: strict
+  - id: M2
+    bug: "A task can be filed under several deals, or under none."
+    from: "deal: one Deal,\n  assignee: one User\n}\n\nsig AuditEntry {\n  actor: one User\n}\n\nfact { all y: Task | one task.y }"
+    to: "deal: set Deal,\n  assignee: one User\n}\n\nsig AuditEntry {\n  actor: one User\n}"
+    detects: TaskInOneDeal
+    run: strict
+  - id: M3
+    bug: "A task can be left without an assignee."
+    from: "assignee: one User"
+    to: "assignee: lone User"
+    detects: TaskHasOneAssignee
+    run: strict
+  - id: M4
+    bug: "A Rep assigned a task on another Rep's deal may write that deal."
+    file: crm_props.als
+    from: "d.owner = u or u.role = Admin}"
+    to: "d.owner = u or u.role = Admin or some t: d.task | t.assignee = u}"
+    detects: OnlyOwnerOrAdminWritesDeal
+    run: strict
+  - id: M5
+    bug: "The owner of a deal may write the tasks assigned to someone else."
+    file: crm_props.als
+    from: "t.assignee = u or u.role = Admin}"
+    to: "t.assignee = u or u.role = Admin or t.deal.owner = u}"
+    detects: OnlyAssigneeOrAdminWritesTask
+    run: strict
+  - id: M6
+    bug: "The owning Rep may reopen its lost deal."
+    file: crm_props.als
+    from: "u.role = Admin and d.stage = Lost"
+    to: "(u.role = Admin or d.owner = u) and d.stage = Lost"
+    detects: OnlyAdminReopens
+    run: strict

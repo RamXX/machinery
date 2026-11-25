@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "spec": "deal-win",
+  "tool": "tla",
+  "tool_version": "tla2tools v1.7.4",
+  "input_sha256": "80bf065c3301fb1922543ff99ba42385cd736add5c324306f3e04e5b7815f05a",
+  "runs": [
+    {
+      "name": "strict",
+      "outcome": "passed",
+      "violated": "",
+      "reach": {
+        "SomeReopened": true,
+        "SomeWon": true
+      }
+    },
+    {
+      "name": "race",
+      "outcome": "violated",
+      "violated": "WinAuditedOnce",
+      "reach": {},
+      "trace": "traces/deal-win.race.trace.json"
+    }
+  ],
+  "mutations": [
+    {
+      "id": "M1",
+      "outcome": "detected"
+    },
+    {
+      "id": "M2",
+      "outcome": "detected"
+    },
+    {
+      "id": "M3",
+      "outcome": "detected"
+    },
+    {
+      "id": "M4",
+      "outcome": "detected"
+    }
+  ]
+}

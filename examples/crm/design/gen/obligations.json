@@ -2,6 +2,12 @@
   "version": 1,
   "obligations": [
     {
+      "id": "cx:deal-win:race",
+      "kind": "cx",
+      "source": "design/formal/traces/deal-win.race.trace.json",
+      "title": "Replay WinAuditedOnce (deal-win run race)"
+    },
+    {
       "id": "fm:database-unreachable",
       "kind": "fm",
       "source": "design/failure-modes.yaml",

@@ -1,0 +1,59 @@
+version: 1
+spec: deal-win
+tool: tla
+areas: [deal-win]
+questions: [concurrency]
+machine: Deal
+properties: DealProps
+sources:
+  read_at: cbd39da3c040be049d9b1fc0ceadb41339d09651
+  paths:
+    - "design/machines/Deal.machine.json"
+    - "internal/api/deals.go"
+    - "internal/api/fire.go"
+    - "internal/api/units_deal.go"
+    - "internal/fsm/fire.go"
+    - "internal/store/deals.go"
+    - "internal/store/tx.go"
+    - "internal/store/wins.go"
+assumptions:
+  - {id: A1, text: "A transition is applied under a row lock, as one read-check-write: the request loads the deal FOR UPDATE, fires the event on the stored stage and saves the new stage in the same transaction.", status: proven, evidence: "cx:deal-win:race"}
+  - {id: A2, text: "The win write ends: recordWin returns, fails, or the closeTimeout deadline cancels it.", status: proven, evidence: "tc:DEAL-55eecd"}
+runs:
+  - name: strict
+    constants: {Instances: 2, Callers: 2, Atomic: true}
+    spec: BoundedSpec
+    invariants: [TypeOK, WinAuditedOnce, WonIsAudited]
+    properties: [WonStaysWon, ClosingEnds]
+    reach: [SomeWon, SomeReopened]
+    expect: pass
+  - name: race
+    constants: {Instances: 1, Callers: 2, Atomic: false}
+    invariants: [WinAuditedOnce]
+    expect: finding
+    assumption: A1
+mutations:
+  - id: M1
+    bug: "A win on a deal that is already won starts another win write."
+    from: "Do_DEAL_d09c4d(i, c) ==\n    /\\ Atomic\n    /\\ st[i] \\in {\"Qualified\"}"
+    to: "Do_DEAL_d09c4d(i, c) ==\n    /\\ Atomic\n    /\\ st[i] \\in {\"Qualified\", \"Won\"}"
+    detects: WinAuditedOnce
+    run: strict
+  - id: M2
+    bug: "A won deal is recorded without its win audit entry."
+    from: "Bump(@, {\"auditWin\"})"
+    to: "Bump(@, {})"
+    detects: WonIsAudited
+    run: strict
+  - id: M3
+    bug: "An Admin can reopen a won deal."
+    from: "Do_DEAL_fe513e(i, c) ==\n    /\\ Atomic\n    /\\ st[i] \\in {\"Lost\"}"
+    to: "Do_DEAL_fe513e(i, c) ==\n    /\\ Atomic\n    /\\ st[i] \\in {\"Lost\", \"Won\"}"
+    detects: WonStaysWon
+    run: strict
+  - id: M4
+    bug: "Nothing drives a deal out of closing: the win write hangs and no timeout fires."
+    from: "Fairness == \\A i \\in Instances : WF_vars(InternalOf(i))"
+    to: "Fairness == TRUE"
+    detects: ClosingEnds
+    run: strict

@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "id": "cx:deal-win:race",
+  "spec": "deal-win",
+  "run": "race",
+  "tool": "tla",
+  "violates": "WinAuditedOnce",
+  "expect": "refuted",
+  "machine": "deal",
+  "steps": [
+    {
+      "n": 1,
+      "case": "tc:DEAL-4a25db",
+      "instance": "i1",
+      "caller": "c1",
+      "step": "begin",
+      "state": {
+        "i1": "Lead"
+      }
+    },
+    {
+      "n": 2,
+      "case": "tc:DEAL-4a25db",
+      "instance": "i1",
+      "caller": "c1",
+      "step": "commit",
+      "state": {
+        "i1": "Qualified"
+      }
+    },
+    {
+      "n": 3,
+      "case": "tc:DEAL-d09c4d",
+      "instance": "i1",
+      "caller": "c1",
+      "step": "begin",
+      "state": {
+        "i1": "Qualified"
+      }
+    },
+    {
+      "n": 4,
+      "case": "tc:DEAL-d09c4d",
+      "instance": "i1",
+      "caller": "c2",
+      "step": "begin",
+      "state": {
+        "i1": "Qualified"
+      }
+    },
+    {
+      "n": 5,
+      "case": "tc:DEAL-d09c4d",
+      "instance": "i1",
+      "caller": "c1",
+      "step": "commit",
+      "state": {
+        "i1": "closing"
+      }
+    },
+    {
+      "n": 6,
+      "case": "tc:DEAL-701b01",
+      "instance": "i1",
+      "caller": "engine",
+      "step": "do",
+      "state": {
+        "i1": "Won"
+      }
+    },
+    {
+      "n": 7,
+      "case": "tc:DEAL-d09c4d",
+      "instance": "i1",
+      "caller": "c2",
+      "step": "commit",
+      "state": {
+        "i1": "closing"
+      }
+    },
+    {
+      "n": 8,
+      "case": "tc:DEAL-701b01",
+      "instance": "i1",
+      "caller": "engine",
+      "step": "do",
+      "state": {
+        "i1": "Won"
+      }
+    }
+  ],
+  "loop": 0,
+  "instance": {}
+}
