@@ -1,0 +1,84 @@
+# machinery run records a receipts file around one command (section 10)
+fixture shop
+exec machinery gen
+gitinit
+
+# header, receipts and end line; the file is named <UTC timestamp>-<short sha>.jsonl
+exec machinery run --stack 'shell fixture' -- sh e2e/orders.sh
+stderr '^machinery run: \.machinery/receipts/[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl \(exit 0\)$'
+exec sh -c 'ls .machinery/receipts'
+stdout '^[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl$'
+exec sh -c 'ls .machinery/receipts/*-$(git rev-parse --short=7 HEAD).jsonl'
+stdout 'jsonl'
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '^\{"v":1,"type":"run","commit":"[0-9a-f]{40}","dirty":false,"command":\["sh","e2e/orders.sh"\],"stack":"shell fixture","started":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"\}$'
+exec sh -c 'grep -q "\"commit\":\"$(git rev-parse HEAD)\"" .machinery/receipts/*.jsonl && echo header-commit-ok'
+stdout header-commit-ok
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '^\{"v":1,"type":"end","exit":0,"finished":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"\}$'
+exec sh -c 'grep -c "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout '^15$'
+
+# the extra environment; inherited MACHINERY_* values are dropped; the command runs at the project root
+env MACHINERY_ONLY=tc:ORDE-2e883d
+cd internal
+exec machinery run -- sh env.sh
+cd ..
+env MACHINERY_ONLY=
+stdout '^receipts=/.+/\.machinery/receipts/[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl$'
+stdout '^receipts-file-exists$'
+stdout '^commit-ok$'
+stdout '^only=$'
+stdout '^cwd-ok$'
+
+# the exit code of the command passes through and is recorded
+exec mrun 3 run -- sh -c 'exit 3'
+stderr '\(exit 3\)$'
+exec sh -c 'cat .machinery/receipts/*.jsonl'
+stdout '^\{"v":1,"type":"end","exit":3,'
+
+# a command that cannot start records nothing
+exec mrun 127 run -- ./no-such-command
+stderr 'machinery: run: cannot start ./no-such-command'
+exec sh -c 'ls .machinery/receipts | wc -l'
+stdout '^ *3$'
+
+# usage errors
+exec mrun 2 run
+stderr 'usage: machinery run \[--stack <description>\] -- <command>'
+exec mrun 2 run --nosuchflag -- true
+
+# files valid for HEAD are kept: a commit that changes only the owed file keeps them
+cp owed-reordered.yaml design/owed.yaml
+gitcommit 'reorder owed'
+exec machinery run -- sh e2e/orders.sh
+exec sh -c 'ls .machinery/receipts | wc -l'
+stdout '^ *4$'
+
+# a commit that changes anything else makes every earlier file stale: they are deleted,
+# and so is a file that is not a receipts file; other files are left alone
+exec sh -c 'echo junk > .machinery/receipts/junk.jsonl; echo keep > .machinery/receipts/notes.txt'
+exec sh -c 'echo "// changed" >> internal/api/handlers.go'
+gitcommit 'change code'
+exec machinery run -- sh e2e/orders.sh
+exec sh -c 'ls .machinery/receipts'
+stdout '^notes\.txt$'
+exec sh -c 'ls .machinery/receipts/*.jsonl | wc -l'
+stdout '^ *1$'
+exec sh -c 'grep -q "\"commit\":\"$(git rev-parse HEAD)\"" .machinery/receipts/*.jsonl && echo header-commit-ok'
+stdout header-commit-ok
+
+-- env.sh --
+echo "receipts=$MACHINERY_RECEIPTS"
+[ -f "$MACHINERY_RECEIPTS" ] && echo receipts-file-exists
+[ "$MACHINERY_COMMIT" = "$(git rev-parse HEAD)" ] && echo commit-ok
+echo "only=${MACHINERY_ONLY:-}"
+[ "$(pwd -P)" = "$(cd "$(git rev-parse --show-toplevel)" && pwd -P)" ] && echo cwd-ok
+exit 0
+-- owed-reordered.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"

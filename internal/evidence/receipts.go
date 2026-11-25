@@ -1,0 +1,203 @@
+// Package evidence joins the design to receipts from real test runs
+// (docs/formats.md sections 10, 10.1 and 12). Every command that judges
+// evidence (verify, owed sync, proof, status, probe) uses this package.
+package evidence
+
+import (
+	"bufio"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+
+	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/project"
+)
+
+// Outcomes and replay values of a receipt (section 10).
+const (
+	Pass       = "pass"
+	Fail       = "fail"
+	Skip       = "skip"
+	Reproduced = "reproduced"
+	Refuted    = "refuted"
+)
+
+// Receipt is one receipt line.
+type Receipt struct {
+	ID       string
+	Outcome  string
+	Test     string
+	Effects  []string
+	Observed string
+	Replay   string
+	File     string // project-relative receipts file
+}
+
+// RunInfo describes one complete receipts file that was used as evidence.
+type RunInfo struct {
+	File     string // project-relative
+	Commit   string
+	Command  []string
+	Stack    string
+	Exit     int
+	Dirty    bool
+	Receipts int
+}
+
+// line is any line of a receipts file.
+type line struct {
+	V        int      `json:"v"`
+	Type     string   `json:"type"`
+	Commit   string   `json:"commit"`
+	Dirty    bool     `json:"dirty"`
+	Command  []string `json:"command"`
+	Stack    string   `json:"stack"`
+	ID       string   `json:"id"`
+	Outcome  string   `json:"outcome"`
+	Test     string   `json:"test"`
+	Effects  []string `json:"effects"`
+	Observed string   `json:"observed"`
+	Replay   string   `json:"replay"`
+	Exit     *int     `json:"exit"`
+}
+
+// fileData is a parsed receipts file.
+type fileData struct {
+	Rel      string
+	Header   *line // nil: not a receipts file
+	End      *line // nil: incomplete run
+	Receipts []Receipt
+	Problems []string
+}
+
+func parseFile(abs, rel string) (*fileData, error) {
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return nil, err
+	}
+	fd := &fileData{Rel: rel}
+	sc := bufio.NewScanner(bytes.NewReader(data))
+	sc.Buffer(make([]byte, 64*1024), 16*1024*1024)
+	n := 0
+	for sc.Scan() {
+		n++
+		text := strings.TrimSpace(sc.Text())
+		if text == "" {
+			continue
+		}
+		var l line
+		if err := json.Unmarshal([]byte(text), &l); err != nil {
+			if n == 1 {
+				return fd, nil
+			}
+			fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: not a JSON object", n))
+			continue
+		}
+		if n == 1 {
+			if l.Type != "run" || l.V != 1 {
+				return fd, nil
+			}
+			fd.Header = &l
+			continue
+		}
+		if l.V != 1 {
+			fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: v must be 1", n))
+			continue
+		}
+		switch l.Type {
+		case "receipt":
+			if msg := checkReceipt(&l); msg != "" {
+				fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: %s", n, msg))
+				continue
+			}
+			fd.Receipts = append(fd.Receipts, Receipt{ID: l.ID, Outcome: l.Outcome, Test: l.Test,
+				Effects: l.Effects, Observed: l.Observed, Replay: l.Replay, File: rel})
+		case "end":
+			if l.Exit == nil {
+				fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: end line without exit", n))
+				continue
+			}
+			end := l
+			fd.End = &end
+		default:
+			fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: unknown type %q", n, l.Type))
+		}
+	}
+	return fd, sc.Err()
+}
+
+func checkReceipt(l *line) string {
+	switch {
+	case l.ID == "":
+		return "receipt without id"
+	case l.Outcome != Pass && l.Outcome != Fail && l.Outcome != Skip:
+		return fmt.Sprintf("%s: outcome must be pass, fail or skip, got %q", l.ID, l.Outcome)
+	case l.Replay != "" && l.Replay != Reproduced && l.Replay != Refuted:
+		return fmt.Sprintf("%s: replay must be reproduced or refuted, got %q", l.ID, l.Replay)
+	}
+	return ""
+}
+
+// Dir returns the project-relative receipts directory without a trailing slash.
+func Dir(p *project.Project) string { return strings.TrimSuffix(p.Cfg.Receipts.Dir, "/") }
+
+// receiptFiles lists the *.jsonl files of the receipts directory, sorted by name.
+func receiptFiles(p *project.Project) ([]string, error) {
+	entries, err := os.ReadDir(p.Abs(Dir(p)))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, e := range entries {
+		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".jsonl") {
+			res = append(res, Dir(p)+"/"+e.Name())
+		}
+	}
+	sort.Strings(res)
+	return res, nil
+}
+
+// TreeDirty reports whether the working tree has changes outside the receipts
+// directory and the owed file (section 10).
+func TreeDirty(p *project.Project) (bool, error) {
+	return gitx.Dirty(p.Root, Dir(p)+"/", p.Cfg.Design.Owed)
+}
+
+// validity decides, per commit, whether evidence from that commit is valid for
+// the head (section 10.1).
+type validity struct {
+	p     *project.Project
+	head  string
+	cache map[string]bool
+}
+
+func newValidity(p *project.Project, head string) *validity {
+	return &validity{p: p, head: head, cache: map[string]bool{head: true}}
+}
+
+func (v *validity) valid(commit string) bool {
+	if ok, seen := v.cache[commit]; seen {
+		return ok
+	}
+	ok := false
+	if commit != "" && gitx.Exists(v.p.Root, commit) {
+		names, err := gitx.DiffNames(v.p.Root, commit, v.head)
+		if err == nil {
+			ok = true
+			for _, n := range names {
+				if n != v.p.Cfg.Design.Owed {
+					ok = false
+					break
+				}
+			}
+		}
+	}
+	v.cache[commit] = ok
+	return ok
+}
