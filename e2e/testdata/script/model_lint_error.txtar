@@ -1,0 +1,60 @@
+# a real Modelith error and warning surface with the model path prefix
+fixture shop
+cp broken.modelith.yaml design/model/shop.modelith.yaml
+exec mrun 1 lint --stage model
+stdout 'ERROR  design/model/shop.modelith.yaml: /entities/Order/relationships/0/entity: relationship targets undefined entity "Ghost"'
+stdout 'warn   design/model/shop.modelith.yaml: /enums/Spare: enum "Spare" is defined but no attribute uses it'
+stdout 'failed: 2 finding\(s\)'
+stdout 'machinery lint: 0 passed, 1 failed, 0 not demonstrated, 0 not applicable'
+
+# a warning alone does not block
+cp warn-only.modelith.yaml design/model/shop.modelith.yaml
+exec machinery gen
+exec machinery lint --stage model
+stdout 'warn   design/model/shop.modelith.yaml: /enums/Spare: enum "Spare" is defined but no attribute uses it'
+stdout '^passed$'
+
+# a model that is not YAML is an ERROR naming the file
+exec sh -c 'echo "not: [valid" > design/model/shop.modelith.yaml'
+exec mrun 1 lint --stage model
+stdout 'ERROR  design/model/shop.modelith.yaml'
+
+# a configured model that does not exist
+rm design/model/shop.modelith.yaml
+exec mrun 1 lint --stage model
+stdout 'ERROR  design/model/shop.modelith.yaml: cannot read'
+
+-- broken.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Broken
+description: A model with one error and one warning.
+
+enums:
+  Spare:
+    values:
+      - {name: A, definition: "Never used."}
+
+entities:
+  Order:
+    definition: A request to buy goods.
+    attributes:
+      - {name: total, type: integer}
+    relationships:
+      - {entity: Ghost, cardinality: "n:1", ownership: referenced}
+-- warn-only.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Warn only
+description: A model with one warning.
+
+enums:
+  Spare:
+    values:
+      - {name: A, definition: "Never used."}
+
+entities:
+  Order:
+    definition: A request to buy goods.
+    attributes:
+      - {name: total, type: integer}

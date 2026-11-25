@@ -1,0 +1,38 @@
+# an id declared twice is an ERROR, whether or not Modelith notices
+fixture shop
+cp duplicates.modelith.yaml design/model/shop.modelith.yaml
+exec mrun 1 lint --stage model
+stdout 'ERROR  duplicate id act:Order.cancel'
+stdout 'ERROR  duplicate id sc:customer-pays-and-the-order-ships'
+! stdout 'duplicate id inv:'
+stdout 'failed: '
+
+-- duplicates.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Duplicates
+description: Two actions and two scenarios share an id.
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Placed."}
+
+entities:
+  Order:
+    definition: A request to buy goods.
+    attributes:
+      - {name: status, type: OrderStatus}
+    actions:
+      - {name: cancel, actor: Customer}
+      - {name: cancel, actor: Customer}
+
+scenarios:
+  - name: Customer pays and the order ships
+    actors: [Customer]
+    steps: ["Customer pays."]
+    invariants_touched: []
+  - name: Customer pays, and the order ships!
+    actors: [Customer]
+    steps: ["Customer pays again."]
+    invariants_touched: []

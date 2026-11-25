@@ -1,0 +1,32 @@
+# no machines directory, or no models: the stage does not apply
+fixture shop
+cp no-machines.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout 'not applicable: no design.machines configured'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+cp no-models.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout 'not applicable: no design.models configured'
+
+# a machines directory without machine files has nothing to check
+mkdir design/empty
+cp empty-dir.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'not demonstrated: nothing to check'
+
+-- no-machines.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+-- no-models.yaml --
+version: 2
+design:
+  machines: design/machines
+-- empty-dir.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/empty

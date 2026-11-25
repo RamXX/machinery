@@ -1,0 +1,101 @@
+# machinery lint on the shop, with a risk file, a dependency and the abuse case they call for
+fixture shop
+cp machinery-full.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+cp failure-modes.yaml design/failure-modes.yaml
+exec machinery gen
+exec sh -c 'machinery lint; true'
+
+# every stage prints its block, in the order of section 3.1
+stdout '(?s)== model ==.*== failure-modes ==.*== risk ==.*== xref-model-machine ==.*== xref-contract ==.*== xref-failure =='
+
+# the stages of the cross-reference tier and their inputs
+stdout '(?s)== model ==\nchecked: 1 models, 2 entities, 4 actions, 3 invariants, 2 scenarios\npassed\n'
+stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 2 abuse cases\npassed\n'
+stdout '(?s)== risk ==\nchecked: 2 areas, 2 consequential ids, 11 critical ids\npassed\n'
+stdout '(?s)== xref-model-machine ==\nchecked: 1 machines, 4 domain states, 3 events, 4 actions\n  warn   waived: action-event: act:Order.place[^\n]*\npassed\n'
+stdout '(?s)== xref-contract ==\nchecked: 1 contracts, 5 operations, 4 bound operations, 4 actions\npassed\n'
+stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 1 invokes, 1 dependencies, 2 tiered actions\npassed\n'
+
+# --stage runs only what is named, in the usual order
+exec machinery lint --stage xref-failure --stage risk
+stdout '(?s)== risk ==.*== xref-failure =='
+! stdout '== model =='
+stdout 'machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# dropping the abuse case for the consequential action fails the cross-reference tier only
+cp failure-modes-no-abuse.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  tiered-action-abuse: act:Order.ship: consequential action \(area shipping-permission\) has no failure mode of kind abuse'
+
+-- machinery-full.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+dependencies:
+  - {name: postgres, posture: real}
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["act:Order.pay", "tc:ORDE-*"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "inv:paid-before-shipped"]
+-- failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "The database does not answer."
+    required: fail-closed
+    behavior: "No order changes and the caller sees UNAVAILABLE."
+  - id: pay-by-stranger
+    kind: abuse
+    subject: act:Order.pay
+    failure: "A caller who does not own the order pays it."
+    required: refuse
+    behavior: "The request is refused with FORBIDDEN and the order does not change."
+  - id: ship-by-non-clerk
+    kind: abuse
+    subject: act:Order.ship
+    failure: "A caller who is not a Clerk asks to ship an order."
+    required: refuse
+    behavior: "The request is refused with FORBIDDEN and the order does not change."
+-- failure-modes-no-abuse.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "The database does not answer."
+    required: fail-closed
+    behavior: "No order changes and the caller sees UNAVAILABLE."
+  - id: pay-by-stranger
+    kind: abuse
+    subject: act:Order.pay
+    failure: "A caller who does not own the order pays it."
+    required: refuse
+    behavior: "The request is refused with FORBIDDEN and the order does not change."

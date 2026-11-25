@@ -1,0 +1,50 @@
+# a pattern that matches no act, inv, sc, tc or fm id is an ERROR
+fixture shop
+cp machinery-risk.yaml machinery.yaml
+cp unknown.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: act:Order.nope matches no act, inv, sc, tc or fm id'
+stdout 'ERROR  design/risk.yaml: area-one: tc:NOPE-\* matches no act, inv, sc, tc or fm id'
+stdout 'failed: '
+
+# an fv id is not a tierable id
+cp fv-pattern.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: fv:\* matches no act, inv, sc, tc or fm id'
+stdout 'failed: '
+
+# a pattern with a prefix matches by prefix
+cp prefix.yaml design/risk.yaml
+exec machinery lint --stage risk
+stdout 'checked: 1 areas, 4 consequential ids, 0 critical ids'
+stdout '^passed$'
+
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+-- unknown.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.ship", "act:Order.nope", "tc:NOPE-*"]
+-- fv-pattern.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["fv:*"]
+-- prefix.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.*"]

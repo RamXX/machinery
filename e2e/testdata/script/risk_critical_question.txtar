@@ -1,0 +1,50 @@
+# a critical area needs a question; only a critical area may have one
+fixture shop
+cp machinery-risk.yaml machinery.yaml
+cp critical-none.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: a critical area lists at least one question'
+stdout 'failed: '
+
+cp consequential-questions.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: only a critical area lists questions'
+stdout 'failed: '
+
+# every question is accepted on a critical area
+cp critical-all.yaml design/risk.yaml
+exec machinery lint --stage risk
+stdout 'checked: 1 areas, 0 consequential ids, 1 critical ids'
+stdout '^passed$'
+
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+-- critical-none.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: critical
+    why: "a reason"
+    ids: ["act:Order.ship"]
+-- consequential-questions.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.ship"]
+    questions: [ordering]
+-- critical-all.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: critical
+    why: "a reason"
+    ids: ["act:Order.ship"]
+    questions: [ordering, concurrency, recovery, structure]

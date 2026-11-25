@@ -1,0 +1,134 @@
+# rule machine-binding: a machine is a lifecycle machine of a model entity, or operational
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout '^passed$'
+
+# a machine named after no entity and not operational
+cp stray.json design/machines/Stray.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  machine-binding: stray: not a lifecycle machine of a model entity and not operational; set _lifecycle_of, name the file after an entity, or set _role: operational'
+stdout 'failed: 1 finding\(s\)'
+rm design/machines/Stray.machine.json
+
+# _lifecycle_of naming an entity that is not in the model
+cp ghost.json design/machines/Other.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  machine-binding: other: _lifecycle_of names entity Ghost, which is not in the model'
+rm design/machines/Other.machine.json
+
+# an operational machine needs no entity
+cp ops.json design/machines/Ops.machine.json
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 2 machines, 3 domain states, 2 events, 2 actions'
+stdout '^passed$'
+
+# both at once
+cp both.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  machine-binding: ops: _lifecycle_of and _role: operational are both set; a machine is one or the other'
+
+# _lifecycle_of binds a machine whose file name is not the entity name
+rm design/machines/Ops.machine.json
+cp alt.json design/machines/Alt.machine.json
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 2 machines, 6 domain states, 4 events, 4 actions'
+stdout '^passed$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- stray.json --
+{ "id": "stray", "initial": "A", "states": { "A": { "type": "final" } } }
+-- ghost.json --
+{ "id": "other", "_lifecycle_of": "Ghost", "initial": "A", "states": { "A": { "type": "final" } } }
+-- ops.json --
+{ "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- both.json --
+{ "id": "ops", "_role": "operational", "_lifecycle_of": "Order", "initial": "idle", "states": { "idle": { "type": "final" } } }
+
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- stray.json --
+{ "id": "stray", "initial": "A", "states": { "A": { "type": "final" } } }
+-- ghost.json --
+{ "id": "other", "_lifecycle_of": "Ghost", "initial": "A", "states": { "A": { "type": "final" } } }
+-- ops.json --
+{ "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- both.json --
+{ "id": "ops", "_role": "operational", "_lifecycle_of": "Order", "initial": "idle", "states": { "idle": { "type": "final" } } }
+-- lifecycle-of.json --
+{ "id": "ops", "_lifecycle_of": "Order", "initial": "idle", "states": { "idle": { "type": "final" } } }
+-- alt.json --
+{
+  "id": "alt", "_lifecycle_of": "Order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}

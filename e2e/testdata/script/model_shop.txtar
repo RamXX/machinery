@@ -1,0 +1,12 @@
+# the shop model lints clean once its rendering is generated
+fixture shop
+exec machinery gen
+exec machinery lint --stage model
+stdout '== model =='
+stdout 'checked: 1 models, 2 entities, 4 actions, 3 invariants, 2 scenarios'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# the committed rendering has no em dash (section 5.1)
+exists design/model/shop.modelith.md
+! grep '\x{2014}' design/model/shop.modelith.md

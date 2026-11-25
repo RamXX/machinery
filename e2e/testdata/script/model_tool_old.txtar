@@ -1,0 +1,14 @@
+# a modelith older than 0.6.0 is not demonstrated
+fixture shop
+cp base.yaml machinery.yaml
+exec sh -c 'echo "  modelith: $MACHINERY_TOOLS/old/modelith" >> machinery.yaml'
+exec mrun 1 lint --stage model
+stdout 'not demonstrated: modelith 0.5.0 is older than 0.6.0 \(go install github.com/stacklok/modelith/cmd/modelith@v0.6.0\)'
+stdout 'machinery lint: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+tools:

@@ -1,0 +1,21 @@
+# the shop machine is the lifecycle its model promises; the waiver for creation prints as a warning
+fixture shop
+exec machinery lint --stage xref-model-machine
+stdout '== xref-model-machine =='
+stdout 'checked: 1 machines, 4 domain states, 3 events, 4 actions'
+stdout 'warn   waived: action-event: act:Order.place: no on event place in machine order \(design/machines/Order.machine.json\) \(creation enters the initial state Pending\)'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# without the waiver the creation action is an ERROR
+cp no-waiver.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  action-event: act:Order.place: no on event place in machine order'
+stdout 'failed: 1 finding\(s\)'
+
+-- no-waiver.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines

@@ -1,0 +1,129 @@
+# the shape rules of section 22
+fixture shop
+cp machinery-risk.yaml machinery.yaml
+cp no-why.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: why is required'
+stdout 'failed: '
+
+cp blank-why.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: why is required'
+stdout 'failed: '
+
+cp no-ids.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: ids needs at least one id pattern'
+stdout 'failed: '
+
+cp bad-tier.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: tier must be consequential or critical, got "routine" \(an id in no area is routine\)'
+stdout 'failed: '
+
+cp bad-name.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: Area_One: name must match \^\[a-z\]\[a-z0-9-\]\+\$'
+stdout 'failed: '
+
+cp dup-name.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: duplicate name'
+stdout 'failed: '
+
+cp bad-question.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: area-one: unknown question "speed" \(ordering, concurrency, recovery, structure\)'
+stdout 'failed: '
+
+cp bad-version.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: version must be 1'
+stdout 'failed: '
+
+cp unknown-key.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: .*field owner not found'
+stdout 'failed: '
+
+
+rm design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'ERROR  design/risk.yaml: cannot read'
+
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+-- no-why.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    ids: ["act:Order.ship"]
+-- blank-why.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "  "
+    ids: ["act:Order.ship"]
+-- no-ids.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: []
+-- bad-tier.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: routine
+    why: "a reason"
+    ids: ["act:Order.ship"]
+-- bad-name.yaml --
+version: 1
+areas:
+  - name: Area_One
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.ship"]
+-- dup-name.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.ship"]
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.pay"]
+-- bad-question.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: critical
+    why: "a reason"
+    ids: ["act:Order.ship"]
+    questions: [speed]
+-- bad-version.yaml --
+version: 2
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.ship"]
+-- unknown-key.yaml --
+version: 1
+areas:
+  - name: area-one
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.ship"]
+    owner: me

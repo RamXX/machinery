@@ -1,0 +1,135 @@
+# rule subject-resolves: a subject names an existing invoke, dependency, action or entity
+cp good.yaml design/failure-modes.yaml
+exec machinery lint --stage xref-failure
+stdout 'checked: 4 failure modes, 1 invokes, 1 dependencies, 0 tiered actions'
+stdout '^passed$'
+
+cp unresolved.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  subject-resolves: invoke:ghost.chargePayment: failure mode a-ghost-machine: no machine has the id ghost'
+stdout 'ERROR  subject-resolves: invoke:order.refund: failure mode b-no-invoke: machine order has no invoke with that src'
+stdout 'ERROR  subject-resolves: dependency:redis: failure mode c-no-dependency: redis is not a configured dependency'
+stdout 'ERROR  subject-resolves: act:Order.ship: failure mode d-no-action: Order.ship is not an action of the model'
+stdout 'ERROR  subject-resolves: entity:Invoice: failure mode e-no-entity: Invoice is not an entity of the model'
+stdout 'failed: 5 finding\(s\)'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+dependencies:
+  - {name: postgres, posture: real}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "paying" }, "cancel": { "target": "Cancelled" } } },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid" },
+        "onError": { "target": "Pending" }
+      }
+    },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- good.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: pay-abuse
+    kind: abuse
+    subject: act:Order.pay
+    failure: "It fails."
+    required: refuse
+    behavior: "The caller is told."
+  - id: order-abuse
+    kind: abuse
+    subject: entity:Order
+    failure: "It fails."
+    required: refuse
+    behavior: "The caller is told."
+-- unresolved.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: a-ghost-machine
+    subject: invoke:ghost.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: b-no-invoke
+    subject: invoke:order.refund
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: c-no-dependency
+    subject: dependency:redis
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: d-no-action
+    subject: act:Order.ship
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: e-no-entity
+    subject: entity:Invoice
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."

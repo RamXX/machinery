@@ -1,0 +1,157 @@
+# rule tiered-action-abuse: every action of a consequential or critical area has an abuse case
+exec machinery lint --stage xref-failure
+stdout 'checked: 3 failure modes, 1 invokes, 1 dependencies, 1 tiered actions'
+stdout '^passed$'
+
+# no abuse case for the consequential action
+cp no-abuse.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  tiered-action-abuse: act:Order.pay: consequential action \(area payment-permission\) has no failure mode of kind abuse; add one with subject act:Order.pay'
+stdout 'failed: 1 finding\(s\)'
+
+# a fault on the action is not an abuse case, and neither is an abuse case on the entity
+cp fault-only.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  tiered-action-abuse: act:Order.pay: consequential action'
+
+# critical actions need one too; an action in two areas names both and takes the higher tier
+cp two-areas.yaml design/risk.yaml
+cp no-abuse.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  tiered-action-abuse: act:Order.pay: critical action \(area order-payment, payment-permission\) has no failure mode of kind abuse'
+! stdout 'act:Order.cancel'
+stdout 'checked: 2 failure modes, 1 invokes, 1 dependencies, 1 tiered actions'
+
+# a routine action needs none: ids that are not actions do not count
+cp inv-only.yaml design/risk.yaml
+exec machinery lint --stage xref-failure
+stdout 'checked: 2 failure modes, 1 invokes, 1 dependencies, 0 tiered actions'
+stdout '^passed$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+dependencies:
+  - {name: postgres, posture: real}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "paying" }, "cancel": { "target": "Cancelled" } } },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid" },
+        "onError": { "target": "Pending" }
+      }
+    },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- design/risk.yaml --
+version: 1
+areas:
+  - name: payment-permission
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.pay"]
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: pay-abuse
+    kind: abuse
+    subject: act:Order.pay
+    failure: "It fails."
+    required: refuse
+    behavior: "The caller is told."
+-- no-abuse.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+-- fault-only.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: pay-fault
+    subject: act:Order.pay
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: order-abuse
+    kind: abuse
+    subject: entity:Order
+    failure: "It fails."
+    required: refuse
+    behavior: "The caller is told."
+-- two-areas.yaml --
+version: 1
+areas:
+  - name: payment-permission
+    tier: consequential
+    why: "a reason"
+    ids: ["act:Order.pay"]
+  - name: order-payment
+    tier: critical
+    why: "a reason"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+-- inv-only.yaml --
+version: 1
+areas:
+  - name: some-tcs
+    tier: consequential
+    why: "a reason"
+    ids: ["tc:ORDE-*"]

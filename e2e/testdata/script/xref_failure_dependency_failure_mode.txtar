@@ -1,0 +1,106 @@
+# rule dependency-failure-mode: every configured dependency is the subject of a failure mode
+exec machinery lint --stage xref-failure
+stdout 'checked: 2 failure modes, 1 invokes, 1 dependencies, 0 tiered actions'
+stdout '^passed$'
+
+cp charge-only.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  dependency-failure-mode: dependency:postgres: no failure mode names this dependency; declare what happens when it fails in design/failure-modes.yaml'
+stdout 'failed: 1 finding\(s\)'
+
+# every dependency counts
+cp two-deps.yaml machinery.yaml
+cp charge-db.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  dependency-failure-mode: dependency:stripe: no failure mode names this dependency'
+! stdout 'dependency:postgres'
+stdout 'checked: 2 failure modes, 1 invokes, 2 dependencies, 0 tiered actions'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+dependencies:
+  - {name: postgres, posture: real}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "paying" }, "cancel": { "target": "Cancelled" } } },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid" },
+        "onError": { "target": "Pending" }
+      }
+    },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+-- charge-only.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+-- charge-db.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+-- two-deps.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+dependencies:
+  - {name: postgres, posture: real}
+  - {name: stripe, posture: sandbox}

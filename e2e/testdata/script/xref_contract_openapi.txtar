@@ -1,0 +1,221 @@
+# OpenAPI: every operation has an id, every binding names a model action, every action is bound
+exec machinery lint --stage xref-contract
+stdout '== xref-contract =='
+stdout 'checked: 1 contracts, 3 operations, 2 bound operations, 2 actions'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# a binding may be a list; reads and queries stay unbound
+cp list.yaml contracts/openapi.yaml
+exec machinery lint --stage xref-contract
+stdout 'checked: 1 contracts, 2 operations, 1 bound operations, 2 actions'
+stdout '^passed$'
+
+# JSON works as well
+cp openapi.json contracts/openapi.yaml
+exec machinery lint --stage xref-contract
+stdout 'checked: 1 contracts, 2 operations, 2 bound operations, 2 actions'
+stdout '^passed$'
+
+# rule operation-id
+cp no-id.yaml contracts/openapi.yaml
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  operation-id: GET /orders/\{id\}: contracts/openapi.yaml has no operation name \(operation\); give the operation an operationId or the rpc a name'
+stdout 'failed: 1 finding\(s\)'
+
+# rule operation-action
+cp unknown-action.yaml contracts/openapi.yaml
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  operation-action: act:Order.refund: operation POST /orders/\{id\}/refund in contracts/openapi.yaml names an action that is not in the model'
+stdout 'ERROR  operation-action: act:cancel: operation POST /orders/\{id\}/cancel in contracts/openapi.yaml names an action that is not in the model'
+
+# rule action-operation
+cp unbound.yaml contracts/openapi.yaml
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  action-operation: act:Order.cancel: no operation names this action; bind one with x-machinery-action'
+stdout 'checked: 1 contracts, 3 operations, 1 bound operations, 2 actions'
+
+# a binding that is not a string or a list of strings
+cp bad-binding.yaml contracts/openapi.yaml
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  contracts/openapi.yaml: POST /orders/\{id\}/pay: x-machinery-action must be a string or a list of strings'
+
+# not an OpenAPI 3.x document, not YAML, not there
+cp swagger.yaml contracts/openapi.yaml
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  contracts/openapi.yaml: not an OpenAPI 3.x document'
+exec sh -c 'echo "paths: [" > contracts/openapi.yaml'
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  contracts/openapi.yaml: not valid YAML or JSON'
+rm contracts/openapi.yaml
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  contracts/openapi.yaml: cannot read'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- contracts/openapi.yaml --
+openapi: 3.1.0
+info: {title: Mini API, version: 0.1.0}
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses: {"200": {description: ok}}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses: {"200": {description: ok}}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses: {"200": {description: ok}}
+-- list.yaml --
+openapi: 3.1.0
+info: {title: Mini API, version: 0.1.0}
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses: {"200": {description: ok}}
+  /orders/{id}/close:
+    post:
+      operationId: closeOrder
+      x-machinery-action: [Order.pay, Order.cancel]
+      responses: {"200": {description: ok}}
+-- openapi.json --
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Mini",
+    "version": "1"
+  },
+  "paths": {
+    "/orders/{id}/pay": {
+      "post": {
+        "operationId": "payOrder",
+        "x-machinery-action": "Order.pay",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    },
+    "/orders/{id}/cancel": {
+      "delete": {
+        "operationId": "cancelOrder",
+        "x-machinery-action": "Order.cancel",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  }
+}
+-- no-id.yaml --
+openapi: 3.1.0
+info: {title: Mini API, version: 0.1.0}
+paths:
+  /orders/{id}:
+    get:
+      responses: {"200": {description: ok}}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses: {"200": {description: ok}}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses: {"200": {description: ok}}
+-- unknown-action.yaml --
+openapi: 3.1.0
+info: {title: Mini API, version: 0.1.0}
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses: {"200": {description: ok}}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses: {"200": {description: ok}}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: cancel
+      responses: {"200": {description: ok}}
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      x-machinery-action: Order.refund
+      responses: {"200": {description: ok}}
+-- unbound.yaml --
+openapi: 3.1.0
+info: {title: Mini API, version: 0.1.0}
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses: {"200": {description: ok}}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses: {"200": {description: ok}}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      responses: {"200": {description: ok}}
+-- bad-binding.yaml --
+openapi: 3.1.0
+info: {title: Mini API, version: 0.1.0}
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses: {"200": {description: ok}}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: {action: Order.pay}
+      responses: {"200": {description: ok}}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses: {"200": {description: ok}}
+-- swagger.yaml --
+swagger: "2.0"
+info: {title: Old, version: "1"}
+paths: {}

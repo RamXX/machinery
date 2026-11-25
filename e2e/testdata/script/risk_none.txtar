@@ -1,0 +1,23 @@
+# no risk file configured: the stage does not apply
+fixture shop
+exec machinery lint --stage risk
+stdout 'not applicable: no design.risk configured'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+# a configured file with no areas has nothing to check
+cp machinery-risk.yaml machinery.yaml
+cp empty.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout 'not demonstrated: nothing to check'
+
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+-- empty.yaml --
+version: 1
+areas: []

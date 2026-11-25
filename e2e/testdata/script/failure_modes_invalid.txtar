@@ -1,0 +1,185 @@
+# every validation error of section 5.4
+fixture shop
+
+# bad-id
+cp bad-id.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: Bad_ID: id must match \^\[a-z\]\[a-z0-9-\]\+\$'
+stdout 'failed: '
+
+# dup-id
+cp dup-id.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: same: duplicate id'
+stdout 'failed: '
+
+# bad-kind
+cp bad-kind.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: k: kind must be fault or abuse, got "attack"'
+stdout 'failed: '
+
+# bad-subject
+cp bad-subject.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: s: subject "order.pay" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action> or entity:<Name>'
+stdout 'failed: '
+
+# bad-required
+cp bad-required.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: r: required must be fail-closed, retry-bounded, surface or refuse, got "ignore"'
+stdout 'failed: '
+
+# refuse-fault
+cp refuse-fault.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: f: required: refuse is only valid with kind: abuse'
+stdout 'failed: '
+
+# abuse-subject
+cp abuse-subject.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: a: kind: abuse needs an act or entity subject'
+stdout 'failed: '
+
+# no-failure
+cp no-failure.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: n: failure is required'
+stdout 'failed: '
+
+# no-behavior
+cp no-behavior.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: n: behavior is required'
+stdout 'failed: '
+
+# no-id
+cp no-id.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: failure mode 1: id must match'
+stdout 'failed: '
+
+# unknown-key
+cp unknown-key.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: .*field severity not found'
+stdout 'failed: '
+
+# a wrong version
+cp bad-version.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'design/failure-modes.yaml: version must be 1'
+
+# a file that is not YAML
+exec sh -c 'echo "version: [1" > design/failure-modes.yaml'
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/failure-modes.yaml: '
+
+# a configured file that is missing
+rm design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/failure-modes.yaml: cannot read'
+
+-- bad-id.yaml --
+version: 1
+failure_modes:
+  - id: Bad_ID
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- dup-id.yaml --
+version: 1
+failure_modes:
+  - id: same
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+  - id: same
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- bad-kind.yaml --
+version: 1
+failure_modes:
+  - id: k
+    kind: attack
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- bad-subject.yaml --
+version: 1
+failure_modes:
+  - id: s
+    subject: order.pay
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- bad-required.yaml --
+version: 1
+failure_modes:
+  - id: r
+    subject: dependency:db
+    failure: "x"
+    required: ignore
+    behavior: "y"
+-- refuse-fault.yaml --
+version: 1
+failure_modes:
+  - id: f
+    subject: act:Order.ship
+    failure: "x"
+    required: refuse
+    behavior: "y"
+-- abuse-subject.yaml --
+version: 1
+failure_modes:
+  - id: a
+    kind: abuse
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- no-failure.yaml --
+version: 1
+failure_modes:
+  - id: n
+    subject: dependency:db
+    required: surface
+    behavior: "y"
+-- no-behavior.yaml --
+version: 1
+failure_modes:
+  - id: n
+    subject: dependency:db
+    failure: "x"
+    required: surface
+-- no-id.yaml --
+version: 1
+failure_modes:
+  - subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- unknown-key.yaml --
+version: 1
+failure_modes:
+  - id: u
+    severity: high
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- bad-version.yaml --
+version: 2
+failure_modes:
+  - id: ok-one
+    subject: dependency:db
+    failure: "x"
+    required: surface
+    behavior: "y"

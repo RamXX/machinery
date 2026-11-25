@@ -1,0 +1,183 @@
+# section 6.7: a waiver turns a finding into a warning that carries the reason; a waiver that matches nothing is an ERROR
+fixture shop
+
+# the shop waives the creation action
+exec machinery lint --stage xref-model-machine
+stdout 'warn   waived: action-event: act:Order.place: no on event place in machine order \(design/machines/Order.machine.json\) \(creation enters the initial state Pending\)'
+stdout '^passed$'
+
+# the same finding without a waiver
+cp none.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  action-event: act:Order.place'
+! stdout 'waived'
+
+# a waiver for another subject does not hide it, and is itself stale
+cp other-subject.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  action-event: act:Order.place'
+stdout 'ERROR  stale waiver: action-event act:Order.pay'
+stdout 'failed: 2 finding\(s\)'
+
+# a waiver that matches no finding is stale
+cp stale.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'warn   waived: action-event: act:Order.place'
+stdout 'ERROR  stale waiver: event-action order.refund'
+stdout 'failed: 1 finding\(s\)'
+
+# a stale waiver is reported by the stage that owns its rule, only when that stage runs
+cp stale-failure.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine --stage xref-contract
+! stdout 'stale waiver'
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  stale waiver: tiered-action-abuse act:Order.ship'
+cp stale-all.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine --stage xref-contract --stage xref-failure
+stdout 'ERROR  stale waiver: tiered-action-abuse act:Order.ship'
+stdout 'ERROR  stale waiver: operation-id GET /orders/\{id\}'
+stdout 'machinery lint: 1 passed, 2 failed, 0 not demonstrated, 0 not applicable'
+
+# every cross-reference stage honors its waivers
+cp waived-failure.yaml machinery.yaml
+cp no-fm.yaml design/failure-modes.yaml
+exec machinery lint --stage xref-failure
+stdout 'warn   waived: invoke-failure-mode: invoke:order.chargePayment: no failure mode names this invoke; declare what happens when it fails in design/failure-modes.yaml \(timeouts are handled by the gateway\)'
+stdout 'checked: 1 failure modes, 1 invokes, 0 dependencies, 0 tiered actions'
+stdout '^passed$'
+
+cp waived-contract.yaml machinery.yaml
+exec sh -c 'grep -v "x-machinery-action: Order.ship" contracts/openapi.yaml > unbound.yaml && cat unbound.yaml extra-ops.txt > contracts/openapi.yaml'
+exec machinery lint --stage xref-contract
+stdout 'warn   waived: action-operation: act:Order.ship: no operation names this action; bind one with x-machinery-action \(shipping is a batch job\)'
+stdout 'warn   waived: operation-action: act:Order.refund: operation POST /orders/\{id\}/refund in contracts/openapi.yaml names an action that is not in the model \(refund is being modeled\)'
+stdout 'warn   waived: operation-action: act:Order.refund: operation POST /orders/\{id\}/return in contracts/openapi.yaml names an action that is not in the model \(refund is being modeled\)'
+stdout '^passed$'
+
+# only cross-reference rules can be waived
+cp bad-rule.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'is not a rule that can be waived'
+
+-- none.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  []
+-- other-subject.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.pay", reason: "not needed"}
+-- stale.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+  - {rule: event-action, id: "order.refund", reason: "left over"}
+-- stale-failure.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+  - {rule: tiered-action-abuse, id: "act:Order.ship", reason: "no risk file yet"}
+-- stale-all.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+  - {rule: tiered-action-abuse, id: "act:Order.ship", reason: "no risk file yet"}
+  - {rule: operation-id, id: "GET /orders/{id}", reason: "old"}
+-- extra-ops.txt --
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      x-machinery-action: Order.refund
+      responses:
+        "200": {description: ok}
+  /orders/{id}/return:
+    post:
+      operationId: returnOrder
+      x-machinery-action: Order.refund
+      responses:
+        "200": {description: ok}
+-- waived-failure.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: invoke-failure-mode, id: "invoke:order.chargePayment", reason: "timeouts are handled by the gateway"}
+-- no-fm.yaml --
+version: 1
+failure_modes:
+  - id: stub-only
+    subject: entity:Order
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+-- waived-contract.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: action-operation, id: "act:Order.ship", reason: "shipping is a batch job"}
+  - {rule: operation-action, id: "act:Order.refund", reason: "refund is being modeled"}
+-- bad-rule.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+waivers:
+  - {rule: machines, id: "order", reason: "x"}

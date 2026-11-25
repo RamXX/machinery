@@ -1,0 +1,170 @@
+# proto: the binding comment sits directly above the rpc line
+exec machinery lint --stage xref-contract
+stdout '== xref-contract =='
+stdout 'checked: 1 contracts, 3 operations, 2 bound operations, 2 actions'
+stdout '^passed$'
+
+# several binding lines on one rpc bind it to several actions
+cp multi.proto contracts/orders.proto
+exec machinery lint --stage xref-contract
+stdout 'checked: 1 contracts, 2 operations, 1 bound operations, 2 actions'
+stdout '^passed$'
+
+# rule operation-action
+cp unknown.proto contracts/orders.proto
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  operation-action: act:Order.refund: operation RPC OrderService/RefundOrder in contracts/orders.proto names an action that is not in the model'
+stdout 'failed: 1 finding\(s\)'
+
+# rule action-operation
+cp unbound.proto contracts/orders.proto
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  action-operation: act:Order.cancel: no operation names this action; bind one with // machinery:action'
+
+# a binding comment cut off from its rpc by a blank line is reported, not ignored
+cp dangling.proto contracts/orders.proto
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  contracts/orders.proto:11: machinery:action comment is not directly above an rpc line'
+stdout 'ERROR  action-operation: act:Order.cancel'
+
+# rule operation-id: an rpc without a name
+cp nameless.proto contracts/orders.proto
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  operation-id: RPC OrderService/: contracts/orders.proto has no operation name \(rpc\); give the operation an operationId or the rpc a name'
+
+# the contract file is missing
+rm contracts/orders.proto
+exec mrun 1 lint --stage xref-contract
+stdout 'ERROR  contracts/orders.proto: cannot read'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+contracts:
+  - kind: proto
+    path: contracts/orders.proto
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- contracts/orders.proto --
+syntax = "proto3";
+package mini.v1;
+
+message Req {}
+message Resp {}
+
+service OrderService {
+  // Reads an order.
+  rpc GetOrder(Req) returns (Resp);
+
+  // machinery:action Order.pay
+  rpc PayOrder(Req) returns (Resp);
+
+  // machinery:action Order.cancel
+  // Cancels an order that has not shipped.
+  rpc CancelOrder(Req) returns (Resp) {
+    option deprecated = false;
+  }
+}
+-- multi.proto --
+syntax = "proto3";
+package mini.v1;
+
+message Req {}
+message Resp {}
+
+service OrderService {
+  rpc GetOrder(Req) returns (Resp);
+
+  // machinery:action Order.pay
+  // machinery:action Order.cancel
+  rpc CloseOrder(Req) returns (Resp);
+}
+-- unknown.proto --
+syntax = "proto3";
+package mini.v1;
+
+message Req {}
+message Resp {}
+
+service OrderService {
+  // Reads an order.
+  rpc GetOrder(Req) returns (Resp);
+
+  // machinery:action Order.pay
+  rpc PayOrder(Req) returns (Resp);
+
+  // machinery:action Order.cancel
+  // Cancels an order that has not shipped.
+  rpc CancelOrder(Req) returns (Resp) {
+    option deprecated = false;
+  }
+
+  // machinery:action Order.refund
+  rpc RefundOrder(Req) returns (Resp);
+}
+-- unbound.proto --
+syntax = "proto3";
+package mini.v1;
+
+message Req {}
+message Resp {}
+
+service OrderService {
+  // Reads an order.
+  rpc GetOrder(Req) returns (Resp);
+
+  // machinery:action Order.pay
+  rpc PayOrder(Req) returns (Resp);
+
+  // Cancels an order that has not shipped.
+  rpc CancelOrder(Req) returns (Resp) {
+    option deprecated = false;
+  }
+}
+-- dangling.proto --
+syntax = "proto3";
+package mini.v1;
+
+message Req {}
+message Resp {}
+
+service OrderService {
+  // machinery:action Order.pay
+  rpc PayOrder(Req) returns (Resp);
+
+  // machinery:action Order.cancel
+
+  rpc CancelOrder(Req) returns (Resp);
+}
+-- nameless.proto --
+syntax = "proto3";
+package mini.v1;
+
+message Req {}
+message Resp {}
+
+service OrderService {
+  // machinery:action Order.pay
+  rpc PayOrder(Req) returns (Resp);
+
+  // machinery:action Order.cancel
+  rpc (Req) returns (Resp);
+}

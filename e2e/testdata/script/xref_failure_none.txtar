@@ -1,0 +1,76 @@
+# no failure-mode file: the stage does not apply, whatever the dependencies say
+exec machinery lint --stage xref-failure
+stdout 'not applicable: no design.failure_modes configured'
+! stdout 'checked:'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+# a failure-mode file with no failure modes and nothing that needs one has nothing to check
+cp no-dep.yaml machinery.yaml
+cp empty-fm.yaml design/failure-modes.yaml
+cp no-invoke.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-failure
+stdout 'not demonstrated: nothing to check'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+dependencies:
+  - {name: postgres, posture: real}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "paying" }, "cancel": { "target": "Cancelled" } } },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid" },
+        "onError": { "target": "Pending" }
+      }
+    },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- no-dep.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+-- empty-fm.yaml --
+version: 1
+failure_modes: []
+-- no-invoke.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}

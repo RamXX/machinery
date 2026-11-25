@@ -1,0 +1,30 @@
+# a critical area yields the obligation fv:<area>; a consequential one does not
+fixture shop
+cp machinery-risk.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+grep '"id": "fv:order-payment"' design/gen/obligations.json
+grep '"title": "Formal model of order-payment: money moves; a double charge cannot be undone"' design/gen/obligations.json
+grep '"source": "design/risk.yaml"' design/gen/obligations.json
+! grep 'fv:shipping-permission' design/gen/obligations.json
+
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["act:Order.pay", "tc:ORDE-*"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "inv:paid-before-shipped"]

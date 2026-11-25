@@ -1,0 +1,15 @@
+# a missing modelith is not demonstrated, never a pass
+fixture shop
+cp tool-missing.yaml machinery.yaml
+exec mrun 1 lint --stage model
+stdout '== model =='
+stdout 'not demonstrated: modelith 0.6.0 or newer not found \(go install github.com/stacklok/modelith/cmd/modelith@v0.6.0\)'
+stdout 'machinery lint: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+
+-- tool-missing.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+tools:
+  modelith: /nonexistent

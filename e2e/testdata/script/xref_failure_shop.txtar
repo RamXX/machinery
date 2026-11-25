@@ -1,0 +1,7 @@
+# the shop names a failure mode for its one invoke; it has no dependencies or tiers
+fixture shop
+exec machinery lint --stage xref-failure
+stdout '== xref-failure =='
+stdout 'checked: 1 failure modes, 1 invokes, 0 dependencies, 0 tiered actions'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'

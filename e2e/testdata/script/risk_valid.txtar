@@ -1,0 +1,48 @@
+# a valid risk file: counts, and the highest tier wins
+fixture shop
+cp machinery-risk.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery lint --stage risk
+stdout '== risk =='
+stdout 'checked: 2 areas, 2 consequential ids, 11 critical ids'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# an id in two areas has the highest tier
+cp overlap.yaml design/risk.yaml
+exec machinery lint --stage risk
+stdout 'checked: 2 areas, 1 consequential ids, 11 critical ids'
+stdout '^passed$'
+
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["act:Order.pay", "tc:ORDE-*"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "inv:paid-before-shipped"]
+-- overlap.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["act:Order.pay", "tc:ORDE-*"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "act:Order.pay"]

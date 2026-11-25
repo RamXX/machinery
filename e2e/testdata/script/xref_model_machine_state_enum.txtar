@@ -1,0 +1,218 @@
+# rule state-enum: the domain states of a lifecycle machine are the values of exactly one enum of its entity
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout '^passed$'
+
+# a state the enum does not have
+cp extra-state.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: domain states differ from enum Status \(not in the enum: Returned\)'
+stdout 'failed: 1 finding\(s\)'
+
+# an enum value the machine does not have
+cp missing-state.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: domain states differ from enum Status \(missing from the machine: Cancelled\)'
+
+# both at once
+cp both-state.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: domain states differ from enum Status \(missing from the machine: Cancelled; not in the enum: Returned\)'
+
+# lower-case states are transient overlays and are not domain states
+cp overlay.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout '^passed$'
+cp extra-state.json design/machines/Order.machine.json
+
+# the candidate with the largest overlap is named; ties go to the first enum name
+cp two-enums.yaml design/model/mini.modelith.yaml
+cp extra-state.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: domain states differ from enum Status \(not in the enum: Returned\)'
+cp tie-enums.yaml design/model/mini.modelith.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: domain states differ from enum Alpha \(not in the enum: Cancelled, Pending, Returned\)'
+
+# two enums with the same values
+cp ambiguous.yaml design/model/mini.modelith.yaml
+cp order.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: more than one enum of Order has the domain states of the machine: Copy, Status'
+
+# an entity with no enum-typed attribute
+cp no-enum.yaml design/model/mini.modelith.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  state-enum: order: entity Order has no attribute whose type is an enum; the domain states \(Cancelled, Paid, Pending\) need one'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- extra-state.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Returned": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- missing-state.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Paid" } } },
+    "Paid": { "type": "final" }
+  }
+}
+-- both-state.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Returned" } } },
+    "Paid": { "type": "final" },
+    "Returned": { "type": "final" }
+  }
+}
+-- overlay.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "paying": { "after": { "5000": { "target": "Paid" } } },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- two-enums.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+  Other:
+    values:
+      - {name: Pending, definition: "x"}
+      - {name: Paid, definition: "x"}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+      - {name: other, type: Other}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- tie-enums.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Zeta:
+    values:
+      - {name: Pending, definition: "x"}
+  Alpha:
+    values:
+      - {name: Paid, definition: "x"}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Zeta}
+      - {name: other, type: Alpha}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- ambiguous.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+  Copy:
+    values:
+      - {name: Pending, definition: "x"}
+      - {name: Paid, definition: "x"}
+      - {name: Cancelled, definition: "x"}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+      - {name: copy, type: Copy}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- no-enum.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: string}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}

@@ -1,0 +1,28 @@
+# no contracts configured: the stage does not apply
+fixture shop
+cp no-contracts.yaml machinery.yaml
+exec machinery lint --stage xref-contract
+stdout '== xref-contract =='
+stdout 'not applicable: no contracts configured'
+! stdout 'checked:'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+# the shop contract binds every shop action; operations without a binding are only counted
+cp with-contract.yaml machinery.yaml
+exec machinery lint --stage xref-contract
+stdout 'checked: 1 contracts, 5 operations, 4 bound operations, 4 actions'
+stdout '^passed$'
+
+-- no-contracts.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+-- with-contract.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml

@@ -1,0 +1,24 @@
+# a missing or stale rendering is DRIFT, and gen repairs it
+fixture shop
+exec mrun 1 lint --stage model
+stdout 'DRIFT  design/model/shop.modelith.md: missing; run machinery gen'
+stdout 'failed: 1 finding\(s\)'
+stdout 'machinery lint: 0 passed, 1 failed, 0 not demonstrated, 0 not applicable'
+
+exec machinery gen
+exec machinery lint --stage model
+stdout '^passed$'
+
+# hand edits to the rendering are drift
+exec sh -c 'echo "hand edit" >> design/model/shop.modelith.md'
+exec mrun 1 lint --stage model
+stdout 'DRIFT  design/model/shop.modelith.md: stale; run machinery gen'
+
+# so is a change to the model that was not rendered again
+exec machinery gen
+exec sh -c 'sed "s/Create the .Order. in the pending status./Create the order./" design/model/shop.modelith.yaml > edited.yaml && cp edited.yaml design/model/shop.modelith.yaml'
+exec mrun 1 lint --stage model
+stdout 'DRIFT  design/model/shop.modelith.md: stale; run machinery gen'
+exec machinery gen
+exec machinery lint --stage model
+stdout '^passed$'

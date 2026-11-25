@@ -1,0 +1,22 @@
+# no failure-mode file configured: the stage does not apply
+fixture empty
+cp bare.yaml machinery.yaml
+exec machinery lint --stage failure-modes
+stdout 'not applicable: no design.failure_modes configured'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+# a configured file with no failure modes has nothing to check
+cp empty.yaml machinery.yaml
+cp empty-fm.yaml fm.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'not demonstrated: nothing to check'
+
+-- bare.yaml --
+version: 2
+-- empty.yaml --
+version: 2
+design:
+  failure_modes: fm.yaml
+-- empty-fm.yaml --
+version: 1
+failure_modes: []

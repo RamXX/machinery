@@ -1,0 +1,49 @@
+# a fault and an abuse case, well formed
+fixture shop
+cp failure-modes.yaml design/failure-modes.yaml
+exec machinery lint --stage failure-modes
+stdout '== failure-modes =='
+stdout 'checked: 2 failure modes, 1 abuse cases'
+stdout '^passed$'
+stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# kind defaults to fault; an entity subject is allowed for abuse
+cp entity-abuse.yaml design/failure-modes.yaml
+exec machinery lint --stage failure-modes
+stdout 'checked: 2 failure modes, 1 abuse cases'
+stdout '^passed$'
+
+# each failure mode becomes an fm obligation
+exec machinery gen
+grep '"id": "fm:payment-provider-down"' design/gen/obligations.json
+grep '"id": "fm:orders-flooded"' design/gen/obligations.json
+
+-- failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    kind: fault
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer."
+    required: retry-bounded
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: ship-by-non-clerk
+    kind: abuse
+    subject: act:Order.ship
+    failure: "A caller who is not a Clerk asks to ship an order."
+    required: refuse
+    behavior: "The request is refused with FORBIDDEN and the order does not change."
+-- entity-abuse.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer."
+    required: fail-closed
+    behavior: "The order returns to Pending."
+  - id: orders-flooded
+    kind: abuse
+    subject: entity:Order
+    failure: "A caller creates orders without bound."
+    required: surface
+    behavior: "Creation is rate limited and the caller sees TOO_MANY_REQUESTS."

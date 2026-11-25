@@ -1,0 +1,92 @@
+# rule action-event: every action of an entity with a lifecycle machine is an on event of that machine
+exec machinery lint --stage xref-model-machine
+stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout '^passed$'
+! stdout 'Customer'
+
+# the machine has no event for the action
+cp no-cancel.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  action-event: act:Order.cancel: no on event cancel in machine order \(design/machines/Order.machine.json\)'
+stdout 'failed: 1 finding\(s\)'
+
+# an ignore is not an on event
+cp ignores-cancel.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout 'ERROR  action-event: act:Order.cancel: no on event cancel'
+
+# the action of an entity without a lifecycle machine is not checked (Customer.register)
+cp order.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^passed$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+  Customer:
+    definition: "A buyer."
+    attributes:
+      - {name: email, type: string}
+    actions:
+      - {name: register, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- no-cancel.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- ignores-cancel.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" } }, "_ignores": { "cancel": "not allowed here" } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}

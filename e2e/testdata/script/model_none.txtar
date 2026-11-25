@@ -1,0 +1,11 @@
+# no models configured: the stage does not apply
+fixture empty
+cp bare.yaml machinery.yaml
+exec machinery lint --stage model
+stdout '== model =='
+stdout 'not applicable: no design.models configured'
+! stdout 'checked:'
+stdout 'machinery lint: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+
+-- bare.yaml --
+version: 2
