@@ -1,0 +1,17 @@
+{
+  "name": "machinery",
+  "owner": {
+    "name": "RamXX",
+    "url": "https://github.com/RamXX"
+  },
+  "metadata": {
+    "description": "machinery: design, evidence and backlog in one loop, with formality that follows risk."
+  },
+  "plugins": [
+    {
+      "name": "machinery",
+      "source": "./",
+      "description": "One small skill and three agent prompts (planner, verifier, modeler) built on the machinery command-line tool. No hooks."
+    }
+  ]
+}

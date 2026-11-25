@@ -1,0 +1,40 @@
+{
+  "name": "machinery",
+  "version": "2.0.0",
+  "description": "Join a design to evidence from real end-to-end runs, plan the unproven as a backlog graph, and gate each story by its risk tier.",
+  "author": {
+    "name": "RamXX",
+    "url": "https://github.com/RamXX"
+  },
+  "homepage": "https://github.com/RamXX/machinery",
+  "repository": "https://github.com/RamXX/machinery",
+  "license": "Apache-2.0",
+  "keywords": [
+    "design",
+    "state-machines",
+    "end-to-end-testing",
+    "formal-verification",
+    "backlog",
+    "brownfield"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "machinery",
+    "shortDescription": "Design, evidence and backlog in one loop",
+    "longDescription": "Lint a Modelith model and XState machines, generate transition cases, prove them end to end on the real system, plan what is unproven as backlog stories, and add formal models where the risk calls for them.",
+    "developerName": "RamXX",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/RamXX/machinery",
+    "defaultPrompt": [
+      "Adopt machinery for this part of the codebase",
+      "Plan the owed obligations as backlog stories",
+      "Verify this story as a fresh verifier"
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}
