@@ -13,7 +13,8 @@ import (
 // key is an ERROR, never silently skipped.
 var (
 	rootKeys = setOf("id", "initial", "context", "states", "description", "meta", "version",
-		"_comment", "_delays", "_lifecycle_of", "_role", "_oracle_tag", "_guards", "_external_events")
+		"_comment", "_delays", "_lifecycle_of", "_role", "_oracle_tag", "_guards", "_external_events",
+		"_entries")
 	stateKeys = setOf("on", "after", "always", "invoke", "entry", "exit", "states", "initial",
 		"type", "id", "meta", "description", "tags", "onDone", "output", "_comment",
 		"_exhaustive", "_ignores", "_refusal")
@@ -76,6 +77,7 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 		}
 	}
 	errs = append(errs, lintExternalEvents(base, ro, states)...)
+	errs = append(errs, lintEntries(base, ro)...)
 	declaredDelays, usedDelays := map[string]bool{}, map[string]bool{}
 	if dv := ro.Get2("_delays"); dv != nil && dv.Kind == ir.KindObject {
 		for _, k := range dv.AsObject().Keys() {
@@ -221,7 +223,7 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 	}
 	errs = append(errs, lintAlwaysCycles(base, states, resolve)...)
 	errs = append(errs, lintEventCompleteness(base, states, nodeOf)...)
-	errs = append(errs, lintReachability(base, ro, states, res)...)
+	errs = append(errs, lintReachability(base, ro, states, res, m.Entries())...)
 
 	// guards, actions and actors are implemented in code under these names
 	for _, u := range []struct {

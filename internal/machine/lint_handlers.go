@@ -280,8 +280,9 @@ func lintEventCompleteness(base string, states []ir.StateEntry, nodeOf map[strin
 	return errs
 }
 
-// lintReachability: every state is reachable from the initial state.
-func lintReachability(base string, ro *ir.Object, states []ir.StateEntry, res *ir.Resolver) (errs []string) {
+// lintReachability: every state is reachable from the initial state or from
+// an entry state (_entries), where an instance may be created directly.
+func lintReachability(base string, ro *ir.Object, states []ir.StateEntry, res *ir.Resolver, entries []string) (errs []string) {
 	init := ro.GetString("initial")
 	if !ro.Get2("states").AsObject().Has(init) {
 		return []string{fmt.Sprintf("%s: initial %s is not a top-level state", base, ir.Repr(init))}
@@ -304,6 +305,9 @@ func lintReachability(base string, ro *ir.Object, states []ir.StateEntry, res *i
 		}
 	}
 	enter(init)
+	for _, e := range entries {
+		enter(e)
+	}
 	for frontier := true; frontier; {
 		frontier = false
 		active := map[string]bool{}

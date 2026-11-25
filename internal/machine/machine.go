@@ -97,6 +97,7 @@ type Table struct {
 	Source       string         `json:"source"`
 	SourceSHA256 string         `json:"source_sha256"`
 	Initial      string         `json:"initial"`
+	Entries      []string       `json:"entries,omitempty"`
 	States       []State        `json:"states"`
 	Transitions  []Transition   `json:"transitions"`
 	Ignores      []Ignore       `json:"ignores"`
@@ -228,7 +229,7 @@ func buildTable(m *Machine) *Table {
 		Version: 1, Machine: m.ID, Tag: m.Tag, Source: m.Path,
 		SourceSHA256: hex.EncodeToString(sum[:]), Initial: ro.GetString("initial"),
 		States: []State{}, Transitions: []Transition{}, Ignores: []Ignore{}, Refusals: []Refusal{},
-		Clauses: []Clause{}, Delays: map[string]int{},
+		Clauses: []Clause{}, Delays: map[string]int{}, Entries: sortedCopy(m.Entries()),
 	}
 	states := ir.WalkStates(ro.Get2("states"), "")
 	guards, actions, actors := map[string]bool{}, map[string]bool{}, map[string]bool{}

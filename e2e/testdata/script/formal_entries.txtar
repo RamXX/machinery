@@ -1,0 +1,125 @@
+# The TLA+ skeleton of a machine with _entries lets an instance start in the initial state or in any entry.
+mkdir design/machines
+cp with-entries.json design/machines/Account.machine.json
+exec machinery lint --stage machines
+stdout '^passed$'
+exec machinery gen
+gitinit
+exec machinery formal new account-start --tool tla --machine Account --area account-start
+cp props.tla design/formal/AccountProps.tla
+exec sed -i.bak 's/reach: \[SomeFinal\]/reach: [SomeFinal, ActiveUnactivated]/' design/formal/account-start.spec.yaml
+exec machinery formal gen
+
+# the skeleton names the entry leaves and Init admits them
+grep '^InitialState == "Pending"$' design/formal/Account.tla
+grep '^EntryStates == \{"Active"\}$' design/formal/Account.tla
+grep '^Init ==\n    /\\ st \\in \[Instances -> \{InitialState\} \\cup EntryStates\]$' design/formal/Account.tla
+
+# TLC reaches an active account that was never activated: a migrated one
+exec mrun 1 formal check account-start
+! stdout 'account-start run strict'
+grep '"ActiveUnactivated": true' design/formal/account-start.result.json
+
+# without entries every instance starts in the initial state, and the same predicate is not reached
+cp without-entries.json design/machines/Account.machine.json
+exec machinery gen
+exec machinery formal gen
+! grep 'EntryStates' design/formal/Account.tla
+grep '^Init ==\n    /\\ st = \[i \\in Instances \|-> InitialState\]$' design/formal/Account.tla
+exec mrun 1 formal check account-start
+stdout 'ERROR  account-start run strict: reach ActiveUnactivated not reached: the pass is vacuous'
+grep '"ActiveUnactivated": false' design/formal/account-start.result.json
+
+-- machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+  risk: design/risk.yaml
+-- design/risk.yaml --
+version: 1
+areas:
+  - name: account-start
+    tier: critical
+    why: "accounts migrated from the old system start active"
+    ids: ["tc:ACCO-*"]
+    questions: [ordering]
+-- with-entries.json --
+{
+  "id": "account",
+  "_role": "operational",
+  "initial": "Pending",
+  "_entries": [
+    "Active"
+  ],
+  "states": {
+    "Pending": {
+      "on": {
+        "activate": {
+          "target": "Active",
+          "actions": "recordActivation"
+        },
+        "close": {
+          "target": "Closed",
+          "actions": "recordClosing"
+        }
+      }
+    },
+    "Active": {
+      "on": {
+        "close": {
+          "target": "Closed",
+          "actions": "recordClosing"
+        }
+      },
+      "_ignores": {
+        "activate": "already active; a repeated activation is refused with ACCOUNT_ACTIVE"
+      }
+    },
+    "Closed": {
+      "type": "final"
+    }
+  }
+}
+-- without-entries.json --
+{
+  "id": "account",
+  "_role": "operational",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "activate": {
+          "target": "Active",
+          "actions": "recordActivation"
+        },
+        "close": {
+          "target": "Closed",
+          "actions": "recordClosing"
+        }
+      }
+    },
+    "Active": {
+      "on": {
+        "close": {
+          "target": "Closed",
+          "actions": "recordClosing"
+        }
+      },
+      "_ignores": {
+        "activate": "already active; a repeated activation is refused with ACCOUNT_ACTIVE"
+      }
+    },
+    "Closed": {
+      "type": "final"
+    }
+  }
+}
+-- props.tla --
+---- MODULE AccountProps ----
+\* Properties of the account lifecycle. Hand-written.
+EXTENDS Account
+
+\* Reach predicates.
+SomeFinal == \E i \in Instances : st[i] \in Final
+ActiveUnactivated == \E i \in Instances : st[i] = "Active" /\ fx[i]["recordActivation"] = 0
+====

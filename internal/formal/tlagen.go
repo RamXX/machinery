@@ -89,6 +89,13 @@ func TLASkeleton(m *machine.Machine) []byte {
 	w("Final == %s", tlaSet(final))
 	w("Resting == %s", tlaSet(resting))
 	w("InitialState == %q", m.Resolver.Leaf(t.Initial))
+	if len(t.Entries) > 0 {
+		var entries []string
+		for _, e := range t.Entries {
+			entries = append(entries, m.Resolver.Leaf(e))
+		}
+		w("EntryStates == %s", tlaSet(entries))
+	}
 	w("CallerCases == %s", tlaSet(callerIDs))
 	w("")
 	w("Bump(f, E) == [e \\in Effects |-> IF e \\in E THEN (IF f[e] < 2 THEN f[e] + 1 ELSE 2) ELSE f[e]]")
@@ -102,7 +109,12 @@ func TLASkeleton(m *machine.Machine) []byte {
 	w("    /\\ pend \\subseteq [c : Callers, i : Instances, id : CallerCases]")
 	w("")
 	w("Init ==")
-	w("    /\\ st = [i \\in Instances |-> InitialState]")
+	if len(t.Entries) > 0 {
+		// an imported or migrated instance starts in an entry state
+		w("    /\\ st \\in [Instances -> {InitialState} \\cup EntryStates]")
+	} else {
+		w("    /\\ st = [i \\in Instances |-> InitialState]")
+	}
 	w("    /\\ fx = [i \\in Instances |-> [e \\in Effects |-> 0]]")
 	w("    /\\ pend = {}")
 	w("    /\\ last = StepOf(\"init\", \"none\", \"none\", \"init\")")
