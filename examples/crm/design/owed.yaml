@@ -1,6 +1,2 @@
 version: 1
-owed:
-  - id: fv:deal-win
-    reason: "formal model not written yet"
-  - id: fv:record-ownership
-    reason: "formal model not written yet"
+owed: []
