@@ -28,10 +28,14 @@ tests, how many use test doubles), design sources, and the state of the backlog.
 
 ```sh
 machinery adopt --paths 'internal/shipping/**' --e2e 'e2e/**' --write
+echo '.machinery/' >> .gitignore
 git add -A
 git commit -q -m "adopt machinery for the shipping area"
 machinery check
 ```
+
+`adopt` does not edit `.gitignore`; it tells you to add `.machinery/`, where the receipts of test
+runs are kept. Receipts are evidence of one run at one commit and are not committed.
 
 `check` passes on day one. The unit tests the area already has are listed in
 `design/tests-baseline.yaml` and print as warnings; nobody has to delete them today. A new unit

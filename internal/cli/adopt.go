@@ -1,6 +1,11 @@
 package cli
 
-import "github.com/RamXX/machinery/internal/adopt"
+import (
+	"fmt"
+
+	"github.com/RamXX/machinery/internal/adopt"
+	"github.com/RamXX/machinery/internal/gitx"
+)
 
 func init() {
 	Register(&Command{Name: "adopt", Summary: "Bring an existing project under machinery without touching its code.", Run: runAdopt})
@@ -27,6 +32,10 @@ func runAdopt(e *Env, args []string) int {
 		return e.Fail(err)
 	}
 	res.Print(e.Stdout)
+	// adopt never edits .gitignore; it says when the receipts would be committed
+	if *write && gitx.IsRepo(root) && !gitx.Ignored(root, ".machinery/receipts/x.jsonl") {
+		fmt.Fprintln(e.Stdout, "note: add .machinery/ to .gitignore; receipts are evidence of one run and are not committed")
+	}
 	if len(res.Blocked) > 0 {
 		return 1
 	}

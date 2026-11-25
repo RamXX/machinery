@@ -2,6 +2,8 @@
 # with its own backlog (a throwaway bd database in the work directory).
 env MACHINERY_REPO=$REPO
 fixture brownfield
+# the project ignores nothing of machinery yet: the guide adds .machinery/ itself
+exec sh -c 'printf ".home/\n" > .gitignore'
 gitinit
 exec sh backlog.sh
 stdout 'backlog.sh: 1 epic, 4 stories'
@@ -11,7 +13,8 @@ exec rundoc $REPO/docs/brownfield.md
 # 1. the dry run reports and writes nothing
 stdout 'backlog: bd, 4 open, [0-9]+ ready, 1 closed, cycles: none'
 stdout 'test files: 0 under e2e roots, 1 elsewhere \(unit tests\), 1 with test doubles'
-# 2. adoption writes config and baseline only
+# 2. adoption writes config and baseline only, and says what it leaves to the team
+stdout 'note: add .machinery/ to .gitignore'
 stdout 'warn   baselined: unit-test: internal/shipping/shipment_test.go'
 # 3. the modeled area is owed in full
 stdout 'tc:SHIP-422414  unproven at adoption \([0-9a-f]+\)'

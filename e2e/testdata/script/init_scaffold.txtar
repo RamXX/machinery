@@ -2,7 +2,9 @@
 mkdir proj
 cd proj
 exec machinery init
-stdout 'init: created 4 path\(s\)'
+stdout 'init: created 5 path\(s\)'
+stdout '  .gitignore'
+grep '^\.machinery/$' .gitignore
 stdout '  design/model/'
 stdout '  design/machines/'
 stdout '  design/owed.yaml'
@@ -29,7 +31,7 @@ cd ..
 mkdir other/design/model
 cp keep.yaml other/design/model/keep.modelith.yaml
 exec machinery -C other init
-stdout 'init: created 3 path\(s\)'
+stdout 'init: created 4 path\(s\)'
 ! exists other/design/model/.gitkeep
 exists other/design/model/keep.modelith.yaml
 

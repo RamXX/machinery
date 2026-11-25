@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/RamXX/machinery/internal/project"
 )
@@ -39,6 +40,9 @@ design:
 
 # backlog:
 #   tool: bd
+
+# tools:
+#   xstate: true   # compare generated tables with the real XState package
 `
 
 const initNext = `next:
@@ -90,6 +94,17 @@ func runInit(e *Env, args []string) int {
 		return e.Fail(err)
 	}
 	created = append(created, project.ConfigName)
+	// receipts are never committed
+	ignore := filepath.Join(root, ".gitignore")
+	if data, _ := os.ReadFile(ignore); !strings.Contains("\n"+string(data), "\n.machinery/") {
+		if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
+			data = append(data, '\n')
+		}
+		if err := os.WriteFile(ignore, append(data, []byte(".machinery/\n")...), 0o644); err != nil {
+			return e.Fail(err)
+		}
+		created = append(created, ".gitignore")
+	}
 	fmt.Fprintf(e.Stdout, "init: created %d path(s)\n", len(created))
 	for _, c := range created {
 		fmt.Fprintf(e.Stdout, "  %s\n", c)

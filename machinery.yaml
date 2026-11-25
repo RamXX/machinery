@@ -10,6 +10,6 @@ constraints:
     - {name: engines, paths: ["internal/gen/**", "internal/tags/**", "internal/arch/**", "internal/testpolicy/**", "internal/evidence/**", "internal/formal/**", "internal/checkers/**", "internal/xstate/**", "internal/backlog/**", "internal/probe/**", "internal/affected/**"]}
     - {name: planning, paths: ["internal/pm/**"]}
     - {name: stages, paths: ["internal/stages/**"]}
-    - {name: flows, paths: ["internal/pm/**", "internal/adopt/**", "internal/landing/**"]}
+    - {name: flows, paths: ["internal/adopt/**", "internal/landing/**"]}
     - {name: cli, paths: ["internal/cli/**"]}
     - {name: cmd, paths: ["cmd/**"]}

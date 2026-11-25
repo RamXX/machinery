@@ -196,6 +196,9 @@ The last line is the stage's outcome, exactly one of four:
 - The `checked:` line lists what the stage looked at, as counts.
 - Findings follow, one per line, ERROR first, then DRIFT, then warn, each group sorted by message.
 - When a stage has findings and a reason for not demonstrated, the outcome is `failed`.
+- The version rules (Modelith 0.6.0 or newer, XState 5.33.4 or newer and below 6) are floors,
+  so that a patch release upstream does not break a project. This repository pins the exact
+  versions in its Makefile.
 - A stage that applies and found nothing to check is `not demonstrated: nothing to check`. A pass
   needs positive evidence; absence is never a pass.
 
@@ -719,8 +722,10 @@ baseline:
 ```
 
 `checked:` counts test files, files under e2e roots and markers looked for. Not applicable when
-neither `tests:` nor `trace.tests` is configured. A project with e2e roots and no test file at all
-is `not demonstrated: nothing to check`.
+neither `tests:` nor `trace.tests` is configured. A project with nothing under its e2e roots and
+no test file at all is `not demonstrated: nothing to check`. End-to-end tests in a form the
+patterns do not know (a shell script, say) count as files under the e2e roots; name them with
+`tests.files` to have them scanned for test doubles.
 
 ## 10. Runs and receipts
 
@@ -734,7 +739,8 @@ machinery run [--stack "<description>"] -- <command> [args...]
 `machinery run`:
 
 1. reads the current commit (`git rev-parse HEAD`) and whether the tree is dirty
-   (`git status --porcelain` not empty, ignoring the receipts directory and the owed file);
+   (`git status --porcelain` not empty, ignoring the owed file and the receipts files: the
+   `.jsonl` files directly in the receipts directory, and nothing else in it);
 2. deletes receipt files in the receipts directory that are not valid for the current commit
    (section 10.1);
 3. creates `<receipts dir>/<UTC timestamp>-<short sha>.jsonl` (timestamp
@@ -747,8 +753,9 @@ machinery run [--stack "<description>"] -- <command> [args...]
    stderr. A command that cannot be started exits 127 and leaves no file; a command killed by a
    signal exits 128 plus the signal number.
 
-The command runs in the project root. `MACHINERY_*` variables inherited from the caller are not
-passed on.
+The command runs in the project root. The variables machinery sets for a run
+(`MACHINERY_RECEIPTS`, `MACHINERY_COMMIT`, `MACHINERY_ONLY`, `MACHINERY_TABLES_DIR`,
+`MACHINERY_PROBE_CASE`) are never inherited from the caller.
 
 The file is JSON Lines. Three line types:
 
@@ -782,8 +789,9 @@ only after its assertions held.
 
 Evidence is bound to a commit. A receipts file is **valid for the current commit** when its header
 commit is the current commit, or when the tree of its header commit differs from the tree of the
-current commit only in the owed file (`git diff --name-only <receipt commit> HEAD` lists nothing
-but the owed file). The owed file is bookkeeping about evidence, not part of the system under
+current commit only in the owed file and in receipts files (`git diff --name-only <receipt commit>
+HEAD` lists nothing else). Receipts are not meant to be committed; when they are, by a broad
+`git add`, the evidence stays valid. The owed file is bookkeeping about evidence, not part of the system under
 test, so pruning it and committing does not invalidate the run that justified the pruning.
 Evidence from any other commit says nothing about the current one.
 
@@ -834,8 +842,10 @@ that was established at the base may quietly stop being established:
 |---|---|
 | `proven-to-owed` | An id that was an obligation at the base and was not owed there is owed now: `ERROR  ratchet: <id> was proven at <ref> and is owed now`. New obligations may be owed. |
 | `scope-narrowed` | A scope glob of the base is missing now: `ERROR  ratchet: scope narrowed: <glob>`. |
-| `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the area's `why` changed too, which prints as `warn` with the new reason. |
-| `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the scope widened in the same change. |
+| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. |
+| `obligation-removed` | An obligation of the base does not exist now: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
+| `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 22), which prints as `warn` with the recorded reason. |
+| `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
 
 `checked:` counts obligations, scope globs, tiered ids and baseline entries compared. An unknown
@@ -927,9 +937,11 @@ ids. A targeted verify is a check for one change; only a full `verify` supports 
 machinery landing --base <ref> [--stack "<description>"] [-- <command> [args...]]
 ```
 
-Runs, in order and stopping at the first that does not pass: `machinery check --base <ref>`; the
+Runs, in order and stopping at the first that does not pass: `machinery check --base <ref>`;
+`machinery formal check --verify` when the project has formal models (section 16.9); the
 project's whole end-to-end suite through `machinery run` (the command after `--`, else
-`commands.e2e`); `machinery verify`. It prints the stage blocks of each and one final line:
+`commands.e2e`); `machinery verify`; and with `--probe` (optionally `--probe-max <n>`) stage
+`probe` over the proven transition cases (section 19). It prints the stage blocks of each and one final line:
 
 ```
 landing: <passed|failed> at <short sha> (attempt <n>, fix-forward <k> of 2)
@@ -1125,7 +1137,8 @@ Generated files, the owed list and formal models are not part of it.
 Stage `contract` (part of `machinery check`) is `not applicable: no wave is frozen` without that
 file. With it, a design source whose hash differs from the frozen one is
 `ERROR  contract changed during fan-out: <path>`. A contract change is its own story: land it
-alone, then freeze again. `machinery waves --thaw` removes the file when the wave has landed (`wave: thawed`, or
+alone, then freeze again. Freezing and thawing are the planner's acts and leave no trace but the wave file.
+`machinery waves --thaw` removes the file when the wave has landed (`wave: thawed`, or
 `wave: none frozen`). `--freeze` prints `wave: frozen <12 hex> at <short sha>, <n> stories` and
 refuses when stage `gen-drift` or the waves stage itself does not pass. A design source that was
 added or removed since the freeze counts as changed.
@@ -1200,8 +1213,10 @@ the verdict line. With `accept` it then runs the gate and exits with its code; `
 the story in the backlog when the gate passed.
 
 The verifier is a fresh context that did not build the change. It receives the verifier brief,
-predicts, and only then reads the proof. machinery cannot see what an agent read; it can and does
-check who predicted, for which commit, and in which order.
+predicts, and only then reads the proof. machinery cannot see what an agent read, and an actor
+name is only as trustworthy as the backlog's own record of who wrote a note. What the gate
+checks is what is recorded: that a prediction exists for this commit, under another name than
+the proof's, before the verdict.
 
 ## 16. Formal models
 
@@ -1458,7 +1473,7 @@ ERROR.
 
 | Class | Meaning | Requires | Effect |
 |---|---|---|---|
-| `no-effect` | The change does not touch what the model describes. | | `read_at` moves to the current commit. |
+| `no-effect` | The change does not touch what the model describes. | `--evidence` saying why. | `read_at` moves to the current commit. |
 | `model-drift` | The model was behind and has been updated from the code. | A file of the spec differs from its content at `read_at`. | `read_at` moves. |
 | `promise-change` | The promise itself changed on purpose. | `--evidence` naming the decision. | `read_at` moves. |
 | `possible-bug` | The code may now break the promise. | `--story`. | `read_at` stays. Stage `formal` reports `ERROR  sync: <spec>: possible bug under investigation (<story>)` until a later classification. |
@@ -1507,6 +1522,12 @@ predicate, then every mutation, writes trace files (section 16.10), writes
   "mutations": [{"id": "M1", "outcome": "detected"}]
 }
 ```
+
+`machinery formal check --verify` runs the tools the same way, writes nothing, and prints a block
+named `formal-verify` with `ERROR  <path>: a fresh run of the tools does not reproduce the
+committed file` for every result or trace file that differs. Committed results are data anyone
+can edit; `machinery landing` runs this step, so a result that the tools did not produce does not
+land.
 
 `outcome` is `passed`, `violated` or `error` (the tool could not check the spec; `violated` then
 holds the tool's first error line). `input_sha256` is the sha256 over the manifest without its
@@ -1586,9 +1607,10 @@ its `cx` id disappears with it. Trace files are generated and never edited.
 
 ### 17.1 `machinery init`
 
-For a new project. Creates, in an empty or existing directory with no `machinery.yaml`: a minimal
-`machinery.yaml`, `design/model/`, `design/machines/`, an empty `design/owed.yaml`, and prints the
-Makefile targets the project should add (`check`, `verify`). It never overwrites a file.
+For a new project. Creates, in an empty or existing directory with no `machinery.yaml`: a
+`machinery.yaml` in which nothing applies yet, `design/model/`, `design/machines/`, an empty
+`design/owed.yaml`, and the line `.machinery/` in `.gitignore` when it is not there; and prints
+the Makefile targets the project should add (`check`, `verify`). It never overwrites a file.
 
 ### 17.2 `machinery adopt`
 
@@ -1637,7 +1659,8 @@ next:
    written, the findings print, no owed entry is written and the exit code is 1.
 
 `adopt` never creates, changes or deletes a file outside `machinery.yaml` and the design
-directory. It prints `adopt: wrote <n> file(s)` and the paths. Running it twice with the same
+directory. That includes `.gitignore`: when the receipts directory is not ignored it prints
+`note: add .machinery/ to .gitignore` and leaves the edit to the team. It prints `adopt: wrote <n> file(s)` and the paths. Running it twice with the same
 arguments writes nothing the second time.
 
 After `adopt --write`, `machinery check` passes: what exists is baselined or owed, and anything new
@@ -1969,7 +1992,7 @@ An id in no area is **routine**. An id in several areas has the highest of their
 |---|---|---|
 | routine | Work where a wrong result is cheap to see and to undo. | The machine, its generated transition cases, end-to-end evidence. |
 | consequential | Published contract semantics, authorization, tenant isolation, money or audit integrity, data migrations. | An abuse case for every action in the area (section 6.6), and acceptance by a fresh verifier who predicts a disproving observation before reading the proof (section 15.6). |
-| critical | Promises whose break harms users and that tests rarely reach: races, lost or repeated work, structural rules that must hold for every shape of data. | A formal model with the honesty checks of section 16. The area yields the obligation `fv:<name>`. |
+| critical | Promises whose break harms users and that tests rarely reach: races, lost or repeated work, structural rules that must hold for every shape of data. | A formal model with the checks of section 16. The area yields the obligation `fv:<name>`. |
 
 Stage `risk`:
 
@@ -1982,5 +2005,14 @@ Stage `risk`:
 `checked:` counts areas, consequential ids and critical ids. Not applicable when `design.risk` is
 absent.
 
-The tier is chosen at planning, not discovered at review. Lowering a tier is visible in the
-ratchet (section 11.3). When it is unclear which tier applies, the higher one does.
+The tier is chosen at planning, not discovered at review. When it is unclear which tier applies,
+the higher one does. Lowering a tier is a deliberate, recorded act: the ratchet (section 11.3)
+fails on a lowered tier unless the risk file says so:
+
+```yaml
+lowered:
+  - {ids: ["act:Order.pay", "tc:ORDE-*"], from: critical, reason: "card payments moved to the hosted page"}
+```
+
+`ids`, `from` (the tier the ids had) and `reason` are required. The entry stays in the file as the
+record of the decision.

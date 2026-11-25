@@ -218,6 +218,12 @@ func UserName(root string) string {
 	return strings.TrimSpace(out)
 }
 
+// Ignored reports whether git ignores a project-relative path.
+func Ignored(root, rel string) bool {
+	_, err := run(root, "check-ignore", "-q", rel)
+	return err == nil
+}
+
 // IsRepo reports whether root is inside a git work tree.
 func IsRepo(root string) bool {
 	_, err := run(root, "rev-parse", "--is-inside-work-tree")
