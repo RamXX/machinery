@@ -1,0 +1,103 @@
+# a checker obligation reaches obligations.json, is owed until proven, and trace wants a verifies tag for it
+fixture shop
+cp machinery.ck.yaml machinery.yaml
+cp facts.yaml design/facts.yaml
+fixture checkerprog .machinery/src/checkerprog
+mkdir .machinery/bin
+exec go build -C .machinery/src/checkerprog -o $WORK/.machinery/bin/checkerprog .
+exec machinery gen
+cp reg_ob.yaml .machinery/checkers.local.yaml
+exec mrun 0 checkers run
+stdout '^checker rules: pass, 0 finding\(s\), 2 obligation\(s\), 7 covered$'
+
+# run regenerated obligations.json at once; gen has nothing left to write
+grep '"id": "ck:rules:operator-can-halt"' design/gen/obligations.json
+grep '"kind": "ck"' design/gen/obligations.json
+grep '"source": "design/checkers/rules.evidence.json"' design/gen/obligations.json
+grep '"title": "Fixture obligation operator-can-halt"' design/gen/obligations.json
+grep '"id": "ck:rules:decisions-logged"' design/gen/obligations.json
+exec mrun 0 gen --check
+stdout '^passed$'
+exec machinery gen
+stdout 'gen: wrote 0 file\(s\)'
+
+# nothing claims it yet: trace reports it as unverified
+exec mrun 1 trace
+stdout 'ERROR  unverified: ck:rules:decisions-logged'
+stdout 'ERROR  unverified: ck:rules:operator-can-halt'
+stdout 'failed: 2 finding\(s\)'
+
+# owing one of them clears that finding
+cp owed_one.yaml design/owed.yaml
+exec mrun 1 trace
+! stdout 'unverified: ck:rules:operator-can-halt'
+stdout 'ERROR  unverified: ck:rules:decisions-logged'
+stdout 'failed: 1 finding\(s\)'
+
+# a test claims the other with machinery:verifies
+exec sh -c 'echo "# machinery:verifies ck:rules:decisions-logged" >> e2e/orders.sh'
+exec mrun 0 trace
+stdout '^passed$'
+
+# a tag for a checker obligation the evidence does not declare is an unknown id
+exec sh -c 'echo "# machinery:verifies ck:rules:never-declared" >> e2e/orders.sh'
+exec mrun 1 trace
+stdout 'unknown-id: e2e/orders.sh:[0-9]+: ck:rules:never-declared'
+
+# a prefix claims every obligation of the checker
+exec sh -c 'grep -v never-declared e2e/orders.sh | grep -v decisions-logged > e2e/orders.new && mv e2e/orders.new e2e/orders.sh'
+exec sh -c 'echo "# machinery:verifies ck:rules:*" >> e2e/orders.sh'
+exec mrun 0 trace
+
+-- machinery.ck.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- facts.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: automated-decisions
+    value: false
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: retention-days
+    value: 90
+-- reg_ob.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "-obligation=operator-can-halt,decisions-logged", "{projection}", "{evidence}"]
+-- owed_one.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+  - id: ck:rules:operator-can-halt
+    reason: "no test halts processing yet"

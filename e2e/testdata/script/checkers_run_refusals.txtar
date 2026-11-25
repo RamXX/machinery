@@ -1,0 +1,203 @@
+# checkers run refuses, and never leaves bad evidence behind
+fixture shop
+cp machinery.ck.yaml machinery.yaml
+cp facts.yaml design/facts.yaml
+fixture checkerprog .machinery/src/checkerprog
+mkdir .machinery/bin
+exec go build -C .machinery/src/checkerprog -o $WORK/.machinery/bin/checkerprog .
+exec machinery gen
+
+# the projection is stale: a change to the design that gen has not carried
+exec sed -i.bak 's/value: 90/value: 30/' design/facts.yaml
+exec mrun 1 checkers run --registry reg_pass.yaml
+stdout '^ERROR  run machinery gen first$'
+! exists design/checkers/rules.evidence.json
+exec machinery gen
+
+# the projection is missing
+rm design/gen/projection.json
+exec mrun 1 checkers run --registry reg_pass.yaml
+stdout '^ERROR  run machinery gen first$'
+exec machinery gen
+
+# no registry file: a config error that names the default path
+! exec machinery checkers run
+stderr '^config: no command registered for checker rules in .machinery/checkers.local.yaml$'
+exec mrun 2 checkers run
+# no entry for the id, in a registry that names another checker
+exec mrun 2 checkers run --registry reg_other.yaml
+! exec machinery checkers run --registry reg_other.yaml
+stderr '^config: no command registered for checker rules in reg_other.yaml$'
+# a malformed registry
+! exec machinery checkers run --registry reg_bad.yaml
+stderr '^config: reg_bad.yaml: '
+! exists design/checkers/rules.evidence.json
+
+# the facts file is invalid: nothing is run
+cp facts_bad.yaml design/facts.yaml
+exec mrun 1 checkers run --registry reg_pass.yaml
+stdout '^ERROR  design/facts.yaml: fact 1: unknown subject "act:Order.nope"; use an id of the projection or system$'
+cp facts.yaml design/facts.yaml
+exec machinery gen
+
+# a command that exits non-zero did not run; nothing is written
+exec mrun 1 checkers run --registry reg_exit.yaml
+stdout '^ERROR  checker rules did not run: exited with status 3: checkerprog: refusing to run$'
+! exists design/checkers/rules.evidence.json
+
+# a command that exceeds its timeout is killed
+exec mrun 1 checkers run --registry reg_timeout.yaml
+stdout '^ERROR  checker rules did not run: timed out after 1s$'
+! exists design/checkers/rules.evidence.json
+
+# a command that writes no file did not run
+exec mrun 1 checkers run --registry reg_nofile.yaml
+stdout '^ERROR  checker rules did not run: no evidence file was written$'
+! exists design/checkers/rules.evidence.json
+
+# a command that cannot be started did not run
+exec mrun 1 checkers run --registry reg_missing.yaml
+stdout '^ERROR  checker rules did not run: '
+! exists design/checkers/rules.evidence.json
+
+# invalid evidence is not installed
+exec mrun 1 checkers run --registry reg_json.yaml
+stdout '^ERROR  design/checkers/rules.evidence.json: not a JSON object: '
+! exists design/checkers/rules.evidence.json
+exec mrun 1 checkers run --registry reg_hash.yaml
+stdout '^ERROR  design/checkers/rules.evidence.json: input_sha256 is not the hash of the projection the checker was given$'
+! exists design/checkers/rules.evidence.json
+exec mrun 1 checkers run --registry reg_key.yaml
+stdout '^ERROR  design/checkers/rules.evidence.json: unknown key "surprise"$'
+exec mrun 1 checkers run --registry reg_verdict.yaml
+stdout '^ERROR  design/checkers/rules.evidence.json: verdict is pass but a finding has severity error$'
+exec mrun 1 checkers run --registry reg_subject.yaml
+stdout '^ERROR  design/checkers/rules.evidence.json: finding 1: subject "act:Order.nope" is not an id of the projection$'
+exec mrun 1 checkers run --registry reg_id.yaml
+stdout '^ERROR  design/checkers/rules.evidence.json: checker is "other", want "rules"$'
+! exists design/checkers/rules.evidence.json
+
+# with good evidence in place, every failure leaves it exactly as it was
+exec mrun 0 checkers run --registry reg_pass.yaml
+cp design/checkers/rules.evidence.json keep.json
+exec mrun 1 checkers run --registry reg_exit.yaml
+cmp design/checkers/rules.evidence.json keep.json
+exec mrun 1 checkers run --registry reg_timeout.yaml
+cmp design/checkers/rules.evidence.json keep.json
+exec mrun 1 checkers run --registry reg_nofile.yaml
+cmp design/checkers/rules.evidence.json keep.json
+exec mrun 1 checkers run --registry reg_json.yaml
+cmp design/checkers/rules.evidence.json keep.json
+exec mrun 1 checkers run --registry reg_hash.yaml
+cmp design/checkers/rules.evidence.json keep.json
+
+-- machinery.ck.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- facts.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: automated-decisions
+    value: false
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: retention-days
+    value: 90
+-- facts_bad.yaml --
+version: 1
+facts:
+  - subject: "act:Order.nope"
+    predicate: handles-payment-data
+    value: true
+-- reg_other.yaml --
+version: 1
+checkers:
+  elsewhere:
+    command: ["true"]
+-- reg_bad.yaml --
+version: 1
+checkers:
+  rules:
+    command: []
+-- reg_pass.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "{projection}", "{evidence}"]
+-- reg_exit.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-exit=3", "{projection}", "{evidence}"]
+-- reg_timeout.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-sleep=5", "{projection}", "{evidence}"]
+    timeout_seconds: 1
+-- reg_nofile.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-no-write", "{projection}", "{evidence}"]
+-- reg_json.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-invalid-json", "{projection}", "{evidence}"]
+-- reg_hash.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-wrong-hash", "{projection}", "{evidence}"]
+-- reg_key.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-extra-key", "{projection}", "{evidence}"]
+-- reg_verdict.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-finding=error", "-bad-verdict", "{projection}", "{evidence}"]
+-- reg_subject.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-finding=warn", "-subject=act:Order.nope", "{projection}", "{evidence}"]
+-- reg_id.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-id=other", "{projection}", "{evidence}"]
+-- reg_missing.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/no-such-program", "{projection}", "{evidence}"]

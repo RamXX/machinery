@@ -1,0 +1,28 @@
+# without checkers and without design.facts the stage is not applicable and gen writes no projection
+fixture shop
+exec mrun 0 check --stage checkers
+stdout '^== checkers ==$'
+stdout '^not applicable: no checkers and no design.facts configured$'
+! stdout 'checked:'
+stdout 'machinery check: 0 passed, 0 failed, 0 not demonstrated, 1 not applicable'
+exec machinery gen
+stdout 'gen: wrote 4 file\(s\)'
+! exists design/gen/projection.json
+exec mrun 0 gen --check
+stdout 'checked: 3 generated files'
+
+# checks declares it
+exec mrun 0 checks
+stdout 'checkers +not applicable: no checkers and no design.facts configured'
+
+# a projection nobody asked for is an unexpected file
+exec sh -c 'echo "{}" > design/gen/projection.json'
+exec mrun 1 gen --check
+stdout 'ERROR  design/gen/projection.json: unexpected file in gen directory'
+rm design/gen/projection.json
+
+# the commands refuse politely
+! exec machinery checkers run
+stderr '^config: no checkers configured: add checkers to machinery.yaml$'
+exec mrun 0 checkers list
+stdout '^no checkers configured$'

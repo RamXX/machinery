@@ -1,0 +1,200 @@
+# stage checkers: each finding of section 21.7, and the checked line
+fixture shop
+cp machinery.ck.yaml machinery.yaml
+cp facts.yaml design/facts.yaml
+fixture checkerprog .machinery/src/checkerprog
+mkdir .machinery/bin
+exec go build -C .machinery/src/checkerprog -o $WORK/.machinery/bin/checkerprog .
+exec machinery gen
+mkdir design/checkers
+
+# no evidence
+exec mrun 1 check --stage checkers
+stdout '^== checkers ==$'
+stdout 'checked: 1 checkers, 0 covered ids, 0 findings, 0 obligations, 3 facts'
+stdout 'ERROR  rules: no evidence; run machinery checkers run rules'
+stdout 'failed: 1 finding\(s\)'
+
+# passing evidence
+exec .machinery/bin/checkerprog -covers=act:*,inv:* design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 0 check --stage checkers
+stdout 'checked: 1 checkers, 7 covered ids, 0 findings, 0 obligations, 3 facts'
+stdout '^passed$'
+stdout 'machinery check: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+# a warn finding does not block; its subject may be system
+exec .machinery/bin/checkerprog -covers=act:*,inv:* -finding=warn design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 0 check --stage checkers
+stdout 'warn   rules: system: fixture finding \[R-1\]'
+stdout 'checked: 1 checkers, 7 covered ids, 1 findings, 0 obligations, 3 facts'
+stdout '^passed$'
+
+# an error finding blocks
+exec .machinery/bin/checkerprog -covers=act:*,inv:* -finding=error -subject=act:Order.pay design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  rules: act:Order.pay: fixture finding \[R-1\]'
+stdout 'failed: 1 finding\(s\)'
+
+# evidence for another projection is stale, and still reports its findings
+exec sed -i.bak 's/value: 90/value: 30/' design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'DRIFT  design/checkers/rules.evidence.json: stale'
+stdout 'ERROR  rules: act:Order.pay: fixture finding \[R-1\]'
+stdout 'failed: 2 finding\(s\)'
+! stdout 'not covered'
+exec machinery gen
+exec mrun 1 check --stage checkers
+stdout 'DRIFT  design/checkers/rules.evidence.json: stale'
+cp facts.yaml design/facts.yaml
+exec machinery gen
+
+# evidence bound to a wrong hash is stale
+exec .machinery/bin/checkerprog -covers=act:*,inv:* -wrong-hash design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'DRIFT  design/checkers/rules.evidence.json: stale'
+stdout 'failed: 1 finding\(s\)'
+
+# invalid evidence: each problem is reported against the evidence path
+cp evidence_bad.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/checkers/rules.evidence.json: unknown key "surprise"'
+stdout 'ERROR  design/checkers/rules.evidence.json: missing key "findings"'
+stdout 'failed: 2 finding\(s\)'
+exec sh -c 'echo "{not json" > design/checkers/rules.evidence.json'
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/checkers/rules.evidence.json: not a JSON object: '
+exec .machinery/bin/checkerprog -id=other design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/checkers/rules.evidence.json: checker is "other", want "rules"'
+exec .machinery/bin/checkerprog -covers=act:*,inv:* -finding=error -bad-verdict -subject=act:Order.pay design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/checkers/rules.evidence.json: verdict is pass but a finding has severity error'
+exec .machinery/bin/checkerprog -covers=act:*,inv:* -finding=warn -subject=entity:Nobody design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/checkers/rules.evidence.json: finding 1: subject "entity:Nobody" is not an id of the projection'
+exec .machinery/bin/checkerprog -covers=act:*,inv:* -extra-cover=act:Order.gone design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/checkers/rules.evidence.json: covers: "act:Order.gone" is not an id of the projection'
+
+# the evidence leaves out an id the manifest selects
+exec .machinery/bin/checkerprog -covers=act:Order.pay,act:Order.place,act:Order.ship,act:Order.cancel,inv:paid-before-shipped design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  rules: not covered: inv:customer-email-unique'
+stdout 'ERROR  rules: not covered: inv:terminal-is-final'
+! stdout 'not covered: act:'
+! stdout 'not covered: inv:paid-before-shipped'
+stdout 'failed: 2 finding\(s\)'
+
+# a covers pattern that selects nothing
+cp machinery.nomatch.yaml machinery.yaml
+exec .machinery/bin/checkerprog -covers=act:*,inv:* design/gen/projection.json design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  rules: covers matches nothing: zzz:\*'
+stdout 'failed: 1 finding\(s\)'
+
+# the stage runs no tool and reads no registry: it passes without one
+cp machinery.ck.yaml machinery.yaml
+exec mrun 0 check --stage checkers
+! exists .machinery/checkers.local.yaml
+
+# facts only, no checkers: the stage still applies
+cp machinery.facts.yaml machinery.yaml
+exec mrun 0 check --stage checkers
+stdout 'checked: 0 checkers, 0 covered ids, 0 findings, 0 obligations, 3 facts'
+
+-- machinery.ck.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- facts.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: automated-decisions
+    value: false
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: retention-days
+    value: 90
+-- machinery.nomatch.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*", "zzz:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery.facts.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- evidence_bad.json --
+{
+  "version": 1,
+  "checker": "rules",
+  "input_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "verdict": "pass",
+  "covers": [],
+  "surprise": true
+}

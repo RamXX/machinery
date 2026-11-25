@@ -1,0 +1,169 @@
+# each error of the facts file is an ERROR of stage checkers, and a bad file keeps gen from carrying facts
+fixture shop
+cp machinery.facts.yaml machinery.yaml
+
+# a valid file passes; machinery gives facts no meaning
+cp facts_ok.yaml design/facts.yaml
+exec mrun 0 check --stage checkers
+stdout 'checked: 0 checkers, 0 covered ids, 0 findings, 0 obligations, 3 facts'
+stdout '^passed$'
+
+# the file is missing
+rm design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: cannot read: no such file or directory'
+stdout 'failed: 1 finding\(s\)'
+
+# bad yaml
+cp facts_bad_yaml.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: not valid YAML'
+stdout 'failed: 1 finding\(s\)'
+
+# unknown top
+cp facts_unknown_top.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: unknown key "extra"'
+stdout 'failed: 1 finding\(s\)'
+
+# version
+cp facts_version.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: version must be 1'
+stdout 'failed: 1 finding\(s\)'
+
+# unknown key
+cp facts_unknown_key.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 1: unknown key "note"'
+stdout 'failed: 1 finding\(s\)'
+
+# unknown subject
+cp facts_unknown_subject.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 1: unknown subject "act:Order.nope"; use an id of the projection or system'
+stdout 'failed: 1 finding\(s\)'
+
+# no subject
+cp facts_no_subject.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 1: subject is required'
+stdout 'failed: 1 finding\(s\)'
+
+# predicate
+cp facts_predicate.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 1: predicate "Handles_Payment" must match'
+stdout 'failed: 1 finding\(s\)'
+
+# value list
+cp facts_value_list.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 1: value must be a string, a number or a boolean'
+stdout 'failed: 1 finding\(s\)'
+
+# value missing
+cp facts_value_missing.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 1: value must be a string, a number or a boolean'
+stdout 'failed: 1 finding\(s\)'
+
+# duplicate
+cp facts_duplicate.yaml design/facts.yaml
+exec mrun 1 check --stage checkers
+stdout 'ERROR  design/facts.yaml: fact 2: duplicate of fact 1 \(subject act:Order.pay, predicate handles-payment-data\)'
+stdout 'failed: 1 finding\(s\)'
+
+# a bad facts file leaves the projection without facts
+exec machinery gen
+grep '"facts": \[\]' design/gen/projection.json
+
+-- machinery.facts.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- facts_ok.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: automated-decisions
+    value: false
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: retention-days
+    value: 90
+-- facts_bad_yaml.yaml --
+facts: [
+  - subject: x
+-- facts_unknown_top.yaml --
+version: 1
+facts: []
+extra: 1
+-- facts_version.yaml --
+version: 2
+facts: []
+-- facts_unknown_key.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: x-y
+    value: true
+    note: hi
+-- facts_unknown_subject.yaml --
+version: 1
+facts:
+  - subject: "act:Order.nope"
+    predicate: handles-payment-data
+    value: true
+-- facts_no_subject.yaml --
+version: 1
+facts:
+  - predicate: handles-payment-data
+    value: true
+-- facts_predicate.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: Handles_Payment
+    value: true
+-- facts_value_list.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: some-list
+    value: [a, b]
+-- facts_value_missing.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: some-thing
+-- facts_duplicate.yaml --
+version: 1
+facts:
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: false

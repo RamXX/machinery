@@ -1,0 +1,101 @@
+# checkers run: the registered command runs against projection.json and its evidence is installed
+fixture shop
+cp machinery.ck.yaml machinery.yaml
+cp facts.yaml design/facts.yaml
+fixture checkerprog .machinery/src/checkerprog
+mkdir .machinery/bin
+exec go build -C .machinery/src/checkerprog -o $WORK/.machinery/bin/checkerprog .
+exec machinery gen
+
+# the registry is machine-local: the default file is .machinery/checkers.local.yaml
+cp reg_pass.yaml .machinery/checkers.local.yaml
+exec mrun 0 checkers run
+stdout '^checker rules: pass, 0 finding\(s\), 0 obligation\(s\), 7 covered$'
+grep '"checker": "rules"' design/checkers/rules.evidence.json
+grep '"verdict": "pass"' design/checkers/rules.evidence.json
+grep '"input_sha256": "' design/checkers/rules.evidence.json
+
+# the stage accepts what was installed
+exec mrun 0 check --stage checkers
+stdout 'checked: 1 checkers, 7 covered ids, 0 findings, 0 obligations, 3 facts'
+stdout '^passed$'
+
+# a named checker, and the registry named by a flag or by the environment
+rm .machinery/checkers.local.yaml
+exec mrun 0 checkers run rules --registry reg_pass.yaml
+stdout '^checker rules: pass'
+env MACHINERY_CHECKERS_REGISTRY=reg_warn.yaml
+exec mrun 0 checkers run
+stdout '^warn   rules: act:Order.pay: fixture finding \[R-1\]$'
+stdout '^checker rules: pass, 1 finding\(s\), 0 obligation\(s\), 7 covered$'
+# the flag wins over the environment
+exec mrun 0 checkers run --registry reg_pass.yaml
+stdout '^checker rules: pass, 0 finding\(s\)'
+
+# a finding with severity error makes the verdict fail and the exit code 1; the evidence is kept
+env MACHINERY_CHECKERS_REGISTRY=
+exec mrun 1 checkers run --registry reg_fail.yaml
+stdout '^ERROR  rules: act:Order.pay: fixture finding \[R-1\]$'
+stdout '^checker rules: fail, 1 finding\(s\), 0 obligation\(s\), 7 covered$'
+grep '"verdict": "fail"' design/checkers/rules.evidence.json
+exec mrun 1 check --stage checkers
+stdout 'ERROR  rules: act:Order.pay: fixture finding \[R-1\]'
+stdout 'failed: 1 finding\(s\)'
+
+# an id that is not configured is a config error
+! exec machinery checkers run nope --registry reg_pass.yaml
+stderr 'config: no checker nope in machinery.yaml \(configured: rules\)'
+
+-- machinery.ck.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- facts.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: automated-decisions
+    value: false
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: retention-days
+    value: 90
+-- reg_pass.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "{projection}", "{evidence}"]
+-- reg_warn.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "-finding=warn", "-subject=act:Order.pay", "{projection}", "{evidence}"]
+-- reg_fail.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "-finding=error", "-subject=act:Order.pay", "{projection}", "{evidence}"]

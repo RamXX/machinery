@@ -1,0 +1,164 @@
+# checkers list: one line per configured checker
+fixture shop
+cp machinery.ck.yaml machinery.yaml
+cp facts.yaml design/facts.yaml
+fixture checkerprog .machinery/src/checkerprog
+mkdir .machinery/bin
+exec go build -C .machinery/src/checkerprog -o $WORK/.machinery/bin/checkerprog .
+exec machinery gen
+
+# not registered, no evidence yet
+exec mrun 0 checkers list
+stdout '^rules  not registered  evidence: missing$'
+
+# registered
+cp reg_pass.yaml .machinery/checkers.local.yaml
+exec mrun 0 checkers list
+stdout '^rules  registered  evidence: missing$'
+exec mrun 0 checkers run
+exec mrun 0 checkers list
+stdout '^rules  registered  evidence: pass$'
+
+# the registry can be named, and then this one has no entry for it
+exec mrun 0 checkers list --registry reg_other.yaml
+stdout '^rules  not registered  evidence: pass$'
+
+# failing, stale and invalid evidence
+exec mrun 1 checkers run --registry reg_fail.yaml
+exec mrun 0 checkers list
+stdout '^rules  registered  evidence: fail$'
+exec sed -i.bak 's/value: 90/value: 30/' design/facts.yaml
+exec mrun 0 checkers list
+stdout '^rules  registered  evidence: stale$'
+exec sh -c 'echo "{not json" > design/checkers/rules.evidence.json'
+exec mrun 0 checkers list
+stdout '^rules  registered  evidence: invalid$'
+
+# the registry is read from the environment too; a malformed one is a config error
+env MACHINERY_CHECKERS_REGISTRY=reg_bad.yaml
+! exec machinery checkers list
+stderr '^config: reg_bad.yaml: '
+
+# two checkers, listed in manifest order
+env MACHINERY_CHECKERS_REGISTRY=
+cp machinery.two.yaml machinery.yaml
+exec mrun 0 checkers list
+stdout '^rules  registered  evidence: invalid$'
+stdout '^audit  not registered  evidence: missing$'
+
+# no checkers configured
+cp machinery.facts.yaml machinery.yaml
+exec mrun 0 checkers list
+stdout '^no checkers configured$'
+! exec machinery checkers run
+stderr '^config: no checkers configured: add checkers to machinery.yaml$'
+
+-- machinery.ck.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- facts.yaml --
+version: 1
+facts:
+  - subject: system
+    predicate: automated-decisions
+    value: false
+  - subject: "act:Order.pay"
+    predicate: handles-payment-data
+    value: true
+  - subject: "act:Order.pay"
+    predicate: retention-days
+    value: 90
+-- reg_pass.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "{projection}", "{evidence}"]
+-- reg_fail.yaml --
+version: 1
+checkers:
+  rules:
+    command: ["./.machinery/bin/checkerprog", "-covers=act:*,inv:*", "-finding=error", "{projection}", "{evidence}"]
+-- reg_other.yaml --
+version: 1
+checkers:
+  elsewhere:
+    command: ["true"]
+-- reg_bad.yaml --
+version: 1
+checkers:
+  rules:
+    command: []
+-- machinery.facts.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- machinery.two.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  facts: design/facts.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+checkers:
+  - id: rules
+    covers: ["act:*", "inv:*"]
+  - id: audit
+    covers: ["fm:*"]
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
