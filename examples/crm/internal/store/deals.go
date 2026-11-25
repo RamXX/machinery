@@ -29,6 +29,26 @@ func (s *Store) CreateDeal(ctx context.Context, d Deal) (Deal, error) {
 		VALUES ($1, $2, $3, $4::uuid) RETURNING `+dealCols, d.Title, d.Stage, d.AmountCents, d.OwnerID))
 }
 
+// ListDeals returns every deal, ordered by id.
+func (s *Store) ListDeals(ctx context.Context) ([]Deal, error) {
+	rows, err := s.pool.Query(ctx, "SELECT "+dealCols+" FROM deals ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Deal, error) { return scanDeal(r) })
+}
+
+// LockDeal loads a deal FOR UPDATE inside the transaction.
+func (t *Tx) LockDeal(id string) (Deal, error) {
+	return scanDeal(t.tx.QueryRow(t.ctx, "SELECT "+dealCols+" FROM deals WHERE id = $1::uuid FOR UPDATE", id))
+}
+
+// SetDealStage stores the new stage of a locked deal.
+func (t *Tx) SetDealStage(id, stage string) error {
+	_, err := t.tx.Exec(t.ctx, "UPDATE deals SET stage = $2 WHERE id = $1::uuid", id, stage)
+	return err
+}
+
 // GetDeal loads a deal; an unknown id is ErrNotFound.
 func (s *Store) GetDeal(ctx context.Context, id string) (Deal, error) {
 	return scanDeal(s.pool.QueryRow(ctx, "SELECT "+dealCols+" FROM deals WHERE id = $1::uuid", id))

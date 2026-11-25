@@ -1,6 +1,7 @@
 package fsm
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,16 +17,24 @@ type Action struct {
 	Simulated bool
 }
 
+// Actor is the implementation of an invoked actor. Its context carries the
+// deadline of the state's after delay, when there is one.
+type Actor struct {
+	Run       func(context.Context, Ctx) error
+	Simulated bool
+}
+
 // Units maps the names the table uses to their implementations.
 type Units struct {
 	Guards  map[string]func(Ctx) bool
 	Actions map[string]Action
+	Actors  map[string]Actor
 }
 
-// Bind checks that every guard and action the table names has an
+// Bind checks that every guard, action and actor the table names has an
 // implementation and keeps them. The error names every missing one.
 func (m *Machine) Bind(u Units) error {
-	guards, actions := m.names()
+	guards, actions, actors := m.names()
 	var missing []string
 	for _, g := range guards {
 		if _, ok := u.Guards[g]; !ok {
@@ -37,6 +46,11 @@ func (m *Machine) Bind(u Units) error {
 			missing = append(missing, "action "+a)
 		}
 	}
+	for _, a := range actors {
+		if _, ok := u.Actors[a]; !ok {
+			missing = append(missing, "actor "+a)
+		}
+	}
 	if len(missing) > 0 {
 		return fmt.Errorf("table %s: no implementation for %s; implement them or fix the table", m.t.Machine, strings.Join(missing, ", "))
 	}
@@ -45,8 +59,8 @@ func (m *Machine) Bind(u Units) error {
 }
 
 // names is every unit name the table lists or uses, each set sorted.
-func (m *Machine) names() (guards, actions []string) {
-	g, a := set(m.t.Units.Guards), set(m.t.Units.Actions)
+func (m *Machine) names() (guards, actions, actors []string) {
+	g, a, r := set(m.t.Units.Guards), set(m.t.Units.Actions), set(m.t.Units.Actors)
 	for _, t := range m.t.Transitions {
 		if t.Guard != "" {
 			g[t.Guard] = true
@@ -55,7 +69,12 @@ func (m *Machine) names() (guards, actions []string) {
 			a[n] = true
 		}
 	}
-	return sorted(g), sorted(a)
+	for _, s := range m.t.States {
+		for _, n := range s.Invoke {
+			r[n] = true
+		}
+	}
+	return sorted(g), sorted(a), sorted(r)
 }
 
 func set(names []string) map[string]bool {

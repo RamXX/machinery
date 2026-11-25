@@ -59,6 +59,10 @@ func writeResult(w http.ResponseWriter, id, event string, res fsm.Result) {
 			code = m[1]
 		}
 		writeJSON(w, http.StatusConflict, errorBody{Code: code, Message: res.Reason, Case: res.CaseID})
+	case res.Failed:
+		writeJSON(w, http.StatusServiceUnavailable, errorBody{Code: "STORE_UNAVAILABLE",
+			Message: "the store did not record the change in time; the record is " + res.State,
+			Case:    res.Cases[len(res.Cases)-1], Cases: res.Cases})
 	case res.Internal:
 		writeJSON(w, http.StatusForbidden, errorBody{Code: "FORBIDDEN", Message: "the caller may not " + event + " this record", Case: res.CaseID})
 	default:

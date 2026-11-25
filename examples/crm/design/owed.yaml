@@ -1,15 +1,5 @@
 version: 1
 owed:
-  - id: act:Deal.create
-    reason: "no handler yet"
-  - id: act:Deal.lose
-    reason: "no handler yet"
-  - id: act:Deal.qualify
-    reason: "no handler yet"
-  - id: act:Deal.reopen
-    reason: "no handler yet"
-  - id: act:Deal.win
-    reason: "no handler yet"
   - id: fm:database-unreachable
     reason: "skeleton: not built yet; no test provokes this failure"
   - id: fm:deal-lose-by-non-owner

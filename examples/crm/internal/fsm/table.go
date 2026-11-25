@@ -62,8 +62,13 @@ type units struct {
 	Actors  []string `json:"actors"`
 }
 
-// The transition kind the engine drives.
-const kindOn = "on"
+// Transition kinds the engine drives.
+const (
+	kindOn      = "on"
+	kindAfter   = "after"
+	kindOnDone  = "onDone"
+	kindOnError = "onError"
+)
 
 // Machine is a loaded table. Bind it before firing events.
 type Machine struct {
@@ -86,8 +91,8 @@ func Load(tableJSON []byte) (*Machine, error) {
 		if s.Kind != "atomic" && s.Kind != "final" {
 			return nil, fmt.Errorf("table %s: state %s is %s; this engine drives atomic and final states only", t.Machine, s.Path, s.Kind)
 		}
-		if len(s.Invoke) > 0 {
-			return nil, fmt.Errorf("table %s: state %s invokes %v; this engine does not run invoked actors yet", t.Machine, s.Path, s.Invoke)
+		if len(s.Invoke) > 1 {
+			return nil, fmt.Errorf("table %s: state %s invokes %d actors; this engine runs one per state", t.Machine, s.Path, len(s.Invoke))
 		}
 		m.states[s.Path] = s
 	}
@@ -108,14 +113,28 @@ func Load(tableJSON []byte) (*Machine, error) {
 }
 
 func (m *Machine) checkTransition(tr transition) error {
-	if _, ok := m.states[tr.Source]; !ok {
+	src, ok := m.states[tr.Source]
+	if !ok {
 		return fmt.Errorf("unknown source state %q", tr.Source)
 	}
 	if _, ok := m.states[tr.Target]; tr.Target != "" && !ok {
 		return fmt.Errorf("unknown target state %q", tr.Target)
 	}
-	if tr.Kind != kindOn {
-		return fmt.Errorf("transition kind %q is not supported by this engine yet", tr.Kind)
+	switch tr.Kind {
+	case kindOn:
+	case kindOnDone, kindOnError:
+		if len(src.Invoke) == 0 || src.Invoke[0] != tr.Event {
+			return fmt.Errorf("%s of %s, which state %s does not invoke", tr.Kind, tr.Event, tr.Source)
+		}
+	case kindAfter:
+		if len(src.Invoke) == 0 {
+			return fmt.Errorf("after on state %s, which invokes nothing; this engine runs timers only around an actor", tr.Source)
+		}
+		if _, ok := m.t.Delays[tr.Event]; !ok {
+			return fmt.Errorf("after %s has no entry in delays", tr.Event)
+		}
+	default:
+		return fmt.Errorf("transition kind %q is not supported by this engine", tr.Kind)
 	}
 	return nil
 }
