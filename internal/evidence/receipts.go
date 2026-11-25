@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path"
 	"sort"
 	"strings"
 
@@ -166,7 +167,23 @@ func receiptFiles(p *project.Project) ([]string, error) {
 // TreeDirty reports whether the working tree has changes outside the receipts
 // directory and the owed file (section 10).
 func TreeDirty(p *project.Project) (bool, error) {
-	return gitx.Dirty(p.Root, Dir(p)+"/", p.Cfg.Design.Owed)
+	paths, err := gitx.StatusPaths(p.Root)
+	if err != nil {
+		return false, err
+	}
+	for _, rel := range paths {
+		if rel != p.Cfg.Design.Owed && !isReceipt(p, rel) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// isReceipt reports whether a project-relative path is a receipts file: a
+// .jsonl file directly in the receipts directory. Nothing else in that
+// directory is exempt from the dirty check or from the validity rule.
+func isReceipt(p *project.Project, rel string) bool {
+	return strings.HasSuffix(rel, ".jsonl") && path.Dir(rel) == Dir(p)
 }
 
 // validity decides, per commit, whether evidence from that commit is valid for
@@ -196,7 +213,7 @@ func (v *validity) valid(commit string) bool {
 		if err == nil {
 			ok = true
 			for _, n := range names {
-				if n != v.p.Cfg.Design.Owed {
+				if n != v.p.Cfg.Design.Owed && !isReceipt(v.p, n) {
 					ok = false
 					break
 				}

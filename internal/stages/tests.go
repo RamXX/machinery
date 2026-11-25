@@ -26,7 +26,7 @@ func Tests(ctx *Context) *report.Stage {
 	}
 	baseline.Apply(s, entries, vs)
 	s.Count(c.TestFiles, "test files").Count(c.E2EFiles, "files under e2e roots").Count(c.Markers, "markers")
-	if c.TestFiles == 0 && s.Blocking() == 0 {
+	if c.TestFiles == 0 && c.E2EFiles == 0 && s.Blocking() == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
 	return s

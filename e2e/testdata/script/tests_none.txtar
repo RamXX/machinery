@@ -10,12 +10,21 @@ exec mrun 0 tests --write-baseline
 stdout 'not applicable'
 ! exists design/tests-baseline.yaml
 
-# trace.tests is enough to apply it; with e2e roots and no test file there is nothing to check
+# trace.tests is enough to apply it; e2e files in a form the patterns do not know (a shell
+# script) are still the project's tests, so the stage has something to hold
 cp trace_only.yaml machinery.yaml
-exec mrun 1 tests
+exec mrun 0 tests
 stdout 'checked: 0 test files, 1 files under e2e roots, 12 markers'
+stdout '^passed$'
+
+# with nothing under the e2e roots and no test file there is nothing to check
+mkdir aside
+exec sh -c 'mv e2e/* aside/'
+exec mrun 1 tests
+stdout 'checked: 0 test files, 0 files under e2e roots, 12 markers'
 stdout 'not demonstrated: nothing to check'
 stdout 'machinery tests: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+exec sh -c 'mv aside/* e2e/'
 
 # a tests block with no e2e roots makes every test file a unit test
 cp tests_block.yaml machinery.yaml

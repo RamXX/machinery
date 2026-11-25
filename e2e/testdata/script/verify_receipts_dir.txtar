@@ -1,0 +1,23 @@
+# Only receipts files are exempt from the dirty check, wherever the receipts directory points,
+# and a receipts file that was committed by mistake does not invalidate its own evidence.
+fixture shop
+exec sh -c 'printf "receipts:\n  dir: internal\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+
+# an uncommitted source change next to the receipts is still a dirty tree
+exec sh -c 'printf "\n// changed after the run\n" >> internal/domain/order.go'
+exec mrun 1 verify
+stdout 'ERROR  working tree has uncommitted changes'
+exec git checkout -- internal/domain/order.go
+
+# committing the receipts file (git add -A) keeps the evidence valid
+exec machinery verify
+stdout '^passed$'
+gitcommit 'everything, receipts included'
+exec machinery verify
+stdout 'checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts'
+stdout '^passed$'
