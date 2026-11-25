@@ -1,0 +1,328 @@
+# rule failure-state-mode: every state tagged failure is the subject of a failure mode
+exec machinery lint --stage xref-failure
+stdout '^checked: 3 failure modes, 1 invokes, 1 dependencies, 0 tiered actions, 1 failure states, 0 failure events$'
+stdout '^passed$'
+
+# a failure state no failure mode names
+cp no-state-mode.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  failure-state-mode: state:order\.PaymentFailed: no failure mode names this failure state; declare what the system must do when it is entered in design/failure-modes\.yaml$'
+stdout 'failed: 1 finding\(s\)'
+
+# a nested failure state is named by its dotted path
+cp nested.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  failure-state-mode: state:order\.Paid\.Disputed: no failure mode names this failure state'
+stdout '^checked: 2 failure modes, 1 invokes, 1 dependencies, 0 tiered actions, 2 failure states, 0 failure events$'
+cp nested-modes.yaml design/failure-modes.yaml
+exec machinery lint --stage xref-failure
+stdout '^passed$'
+
+# a waiver turns the finding into a warning; the waiver id is the subject
+cp flat.json design/machines/Order.machine.json
+cp no-state-mode.yaml design/failure-modes.yaml
+cp waived.yaml machinery.yaml
+exec machinery lint --stage xref-failure
+stdout '^  warn   waived: failure-state-mode: state:order\.PaymentFailed: no failure mode names this failure state; declare what the system must do when it is entered in design/failure-modes\.yaml \(written in the next story\)$'
+stdout '^passed$'
+
+# subject-resolves: the machine exists, the state exists, and it is tagged failure
+cp unwaived.yaml machinery.yaml
+cp unresolved.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  subject-resolves: state:ghost\.PaymentFailed: failure mode a-ghost-machine: no machine has the id ghost'
+stdout 'ERROR  subject-resolves: state:order\.Nope: failure mode b-no-state: machine order has no state Nope'
+stdout 'ERROR  subject-resolves: state:order\.Paid: failure mode c-not-failure: state Paid of machine order is not tagged failure'
+stdout 'failed: 3 finding\(s\)'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+dependencies:
+  - {name: postgres, posture: real}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid"
+        },
+        "onError": {
+          "target": "PaymentFailed"
+        }
+      }
+    },
+    "PaymentFailed": {
+      "tags": [
+        "failure",
+        "billing"
+      ],
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: payment-failed
+    subject: state:order.PaymentFailed
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+-- flat.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid"
+        },
+        "onError": {
+          "target": "PaymentFailed"
+        }
+      }
+    },
+    "PaymentFailed": {
+      "tags": [
+        "failure",
+        "billing"
+      ],
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- nested.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid"
+        },
+        "onError": {
+          "target": "PaymentFailed"
+        }
+      }
+    },
+    "PaymentFailed": {
+      "tags": [
+        "failure",
+        "billing"
+      ],
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "initial": "settled",
+      "states": {
+        "settled": {
+          "type": "final"
+        },
+        "Disputed": {
+          "tags": "failure",
+          "on": {
+            "settle": {
+              "target": "settled"
+            }
+          }
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- no-state-mode.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+-- nested-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: payment-failed
+    subject: state:order.PaymentFailed
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: payment-disputed
+    subject: state:order.Paid.Disputed
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+dependencies:
+  - {name: postgres, posture: real}
+waivers:
+  - {rule: failure-state-mode, id: "state:order.PaymentFailed", reason: "written in the next story"}
+-- unwaived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+dependencies:
+  - {name: postgres, posture: real}
+-- unresolved.yaml --
+version: 1
+failure_modes:
+  - id: payment-down
+    subject: invoke:order.chargePayment
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: database-down
+    subject: dependency:postgres
+    failure: "It fails."
+    required: fail-closed
+    behavior: "The caller is told."
+  - id: payment-failed
+    subject: state:order.PaymentFailed
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: a-ghost-machine
+    subject: state:ghost.PaymentFailed
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: b-no-state
+    subject: state:order.Nope
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."
+  - id: c-not-failure
+    subject: state:order.Paid
+    failure: "It fails."
+    required: surface
+    behavior: "The caller is told."

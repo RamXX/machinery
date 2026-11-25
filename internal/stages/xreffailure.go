@@ -6,20 +6,39 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 )
 
 func init() { Bind("xref-failure", XrefFailure) }
 
-var xrefFailureRules = []string{"subject-resolves", "invoke-failure-mode", "dependency-failure-mode", "tiered-action-abuse"}
+var xrefFailureRules = []string{"subject-resolves", "invoke-failure-mode", "dependency-failure-mode", "tiered-action-abuse",
+	"failure-state-mode", "failure-event-mode"}
+
+// The rules that hold the failure states and failure events of the machines.
+const (
+	ruleFailureState = "failure-state-mode"
+	ruleFailureEvent = "failure-event-mode"
+)
 
 // XrefFailure is stage xref-failure (section 6.6).
 func XrefFailure(ctx *Context) *report.Stage {
 	s := report.New("xref-failure")
 	p := ctx.P
 	d := ctx.Design()
+	fstates, fevents := failureSubjects(d)
 	if !d.HasFM {
-		return s.NotApplicable("no design.failure_modes configured")
+		if len(fstates) == 0 && len(fevents) == 0 {
+			return s.NotApplicable("no design.failure_modes configured")
+		}
+		// the machines declare failures and nothing says what to do about
+		// them: only the two rules that ask for it run
+		w := waiversFor(p, ruleFailureState, ruleFailureEvent)
+		failureGaps(s, w, fstates, fevents, nil, func(when string) string {
+			return "configure design.failure_modes and declare what the system must do when it " + when
+		})
+		w.stale(s)
+		return s.Count(len(fstates), "failure states").Count(len(fevents), "failure events")
 	}
 	w := waiversFor(p, xrefFailureRules...)
 
@@ -41,7 +60,7 @@ func XrefFailure(ctx *Context) *report.Stage {
 		if fm.Kind == "abuse" {
 			abused[fm.Subject] = true
 		}
-		if why := unresolved(d, fm.Subject, invokes, deps); why != "" {
+		if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
 			w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
 		}
 	}
@@ -71,17 +90,84 @@ func XrefFailure(ctx *Context) *report.Stage {
 			w.find(s, "tiered-action-abuse", sv.ID, "%s action (area %s) has no failure mode of kind abuse; add one with subject %s", tier, strings.Join(names, ", "), sv.ID)
 		}
 	}
+	failureGaps(s, w, fstates, fevents, named, func(when string) string {
+		return "declare what the system must do when it " + when + " in " + p.Cfg.Design.FailureModes
+	})
 	w.stale(s)
-	s.Count(len(d.FailureModes), "failure modes").Count(len(invokes), "invokes").Count(len(deps), "dependencies").Count(tiered, "tiered actions")
-	if len(d.FailureModes) == 0 && len(invokes) == 0 && len(deps) == 0 && tiered == 0 && len(d.FMProblems) == 0 {
+	s.Count(len(d.FailureModes), "failure modes").Count(len(invokes), "invokes").Count(len(deps), "dependencies").Count(tiered, "tiered actions").
+		Count(len(fstates), "failure states").Count(len(fevents), "failure events")
+	if len(d.FailureModes) == 0 && len(invokes) == 0 && len(deps) == 0 && tiered == 0 && len(fstates) == 0 && len(fevents) == 0 && len(d.FMProblems) == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
 	return s
 }
 
+// failureSubjects returns the subject of every failure state
+// (state:<machine id>.<path>) and of every failure event
+// (event:<machine id>.<event>) of the machines.
+func failureSubjects(d *design.Design) (states, events map[string]bool) {
+	states, events = map[string]bool{}, map[string]bool{}
+	for _, m := range d.Machines {
+		for _, p := range m.FailureStates() {
+			states["state:"+m.ID+"."+p] = true
+		}
+		for _, e := range m.FailureEvents() {
+			events["event:"+m.ID+"."+e] = true
+		}
+	}
+	return states, events
+}
+
+// failureGaps reports every failure state and failure event no failure mode
+// names; todo says what to do, given when the failure happens.
+func failureGaps(s *report.Stage, w *waivers, states, events, named map[string]bool, todo func(when string) string) {
+	for _, id := range sortedSet(states) {
+		if !named[id] {
+			w.find(s, ruleFailureState, id, "no failure mode names this failure state; %s", todo("is entered"))
+		}
+	}
+	for _, id := range sortedSet(events) {
+		if !named[id] {
+			w.find(s, ruleFailureEvent, id, "no failure mode names this failure event; %s", todo("arrives"))
+		}
+	}
+}
+
+// UnmodeledFailures returns the findings of failure-state-mode and
+// failure-event-mode that no waiver covers, as waivers without a reason,
+// sorted by rule and subject (section 17.2). It returns none while the
+// failure-mode file has problems: what it names is then unknown.
+func UnmodeledFailures(ctx *Context) []project.Waiver {
+	d := ctx.Design()
+	if len(d.FMProblems) > 0 {
+		return nil
+	}
+	states, events := failureSubjects(d)
+	named := map[string]bool{}
+	for _, fm := range d.FailureModes {
+		named[fm.Subject] = true
+	}
+	waived := map[string]bool{}
+	for _, wv := range ctx.P.Cfg.Waivers {
+		waived[wv.Rule+" "+wv.ID] = true
+	}
+	var res []project.Waiver
+	for _, g := range []struct {
+		rule string
+		ids  map[string]bool
+	}{{ruleFailureEvent, events}, {ruleFailureState, states}} {
+		for _, id := range sortedSet(g.ids) {
+			if !named[id] && !waived[g.rule+" "+id] {
+				res = append(res, project.Waiver{Rule: g.rule, ID: id})
+			}
+		}
+	}
+	return res
+}
+
 // unresolved says why a well-formed subject names nothing, or "".
 // Malformed subjects are the failure-modes stage's finding.
-func unresolved(d *design.Design, subject string, invokes, deps map[string]bool) string {
+func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevents map[string]bool) string {
 	kind, name, ok := strings.Cut(subject, ":")
 	if !ok {
 		return ""
@@ -108,6 +194,28 @@ func unresolved(d *design.Design, subject string, invokes, deps map[string]bool)
 		if e, _ := design.FindEntity(d.Models, name); e == nil {
 			return fmt.Sprintf("%s is not an entity of the model", name)
 		}
+	case "state":
+		if fstates[subject] {
+			return ""
+		}
+		mid, path, _ := strings.Cut(name, ".")
+		m := d.MachineByID(mid)
+		switch {
+		case m == nil:
+			return fmt.Sprintf("no machine has the id %s", mid)
+		case !m.Resolver.PathSet[path]:
+			return fmt.Sprintf("machine %s has no state %s", mid, path)
+		}
+		return fmt.Sprintf("state %s of machine %s is not tagged failure", path, mid)
+	case "event":
+		if fevents[subject] {
+			return ""
+		}
+		mid, ev, _ := strings.Cut(name, ".")
+		if d.MachineByID(mid) == nil {
+			return fmt.Sprintf("no machine has the id %s", mid)
+		}
+		return fmt.Sprintf("%s is not in the _failure_events of machine %s", ev, mid)
 	}
 	return ""
 }

@@ -29,7 +29,7 @@ type failureFile struct {
 
 var (
 	kebabRe   = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
-	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+)$`)
+	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
 )
 
 func strictYAML(data []byte, out any) error {
@@ -82,7 +82,7 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 			problems = append(problems, fmt.Sprintf("%s: kind must be fault or abuse, got %q", where, fm.Kind))
 		}
 		if !subjectRe.MatchString(fm.Subject) {
-			problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action> or entity:<Name>", where, fm.Subject))
+			problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>", where, fm.Subject))
 		}
 		switch fm.Required {
 		case "fail-closed", "retry-bounded", "surface":

@@ -15,7 +15,7 @@ stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 2 abuse cases\npassed
 stdout '(?s)== risk ==\nchecked: 2 areas, 2 consequential ids, 11 critical ids\npassed\n'
 stdout '(?s)== xref-model-machine ==\nchecked: 1 machines, 4 domain states, 3 events, 4 actions\n  warn   waived: action-event: act:Order.place[^\n]*\npassed\n'
 stdout '(?s)== xref-contract ==\nchecked: 1 contracts, 5 operations, 4 bound operations, 4 actions\npassed\n'
-stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 1 invokes, 1 dependencies, 2 tiered actions\npassed\n'
+stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 1 invokes, 1 dependencies, 2 tiered actions, 0 failure states, 0 failure events\npassed\n'
 
 # --stage runs only what is named, in the usual order
 exec machinery lint --stage xref-failure --stage risk

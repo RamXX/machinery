@@ -22,7 +22,7 @@ stdout 'failed: '
 # bad-subject
 cp bad-subject.yaml design/failure-modes.yaml
 exec mrun 1 lint --stage failure-modes
-stdout 'design/failure-modes.yaml: s: subject "order.pay" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action> or entity:<Name>'
+stdout 'design/failure-modes.yaml: s: subject "order.pay" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>'
 stdout 'failed: '
 
 # bad-required

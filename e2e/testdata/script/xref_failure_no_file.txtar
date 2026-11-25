@@ -1,0 +1,149 @@
+# no failure-mode file, but the machines declare failures: the stage applies to them alone
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  failure-event-mode: event:order\.providerDown: no failure mode names this failure event; configure design\.failure_modes and declare what the system must do when it arrives$'
+stdout '^  ERROR  failure-state-mode: state:order\.PaymentFailed: no failure mode names this failure state; configure design\.failure_modes and declare what the system must do when it is entered$'
+stdout '^checked: 1 failure states, 1 failure events$'
+stdout 'failed: 2 finding\(s\)'
+! stdout 'invoke-failure-mode'
+exec machinery checks
+stdout '^xref-failure +applicable$'
+
+# waived, they pass; a waiver of a rule that does not run here is not looked at
+cp waived.yaml machinery.yaml
+exec machinery lint --stage xref-failure
+stdout '^  warn   waived: failure-event-mode: event:order\.providerDown: .* \(unmodeled at adoption \(0000000\)\)$'
+stdout '^  warn   waived: failure-state-mode: state:order\.PaymentFailed: .* \(unmodeled at adoption \(0000000\)\)$'
+! stdout 'stale waiver'
+stdout '^passed$'
+
+# with no failure declared the stage does not apply
+cp no-waivers.yaml machinery.yaml
+cp plain.json design/machines/Order.machine.json
+exec machinery lint --stage xref-failure
+stdout '^not applicable: no design.failure_modes configured$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_failure_events": [
+    "providerDown"
+  ],
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        },
+        "providerDown": {
+          "target": "Pending"
+        }
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid"
+        },
+        "onError": {
+          "target": "PaymentFailed"
+        }
+      }
+    },
+    "PaymentFailed": {
+      "tags": "failure",
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- plain.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "paying"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": {
+          "target": "Paid"
+        },
+        "onError": {
+          "target": "Pending"
+        }
+      }
+    },
+    "Paid": {
+      "type": "final"
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- no-waivers.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: failure-state-mode, id: "state:order.PaymentFailed", reason: "unmodeled at adoption (0000000)"}
+  - {rule: failure-event-mode, id: "event:order.providerDown", reason: "unmodeled at adoption (0000000)"}
+  - {rule: invoke-failure-mode, id: "invoke:order.chargePayment", reason: "the gateway retries"}

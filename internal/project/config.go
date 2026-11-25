@@ -216,7 +216,7 @@ var (
 		"machine-binding": true, "state-enum": true, "event-action": true, "action-event": true,
 		"operation-id": true, "operation-action": true, "action-operation": true,
 		"subject-resolves": true, "invoke-failure-mode": true, "dependency-failure-mode": true,
-		"tiered-action-abuse": true,
+		"tiered-action-abuse": true, "failure-state-mode": true, "failure-event-mode": true,
 	}
 )
 

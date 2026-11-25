@@ -1,0 +1,62 @@
+# failure-mode subjects name failure states and failure events of a machine
+fixture shop
+
+# state:<machine id>.<State>, a nested one by its dotted path, and event:<machine id>.<event>
+cp valid.yaml design/failure-modes.yaml
+exec machinery lint --stage failure-modes
+stdout '^checked: 3 failure modes, 0 abuse cases$'
+stdout '^passed$'
+
+# the machine id and the name are both required
+cp no-name.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/failure-modes.yaml: bad-state: subject "state:order" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>$'
+stdout 'ERROR  design/failure-modes.yaml: bad-event: subject "event:providerDown" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>$'
+stdout 'failed: 2 finding\(s\)'
+
+# kind abuse stays limited to act and entity subjects
+cp abuse.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/failure-modes.yaml: abuse-state: kind: abuse needs an act or entity subject'
+stdout 'failed: 1 finding\(s\)'
+
+-- valid.yaml --
+version: 1
+failure_modes:
+  - id: payment-failed
+    subject: state:order.PaymentFailed
+    failure: "The charge failed and the order records it."
+    required: surface
+    behavior: "The caller sees PAYMENT_FAILED and may pay again."
+  - id: dispute-opened
+    subject: state:order.Paid.Disputed
+    failure: "The customer disputes the charge."
+    required: surface
+    behavior: "The order holds until the dispute is settled."
+  - id: provider-outage
+    subject: event:order.providerDown
+    failure: "The payment provider reports an outage."
+    required: fail-closed
+    behavior: "No charge is attempted until it is back."
+-- no-name.yaml --
+version: 1
+failure_modes:
+  - id: bad-state
+    subject: state:order
+    failure: "x"
+    required: surface
+    behavior: "y"
+  - id: bad-event
+    subject: event:providerDown
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- abuse.yaml --
+version: 1
+failure_modes:
+  - id: abuse-state
+    kind: abuse
+    subject: state:order.PaymentFailed
+    failure: "x"
+    required: refuse
+    behavior: "y"

@@ -41,7 +41,7 @@ var Defs = []Def{
 	{"risk", "Each risk area names real design ids, so tier gates attach to real behavior."},
 	{"xref-model-machine", "The lifecycle a machine implements is the lifecycle the model promises."},
 	{"xref-contract", "Every action is reachable through a published operation."},
-	{"xref-failure", "Every side effect, dependency and tiered action has a declared failure behavior."},
+	{"xref-failure", "Every side effect, dependency, failure state, failure event and tiered action has a declared failure behavior."},
 	{"xstate", "A generated table means what XState would execute for the same machine."},
 	{"gen-drift", "Tables and obligations in the tree are the ones the design produces."},
 	{"formal", "The formal model of a critical area is current, not vacuous and not weakened."},
