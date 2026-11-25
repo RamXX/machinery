@@ -1,0 +1,59 @@
+# The plugin manifests are valid JSON and every path they name exists; the
+# agent surfaces stay small (docs/formats.md section 20).
+exec node check.cjs $REPO
+stdout 'manifests ok'
+exists $REPO/skills/machinery/SKILL.md
+exists $REPO/agents/machinery-pm.md
+exists $REPO/agents/machinery-verifier.md
+exists $REPO/agents/machinery-modeler.md
+! exists $REPO/hooks
+
+# size limits of section 20
+exec sh -c 'test $(wc -l < $REPO/skills/machinery/SKILL.md) -le 120'
+exec sh -c 'for f in $REPO/agents/*.md; do test $(wc -l < $f) -le 60 || exit 1; done'
+
+# the installed version matches the manifests
+exec machinery version
+stdout '^machinery 2\.0\.0$'
+
+# every command the skill and the agent prompts name exists
+exec machinery
+cp stdout help.txt
+exec node commands.cjs $REPO help.txt
+stdout 'commands ok'
+
+-- check.cjs --
+const fs = require("fs");
+const path = require("path");
+const repo = process.argv[2];
+for (const f of [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", ".codex-plugin/plugin.json"]) {
+  const m = JSON.parse(fs.readFileSync(path.join(repo, f), "utf8"));
+  if (m.name !== "machinery") throw new Error(f + ": name");
+  if (f.endsWith("plugin.json") && m.version !== "2.0.0") throw new Error(f + ": version");
+  for (const k of ["skills", "agents"]) {
+    if (m[k] && !fs.existsSync(path.join(repo, m[k]))) throw new Error(f + ": missing " + m[k]);
+  }
+  if (m.hooks) throw new Error(f + ": v2 ships no hook");
+}
+console.log("manifests ok");
+-- commands.cjs --
+const fs = require("fs");
+const path = require("path");
+const repo = process.argv[2];
+const help = fs.readFileSync(process.argv[3], "utf8");
+const known = new Set();
+for (const line of help.split("\n")) {
+  const m = line.match(/^  ([a-z]+(?: [a-z]+)?) {2,}/);
+  if (m) known.add(m[1]);
+}
+const files = ["skills/machinery/SKILL.md", ...fs.readdirSync(path.join(repo, "agents")).map((f) => "agents/" + f)];
+let checked = 0;
+for (const f of files) {
+  const text = fs.readFileSync(path.join(repo, f), "utf8");
+  for (const m of text.matchAll(/`machinery ([a-z]+)(?: ([a-z]+))?/g)) {
+    checked++;
+    if (!known.has(m[1]) && !known.has(m[1] + " " + m[2])) throw new Error(f + ": unknown command machinery " + m[1] + " " + (m[2] || ""));
+  }
+}
+if (checked < 20) throw new Error("too few commands found: " + checked);
+console.log("commands ok");

@@ -1,0 +1,46 @@
+# help names every command of docs/formats.md section 3.1, and every stage is built
+exec machinery
+stdout '^  lint '
+stdout '^  gen '
+stdout '^  arch '
+stdout '^  tests '
+stdout '^  trace '
+stdout '^  check '
+stdout '^  checks '
+stdout '^  run '
+stdout '^  verify '
+stdout '^  affected '
+stdout '^  landing '
+stdout '^  owed list '
+stdout '^  owed sync '
+stdout '^  proof '
+stdout '^  status '
+stdout '^  probe '
+stdout '^  formal new '
+stdout '^  formal gen '
+stdout '^  formal check '
+stdout '^  formal baseline '
+stdout '^  formal sync '
+stdout '^  formal tools '
+stdout '^  plan '
+stdout '^  waves '
+stdout '^  brief '
+stdout '^  predict '
+stdout '^  accept '
+stdout '^  story '
+stdout '^  checkers run '
+stdout '^  checkers list '
+stdout '^  init '
+stdout '^  adopt '
+stdout '^  config '
+stdout '^  version '
+
+# a command group without its subcommand is a usage error that lists them
+exec mrun 2 owed
+stderr 'usage: machinery owed needs a subcommand: owed list, owed sync'
+
+# no stage is left unbuilt
+fixture shop
+exec machinery gen
+exec sh -c 'machinery check; true'
+! stdout 'this stage is not built'

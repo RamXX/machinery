@@ -33,6 +33,6 @@ exec bd list --all --json --limit 0
 stdout 'Dispatch rules'
 stdout 'Prove shipment pack'
 exec git log --oneline -- internal/shipping/shipment.go internal/billing cmd
-stdout -count=1 .
+stdout -count=1 '^[0-9a-f]+ '
 grep 'internal/billing/\*\*' machinery.yaml
 grep 'unit-test, subject: "?internal/billing/invoice_test.go' design/tests-baseline.yaml
