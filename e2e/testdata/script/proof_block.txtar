@@ -1,0 +1,122 @@
+# proof prints a block for the selected obligations from the evidence at this commit (section 13)
+fixture shop
+exec machinery gen
+gitinit
+
+# no evidence: every selected id is unproven, exit 1
+exec mrun 1 proof --ids tc:ORDE-2e883d
+stdout '^result:   no evidence at [0-9a-f]{7}$'
+stdout '^  tc:ORDE-2e883d \(unproven\)$'
+
+exec machinery run -- sh e2e/orders.sh
+
+# all obligations: exit 1 because one is partial and one unproven
+exec mrun 1 proof
+stdout '^PROOF$'
+stdout '^commit:   [0-9a-f]{40}$'
+stdout '^tier:     routine$'
+stdout '^command:  sh e2e/orders.sh$'
+stdout '^result:   15 passed / 0 failed / 0 skipped$'
+stdout '^criteria:$'
+stdout '^  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying$'
+stdout '^  tc:ORDE-8bd6e7 -> orders.sh -> pass: paying -> Paid; charge record not observed$'
+! stdout 'fm:payment-provider-down ->'
+stdout '^not proven:$'
+stdout '^  fm:payment-provider-down \(unproven, owed\)$'
+stdout '^  tc:ORDE-8bd6e7 \(partial, owed\)$'
+stdout '^learnings:$'
+exec sh -c 'machinery proof | grep -c " -> "'
+stdout '^15$'
+
+# selected ids that are all proven: exit 0; the exact block
+exec machinery proof --ids tc:ORDE-2e883d,inv:terminal-is-final
+exec sh -c 'machinery proof --ids tc:ORDE-2e883d,inv:terminal-is-final | sed 2d'
+cmp stdout want-two.txt
+exec sh -c 'machinery proof --ids tc:ORDE-2e883d | grep "^commit:   $(git rev-parse HEAD)$"'
+
+# --prefix, repeatable selectors together
+exec machinery proof --prefix inv:
+stdout '^result:   3 passed / 0 failed / 0 skipped$'
+exec mrun 1 proof --prefix 'tc:ORDE-8b*'
+stdout '^  tc:ORDE-8bd6e7 \(partial, owed\)$'
+exec mrun 1 proof --prefix sc: --ids fm:payment-provider-down
+stdout '^result:   2 passed / 0 failed / 0 skipped$'
+
+# a selector that matches nothing: exit 2
+exec mrun 2 proof --prefix nope:
+stderr '^usage: --prefix: nope: matches no obligation$'
+exec mrun 2 proof --ids tc:ORDE-ffffff
+stderr '^usage: --ids: tc:ORDE-ffffff is not an obligation$'
+exec mrun 2 proof --ids act:Order.pay
+stderr 'is not an obligation'
+
+# with a risk file the tier line names the highest tier and the areas giving it
+cp machinery-risk.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+gitcommit 'add risk tiers'
+exec machinery run --stack 'sh on the host' -- sh e2e/orders.sh
+exec machinery proof --ids tc:ORDE-2e883d
+stdout '^tier:     critical \(order-payment\)$'
+stdout '^result:   1 passed / 0 failed / 0 skipped, against sh on the host$'
+exec machinery proof --ids tc:ORDE-e6d28f,inv:terminal-is-final
+stdout '^tier:     consequential \(audit, shipping-permission\)$'
+exec machinery proof --ids inv:paid-before-shipped,tc:ORDE-2e883d
+stdout '^tier:     critical \(order-payment\)$'
+exec machinery proof --ids inv:terminal-is-final
+stdout '^tier:     routine$'
+# fv ids are proven by the formal stage, not by receipts
+exec mrun 1 proof --ids fv:order-payment
+stdout '^tier:     critical \(order-payment\)$'
+stdout '^  fv:order-payment \(unproven\)$'
+! stdout 'fv:order-payment ->'
+
+-- want-two.txt --
+PROOF
+tier:     routine
+command:  sh e2e/orders.sh
+result:   2 passed / 0 failed / 0 skipped
+criteria:
+  inv:terminal-is-final -> orders.sh -> pass: no event changes a Shipped or Cancelled order
+  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying
+not proven:
+learnings:
+-- machinery-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]
+  - name: audit
+    tier: consequential
+    why: "shipments are audited"
+    ids: ["tc:ORDE-e6d28f", "inv:paid-before-shipped"]
