@@ -86,7 +86,7 @@ ok  	github.com/RamXX/machinery/examples/crm/e2e	14.644s
 machinery run: .machinery/receipts/<time>-<sha>.jsonl (exit 0)
 $ machinery verify
 == verify ==
-checked: 60 obligations, 60 proven, 0 partial, 0 owed, 152 receipts
+checked: 60 obligations, 60 proven, 0 partial, 0 owed, 76 receipts
 passed
 ```
 
@@ -101,7 +101,7 @@ obligations: 60 (tc 32, sc 4, inv 11, fm 10, fv 2, cx 1)
 tiers: routine 47, consequential 0, critical 13
 proven: 60  partial: 0  failed: 0  owed: 0  unproven and not owed: 0
 owed without a story: 0
-evidence: <sha> clean, 2 run(s), 152 receipt(s)
+evidence: <sha> clean, 1 run(s), 76 receipt(s)
 $ machinery owed list
 owed: 0 entries
 $ machinery proof
@@ -189,10 +189,15 @@ checked: 2 mutations, 1 killed, 1 survived
 failed: 1 finding(s)
 $ git switch -
 $ git branch -D try-survivor
+$ make evidence
+...
+machinery run: .machinery/receipts/<time>-<sha>.jsonl (exit 0)
 ```
 
 The retarget is still killed (the test checks the state); the dropped audit row is not, because
-the weakened test claims it without looking.
+the weakened test claims it without looking. `machinery run` keeps only the receipts that are
+valid for the commit it runs at, so the run on the throwaway branch removed the evidence of
+yours: the last `make evidence` puts it back.
 
 ## 6. `make formal`: the two critical areas, model checked
 
@@ -294,7 +299,7 @@ checked: 2 specs
 passed
 ok  	github.com/RamXX/machinery/examples/crm/e2e	14.917s
 == verify ==
-checked: 60 obligations, 60 proven, 0 partial, 0 owed, 228 receipts
+checked: 60 obligations, 60 proven, 0 partial, 0 owed, 152 receipts
 passed
 ...
 == probe ==
