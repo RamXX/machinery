@@ -33,6 +33,24 @@ repository's `.bin`, where `machinery` itself is expected too (`make build` at t
 - Service: `CRM_ADDR` (default `127.0.0.1:18080`), `CRM_DATABASE_URL`, `CRM_ADMIN_DATABASE_URL`.
 - `GET /healthz`: 200 `{"status":"ok"}`, or 503 `{"code":"STORE_UNAVAILABLE","message":"..."}`.
 
+## Identity
+
+The caller is named by the `X-User-Id` header: a missing, malformed or unknown id is 401. This is
+enough for an example and is not authentication.
+
+## The suite and the owed list
+
+`e2e/transitions_test.go` walks the committed tables (`design/gen/tables`, never
+`MACHINERY_TABLES_DIR`): one subtest per transition, ignore and clause case, which arranges a
+record in the source state, fires the event over HTTP, checks the answer and the row, and claims
+only the effects it observed (each audit effect as exactly one audit row). `audit_test.go`,
+`adversary_test.go` and `scenarios_test.go` prove the invariants, the abuse failure modes and
+the scenarios. The suite honors `MACHINERY_ONLY`; under `machinery probe` it runs only the
+subtest of `MACHINERY_PROBE_CASE`.
+
+After a change: `make up`, `make evidence`, `machinery owed sync --prune-only`, commit,
+`machinery verify`. `machinery owed list` says what is still unproven and why.
+
 ## Clean up
 
 `make down`. Afterwards `docker ps -a --filter name=machinery-crm` prints no container.
