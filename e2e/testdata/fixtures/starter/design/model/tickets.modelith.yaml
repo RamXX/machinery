@@ -1,0 +1,37 @@
+kind: DomainModel
+version: v1
+title: Tickets
+description: >
+  A support desk in one entity. An Agent opens a Ticket, closes it with a
+  resolution, and may reopen it.
+
+glossary:
+  Agent: "A person who works a `Ticket`."
+
+enums:
+  TicketStatus:
+    values:
+      - {name: Open, definition: "Being worked."}
+      - {name: Closed, definition: "Resolved; may be reopened."}
+
+entities:
+  Ticket:
+    definition: >
+      A request for help. Its status follows the ticket lifecycle.
+    attributes:
+      - {name: status, type: TicketStatus}
+    actions:
+      - {name: open, actor: Agent, description: "Create the `Ticket` in the open status."}
+      - {name: close, actor: Agent, preserves: [closed-has-resolution]}
+      - {name: reopen, actor: Agent}
+    invariants:
+      - {id: closed-has-resolution, statement: "A closed `Ticket` has a recorded resolution."}
+
+scenarios:
+  - name: Agent closes and reopens a ticket
+    actors: [Agent]
+    steps:
+      - "Agent opens a `Ticket`; it is open."
+      - "Agent closes it; a resolution is recorded."
+      - "Agent reopens it; it is open again."
+    invariants_touched: [closed-has-resolution]

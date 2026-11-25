@@ -1,0 +1,19 @@
+{
+  "_comment": "Ticket lifecycle. States mirror the TicketStatus enum.",
+  "id": "ticket",
+  "initial": "Open",
+  "states": {
+    "Open": {
+      "on": {
+        "close": { "target": "Closed", "actions": "recordResolution" }
+      },
+      "_ignores": { "reopen": "an open ticket cannot be reopened; the command refuses with TICKET_NOT_CLOSED" }
+    },
+    "Closed": {
+      "on": {
+        "reopen": { "target": "Open", "actions": "recordReopen" }
+      },
+      "_ignores": { "close": "already closed; the command refuses with TICKET_ALREADY_CLOSED" }
+    }
+  }
+}

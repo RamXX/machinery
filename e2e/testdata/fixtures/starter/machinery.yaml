@@ -1,0 +1,15 @@
+version: 2
+design:
+  models:
+    - design/model/tickets.modelith.yaml
+  machines: design/machines
+trace:
+  code: ["bin/**"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["e2e/**"]
+  files: ["**/*_test.sh"]
+commands:
+  e2e: ["sh", "e2e/tickets_test.sh"]
+waivers:
+  - {rule: action-event, id: "act:Ticket.open", reason: "opening creates the ticket in its initial state"}

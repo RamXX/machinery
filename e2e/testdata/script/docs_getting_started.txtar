@@ -1,0 +1,16 @@
+# Every command of the getting-started guide runs, in order, in an empty directory.
+env MACHINERY_REPO=$REPO
+mkdir proj
+cd proj
+exec rundoc $REPO/docs/getting-started.md
+stdout 'init: created 4 path\(s\)'
+stdout 'gen: wrote 4 file\(s\)'
+stdout 'machinery lint: 3 passed, 0 failed, 0 not demonstrated, 5 not applicable'
+stdout 'machinery check: [0-9]+ passed, 0 failed, 0 not demonstrated, [0-9]+ not applicable'
+stdout 'tickets: all checks passed'
+stdout 'checked: 6 obligations, 6 proven, 0 partial, 0 owed, 6 receipts'
+stdout 'machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+stdout 'obligations: 6 \(tc 4, sc 1, inv 1\)'
+stdout 'tc:TICK-837662 -> tickets_test.sh -> pass: Open -> Closed; resolution recorded'
+stdout 'owed: 0 entries'
+stdout 'protects: Every state answers every event'

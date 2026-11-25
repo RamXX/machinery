@@ -1,0 +1,12 @@
+#!/bin/sh
+# rundoc <markdown file>: executes, in order, every command of every fenced
+# block that opens with three backticks followed by "sh". The first failing
+# command stops it.
+set -eu
+awk '
+  /^```sh$/ { run = 1; next }
+  /^```/    { run = 0; next }
+  run          { print }
+' "$1" > .rundoc.sh
+sh -eux .rundoc.sh
+rm -f .rundoc.sh

@@ -1,0 +1,31 @@
+#!/bin/sh
+# tickets is the whole system of the starter project: a ticket desk that keeps
+# one file per ticket under $TICKETS_DIR.
+#
+# machinery:serves act:Ticket.open act:Ticket.close act:Ticket.reopen
+set -eu
+dir="${TICKETS_DIR:?set TICKETS_DIR}"
+cmd="${1:?usage: tickets open|close|reopen|show <id>}"
+id="${2:?usage: tickets $cmd <id>}"
+file="$dir/$id"
+status() { [ -f "$file" ] && cat "$file" || { echo "TICKET_NOT_FOUND" >&2; exit 1; }; }
+
+case "$cmd" in
+  open)
+    [ ! -f "$file" ] || { echo "TICKET_EXISTS" >&2; exit 1; }
+    echo Open > "$file"
+    ;;
+  close)
+    [ "$(status)" = Open ] || { echo "TICKET_ALREADY_CLOSED" >&2; exit 1; }
+    echo "resolution" >> "$file.log"
+    echo Closed > "$file"
+    ;;
+  reopen)
+    [ "$(status)" = Closed ] || { echo "TICKET_NOT_CLOSED" >&2; exit 1; }
+    echo "reopen" >> "$file.log"
+    echo Open > "$file"
+    ;;
+  show) ;;
+  *) echo "usage: tickets open|close|reopen|show <id>" >&2; exit 2 ;;
+esac
+status
