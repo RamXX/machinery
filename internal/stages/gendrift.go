@@ -11,6 +11,12 @@ func init() { Bind("gen-drift", GenDrift) }
 func GenDrift(ctx *Context) *report.Stage {
 	s := report.New("gen-drift")
 	d := ctx.Design()
+	c := ctx.P.Cfg
+	if len(c.Design.Models) == 0 && c.Design.Machines == "" && c.Design.FailureModes == "" && c.Design.Risk == "" && len(c.Checkers) == 0 {
+		if files, _ := ctx.P.Glob([]string{gen.Dir(d) + "/**"}); len(files) == 0 {
+			return s.NotApplicable("no design sources configured")
+		}
+	}
 	diffs, n, err := gen.Compare(d)
 	if err != nil {
 		s.Errorf("%v", err)

@@ -464,7 +464,8 @@ indentation, keys in the order given in this document, and a trailing newline. W
 `machines` or `failure-modes` stage has an ERROR.
 
 `machinery gen --check` regenerates in memory and reports `DRIFT  <path>: stale`, `DRIFT  <path>:
-missing`, and `ERROR  <path>: unexpected file in gen directory`.
+missing`, and `ERROR  <path>: unexpected file in gen directory`. A project with no design source
+configured and an empty gen directory is `not applicable: no design sources configured`.
 
 ### 7.1 `obligations.json`
 

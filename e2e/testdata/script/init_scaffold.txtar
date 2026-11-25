@@ -1,0 +1,38 @@
+# init scaffolds a new project and never overwrites
+mkdir proj
+cd proj
+exec machinery init
+stdout 'init: created 4 path\(s\)'
+stdout '  design/model/'
+stdout '  design/machines/'
+stdout '  design/owed.yaml'
+stdout '  machinery.yaml'
+stdout 'machinery landing --base main'
+exists design/model/.gitkeep
+exists design/machines/.gitkeep
+grep 'owed: \[\]' design/owed.yaml
+grep '^version: 2' machinery.yaml
+
+# the scaffold is a valid project in which nothing applies yet
+exec machinery config
+stdout 'owed: design/owed.yaml'
+exec machinery check
+stdout 'not applicable: no design.models configured'
+stdout 'machinery check: 0 passed, 0 failed, 0 not demonstrated, 15 not applicable'
+
+# never overwrites
+exec mrun 2 init
+stderr 'config: machinery.yaml exists; init never overwrites'
+
+# an existing design directory is left alone
+cd ..
+mkdir other/design/model
+cp keep.yaml other/design/model/keep.modelith.yaml
+exec machinery -C other init
+stdout 'init: created 3 path\(s\)'
+! exists other/design/model/.gitkeep
+exists other/design/model/keep.modelith.yaml
+
+-- keep.yaml --
+kind: DomainModel
+version: v1
