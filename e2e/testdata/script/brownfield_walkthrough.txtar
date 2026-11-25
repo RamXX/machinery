@@ -1,0 +1,38 @@
+# Every command of the brownfield guide runs, in order, on an existing project
+# with its own backlog (a throwaway bd database in the work directory).
+env MACHINERY_REPO=$REPO
+fixture brownfield
+gitinit
+exec sh backlog.sh
+stdout 'backlog.sh: 1 epic, 4 stories'
+
+exec rundoc $REPO/docs/brownfield.md
+
+# 1. the dry run reports and writes nothing
+stdout 'backlog: bd, 4 open, [0-9]+ ready, 1 closed, cycles: none'
+stdout 'test files: 0 under e2e roots, 1 elsewhere \(unit tests\), 1 with test doubles'
+# 2. adoption writes config and baseline only
+stdout 'warn   baselined: unit-test: internal/shipping/shipment_test.go'
+# 3. the modeled area is owed in full
+stdout 'tc:SHIP-422414  unproven at adoption \([0-9a-f]+\)'
+# 4. stories are created beside the existing ones
+stdout 'plan: [0-9]+ created, 0 existing, [0-9]+ edge\(s\)'
+stdout 'Prove shipment pack'
+# 5. one story proven end to end
+stdout 'shipment_e2e: ok'
+stdout 'owed: [0-9]+ kept, 0 added, 3 removed'
+stdout 'machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+stdout 'tc:SHIP-422414 -> shipment_e2e.sh -> pass: Created -> Packed; packing recorded in the store history'
+stdout '== story =='
+# 6. the ratchet holds and the scope widens
+stdout '== ratchet =='
+stdout 'internal/billing'
+
+# the project's own stories are still there, and the existing code was never rewritten
+exec bd list --all --json --limit 0
+stdout 'Dispatch rules'
+stdout 'Prove shipment pack'
+exec git log --oneline -- internal/shipping/shipment.go internal/billing cmd
+stdout -count=1 .
+grep 'internal/billing/\*\*' machinery.yaml
+grep 'unit-test, subject: "?internal/billing/invoice_test.go' design/tests-baseline.yaml

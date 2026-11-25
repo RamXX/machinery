@@ -18,6 +18,8 @@ const (
 type Shipment struct {
 	ID     string `json:"id"`
 	Status Status `json:"status"`
+	// History records every status the shipment has had, oldest first.
+	History []Status `json:"history"`
 }
 
 // Error is a refused move. Code is stable and printed by the command line.
@@ -37,7 +39,7 @@ func New(id string) (*Shipment, error) {
 	if id == "" {
 		return nil, refuse("SHIPMENT_ID_REQUIRED", "a shipment needs an id")
 	}
-	return &Shipment{ID: id, Status: Created}, nil
+	return &Shipment{ID: id, Status: Created, History: []Status{Created}}, nil
 }
 
 // Pack moves a created shipment to packed.
@@ -45,7 +47,7 @@ func (s *Shipment) Pack() error {
 	if s.Status != Created {
 		return refuse("SHIPMENT_NOT_CREATED", "cannot pack shipment %s in status %s", s.ID, s.Status)
 	}
-	s.Status = Packed
+	s.move(Packed)
 	return nil
 }
 
@@ -54,7 +56,7 @@ func (s *Shipment) Dispatch() error {
 	if s.Status != Packed {
 		return refuse("SHIPMENT_NOT_PACKED", "cannot dispatch shipment %s in status %s", s.ID, s.Status)
 	}
-	s.Status = Dispatched
+	s.move(Dispatched)
 	return nil
 }
 
@@ -63,7 +65,7 @@ func (s *Shipment) Deliver() error {
 	if s.Status != Dispatched {
 		return refuse("SHIPMENT_NOT_DISPATCHED", "cannot deliver shipment %s in status %s", s.ID, s.Status)
 	}
-	s.Status = Delivered
+	s.move(Delivered)
 	return nil
 }
 
@@ -72,6 +74,11 @@ func (s *Shipment) Cancel() error {
 	if s.Status != Created && s.Status != Packed {
 		return refuse("SHIPMENT_NOT_CANCELLABLE", "cannot cancel shipment %s in status %s", s.ID, s.Status)
 	}
-	s.Status = Cancelled
+	s.move(Cancelled)
 	return nil
+}
+
+func (s *Shipment) move(to Status) {
+	s.Status = to
+	s.History = append(s.History, to)
 }
