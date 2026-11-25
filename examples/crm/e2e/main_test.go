@@ -4,6 +4,7 @@ package e2e
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"syscall"
 	"testing"
 	"time"
@@ -34,6 +36,15 @@ func env(name, def string) string {
 }
 
 func TestMain(m *testing.M) {
+	// A probe run (docs/formats.md section 19) names the one case it
+	// mutated; only the table walker's subtest for it runs.
+	if id := os.Getenv("MACHINERY_PROBE_CASE"); id != "" {
+		flag.Parse()
+		if err := flag.Set("test.run", "^TestTransitions$/^"+regexp.QuoteMeta(id)+"$"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
 	os.Exit(run(m))
 }
 

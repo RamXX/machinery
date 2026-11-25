@@ -19,9 +19,12 @@ export CRM_ADMIN_DATABASE_URL ?= postgres://$(PG_ADMIN):$(PG_ADMIN)@127.0.0.1:$(
 
 # The end-to-end command; keep it equal to commands.e2e in machinery.yaml.
 E2E := env GOMAXPROCS=2 go test ./e2e/... -count=1 -p 1
-BASE ?= main
+# What the receipts say the suite ran against.
+STACK := postgres 17 in docker, crm over http
+BASE ?= experimental/v2
+MAX ?= 6
 
-.PHONY: help up down build serve psql check e2e verify
+.PHONY: help up down build serve psql check e2e evidence verify probe
 
 help: ## List the targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-8s %s\n", $$1, $$2}'
@@ -58,6 +61,11 @@ check: ## gofmt, go vet and machinery check
 e2e: ## The end-to-end suite: the real service over HTTP against the real Postgres (needs make up)
 	$(E2E)
 
-verify: ## The end gate: machinery landing with the e2e suite (not built yet)
-	@echo "verify will run: machinery landing --base $(BASE) -- $(E2E)"
-	@echo "verify: machinery landing is not built yet; run make check and make e2e meanwhile"; exit 1
+evidence: ## Run the e2e suite through machinery run: receipts for this commit (needs make up)
+	$(MACHINERY) run --stack "$(STACK)" -- $(E2E)
+
+verify: ## The end gate: machinery landing (check --base BASE, the whole suite through run, verify)
+	$(MACHINERY) landing --base $(BASE) --stack "$(STACK)" -- $(E2E)
+
+probe: ## Mutate the tables and expect the suite to notice (the first MAX mutations, default 6)
+	$(MACHINERY) probe --max $(MAX) -- $(E2E)
