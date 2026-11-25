@@ -1,0 +1,73 @@
+# verify --story judges only the ids of a backlog story; failed obligations always print (section 12)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-v1 --title 'Prove pay and the terminal invariant' --body-file v1.txt --silent
+exec bd create --id shop-v2 --title 'Prove the charge and the outage' --body-file v2.txt --silent
+exec bd create --id shop-v3 --title 'No ids' --body-file v3.txt --silent
+exec bd create --id shop-v4 --title 'An unknown id' --body-file v4.txt --silent
+
+# no evidence
+exec mrun 1 verify --story shop-v1
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+
+# a run that proves the story's ids, fails another and leaves the rest unproven
+exec machinery run -- sh some.sh
+exec mrun 1 verify
+stdout 'ERROR  unproven: sc:customer-pays-and-the-order-ships'
+exec mrun 1 verify --story shop-v1
+stdout '^checked: 2 obligations, 2 proven, 0 partial, 0 owed, 2 receipts$'
+stdout '^  ERROR  failed: tc:ORDE-1ded14 \(some.sh\)$'
+! stdout 'unproven'
+stdout '^failed: 1 finding\(s\)$'
+
+# a new commit and the whole suite
+exec sh -c 'printf "// next\n" >> internal/domain/order.go'
+gitcommit 'next'
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify --story shop-v1
+cmp stdout want-v1.txt
+
+# owed ids are fine for verify; they are counted
+exec machinery verify --story shop-v2
+stdout '^checked: 2 obligations, 0 proven, 1 partial, 2 owed, 1 receipts$'
+stdout '^passed$'
+
+# an id the design does not have
+exec mrun 1 verify --story shop-v4
+stdout '^  ERROR  unknown id in story: tc:ORDE-ffffff$'
+stdout '^checked: 1 obligations, 1 proven, 0 partial, 0 owed, 1 receipts$'
+
+# a story without ids
+exec mrun 1 verify --story shop-v3
+stdout '^not demonstrated: story names no design ids$'
+
+# uncommitted changes
+exec sh -c 'printf "// dirty\n" >> internal/domain/order.go'
+exec mrun 1 verify --story shop-v1
+stdout '^  ERROR  working tree has uncommitted changes$'
+exec machinery verify --story shop-v1 --allow-dirty
+stdout '^passed$'
+
+-- v1.txt --
+machinery:ids tc:ORDE-2e883d inv:terminal-is-final
+-- v2.txt --
+machinery:ids tc:ORDE-8bd6e7 fm:payment-provider-down
+-- v3.txt --
+Nothing machine-readable.
+-- v4.txt --
+machinery:ids tc:ORDE-ffffff tc:ORDE-2e883d
+-- some.sh --
+#!/bin/sh
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+printf '{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"some.sh","effects":["stampAttempt"],"observed":"Pending -> paying"}\n' >> "$MACHINERY_RECEIPTS"
+printf '{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"some.sh","observed":"final"}\n' >> "$MACHINERY_RECEIPTS"
+printf '{"v":1,"type":"receipt","id":"tc:ORDE-1ded14","outcome":"fail","test":"some.sh","effects":[],"observed":"stayed Pending"}\n' >> "$MACHINERY_RECEIPTS"
+-- want-v1.txt --
+== verify ==
+checked: 2 obligations, 2 proven, 0 partial, 0 owed, 2 receipts
+passed
+machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable

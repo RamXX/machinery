@@ -1,0 +1,55 @@
+# the critical tier gate: the consequential gate, the area's formal model proven and its counterexample replayed (section 15.6)
+fixture shop
+fixture shop-formal
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec shopformal
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-k1 --title 'Prove order pay' --body-file k1.txt --silent
+
+# the real model checkers run; the baseline is not recorded yet, so fv:order-payment is unproven
+exec mrun 1 formal check
+stdout 'DRIFT  baseline: order-payment: spec not recorded'
+gitcommit 'formal results'
+exec machinery run -- sh e2e/orders.sh
+exec machinery proof --story shop-k1 --post
+env BEADS_ACTOR=verifier
+exec machinery predict shop-k1 --observation 'two concurrent pay requests both charge' --expect 'one charge'
+exec mrun 1 accept shop-k1 --verdict accept --observed 'one charge'
+stdout '^checked: 1 ids, 1 proofs, 1 predictions, 1 verdicts$'
+stdout '^  ERROR  unproven: cx:order-payment:race$'
+stdout '^  ERROR  unproven: fv:order-payment$'
+stdout '^failed: 2 finding\(s\)$'
+env BEADS_ACTOR=builder
+
+# the baseline makes the formal stage pass: fv:order-payment is proven at the new commit
+exec machinery formal baseline
+gitcommit 'formal baseline'
+exec machinery check --stage formal
+stdout '^passed$'
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 story shop-k1
+stdout '^  ERROR  proof is for another commit'
+exec machinery proof --story shop-k1 --post
+env BEADS_ACTOR=verifier
+exec machinery predict shop-k1 --observation 'two concurrent pay requests both charge' --expect 'one charge'
+exec mrun 1 accept shop-k1 --verdict accept --observed 'one charge'
+stdout '^  ERROR  unproven: cx:order-payment:race$'
+! stdout 'fv:order-payment'
+stdout '^failed: 1 finding\(s\)$'
+env BEADS_ACTOR=builder
+
+# the replay of the counterexample on the real system proves the cx id; the gate passes
+exec machinery run -- sh e2e/replay.sh
+exec machinery story shop-k1
+stdout '^checked: 1 ids, 2 proofs, 2 predictions, 2 verdicts$'
+stdout '^passed$'
+
+# a replay that reproduces the trace fails it
+env MACHINERY_REPLAY=reproduced
+exec machinery run -- sh e2e/replay.sh
+exec mrun 1 story shop-k1
+stdout '^  ERROR  unproven: cx:order-payment:race$'
+
+-- k1.txt --
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**

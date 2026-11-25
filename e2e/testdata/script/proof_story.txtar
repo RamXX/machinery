@@ -1,0 +1,63 @@
+# proof --story selects a story's ids; --post appends the block to the story; assumption lines (section 13)
+fixture shop
+fixture shop-formal
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec shopformal
+gitcommit 'formal skeletons'
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-p1 --title 'Prove order pay' --body-file p1.txt --silent
+exec bd create --id shop-p2 --title 'Prove the charge' --body-file p2.txt --silent
+exec bd create --id shop-a1 --title 'Serve shipping' --body-file a1.txt --silent
+exec machinery run -- sh e2e/orders.sh
+
+# the story's obligation ids, the tier, and the unproven assumptions of the model covering them
+exec machinery proof --story shop-p1
+stdout '^tier:     critical \(order-payment\)$'
+stdout '^  inv:terminal-is-final -> orders.sh -> pass: no event changes a Shipped or Cancelled order$'
+stdout '^  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying$'
+stdout '^not proven:\n  assumption order-payment A1: A transition is applied as one compare-and-set on the stored order status.\n  assumption order-payment A2: The payment provider answers, fails or times out; it never answers twice.\nlearnings:$'
+stdout '^result:   2 passed / 0 failed / 0 skipped$'
+! stdout 'act:Order.pay'
+! stdout 'assumption order-ownership'
+
+# ids outside every modeled area get no assumption lines
+exec mrun 1 proof --ids inv:terminal-is-final,fm:payment-provider-down
+! stdout 'assumption'
+
+# --post: the proof line and the block, as one note
+exec machinery proof --story shop-p1 --post
+exec bd show shop-p1 --json
+stdout '"notes": "machinery:proof [0-9a-f]{40} builder\\nPROOF\\ncommit:   [0-9a-f]{40}\\ntier:     critical \(order-payment\)\\n'
+stdout 'assumption order-payment A2: The payment provider answers'
+stdout 'learnings:",'
+exec sh -c 'bd show shop-p1 --json | grep -c "machinery:proof $(git rev-parse HEAD) builder"'
+stdout '^1$'
+exec machinery proof --story shop-p1 --post --actor alice
+exec bd show shop-p1 --json
+stdout 'machinery:proof [0-9a-f]{40} alice\\nPROOF'
+exec mrun 1 story shop-p1
+stdout '^checked: 3 ids, 2 proofs, 0 predictions, 0 verdicts$'
+! stdout 'no proof'
+
+# a story whose id is not proven: exit 1, and the block is still posted
+exec mrun 1 proof --story shop-p2 --post
+stdout '^  tc:ORDE-8bd6e7 \(partial, owed\)$'
+exec bd show shop-p2 --json
+stdout 'tc:ORDE-8bd6e7 \(partial, owed\)'
+
+# refusals
+exec mrun 2 proof --post
+stderr '^usage: --post needs --story$'
+exec mrun 2 proof --story shop-p1 --ids tc:ORDE-2e883d
+stderr '^usage: --story does not go with --ids or --prefix$'
+exec mrun 2 proof --story shop-a1
+stderr '^usage: story shop-a1 names no obligation id$'
+exec mrun 2 proof --story shop-nope
+stderr '^usage: no story shop-nope in the backlog'
+
+-- p1.txt --
+machinery:ids tc:ORDE-2e883d inv:terminal-is-final act:Order.pay
+-- p2.txt --
+machinery:ids tc:ORDE-8bd6e7
+-- a1.txt --
+machinery:ids act:Order.ship
