@@ -1542,7 +1542,9 @@ next:
    to the scope, `trace.tests` and `tests.e2e` from `--e2e` (default `e2e/**`), the model,
    machine and contract files found (`*.modelith.yaml`, `*.machine.json`, `openapi.{yaml,yml,json}`),
    `tests.baseline`, and `backlog.tool: bd` when a backlog was found. With an existing file, adds
-   the new `--paths` to `scope` and changes nothing else in it; comments are kept.
+   the new `--paths` to `scope`, adds design sources it finds that are not configured yet (so a
+   model written after the first adoption is picked up), and changes nothing else in it;
+   comments are kept.
 2. **Baselines.** Writes the tests baseline with every unit test and test double now in scope
    (section 9.4), and the architecture baseline when `constraints` are configured. Existing
    entries are kept; entries are added only for paths newly in scope.
