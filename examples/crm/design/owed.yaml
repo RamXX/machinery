@@ -1,44 +1,16 @@
 version: 1
 owed:
   - id: fm:database-unreachable
-    reason: "no test yet: no test takes the database away and brings it back"
-  - id: fm:deal-lose-by-non-owner
-    reason: "no test yet"
-  - id: fm:deal-qualify-by-non-owner
-    reason: "no test yet"
-  - id: fm:deal-reopen-by-rep
-    reason: "no test yet"
-  - id: fm:deal-win-by-non-owner
-    reason: "no test yet"
+    reason: "no test yet: no test takes the database away during requests and brings it back"
   - id: fm:deal-win-store-failure
-    reason: "no test yet: no test makes the recordWin store write fail or time out"
-  - id: fm:task-cancel-by-non-assignee
-    reason: "no test yet"
-  - id: fm:task-complete-by-non-assignee
-    reason: "no test yet"
-  - id: fm:task-start-by-non-assignee
-    reason: "no test yet"
+    reason: "no test yet: recordWin is simulated, so no store write of a won deal can be made to fail or time out"
   - id: fv:deal-win
     reason: "formal model not written yet"
   - id: fv:record-ownership
     reason: "formal model not written yet"
-  - id: inv:deal-owner-or-admin-writes
-    reason: "no test yet"
-  - id: inv:deal-reopen-admin-only
-    reason: "no test yet"
-  - id: inv:deal-won-is-final
-    reason: "no test yet"
-  - id: inv:deal-won-needs-amount
-    reason: "no test yet"
   - id: inv:lifecycle-single-writer
-    reason: "no test yet"
-  - id: inv:task-assignee-or-admin-writes
-    reason: "no test yet"
-  - id: inv:task-terminal-is-final
-    reason: "no test yet"
-  - id: sc:rep-qualifies-and-wins-a-deal
-    reason: "no test yet"
+    reason: "no test yet: crm_app may still UPDATE deals.stage and tasks.status outside the transition path"
   - id: tc:DEAL-23efa8
-    reason: "failure path not induced yet: no test makes the recordWin actor fail"
+    reason: "failure path not induced yet: recordWin is simulated and never fails"
   - id: tc:DEAL-55eecd
-    reason: "failure path not induced yet: no test makes recordWin outlast closeTimeout"
+    reason: "failure path not induced yet: recordWin is simulated and never outlasts closeTimeout"
