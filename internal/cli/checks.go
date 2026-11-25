@@ -19,6 +19,9 @@ func runChecks(e *Env, args []string) int {
 	if !e.Parse(fs, args) {
 		return 2
 	}
+	if fs.NArg() > 0 {
+		return e.Usage("machinery checks takes no arguments")
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2

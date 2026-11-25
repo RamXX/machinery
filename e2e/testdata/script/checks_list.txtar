@@ -1,0 +1,64 @@
+# checks: the declaration of applicable checks, one stage per two lines
+fixture shop
+exec machinery gen
+
+# every stage of section 3.4, in order, each with what it protects
+exec mrun 0 checks
+stdout -count=19 'protects: '
+stdout -count=19 '^[a-z-]+ +(applicable|not applicable|on demand)'
+stdout '^model +applicable$'
+stdout '^ +protects: The vocabulary every other artifact uses: entities, actions, invariants, scenarios\.$'
+stdout '^ +protects: What was proven, covered or modeled stays so\.$'
+stdout '^ratchet +on demand: machinery check --base <ref>$'
+stdout '^verify +on demand: machinery verify$'
+stdout '^probe +on demand: machinery probe -- <command>$'
+stdout '^story +on demand: machinery story <id>$'
+stdout '^risk +not applicable: no design.risk configured$'
+stdout '^formal +not applicable: no formal model and no critical area$'
+! stderr .
+exec sh -c 'machinery checks | grep -v protects: | cut -d" " -f1 > names.txt'
+cmp names.txt want_names.txt
+
+# a project with almost nothing configured names what is absent
+cp empty/machinery.yaml machinery.yaml
+exec mrun 0 checks
+stdout '^model +not applicable: no design.models configured$'
+stdout '^machines +not applicable: no design.machines configured$'
+stdout '^failure-modes +not applicable: no design.failure_modes configured$'
+stdout '^risk +not applicable: no design.risk configured$'
+stdout '^xref-model-machine +not applicable: no design.machines configured$'
+stdout '^xref-contract +not applicable: no contracts configured$'
+stdout '^xref-failure +not applicable: no design.failure_modes configured$'
+stdout '^xstate +not applicable: tools.xstate is not enabled$'
+stdout '^formal +not applicable: no formal model and no critical area$'
+stdout '^checkers +not applicable: no checkers and no design.facts configured$'
+stdout '^arch +not applicable: no constraints configured$'
+stdout '^tests +not applicable: no tests or trace.tests configured$'
+stdout '^trace +not applicable: no trace configured$'
+stdout -count=19 'protects: '
+
+# it is a report, never a gate, and takes no arguments
+exec mrun 2 checks extra
+stderr 'usage: machinery checks takes no arguments'
+-- empty/machinery.yaml --
+version: 2
+-- want_names.txt --
+model
+machines
+failure-modes
+risk
+xref-model-machine
+xref-contract
+xref-failure
+xstate
+gen-drift
+formal
+checkers
+arch
+tests
+trace
+contract
+ratchet
+verify
+probe
+story

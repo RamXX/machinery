@@ -1,0 +1,68 @@
+# landing counts attempts per branch: a failure at a new head is a fix-forward, the third one stops
+fixture shop
+cp orders_test.go.in e2e/orders_test.go
+exec machinery gen
+gitinit
+exec git branch base
+cp design/owed.yaml owed.keep
+
+# attempt 1: the check fails, nothing after it runs
+exec sh -c 'printf "  - id: inv:terminal-is-final\n    reason: \"dropped\"\n" >> design/owed.yaml'
+exec mrun 1 landing --base base -- sh e2e/orders.sh
+stdout 'ERROR  ratchet: inv:terminal-is-final was proven at base and is owed now'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+! stdout '== verify =='
+! stderr 'machinery run'
+! stdout 'stop:'
+grep '"attempts": 1' .git/machinery/landing.json
+
+# the same head again is a new attempt, not a fix-forward
+exec mrun 1 landing --base base -- sh e2e/orders.sh
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 2, fix-forward 0 of 2\)$'
+
+# a new head after a failure is a fix-forward; the suite fails now
+cp owed.keep design/owed.yaml
+gitcommit 'restore the owed list'
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout 'machinery check: 11 passed'
+stderr 'machinery run: .machinery/receipts/.*\.jsonl \(exit 3\)'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 3, fix-forward 1 of 2\)$'
+! stdout '== verify =='
+! stdout 'stop:'
+
+exec git -c user.name=t -c user.email=t@t commit -q --allow-empty -m 'try again'
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 4, fix-forward 2 of 2\)$'
+! stdout 'stop:'
+
+# after two fix-forwards a further failure prints the stop line
+exec git -c user.name=t -c user.email=t@t commit -q --allow-empty -m 'once more'
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 5, fix-forward 3 of 2\)$'
+stdout '^stop: two fix-forwards used; return the failing stories to the backlog$'
+grep '"fix_forward": 3' .git/machinery/landing.json
+
+# another branch counts on its own
+exec git checkout -q -b other
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+! stdout 'stop:'
+exec git checkout -q main
+
+# the count is a report: a landing that passes still passes, and resets the count
+exec git -c user.name=t -c user.email=t@t commit -q --allow-empty -m 'fixed'
+exec mrun 0 landing --base base -- sh e2e/orders.sh
+stdout '^landing: passed at [0-9a-f]{7} \(attempt 6, fix-forward 4 of 2\)$'
+! stdout 'stop:'
+! grep '"main"' .git/machinery/landing.json
+grep '"other"' .git/machinery/landing.json
+exec git -c user.name=t -c user.email=t@t commit -q --allow-empty -m 'next story'
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}

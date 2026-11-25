@@ -1,0 +1,27 @@
+# landing needs a command: after -- or commands.e2e; neither is a config error
+fixture shop
+cp orders_test.go.in e2e/orders_test.go
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 2 landing --base base
+stderr 'config: no end-to-end command: pass one after -- or set commands.e2e in machinery.yaml'
+! stdout .
+! exists .git/machinery/landing.json
+! exists .machinery/receipts
+
+# nothing ran and nothing was counted, so the first real attempt is attempt 1
+exec mrun 0 landing --base base -- sh e2e/orders.sh
+stdout '^landing: passed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+
+# --base is required
+exec mrun 2 landing -- sh e2e/orders.sh
+stderr 'usage: machinery landing --base <ref>'
+
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}

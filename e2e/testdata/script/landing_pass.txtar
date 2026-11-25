@@ -1,0 +1,64 @@
+# landing: check with the ratchet, the whole suite, verify, one final line
+fixture shop
+cp orders_test.go.in e2e/orders_test.go
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 0 landing --base base --stack 'shell fixture' -- sh e2e/orders.sh
+stdout '== model =='
+stdout '== ratchet =='
+stdout 'checked: 16 obligations, 1 scope globs, 0 tiered ids, 0 baseline entries'
+stdout 'machinery check: 11 passed, 0 failed, 0 not demonstrated, 5 not applicable'
+stderr 'machinery run: .machinery/receipts/.*\.jsonl \(exit 0\)'
+stdout '== verify =='
+stdout 'checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts'
+stdout 'machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+stdout '^landing: passed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+! stdout 'stop:'
+
+# the run recorded the stack
+exec sh -c 'cat .machinery/receipts/*.jsonl > .machinery/seen.txt'
+grep '"stack":"shell fixture"' .machinery/seen.txt
+
+# a passed landing leaves nothing counted for the branch
+grep '"branches": {}' .git/machinery/landing.json
+exec mrun 0 landing --base base -- sh e2e/orders.sh
+stdout '^landing: passed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+
+# the suite may come from the config
+cp machinery_cmd.yaml machinery.yaml
+gitcommit 'configure the suite'
+exec mrun 0 landing --base base
+stdout '^landing: passed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}
+-- machinery_cmd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+commands:
+  e2e: ["sh", "e2e/orders.sh"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

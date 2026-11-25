@@ -1,0 +1,31 @@
+# landing stops at verify when the suite ran but proved too little
+fixture shop
+cp orders_test.go.in e2e/orders_test.go
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 1 landing --base base -- true
+stdout 'machinery check: 11 passed'
+stderr 'machinery run: .machinery/receipts/.*\.jsonl \(exit 0\)'
+stdout '== verify =='
+stdout 'ERROR  unproven: tc:ORDE-2e883d'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+
+# the suite itself failing is reported before verify
+exec mrun 1 landing --base base -- sh -c 'exit 1'
+stderr '\(exit 1\)'
+! stdout '== verify =='
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 2, fix-forward 0 of 2\)$'
+
+# a command that cannot start fails the landing too
+exec mrun 1 landing --base base -- machinery-no-such-command
+stderr 'cannot start machinery-no-such-command'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 3, fix-forward 0 of 2\)$'
+
+-- orders_test.go.in --
+package e2e
+
+import "testing"
+
+func TestOrders(t *testing.T) {}

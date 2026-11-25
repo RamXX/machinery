@@ -22,7 +22,7 @@ func runRun(e *Env, args []string) int {
 	}
 	argv := fs.Args()
 	if len(argv) == 0 {
-		return e.Usage("machinery run [--stack <description>] [--affected --base <ref>] -- <command> [args...]")
+		return e.Usage("machinery run [--stack <description>] -- <command> [args...]")
 	}
 	if *targeted != (*base != "") {
 		return e.Usage("--affected and --base go together: machinery run --affected --base <ref> -- <command> [args...]")
