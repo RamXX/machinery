@@ -65,6 +65,10 @@ exec machinery brief shop-m1 --role modeler
 stdout '^read:\n  design/formal/order-payment.spec.yaml\n  design/machines/Order.machine.json\n'
 stdout '^done when: machinery check --stage formal passes and fv:order-payment is proven$'
 
+# the modeler role is for a story with an id in a critical area
+exec mrun 2 brief shop-r1 --role modeler
+stderr 'config: story shop-r1 has no id in a critical area'
+
 -- formats.md --
 The contract.
 -- baseline-main.json --

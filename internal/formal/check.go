@@ -216,6 +216,25 @@ func (c *tlaChecker) run(dir string, r *Run) (RunResult, *Trace) {
 				}
 			}
 		}
+		// With several workers TLC may report a different, equally short
+		// counterexample each time. The trace file is generated data that must
+		// not change between runs, so the trace comes from one worker.
+		if c.r.workers > 1 {
+			single := *c.r
+			single.workers = 1
+			var det tlcOutcome
+			switch out.Kind {
+			case "property":
+				det = single.run(dir, c.s.Properties, tlcConfig(r, nil, []string{rr.Violated}), false, timeoutOf(r))
+			case "deadlock":
+				det = single.run(dir, c.s.Properties, tlcConfig(r, r.Invariants, r.Properties), true, timeoutOf(r))
+			default:
+				det = single.run(dir, c.s.Properties, tlcConfig(r, []string{rr.Violated}, nil), false, timeoutOf(r))
+			}
+			if det.Outcome == "violated" {
+				out = det
+			}
+		}
 		trace = &Trace{Steps: out.steps(), Loop: out.loopStep()}
 	}
 	for _, name := range r.Reach {

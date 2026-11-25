@@ -272,6 +272,8 @@ list refer to the design. An id is `<kind>:<name>`.
 - An **obligation** is an id that must be either proven at the current commit or listed in
   `owed.yaml`. The obligation kinds are `inv`, `sc`, `tc`, `fm`, `fv`, `cx` and `ck`.
 - An id pattern is a full id or a prefix ending in `*` (`tc:ORDE-*`, `act:Order.*`).
+- An `fv` id has the tier of its area, and a `cx` id the highest tier among the areas its formal
+  model lists (section 22).
 
 ## 5. Design sources
 
@@ -1362,6 +1364,8 @@ platform guarantees, what a dependency does. They are numbered data, not comment
 - `status: proven` requires `evidence`, the id of an obligation (often the `cx` id of the run that
   negates the assumption, section 16.4). Evidence that is not an obligation is an ERROR. While
   the evidence is in the owed list the assumption counts as unproven.
+- Stage `formal` reads no receipts: whether the evidence is in fact proven is `verify`'s
+  judgment, which fails on an obligation that is neither proven nor owed.
 - Every unproven assumption prints in stage `formal` as
   `warn   <spec>: assumption <id> unproven: <text>`, in every proof block that touches the area
   (section 13) and in the verifier brief. It cannot be hidden, and it does not block.
@@ -1384,6 +1388,9 @@ A run is one configuration of the model.
 **Reach.** A property that holds because the interesting state is never reached proves nothing.
 Every run with `expect: pass` lists at least one reach predicate, and each must be reached:
 otherwise `ERROR  <spec> run <run>: reach <name> not reached: the pass is vacuous`.
+
+A violated run's trace is taken with one worker, whatever `--workers` says, so that the trace
+file does not change between runs.
 
 **Findings.** A run with `expect: finding` is expected to fail. It records a known bug (`story`)
 or shows what breaks when a host assumption is false (`assumption`). It keeps failing in the
@@ -1653,8 +1660,10 @@ next:
    entries are kept; entries are added only for paths newly in scope.
 3. **Owed.** Runs `machinery gen` (with no design yet it writes an empty obligation list). When
    design sources exist and stages `model`, `machines` and `failure-modes` pass, it adds to
-   `owed.yaml` every obligation and every unserved `act` id that
-   is not there, with the reason `unproven at adoption (<short sha>)`. It never removes an entry
+   `owed.yaml` every obligation and every unserved `act` id that is new: neither in the owed
+   list nor in the obligation list of the last commit (an id that list already has was owed
+   before, or has been proven and pruned since; owing it again would undo the ratchet). Each
+   is added, with the reason `unproven at adoption (<short sha>)`. It never removes an entry
    and never changes a reason. When a stage fails the config and the baselines are still
    written, the findings print, no owed entry is written and the exit code is 1.
 

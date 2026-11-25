@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/RamXX/machinery/internal/machine"
 	"github.com/RamXX/machinery/internal/project"
 )
@@ -64,8 +66,9 @@ type Design struct {
 	Served      []Served     // sorted by id
 	Duplicates  []string     // ids declared more than once
 
-	byID map[string]*Obligation
-	acts map[string]bool
+	byID  map[string]*Obligation
+	acts  map[string]bool
+	specs map[string][]string
 }
 
 // Load reads every design source. It never fails: problems are kept per
@@ -209,7 +212,58 @@ func (d *Design) AllIDs() []string {
 }
 
 // Tier returns the tier of an id and the areas that give it.
-func (d *Design) Tier(id string) (string, []Area) { return TierOf(d.Areas, id) }
+//
+// An fv id has the tier of the area it names. A cx id has the highest tier
+// among the areas its formal model covers.
+func (d *Design) Tier(id string) (string, []Area) {
+	var names []string
+	switch {
+	case strings.HasPrefix(id, "fv:"):
+		names = []string{strings.TrimPrefix(id, "fv:")}
+	case strings.HasPrefix(id, "cx:"):
+		if parts := strings.SplitN(id, ":", 3); len(parts) == 3 {
+			names = d.specAreas()[parts[1]]
+		}
+	default:
+		return TierOf(d.Areas, id)
+	}
+	tier := Routine
+	var in []Area
+	for _, a := range d.Areas {
+		for _, n := range names {
+			if a.Name == n {
+				in = append(in, a)
+				if TierRank(a.Tier) > TierRank(tier) {
+					tier = a.Tier
+				}
+			}
+		}
+	}
+	return tier, in
+}
+
+// specAreas maps each formal spec to the risk areas its manifest lists.
+func (d *Design) specAreas() map[string][]string {
+	if d.specs != nil {
+		return d.specs
+	}
+	d.specs = map[string][]string{}
+	files, _ := d.P.Glob([]string{strings.TrimSuffix(d.P.Cfg.Design.Formal, "/") + "/*.spec.yaml"})
+	for _, f := range files {
+		data, err := d.P.Read(f)
+		if err != nil {
+			continue
+		}
+		var m struct {
+			Spec  string   `yaml:"spec"`
+			Areas []string `yaml:"areas"`
+		}
+		if yaml.Unmarshal(data, &m) == nil && m.Spec != "" {
+			d.specs[m.Spec] = m.Areas
+		}
+	}
+	return d.specs
+}
 
 // OwedSet returns the owed ids.
 func (d *Design) OwedSet() map[string]OwedEntry {

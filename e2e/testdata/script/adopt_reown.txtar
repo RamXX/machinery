@@ -1,0 +1,34 @@
+# adopt owes what is new. An id that was owed before and has since been proven and pruned
+# is not owed again: that would undo the ratchet.
+fixture brownfield
+gitinit
+exec machinery adopt --paths 'internal/shipping/**' --write
+fixture brownfield-design
+exec sh -c 'printf "waivers:\n  - {rule: action-event, id: \"act:Shipment.create\", reason: \"creation enters the initial state\"}\n" >> machinery.yaml'
+exec machinery adopt --write
+grep 'id: tc:SHIP-422414' design/owed.yaml
+gitcommit 'adopted with the shipment model'
+
+# as if a story had proven one id and pruned it
+exec sh -c 'grep -v -A1 "id: tc:SHIP-422414" design/owed.yaml | grep -v "^--$" > owed.tmp && awk "BEGIN{skip=0} /tc:SHIP-422414/{skip=2} skip>0{skip--; next} {print}" design/owed.yaml > owed.tmp && mv owed.tmp design/owed.yaml'
+! grep 'tc:SHIP-422414' design/owed.yaml
+gitcommit 'pruned after a proof'
+
+# a later adopt does not owe it again, and writes nothing
+exec machinery adopt --write
+stdout 'adopt: wrote 0 file\(s\)'
+! grep 'tc:SHIP-422414' design/owed.yaml
+
+# a new scenario in the design is new: it is owed, and only it
+exec sh -c 'cat scenario.yaml >> design/model/depot.modelith.yaml'
+exec machinery adopt --write
+grep 'id: sc:a-cancelled-shipment-stays-cancelled' design/owed.yaml
+! grep 'tc:SHIP-422414' design/owed.yaml
+
+-- scenario.yaml --
+  - name: A cancelled shipment stays cancelled
+    actors: [Clerk]
+    steps:
+      - "Clerk creates a `Shipment` and cancels it."
+      - "Clerk tries to pack it; the request is refused."
+    invariants_touched: [terminal-is-final]

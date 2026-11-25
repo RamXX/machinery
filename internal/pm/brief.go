@@ -11,6 +11,7 @@ import (
 	"github.com/RamXX/machinery/internal/formal"
 	"github.com/RamXX/machinery/internal/gen"
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/project"
 )
 
 // Roles of a brief (section 15.5).
@@ -34,6 +35,9 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string) error 
 	base := "main"
 	if p.Cfg.Backlog != nil {
 		base = p.Cfg.Backlog.Base
+	}
+	if role == Modeler && len(CriticalAreas(d, t.IDs)) == 0 {
+		return project.Errf("story %s has no id in a critical area: the modeler role is for a story that needs a formal model", is.ID)
 	}
 	fmt.Fprintf(w, "BRIEF %s (%s)\n", is.ID, role)
 	fmt.Fprintf(w, "title: %s\n", is.Title)

@@ -110,9 +110,16 @@ func Proof(w io.Writer, d *design.Design, ev *Evaluation, ids []string) int {
 // ProofWith is Proof with extra lines under not proven (the unproven
 // assumptions of the formal models covering the ids).
 func ProofWith(w io.Writer, d *design.Design, ev *Evaluation, ids, extra []string) int {
+	return ProofFor(w, d, ev, ids, ids, extra)
+}
+
+// ProofFor is ProofWith with the tier line computed over tierIDs: the ids of
+// a story include the actions it serves, which are not obligations but do
+// carry a tier.
+func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra []string) int {
 	fmt.Fprintln(w, "PROOF")
 	fmt.Fprintf(w, "commit:   %s\n", ev.Head)
-	tier, areas := HighestTier(d, ids)
+	tier, areas := HighestTier(d, tierIDs)
 	if len(areas) > 0 {
 		fmt.Fprintf(w, "tier:     %s (%s)\n", tier, strings.Join(areas, ", "))
 	} else {

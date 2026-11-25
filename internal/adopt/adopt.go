@@ -3,6 +3,7 @@
 package adopt
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -379,14 +380,18 @@ func (w *worker) addOwed(d *design.Design) error {
 	entries := append([]design.OwedEntry(nil), d.Owed...)
 	added := 0
 	served := servedIDs(w.p, d)
+	// Only what is new is owed: an id the committed obligation list already
+	// has was owed, or proven and pruned, before. Owing it again would undo
+	// the ratchet.
+	known := committedIDs(w.p)
 	for _, o := range d.Obligations {
-		if _, ok := have[o.ID]; !ok {
+		if _, ok := have[o.ID]; !ok && !known[o.ID] {
 			entries = append(entries, design.OwedEntry{ID: o.ID, Reason: reason})
 			added++
 		}
 	}
 	for _, s := range d.Served {
-		if _, ok := have[s.ID]; !ok && !served[s.ID] {
+		if _, ok := have[s.ID]; !ok && !served[s.ID] && !known[s.ID] {
 			entries = append(entries, design.OwedEntry{ID: s.ID, Reason: reason})
 			added++
 		}
@@ -401,6 +406,34 @@ func (w *worker) addOwed(d *design.Design) error {
 	}
 	w.record(w.p.Cfg.Design.Owed, fmt.Sprintf("new owed entries: %d", added))
 	return nil
+}
+
+// committedIDs returns the ids of the obligation list at HEAD (empty when
+// there is none, as on a first adoption).
+func committedIDs(p *project.Project) map[string]bool {
+	res := map[string]bool{}
+	data, ok := gitx.Show(p.Root, "HEAD", strings.TrimSuffix(p.Cfg.Design.Gen, "/")+"/obligations.json")
+	if !ok {
+		return res
+	}
+	var doc struct {
+		Obligations []struct {
+			ID string `json:"id"`
+		} `json:"obligations"`
+		Served []struct {
+			ID string `json:"id"`
+		} `json:"served"`
+	}
+	if json.Unmarshal(data, &doc) != nil {
+		return res
+	}
+	for _, o := range doc.Obligations {
+		res[o.ID] = true
+	}
+	for _, s := range doc.Served {
+		res[s.ID] = true
+	}
+	return res
 }
 
 func (w *worker) reasonSha() string {

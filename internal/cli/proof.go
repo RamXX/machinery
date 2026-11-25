@@ -42,7 +42,7 @@ func runProof(e *Env, args []string) int {
 		return 2
 	}
 	d := design.Load(p)
-	var sel []string
+	var sel, tierIDs []string
 	var c *backlog.Client
 	if *story != "" {
 		var err error
@@ -53,7 +53,8 @@ func runProof(e *Env, args []string) int {
 		if is == nil {
 			return code
 		}
-		if sel = pm.ObligationIDs(d, backlog.ParseTags(is).IDs); len(sel) == 0 {
+		tierIDs = backlog.ParseTags(is).IDs
+		if sel = pm.ObligationIDs(d, tierIDs); len(sel) == 0 {
 			return e.Usage("story %s names no obligation id", *story)
 		}
 	} else {
@@ -67,7 +68,10 @@ func runProof(e *Env, args []string) int {
 		return e.Fail(err)
 	}
 	var block bytes.Buffer
-	code := evidence.ProofWith(io.MultiWriter(e.Stdout, &block), d, ev, sel, assumptionLines(d, sel))
+	if tierIDs == nil {
+		tierIDs = sel
+	}
+	code := evidence.ProofFor(io.MultiWriter(e.Stdout, &block), d, ev, sel, tierIDs, assumptionLines(d, sel))
 	if *post {
 		if c.Actor == "" {
 			return e.Usage("no actor: pass --actor or set BEADS_ACTOR")
