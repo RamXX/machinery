@@ -1,0 +1,27 @@
+version: 2
+design:
+  models:
+    - design/model/crm.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+dependencies:
+  - name: postgres
+    posture: real
+trace:
+  code: ["cmd/**/*.go", "internal/**/*.go"]
+  tests: ["e2e/**/*.go"]
+constraints:
+  layers:
+    - {name: fsm, paths: ["internal/fsm/**"]}
+    - {name: store, paths: ["internal/store/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+    - {name: cmd, paths: ["cmd/**"]}
+  size:
+    max_file_lines: 400
+    max_func_lines: 60
+waivers:
+  - {rule: action-event, id: "act:Deal.create", reason: "creation enters the initial state Lead"}
+  - {rule: action-event, id: "act:Task.create", reason: "creation enters the initial state Open"}

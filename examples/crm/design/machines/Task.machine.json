@@ -1,0 +1,40 @@
+{
+  "_comment": "Task lifecycle. Domain states mirror the TaskStatus enum. One request loads the task, fires one event and saves inside one database transaction.",
+  "id": "task",
+  "initial": "Open",
+  "context": { "taskId": null, "actorId": null },
+  "states": {
+    "Open": {
+      "on": {
+        "start": [
+          { "target": "InProgress", "guard": "canWriteTask", "actions": "auditStart" },
+          { "actions": "auditTaskDenied" }
+        ],
+        "cancel": [
+          { "target": "Cancelled", "guard": "canWriteTask", "actions": "auditCancel" },
+          { "actions": "auditTaskDenied" }
+        ]
+      },
+      "_ignores": {
+        "complete": "a task must be started first; the API refuses with TASK_NOT_STARTED"
+      }
+    },
+    "InProgress": {
+      "on": {
+        "complete": [
+          { "target": "Done", "guard": "canWriteTask", "actions": "auditComplete" },
+          { "actions": "auditTaskDenied" }
+        ],
+        "cancel": [
+          { "target": "Cancelled", "guard": "canWriteTask", "actions": "auditCancel" },
+          { "actions": "auditTaskDenied" }
+        ]
+      },
+      "_ignores": {
+        "start": "already started; the API refuses with TASK_ALREADY_STARTED"
+      }
+    },
+    "Done": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}

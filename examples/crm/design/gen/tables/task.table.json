@@ -1,0 +1,185 @@
+{
+  "version": 1,
+  "machine": "task",
+  "tag": "TASK",
+  "source": "design/machines/Task.machine.json",
+  "source_sha256": "d9ea1a3a304fe7abf9f36d934acfcfd502085561eeef455234b6fb589f5f09d3",
+  "initial": "Open",
+  "states": [
+    {
+      "path": "Open",
+      "kind": "atomic",
+      "resting": true,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    },
+    {
+      "path": "InProgress",
+      "kind": "atomic",
+      "resting": true,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    },
+    {
+      "path": "Done",
+      "kind": "final",
+      "resting": false,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    },
+    {
+      "path": "Cancelled",
+      "kind": "final",
+      "resting": false,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    }
+  ],
+  "transitions": [
+    {
+      "id": "tc:TASK-067fe3",
+      "source": "Open",
+      "kind": "on",
+      "event": "start",
+      "guard": "canWriteTask",
+      "target": "InProgress",
+      "actions": [
+        "auditStart"
+      ],
+      "effects": [
+        "auditStart"
+      ]
+    },
+    {
+      "id": "tc:TASK-2a7cdb",
+      "source": "Open",
+      "kind": "on",
+      "event": "start",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditTaskDenied"
+      ],
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-f7ab1e",
+      "source": "Open",
+      "kind": "on",
+      "event": "cancel",
+      "guard": "canWriteTask",
+      "target": "Cancelled",
+      "actions": [
+        "auditCancel"
+      ],
+      "effects": [
+        "auditCancel"
+      ]
+    },
+    {
+      "id": "tc:TASK-36d38a",
+      "source": "Open",
+      "kind": "on",
+      "event": "cancel",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditTaskDenied"
+      ],
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-d307aa",
+      "source": "InProgress",
+      "kind": "on",
+      "event": "complete",
+      "guard": "canWriteTask",
+      "target": "Done",
+      "actions": [
+        "auditComplete"
+      ],
+      "effects": [
+        "auditComplete"
+      ]
+    },
+    {
+      "id": "tc:TASK-7d91c2",
+      "source": "InProgress",
+      "kind": "on",
+      "event": "complete",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditTaskDenied"
+      ],
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-67d9f6",
+      "source": "InProgress",
+      "kind": "on",
+      "event": "cancel",
+      "guard": "canWriteTask",
+      "target": "Cancelled",
+      "actions": [
+        "auditCancel"
+      ],
+      "effects": [
+        "auditCancel"
+      ]
+    },
+    {
+      "id": "tc:TASK-d159c9",
+      "source": "InProgress",
+      "kind": "on",
+      "event": "cancel",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditTaskDenied"
+      ],
+      "effects": [
+        "auditTaskDenied"
+      ]
+    }
+  ],
+  "ignores": [
+    {
+      "id": "tc:TASK-ac3aa3",
+      "state": "Open",
+      "event": "complete",
+      "reason": "a task must be started first; the API refuses with TASK_NOT_STARTED"
+    },
+    {
+      "id": "tc:TASK-fcd596",
+      "state": "InProgress",
+      "event": "start",
+      "reason": "already started; the API refuses with TASK_ALREADY_STARTED"
+    }
+  ],
+  "refusals": [],
+  "clauses": [],
+  "units": {
+    "guards": [
+      "canWriteTask"
+    ],
+    "actions": [
+      "auditCancel",
+      "auditComplete",
+      "auditStart",
+      "auditTaskDenied"
+    ],
+    "actors": []
+  },
+  "delays": {}
+}

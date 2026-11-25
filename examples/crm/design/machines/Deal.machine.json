@@ -1,0 +1,70 @@
+{
+  "_comment": "Deal pipeline. Domain states mirror the DealStage enum. `closing` is the transient overlay around the store write that makes a deal Won. One request loads the deal, fires one event and saves inside one database transaction; concurrent writers serialize on the row lock.",
+  "_delays": {
+    "closeTimeout": "1000 ms - upper bound on the store write that records a won deal"
+  },
+  "_guards": {
+    "canWinDeal": ["callerMayWriteDeal", "amountIsPositive"]
+  },
+  "id": "deal",
+  "initial": "Lead",
+  "context": { "dealId": null, "actorId": null, "lastError": null },
+  "states": {
+    "Lead": {
+      "on": {
+        "qualify": [
+          { "target": "Qualified", "guard": "canWriteDeal", "actions": "auditQualify" },
+          { "actions": "auditDealDenied" }
+        ],
+        "lose": [
+          { "target": "Lost", "guard": "canWriteDeal", "actions": "auditLose" },
+          { "actions": "auditDealDenied" }
+        ]
+      },
+      "_ignores": {
+        "win": "a lead must be qualified first; the API refuses with DEAL_NOT_QUALIFIED",
+        "reopen": "only a lost deal can be reopened; the API refuses with DEAL_NOT_LOST"
+      }
+    },
+    "Qualified": {
+      "on": {
+        "win": [
+          { "target": "closing", "guard": "canWinDeal", "actions": "stampWinAttempt" },
+          { "actions": "auditDealDenied" }
+        ],
+        "lose": [
+          { "target": "Lost", "guard": "canWriteDeal", "actions": "auditLose" },
+          { "actions": "auditDealDenied" }
+        ]
+      },
+      "_ignores": {
+        "qualify": "already qualified; the API refuses with DEAL_ALREADY_QUALIFIED",
+        "reopen": "only a lost deal can be reopened; the API refuses with DEAL_NOT_LOST"
+      }
+    },
+    "closing": {
+      "invoke": {
+        "src": "recordWin",
+        "onDone": { "target": "Won", "actions": "auditWin" },
+        "onError": { "target": "Qualified", "actions": "auditCloseFailure" }
+      },
+      "after": {
+        "closeTimeout": { "target": "Qualified", "actions": "auditCloseTimeout" }
+      }
+    },
+    "Won": { "type": "final" },
+    "Lost": {
+      "on": {
+        "reopen": [
+          { "target": "Lead", "guard": "isAdmin", "actions": "auditReopen" },
+          { "actions": "auditDealDenied" }
+        ]
+      },
+      "_ignores": {
+        "qualify": "a lost deal must be reopened first; the API refuses with DEAL_LOST",
+        "win": "a lost deal must be reopened first; the API refuses with DEAL_LOST",
+        "lose": "already lost; the API refuses with DEAL_LOST"
+      }
+    }
+  }
+}

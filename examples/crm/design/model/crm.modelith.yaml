@@ -1,0 +1,129 @@
+kind: DomainModel
+version: v1
+title: CRM
+description: >
+  A small customer relationship manager used as the reference project for
+  machinery. A Rep works deals through a pipeline and tracks tasks against
+  them. An Admin can do everything a Rep can and can reopen lost deals. Every
+  change is recorded in an append-only audit trail.
+
+glossary:
+  Rep: "A `User` with the rep role. Works the deals and tasks it owns."
+  Admin: "A `User` with the admin role. May change any `Deal` or `Task` and may reopen a lost `Deal`."
+  Owner: "The `User` a `Deal` belongs to."
+  Assignee: "The `User` a `Task` is assigned to."
+
+enums:
+  UserRole:
+    values:
+      - {name: Admin, definition: "May change any record."}
+      - {name: Rep, definition: "May change the records it owns or is assigned."}
+  DealStage:
+    values:
+      - {name: Lead, definition: "Unqualified opportunity."}
+      - {name: Qualified, definition: "Confirmed fit and budget."}
+      - {name: Won, definition: "Closed successfully; terminal."}
+      - {name: Lost, definition: "Closed unsuccessfully; an Admin may reopen it."}
+  TaskStatus:
+    values:
+      - {name: Open, definition: "Created, not started."}
+      - {name: InProgress, definition: "Being worked."}
+      - {name: Done, definition: "Completed; terminal."}
+      - {name: Cancelled, definition: "Abandoned; terminal."}
+
+entities:
+  User:
+    definition: >
+      A person who signs in and acts on deals and tasks. A `User` has exactly
+      one role.
+    attributes:
+      - {name: email, type: string}
+      - {name: role, type: UserRole}
+    invariants:
+      - {id: user-email-unique, statement: "No two `User` records share an email."}
+  Deal:
+    definition: >
+      A sales opportunity owned by one `User`. Its stage follows the deal
+      pipeline from lead to won or lost.
+    attributes:
+      - {name: title, type: string}
+      - {name: stage, type: DealStage}
+      - {name: amountCents, type: integer}
+    relationships:
+      - {entity: User, cardinality: "n:1", role: owner, ownership: referenced}
+      - {entity: Task, cardinality: "1:n", ownership: owned}
+    actions:
+      - {name: create, actor: Rep, description: "Create the `Deal` as a lead owned by the acting `User`."}
+      - {name: qualify, actor: Rep, preserves: [deal-owner-or-admin-writes]}
+      - {name: win, actor: Rep, preserves: [deal-owner-or-admin-writes, deal-won-needs-amount]}
+      - {name: lose, actor: Rep, preserves: [deal-owner-or-admin-writes]}
+      - {name: reopen, actor: Admin, preserves: [deal-reopen-admin-only]}
+    invariants:
+      - {id: deal-owner-or-admin-writes, statement: "Only the `Owner` of a `Deal` or an `Admin` changes it."}
+      - {id: deal-won-needs-amount, statement: "A `Deal` is won only when its amount is greater than zero."}
+      - {id: deal-reopen-admin-only, statement: "Only an Admin reopens a lost `Deal`."}
+      - {id: deal-won-is-final, statement: "A won `Deal` never changes stage again."}
+  Task:
+    definition: >
+      A unit of work attached to one `Deal` and assigned to one `User`.
+    attributes:
+      - {name: title, type: string}
+      - {name: status, type: TaskStatus}
+    relationships:
+      - {entity: Deal, cardinality: "n:1", ownership: referenced}
+      - {entity: User, cardinality: "n:1", role: assignee, ownership: referenced}
+    actions:
+      - {name: create, actor: Rep, description: "Create the `Task` as open, assigned to the acting `User`."}
+      - {name: start, actor: Rep, preserves: [task-assignee-or-admin-writes]}
+      - {name: complete, actor: Rep, preserves: [task-assignee-or-admin-writes]}
+      - {name: cancel, actor: Rep, preserves: [task-assignee-or-admin-writes, task-terminal-is-final]}
+    invariants:
+      - {id: task-assignee-or-admin-writes, statement: "Only the `Assignee` of a `Task` or an `Admin` changes it."}
+      - {id: task-terminal-is-final, statement: "A done or cancelled `Task` never changes status again."}
+  AuditEntry:
+    definition: >
+      A record that one `User` performed one action on one `Deal` or `Task`,
+      with the outcome.
+    attributes:
+      - {name: action, type: string}
+      - {name: subject, type: string}
+      - {name: outcome, type: string}
+      - {name: at, type: timestamp}
+    relationships:
+      - {entity: User, cardinality: "n:1", role: actor, ownership: referenced}
+    invariants:
+      - {id: audit-append-only, statement: "An `AuditEntry` is never updated or deleted."}
+
+invariants:
+  - {id: lifecycle-single-writer, statement: "The stage of a `Deal` and the status of a `Task` change only along a transition of their machine, and only through the service's transition path."}
+  - {id: every-change-audited, statement: "Every stage change of a `Deal` and every status change of a `Task` writes exactly one `AuditEntry` in the same transaction."}
+  - {id: refusals-are-audited, statement: "Every refused action on a `Deal` or `Task` writes one `AuditEntry` with a refused outcome."}
+
+scenarios:
+  - name: Rep qualifies and wins a deal
+    actors: [Rep]
+    steps:
+      - "Rep creates a `Deal` with an amount; it is a lead."
+      - "Rep qualifies the `Deal`."
+      - "Rep wins the `Deal`; it is won and the audit trail shows three `AuditEntry` records."
+    invariants_touched: [deal-won-needs-amount, every-change-audited]
+  - name: Rep cannot change another rep's deal
+    actors: [Rep]
+    steps:
+      - "A first Rep creates a `Deal`."
+      - "A second `User` with the rep role tries to qualify it; the request is refused and the `Deal` is unchanged."
+    invariants_touched: [deal-owner-or-admin-writes, refusals-are-audited]
+  - name: Admin reopens a lost deal
+    actors: [Rep, Admin]
+    steps:
+      - "Rep creates a `Deal` and loses it."
+      - "Rep tries to reopen it; the request is refused."
+      - "Admin reopens it; the `Deal` is a lead again."
+    invariants_touched: [deal-reopen-admin-only]
+  - name: Rep works a task to completion
+    actors: [Rep]
+    steps:
+      - "Rep creates a `Task` on a `Deal`; it is open."
+      - "Rep starts the `Task`, then completes it."
+      - "Rep tries to cancel the completed `Task`; the request is refused."
+    invariants_touched: [task-terminal-is-final]

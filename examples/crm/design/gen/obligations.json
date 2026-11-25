@@ -1,0 +1,411 @@
+{
+  "version": 1,
+  "obligations": [
+    {
+      "id": "fm:database-unreachable",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "The database does not answer."
+    },
+    {
+      "id": "fm:deal-win-store-failure",
+      "kind": "fm",
+      "source": "design/failure-modes.yaml",
+      "title": "The store write that records a won deal fails or does not finish in time."
+    },
+    {
+      "id": "inv:audit-append-only",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "An AuditEntry is never updated or deleted."
+    },
+    {
+      "id": "inv:deal-owner-or-admin-writes",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Only the Owner of a Deal or an Admin changes it."
+    },
+    {
+      "id": "inv:deal-reopen-admin-only",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Only an Admin reopens a lost Deal."
+    },
+    {
+      "id": "inv:deal-won-is-final",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "A won Deal never changes stage again."
+    },
+    {
+      "id": "inv:deal-won-needs-amount",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "A Deal is won only when its amount is greater than zero."
+    },
+    {
+      "id": "inv:every-change-audited",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Every stage change of a Deal and every status change of a Task writes exactly one AuditEntry in the same transaction."
+    },
+    {
+      "id": "inv:lifecycle-single-writer",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "The stage of a Deal and the status of a Task change only along a transition of their machine, and only through the service's transition path."
+    },
+    {
+      "id": "inv:refusals-are-audited",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Every refused action on a Deal or Task writes one AuditEntry with a refused outcome."
+    },
+    {
+      "id": "inv:task-assignee-or-admin-writes",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Only the Assignee of a Task or an Admin changes it."
+    },
+    {
+      "id": "inv:task-terminal-is-final",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "A done or cancelled Task never changes status again."
+    },
+    {
+      "id": "inv:user-email-unique",
+      "kind": "inv",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "No two User records share an email."
+    },
+    {
+      "id": "sc:admin-reopens-a-lost-deal",
+      "kind": "sc",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Admin reopens a lost deal"
+    },
+    {
+      "id": "sc:rep-cannot-change-another-rep-s-deal",
+      "kind": "sc",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Rep cannot change another rep's deal"
+    },
+    {
+      "id": "sc:rep-qualifies-and-wins-a-deal",
+      "kind": "sc",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Rep qualifies and wins a deal"
+    },
+    {
+      "id": "sc:rep-works-a-task-to-completion",
+      "kind": "sc",
+      "source": "design/model/crm.modelith.yaml",
+      "title": "Rep works a task to completion"
+    },
+    {
+      "id": "tc:DEAL-062b75",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lead ignore:win -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-23efa8",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "closing onError:recordWin -> Qualified",
+      "effects": [
+        "auditCloseFailure"
+      ]
+    },
+    {
+      "id": "tc:DEAL-2c0b2a",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lost ignore:qualify -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-3080d9",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified ignore:reopen -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-346352",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified on:win [canWinDeal!callerMayWriteDeal] -> (branch does not fire)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-3545e5",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lost ignore:lose -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-4a25db",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lead on:qualify [canWriteDeal] -> Qualified",
+      "effects": [
+        "auditQualify"
+      ]
+    },
+    {
+      "id": "tc:DEAL-559572",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified on:win [canWinDeal!amountIsPositive] -> (branch does not fire)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-55eecd",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "closing after:closeTimeout -> Qualified",
+      "effects": [
+        "auditCloseTimeout"
+      ]
+    },
+    {
+      "id": "tc:DEAL-59fcd3",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lost ignore:win -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-701b01",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "closing onDone:recordWin -> Won",
+      "effects": [
+        "auditWin"
+      ]
+    },
+    {
+      "id": "tc:DEAL-776ffd",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lead on:lose [canWriteDeal] -> Lost",
+      "effects": [
+        "auditLose"
+      ]
+    },
+    {
+      "id": "tc:DEAL-7bb594",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lost on:reopen -> (internal)",
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-81d0ab",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified on:win -> (internal)",
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-9369a6",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lead ignore:reopen -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-9597fe",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified ignore:qualify -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:DEAL-9f48af",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified on:lose -> (internal)",
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-a627f4",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified on:lose [canWriteDeal] -> Lost",
+      "effects": [
+        "auditLose"
+      ]
+    },
+    {
+      "id": "tc:DEAL-d09c4d",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Qualified on:win [canWinDeal] -> closing",
+      "effects": [
+        "stampWinAttempt"
+      ]
+    },
+    {
+      "id": "tc:DEAL-fdd582",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lead on:qualify -> (internal)",
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-fdf795",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lead on:lose -> (internal)",
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-fe513e",
+      "kind": "tc",
+      "source": "design/machines/Deal.machine.json",
+      "title": "Lost on:reopen [isAdmin] -> Lead",
+      "effects": [
+        "auditReopen"
+      ]
+    },
+    {
+      "id": "tc:TASK-067fe3",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "Open on:start [canWriteTask] -> InProgress",
+      "effects": [
+        "auditStart"
+      ]
+    },
+    {
+      "id": "tc:TASK-2a7cdb",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "Open on:start -> (internal)",
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-36d38a",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "Open on:cancel -> (internal)",
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-67d9f6",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "InProgress on:cancel [canWriteTask] -> Cancelled",
+      "effects": [
+        "auditCancel"
+      ]
+    },
+    {
+      "id": "tc:TASK-7d91c2",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "InProgress on:complete -> (internal)",
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-ac3aa3",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "Open ignore:complete -> (unchanged)",
+      "effects": []
+    },
+    {
+      "id": "tc:TASK-d159c9",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "InProgress on:cancel -> (internal)",
+      "effects": [
+        "auditTaskDenied"
+      ]
+    },
+    {
+      "id": "tc:TASK-d307aa",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "InProgress on:complete [canWriteTask] -> Done",
+      "effects": [
+        "auditComplete"
+      ]
+    },
+    {
+      "id": "tc:TASK-f7ab1e",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "Open on:cancel [canWriteTask] -> Cancelled",
+      "effects": [
+        "auditCancel"
+      ]
+    },
+    {
+      "id": "tc:TASK-fcd596",
+      "kind": "tc",
+      "source": "design/machines/Task.machine.json",
+      "title": "InProgress ignore:start -> (unchanged)",
+      "effects": []
+    }
+  ],
+  "served": [
+    {
+      "id": "act:Deal.create",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Deal.lose",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Deal.qualify",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Deal.reopen",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Deal.win",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Task.cancel",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Task.complete",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Task.create",
+      "source": "design/model/crm.modelith.yaml"
+    },
+    {
+      "id": "act:Task.start",
+      "source": "design/model/crm.modelith.yaml"
+    }
+  ]
+}

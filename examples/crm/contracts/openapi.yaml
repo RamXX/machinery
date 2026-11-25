@@ -1,0 +1,218 @@
+openapi: 3.1.0
+info:
+  title: CRM reference API
+  version: 0.1.0
+  description: >
+    Reference project for machinery. The caller is identified by the X-User-Id
+    header, which is enough for an example and not for production.
+components:
+  parameters:
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      schema: {type: string}
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string, description: "Stable machine-readable code, for example FORBIDDEN or DEAL_NOT_QUALIFIED."}
+        message: {type: string}
+        case: {type: string, description: "The transition case id that produced this answer, when one fired."}
+    Change:
+      type: object
+      required: [id, state, cases, effects, simulated]
+      properties:
+        id: {type: string}
+        state: {type: string, description: "The state after the request."}
+        cases:
+          type: array
+          items: {type: string}
+          description: "The transition case ids that fired, in order."
+        effects:
+          type: array
+          items: {type: string}
+          description: "The named effects that really ran."
+        simulated:
+          type: array
+          items: {type: string}
+          description: "The named effects that are still noops."
+    User:
+      type: object
+      required: [id, email, role]
+      properties:
+        id: {type: string}
+        email: {type: string}
+        role: {type: string, enum: [Admin, Rep]}
+    Deal:
+      type: object
+      required: [id, title, stage, amountCents, ownerId]
+      properties:
+        id: {type: string}
+        title: {type: string}
+        stage: {type: string, enum: [Lead, Qualified, Won, Lost]}
+        amountCents: {type: integer}
+        ownerId: {type: string}
+    Task:
+      type: object
+      required: [id, title, status, dealId, assigneeId]
+      properties:
+        id: {type: string}
+        title: {type: string}
+        status: {type: string, enum: [Open, InProgress, Done, Cancelled]}
+        dealId: {type: string}
+        assigneeId: {type: string}
+    AuditEntry:
+      type: object
+      required: [id, actorId, action, subject, outcome, at]
+      properties:
+        id: {type: string}
+        actorId: {type: string}
+        action: {type: string}
+        subject: {type: string}
+        outcome: {type: string, enum: [applied, refused, failed]}
+        at: {type: string, format: date-time}
+  responses:
+    Changed:
+      description: The change was applied.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Change"}
+    Refused:
+      description: The request was refused. Nothing changed.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      responses:
+        "200": {description: The service and its database answer.}
+        "503": {$ref: "#/components/responses/Refused"}
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        "200": {description: All users.}
+    post:
+      operationId: createUser
+      responses:
+        "201": {description: Created.}
+        "409": {$ref: "#/components/responses/Refused"}
+  /deals:
+    get:
+      operationId: listDeals
+      parameters: [{$ref: "#/components/parameters/UserId"}]
+      responses:
+        "200": {description: All deals.}
+    post:
+      operationId: createDeal
+      x-machinery-action: Deal.create
+      parameters: [{$ref: "#/components/parameters/UserId"}]
+      responses:
+        "201": {$ref: "#/components/responses/Changed"}
+        "401": {$ref: "#/components/responses/Refused"}
+  /deals/{id}:
+    get:
+      operationId: getDeal
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {description: The deal.}
+        "404": {$ref: "#/components/responses/Refused"}
+  /deals/{id}/qualify:
+    post:
+      operationId: qualifyDeal
+      x-machinery-action: Deal.qualify
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+  /deals/{id}/win:
+    post:
+      operationId: winDeal
+      x-machinery-action: Deal.win
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+        "503": {$ref: "#/components/responses/Refused"}
+  /deals/{id}/lose:
+    post:
+      operationId: loseDeal
+      x-machinery-action: Deal.lose
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+  /deals/{id}/reopen:
+    post:
+      operationId: reopenDeal
+      x-machinery-action: Deal.reopen
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+  /tasks:
+    get:
+      operationId: listTasks
+      parameters: [{$ref: "#/components/parameters/UserId"}]
+      responses:
+        "200": {description: All tasks.}
+    post:
+      operationId: createTask
+      x-machinery-action: Task.create
+      parameters: [{$ref: "#/components/parameters/UserId"}]
+      responses:
+        "201": {$ref: "#/components/responses/Changed"}
+        "401": {$ref: "#/components/responses/Refused"}
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {description: The task.}
+        "404": {$ref: "#/components/responses/Refused"}
+  /tasks/{id}/start:
+    post:
+      operationId: startTask
+      x-machinery-action: Task.start
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+  /tasks/{id}/complete:
+    post:
+      operationId: completeTask
+      x-machinery-action: Task.complete
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+  /tasks/{id}/cancel:
+    post:
+      operationId: cancelTask
+      x-machinery-action: Task.cancel
+      parameters: [{$ref: "#/components/parameters/UserId"}, {$ref: "#/components/parameters/Id"}]
+      responses:
+        "200": {$ref: "#/components/responses/Changed"}
+        "403": {$ref: "#/components/responses/Refused"}
+        "409": {$ref: "#/components/responses/Refused"}
+  /audit:
+    get:
+      operationId: listAudit
+      parameters: [{$ref: "#/components/parameters/UserId"}]
+      responses:
+        "200": {description: The audit trail, oldest first.}

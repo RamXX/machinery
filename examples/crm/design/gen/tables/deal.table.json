@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "machine": "deal",
+  "tag": "DEAL",
+  "source": "design/machines/Deal.machine.json",
+  "source_sha256": "4d341a65947ee32ca37fe4b49bb47efeb6441a91568776dea1249656004b05ee",
+  "initial": "Lead",
+  "states": [
+    {
+      "path": "Lead",
+      "kind": "atomic",
+      "resting": true,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    },
+    {
+      "path": "Qualified",
+      "kind": "atomic",
+      "resting": true,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    },
+    {
+      "path": "closing",
+      "kind": "atomic",
+      "resting": false,
+      "entry": [],
+      "exit": [],
+      "invoke": [
+        "recordWin"
+      ]
+    },
+    {
+      "path": "Won",
+      "kind": "final",
+      "resting": false,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    },
+    {
+      "path": "Lost",
+      "kind": "atomic",
+      "resting": true,
+      "entry": [],
+      "exit": [],
+      "invoke": []
+    }
+  ],
+  "transitions": [
+    {
+      "id": "tc:DEAL-4a25db",
+      "source": "Lead",
+      "kind": "on",
+      "event": "qualify",
+      "guard": "canWriteDeal",
+      "target": "Qualified",
+      "actions": [
+        "auditQualify"
+      ],
+      "effects": [
+        "auditQualify"
+      ]
+    },
+    {
+      "id": "tc:DEAL-fdd582",
+      "source": "Lead",
+      "kind": "on",
+      "event": "qualify",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditDealDenied"
+      ],
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-776ffd",
+      "source": "Lead",
+      "kind": "on",
+      "event": "lose",
+      "guard": "canWriteDeal",
+      "target": "Lost",
+      "actions": [
+        "auditLose"
+      ],
+      "effects": [
+        "auditLose"
+      ]
+    },
+    {
+      "id": "tc:DEAL-fdf795",
+      "source": "Lead",
+      "kind": "on",
+      "event": "lose",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditDealDenied"
+      ],
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-d09c4d",
+      "source": "Qualified",
+      "kind": "on",
+      "event": "win",
+      "guard": "canWinDeal",
+      "target": "closing",
+      "actions": [
+        "stampWinAttempt"
+      ],
+      "effects": [
+        "stampWinAttempt"
+      ]
+    },
+    {
+      "id": "tc:DEAL-81d0ab",
+      "source": "Qualified",
+      "kind": "on",
+      "event": "win",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditDealDenied"
+      ],
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-a627f4",
+      "source": "Qualified",
+      "kind": "on",
+      "event": "lose",
+      "guard": "canWriteDeal",
+      "target": "Lost",
+      "actions": [
+        "auditLose"
+      ],
+      "effects": [
+        "auditLose"
+      ]
+    },
+    {
+      "id": "tc:DEAL-9f48af",
+      "source": "Qualified",
+      "kind": "on",
+      "event": "lose",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditDealDenied"
+      ],
+      "effects": [
+        "auditDealDenied"
+      ]
+    },
+    {
+      "id": "tc:DEAL-55eecd",
+      "source": "closing",
+      "kind": "after",
+      "event": "closeTimeout",
+      "guard": "",
+      "target": "Qualified",
+      "actions": [
+        "auditCloseTimeout"
+      ],
+      "effects": [
+        "auditCloseTimeout"
+      ]
+    },
+    {
+      "id": "tc:DEAL-701b01",
+      "source": "closing",
+      "kind": "onDone",
+      "event": "recordWin",
+      "guard": "",
+      "target": "Won",
+      "actions": [
+        "auditWin"
+      ],
+      "effects": [
+        "auditWin"
+      ]
+    },
+    {
+      "id": "tc:DEAL-23efa8",
+      "source": "closing",
+      "kind": "onError",
+      "event": "recordWin",
+      "guard": "",
+      "target": "Qualified",
+      "actions": [
+        "auditCloseFailure"
+      ],
+      "effects": [
+        "auditCloseFailure"
+      ]
+    },
+    {
+      "id": "tc:DEAL-fe513e",
+      "source": "Lost",
+      "kind": "on",
+      "event": "reopen",
+      "guard": "isAdmin",
+      "target": "Lead",
+      "actions": [
+        "auditReopen"
+      ],
+      "effects": [
+        "auditReopen"
+      ]
+    },
+    {
+      "id": "tc:DEAL-7bb594",
+      "source": "Lost",
+      "kind": "on",
+      "event": "reopen",
+      "guard": "",
+      "target": "",
+      "actions": [
+        "auditDealDenied"
+      ],
+      "effects": [
+        "auditDealDenied"
+      ]
+    }
+  ],
+  "ignores": [
+    {
+      "id": "tc:DEAL-062b75",
+      "state": "Lead",
+      "event": "win",
+      "reason": "a lead must be qualified first; the API refuses with DEAL_NOT_QUALIFIED"
+    },
+    {
+      "id": "tc:DEAL-9369a6",
+      "state": "Lead",
+      "event": "reopen",
+      "reason": "only a lost deal can be reopened; the API refuses with DEAL_NOT_LOST"
+    },
+    {
+      "id": "tc:DEAL-9597fe",
+      "state": "Qualified",
+      "event": "qualify",
+      "reason": "already qualified; the API refuses with DEAL_ALREADY_QUALIFIED"
+    },
+    {
+      "id": "tc:DEAL-3080d9",
+      "state": "Qualified",
+      "event": "reopen",
+      "reason": "only a lost deal can be reopened; the API refuses with DEAL_NOT_LOST"
+    },
+    {
+      "id": "tc:DEAL-2c0b2a",
+      "state": "Lost",
+      "event": "qualify",
+      "reason": "a lost deal must be reopened first; the API refuses with DEAL_LOST"
+    },
+    {
+      "id": "tc:DEAL-59fcd3",
+      "state": "Lost",
+      "event": "win",
+      "reason": "a lost deal must be reopened first; the API refuses with DEAL_LOST"
+    },
+    {
+      "id": "tc:DEAL-3545e5",
+      "state": "Lost",
+      "event": "lose",
+      "reason": "already lost; the API refuses with DEAL_LOST"
+    }
+  ],
+  "refusals": [],
+  "clauses": [
+    {
+      "id": "tc:DEAL-346352",
+      "transition": "tc:DEAL-d09c4d",
+      "guard": "canWinDeal",
+      "clause": "callerMayWriteDeal"
+    },
+    {
+      "id": "tc:DEAL-559572",
+      "transition": "tc:DEAL-d09c4d",
+      "guard": "canWinDeal",
+      "clause": "amountIsPositive"
+    }
+  ],
+  "units": {
+    "guards": [
+      "canWinDeal",
+      "canWriteDeal",
+      "isAdmin"
+    ],
+    "actions": [
+      "auditCloseFailure",
+      "auditCloseTimeout",
+      "auditDealDenied",
+      "auditLose",
+      "auditQualify",
+      "auditReopen",
+      "auditWin",
+      "stampWinAttempt"
+    ],
+    "actors": [
+      "recordWin"
+    ]
+  },
+  "delays": {
+    "closeTimeout": 1000
+  }
+}

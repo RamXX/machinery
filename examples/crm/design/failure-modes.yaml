@@ -1,0 +1,12 @@
+version: 1
+failure_modes:
+  - id: database-unreachable
+    subject: dependency:postgres
+    failure: "The database does not answer."
+    required: surface
+    behavior: "Every request answers 503 with code STORE_UNAVAILABLE within three seconds and changes nothing. After the database returns, the same request succeeds."
+  - id: deal-win-store-failure
+    subject: invoke:deal.recordWin
+    failure: "The store write that records a won deal fails or does not finish in time."
+    required: fail-closed
+    behavior: "The deal returns to Qualified, the caller sees 503 with code STORE_UNAVAILABLE, and no deal is Won without its audit entry."
