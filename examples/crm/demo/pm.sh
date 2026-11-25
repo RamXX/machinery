@@ -109,7 +109,7 @@ run git add -A
 commit "crm: admin cancels a task; qualify without a user"
 may machinery check --stage formal
 may machinery formal sync record-ownership
-run machinery formal sync record-ownership --class no-effect
+run machinery formal sync record-ownership --class no-effect --evidence "a new scenario; the write policy and the signatures are unchanged"
 run git add -A
 commit "crm: the new scenario does not change who may write"
 # The suite runs once, here: the owed list grows by what the change made
@@ -130,7 +130,7 @@ sc=$(story_of '^sc:')
 [ -n "$fm" ] && [ -n "$sc" ] && [ -n "$sc" ] || die "plan --apply did not create the fm and sc stories"
 run machinery brief "$fm"
 run machinery brief "$fm" --role verifier
-run machinery brief "$sc" --role modeler
+run machinery brief "$sc"
 
 echo
 echo "== 3. the gates, on stories whose ids are proven"
@@ -142,6 +142,8 @@ printf 'machinery:ids act:Task.start act:Task.complete act:Task.cancel%s\nmachin
 printf 'machinery:ids act:Deal.win%s\nmachinery:scope internal/api/units_deal.go internal/store/wins.go\n' "$win_ids" >"$tmp/win.txt"
 run bd create --id crm-tasks --title "Serve the task writes" --body-file "$tmp/tasks.txt" --silent
 run bd create --id crm-win --title "Serve the deal win" --body-file "$tmp/win.txt" --silent
+# The modeler's brief is for a story with ids in a critical area.
+run machinery brief crm-win --role modeler
 run machinery status
 for s in crm-tasks crm-win; do
 	as builder machinery proof --story "$s" --post
