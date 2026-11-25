@@ -28,7 +28,7 @@ FORMAL_WORKERS ?= 1
 # MAX keeps the first MAX probe mutations; empty probes them all.
 MAX ?=
 
-.PHONY: help up down build serve psql check e2e evidence verify probe formal
+.PHONY: help up down build serve psql check e2e evidence verify probe formal demo-pm
 
 help: ## List the targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-8s %s\n", $$1, $$2}'
@@ -74,6 +74,9 @@ verify: ## The end gate: machinery landing (check --base BASE, the whole suite t
 formal: ## Formal models: skeletons current, then TLC and Alloy for real (needs Java)
 	$(MACHINERY) formal gen --check
 	$(MACHINERY) formal check --workers $(FORMAL_WORKERS)
+
+demo-pm: ## The planner's loop on a throwaway copy with its own bd backlog (needs make up)
+	MACHINERY=$(MACHINERY) sh demo/pm.sh
 
 probe: ## Mutate the tables and expect the suite to notice (every proven transition; MAX=n keeps n)
 	$(MACHINERY) probe $(if $(MAX),--max $(MAX)) -- $(E2E)

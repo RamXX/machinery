@@ -19,6 +19,8 @@ names a unit the service does not implement stops it at start.
 | `make check` | gofmt, `go vet`, `machinery check`. |
 | `make evidence` | The suite through `machinery run`: a receipts file for the current commit. |
 | `make verify` | The end gate: `machinery landing --base $(BASE)` (check with the ratchet, the whole suite through `run`, `verify`). `BASE` is the ref the change started from (default `HEAD~1`); it must contain this project. |
+| `make formal` | `machinery formal gen --check`, then `machinery formal check`: TLC and Alloy for real (needs Java; `FORMAL_WORKERS`, default 1). |
+| `make demo-pm` | The planner's loop on a throwaway copy with its own bd backlog (`demo/pm.sh`; needs `make up`). |
 | `make probe` | `machinery probe`: mutates every proven transition in the tables the service reads and expects the suite to notice (`MAX=n` keeps the first n). |
 | `make psql` | A psql shell as the admin role. |
 | `make down` | Stops Postgres and removes the container and its data. |
@@ -72,6 +74,50 @@ table: fix the test (or the service), never the probe.
 
 Last result: `checked: 33 mutations, 33 killed, 0 survived` (12 `retarget`, 21 `drop-effect`: every
 transition case of both tables, the `onError` and `after` cases of `closing` included).
+
+## Formal models
+
+The two critical areas of `design/risk.yaml` have formal models in `design/formal/`
+(`docs/formal.md` in the repository is the working order). `Deal.tla` and `crm.als` are generated
+by `machinery formal gen`; the properties and the manifests are written by hand; results,
+`baseline.json` and `traces/` are written by `machinery formal check` and `machinery formal
+baseline` and committed.
+
+- `deal-win` (TLA+, `concurrency`, `DealProps.tla`): a deal is won at most once (its win is
+  audited at most once), a won deal carries its win audit, a won deal never leaves Won, and the
+  win write always ends. Run `strict` checks them for two deals and two callers with atomic
+  steps, under a history bound (`BoundedSpec`: every effect but the win attempt and the win
+  audit at most once per deal), and reaches a won deal and a lost and reopened one. Run `race`
+  takes the row lock away (`Atomic: false`) and finds the double win: the trace
+  `traces/deal-win.race.trace.json` and the obligation `cx:deal-win:race`.
+- `record-ownership` (Alloy, `structure`, `crm_props.als`): the write policy as relations over
+  the generated signatures, and assertions that every Deal has one owner, every Task one Deal
+  and one assignee, nobody but the owner or an Admin writes a Deal, nobody but the assignee or
+  an Admin writes a Task, and only an Admin reopens.
+
+Every property has a mutation it must catch (10, all detected), and every assumption is proven:
+`deal-win` A1 (a transition is one read-check-write under the row lock) by `cx:deal-win:race`,
+A2 (the win write ends) by the induced timeout case `tc:DEAL-55eecd`; the three
+`record-ownership` assumptions (the service's guards decide as the relations do) by the
+ownership invariants the adversary tests prove.
+
+`e2e/replay_test.go` replays the race trace against the real service: for 60 rounds it creates
+a qualified deal, holds its row from an admin transaction until both win requests (the owner and
+an Admin, as the trace's two callers) wait on it, then lets them go. Each round must end with one
+200, one 409, one win audit row and one `deal_wins` row. The receipt for `cx:deal-win:race` says
+`replay: refuted`; a double win would say `reproduced` and fail the suite. With the row lock
+removed by hand (`FOR UPDATE` dropped from `LockDeal`) the second win is no longer a 409 but a
+503 (the primary key of `deal_wins` and the single-writer trigger still keep a second win out),
+which the test also rejects.
+
+## The planner's loop
+
+`make demo-pm` runs `demo/pm.sh`: it copies the committed tree into a temporary directory, makes
+it its own git repository and its own bd backlog, then plays the planner (a new scenario and a
+new abuse case, `machinery gen`, one suite run, `machinery owed sync`, `plan --apply`, `waves`,
+`waves --freeze`, three briefs) and the gates (a consequential story and a critical one, proof by
+`builder`, prediction and verdict by `verifier`, the builder refused as its own verifier). It
+prints every command, stops at the first unexpected failure and removes the copy.
 
 ## Single writer
 
