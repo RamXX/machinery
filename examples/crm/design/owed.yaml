@@ -4,5 +4,3 @@ owed:
     reason: "formal model not written yet"
   - id: fv:record-ownership
     reason: "formal model not written yet"
-  - id: inv:lifecycle-single-writer
-    reason: "no test yet: crm_app may still UPDATE deals.stage and tasks.status outside the transition path"
