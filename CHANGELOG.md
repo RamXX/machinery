@@ -28,8 +28,7 @@ under their version heading when a release is cut.
   engine v0.21.12, govulncheck v1.10.0, gitleaks v8.30.1 and Docker 29.10.1. Actions: `setup-go`,
   `setup-node` and `setup-python` 7.1.0, `dependency-review-action` 5.0.1, `erlef/setup-beam` 1.24.1.
   Go modules: `golang.org/x/sys` 0.50.0, and in the Dagger module gqlgen 0.17.98, grpc 1.85.0 and
-  the x/ libraries. The Dagger module drops the codegen `replace` lines that held the OTel log
-  packages on v0.16.0, which no longer build against OTel 1.47.
+  the x/ libraries.
 
 ### Security
 
@@ -43,8 +42,13 @@ under their version heading when a release is cut.
   0.58.0 and `actions/upload-artifact` 7.0.2 / `download-artifact` 8.0.2 follow.
 - Pinned Go moves to 1.27.4, which fixes GO-2026-6859 (`net/http`), the vulnerability that failed the
   nightly and security `govulncheck` runs from 2026-11-23.
-- The Dagger module moves to `go.opentelemetry.io/otel/sdk` 1.47.0 (and the rest of OTel to 1.47.0),
-  clearing Dependabot alerts 16 and 17 (`AttributeValueLengthLimit` bypass with U+FFFD runes).
+- **Dependabot alerts 16 and 17** (`go.opentelemetry.io/otel/sdk` < 1.47.0, `AttributeValueLengthLimit`
+  bypassed by U+FFFD runes) are held, not fixed, for the reason alert 13 was. OTel 1.47 moved
+  `otel/internal/global` onto `otel/log`, and the Dagger Go SDK codegen (v0.21.12, and Dagger main
+  as of 2026-11-24) re-applies `replace` directives pinning `otel/log` to v0.16.0 inside the engine on
+  every `dagger call`, which turns the bump into an import cycle. It affects only the CI module,
+  never the machinery binary. The alerts are dismissed as tolerable risk; dagger/dagger#13040
+  unblocks them.
 - The go-crm example moves to `golang.org/x/crypto` 0.59.0, `golang.org/x/sys` 0.50.0 and
   `github.com/klauspost/compress` 1.20.5 (with arrow-go 18.9.0 and the other indirect modules);
   its `gt.conformance-test-shape` and `g4.zero-context` attestations are renewed over the bump.
