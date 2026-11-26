@@ -1,0 +1,617 @@
+# import.machines.annotate declares, for a dialect that has no key for it, the event by which a
+# machine writes that it refused a caller's command (refusal_events), and an event may be given an
+# alias and listed as a failure event at once (docs/formats.md section 5.2.1, step 7)
+
+# without the declaration the event is hinted as a failure and is no action
+cp before.yaml machinery.yaml
+exec machinery lint --stage machines
+stdout '^  warn   machines/desk\.json: event lend_error looks like a failure event and is not in _failure_events$'
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: desk\.lend_error: event is not an action of Loan; '
+stdout '^failed: 1 finding\(s\)$'
+
+# with it nothing is hinted, the rule holds, and the declaration is printed and counted; the event
+# that is the failing action under another name is an alias and a failure event
+cp config.yaml machinery.yaml
+exec machinery lint --stage machines
+! stdout 'warn'
+stdout '^passed$'
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   alias: desk: count_failed stands for writeOff$'
+stdout '^  warn   refusal: desk: lend_error refuses lend \(a refused loan changes nothing\)$'
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 2 domain states, 4 events, 3 actions, 1 entities with actions, 1 aliases, 1 refusal events$'
+stdout '^passed$'
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  failure-event-mode: event:desk\.count_failed: '
+! stdout 'lend_error'
+stdout '^failed: 1 finding\(s\)$'
+
+# the generated machine carries the native annotation, after the aliases
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/desk.machine.json > desk.flat'
+grep '"_failure_events":\["count_failed"\],"_aliases":\{"count_failed":"writeOff"\},"_refusal_events":\{"lend_error":\{"action":"lend","reason":"arefusedloanchangesnothing"\}\},"_oracle_tag":' desk.flat
+
+# a refusal the source declares is kept, and one the config repeats is no conflict
+cp desk-declared.json machines/desk.json
+exec machinery lint --stage machines --stage xref-model-machine
+stdout '^  warn   refusal: desk: lend_error refuses lend \(the command was refused, nothing failed\)$'
+stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
+
+# the source and the config disagree
+cp desk-other.json machines/desk.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk gives event lend_error the refused action lend, and the source gives it giveBack; keep one$'
+stdout '^failed: 1 finding\(s\)$'
+cp desk.json machines/desk.json
+
+# an event the machine does not have
+cp no-event.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk: refusal_events names event lend_denied, which no state of the machine handles or ignores; correct the name or remove the refusal$'
+
+# two entries that give one event different actions
+cp two.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk and machines/\*\.json give event lend_error different refused actions \(lend, giveBack\); keep one$'
+
+# the cross-reference finding names the entry
+cp unknown.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: desk\.lend_error: _refusal_events names action revoke, which is not an action of Loan; name an action of Loan, or remove the refusal from import.machines.annotate desk \(for machines/desk\.json\)$'
+
+# a refusal the config declares for an event that is also listed or aliased: the finding names the
+# entry and the pattern to change, not keys the source file does not have, and is the only one
+cp external.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk: refusal_events names lend_error, which is also in _external_events \(import.machines.annotate desk lists it for machines/desk\.json \(external_events pattern lend_error\)\); the machine writes a refusal itself, so it does not arrive from outside: keep one$'
+stdout '^failed: 1 finding\(s\)$'
+cp failure-pattern.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk: refusal_events names lend_error, which is also in _failure_events \(import.machines.annotate machines/\*\.json lists it for machines/desk\.json \(failure_events pattern lend_err\*\)\); a refusal is declared, not a failure: keep one$'
+stdout '^failed: 1 finding\(s\)$'
+cp aliased.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk: refusal_events names lend_error, which also has an alias \(import.machines.annotate desk gives it\); an event refuses an action or is one under another name: keep one$'
+stdout '^failed: 1 finding\(s\)$'
+cp desk-fails.json machines/desk.json
+cp config.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk: refusal_events names lend_error, which is also in _failure_events \(the source lists it\); a refusal is declared, not a failure: keep one$'
+stdout '^failed: 1 finding\(s\)$'
+cp desk.json machines/desk.json
+
+# two entries that agree on the action: the reason is that of the first entry, in key order
+cp two-reasons.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   refusal: desk: lend_error refuses lend \(the desk entry says why\)$'
+! stdout 'the glob entry says why'
+
+# a source entry of another shape is left to the lint: one cause, one finding
+cp desk-bare.json machines/desk.json
+cp config.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: _refusal_events\[''lend_error''\] must be an object with action and reason, and nothing else$'
+stdout -count=1 'ERROR'
+cp desk.json machines/desk.json
+
+# what the tool may print is one line: a line break or a control character in an action or a reason
+# is a config error, for a refusal, an alias and a dismissal alike
+cp newline-reason.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: import.machines.annotate.desk.refusal_events: "a refused loan\\n  ERROR  fake: finding" has a line break or a control character; a name, an action and a reason are one line$'
+cp tab-action.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: import.machines.annotate.desk.refusal_events: "le\\tnd" has a line break or a control character; a name, an action and a reason are one line$'
+cp newline-alias.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: import.machines.annotate.desk.aliases: "write\\nOff" has a line break or a control character; a name, an action and a reason are one line$'
+cp newline-dismissal.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: import.machines.annotate.desk.not_failures: "counted\\nlater" has a line break or a control character; a name, an action and a reason are one line$'
+
+# an entry that is a bare action name says what an entry is
+cp bare.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: machinery.yaml: line 14: a refusal_events entry must be \{action: <action>, reason: "<why the event is a refusal and no failure>"\}, got lend$'
+
+# a declaration carries its reason
+cp no-reason.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: import.machines.annotate.desk.refusal_events.lend_error: reason is required: say why the event is a refusal and no failure$'
+
+# a refusal is never hinted, so the config dismisses no hint for it
+cp dismissed.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/desk\.json: import.machines.annotate desk: not_failures names lend_error, which is a refusal event of the machine; a refusal is never hinted, so there is no hint to dismiss \(remove it\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an empty name is a config error
+cp empty.yaml machinery.yaml
+exec mrun 2 lint --stage machines
+stderr '^config: import.machines.annotate.desk.refusal_events: an event and its action must not be empty$'
+
+-- before.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+-- config.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan changes nothing"}}
+-- no-event.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_denied: {action: lend, reason: "a refused loan changes nothing"}}
+-- two.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan changes nothing"}}
+      "machines/*.json":
+        refusal_events: {lend_error: {action: giveBack, reason: "a refused return changes nothing"}}
+-- unknown.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: revoke, reason: "a refused loan changes nothing"}}
+-- external.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        external_events: ["lend_error"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan changes nothing"}}
+-- dismissed.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan changes nothing"}}
+        not_failures: {lend_error: "a refused loan is no failure"}
+-- empty.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        refusal_events: {lend_error: {action: " ", reason: "a refused loan changes nothing"}}
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  LoanStatus:
+    values:
+      - {name: Shelved, definition: "On the shelf."}
+      - {name: Lent, definition: "With a member."}
+entities:
+  Loan:
+    definition: "One copy lent to one member."
+    attributes:
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian}
+      - {name: giveBack, actor: Member}
+      - {name: writeOff, actor: Librarian}
+-- machines/desk.json --
+{
+  "id": "desk",
+  "initial": "Shelved",
+  "states": {
+    "Shelved": {
+      "on": {
+        "lend": {
+          "target": "Lent"
+        }
+      },
+      "_ignores": {
+        "lend_error": "nothing is refused on the shelf",
+        "giveBack": "the copy is on the shelf; refused with NOT_LENT",
+        "count_failed": "a shelved copy is not counted"
+      }
+    },
+    "Lent": {
+      "on": {
+        "lend_error": {
+          "actions": "recordRefusal"
+        },
+        "giveBack": {
+          "target": "Shelved"
+        },
+        "count_failed": {
+          "target": "Shelved"
+        }
+      },
+      "_ignores": {
+        "lend": "already lent; the desk writes lend_error"
+      }
+    }
+  }
+}
+-- desk.json --
+{
+  "id": "desk",
+  "initial": "Shelved",
+  "states": {
+    "Shelved": {
+      "on": {
+        "lend": {
+          "target": "Lent"
+        }
+      },
+      "_ignores": {
+        "lend_error": "nothing is refused on the shelf",
+        "giveBack": "the copy is on the shelf; refused with NOT_LENT",
+        "count_failed": "a shelved copy is not counted"
+      }
+    },
+    "Lent": {
+      "on": {
+        "lend_error": {
+          "actions": "recordRefusal"
+        },
+        "giveBack": {
+          "target": "Shelved"
+        },
+        "count_failed": {
+          "target": "Shelved"
+        }
+      },
+      "_ignores": {
+        "lend": "already lent; the desk writes lend_error"
+      }
+    }
+  }
+}
+-- desk-declared.json --
+{
+  "id": "desk",
+  "_refusal_events": {
+    "lend_error": {"action": "lend", "reason": "the command was refused, nothing failed"}
+  },
+  "initial": "Shelved",
+  "states": {
+    "Shelved": {
+      "on": {
+        "lend": {
+          "target": "Lent"
+        }
+      },
+      "_ignores": {
+        "lend_error": "nothing is refused on the shelf",
+        "giveBack": "the copy is on the shelf; refused with NOT_LENT",
+        "count_failed": "a shelved copy is not counted"
+      }
+    },
+    "Lent": {
+      "on": {
+        "lend_error": {
+          "actions": "recordRefusal"
+        },
+        "giveBack": {
+          "target": "Shelved"
+        },
+        "count_failed": {
+          "target": "Shelved"
+        }
+      },
+      "_ignores": {
+        "lend": "already lent; the desk writes lend_error"
+      }
+    }
+  }
+}
+-- desk-other.json --
+{
+  "id": "desk",
+  "_refusal_events": {
+    "lend_error": {"action": "giveBack", "reason": "the command was refused, nothing failed"}
+  },
+  "initial": "Shelved",
+  "states": {
+    "Shelved": {
+      "on": {
+        "lend": {
+          "target": "Lent"
+        }
+      },
+      "_ignores": {
+        "lend_error": "nothing is refused on the shelf",
+        "giveBack": "the copy is on the shelf; refused with NOT_LENT",
+        "count_failed": "a shelved copy is not counted"
+      }
+    },
+    "Lent": {
+      "on": {
+        "lend_error": {
+          "actions": "recordRefusal"
+        },
+        "giveBack": {
+          "target": "Shelved"
+        },
+        "count_failed": {
+          "target": "Shelved"
+        }
+      },
+      "_ignores": {
+        "lend": "already lent; the desk writes lend_error"
+      }
+    }
+  }
+}
+-- failure-pattern.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan changes nothing"}}
+      "machines/*.json":
+        failure_events: ["*_failed", "lend_err*"]
+-- aliased.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff, lend_error: giveBack}
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan changes nothing"}}
+-- no-reason.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        refusal_events: {lend_error: {action: lend, reason: " "}}
+-- desk-fails.json --
+{
+  "id": "desk",
+  "_failure_events": ["lend_error"],
+  "initial": "Shelved",
+  "states": {
+    "Shelved": {
+      "on": {
+        "lend": {
+          "target": "Lent"
+        }
+      },
+      "_ignores": {
+        "lend_error": "nothing is refused on the shelf",
+        "giveBack": "the copy is on the shelf; refused with NOT_LENT",
+        "count_failed": "a shelved copy is not counted"
+      }
+    },
+    "Lent": {
+      "on": {
+        "lend_error": {
+          "actions": "recordRefusal"
+        },
+        "giveBack": {
+          "target": "Shelved"
+        },
+        "count_failed": {
+          "target": "Shelved"
+        }
+      },
+      "_ignores": {
+        "lend": "already lent; the desk writes lend_error"
+      }
+    }
+  }
+}
+-- two-reasons.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: {action: lend, reason: "the desk entry says why"}}
+      "machines/*.json":
+        refusal_events: {lend_error: {action: lend, reason: "the glob entry says why"}}
+-- newline-reason.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        refusal_events: {lend_error: {action: lend, reason: "a refused loan\n  ERROR  fake: finding"}}
+-- tab-action.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        refusal_events: {lend_error: {action: "le\tnd", reason: "a refused loan changes nothing"}}
+-- newline-alias.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        aliases: {count_failed: "write\nOff"}
+-- newline-dismissal.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        not_failures: {count_failed: "counted\nlater"}
+-- bare.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    bind:
+      desk: {lifecycle_of: Loan}
+    annotate:
+      desk:
+        failure_events: ["*_failed"]
+        aliases: {count_failed: writeOff}
+        refusal_events: {lend_error: lend}
+-- desk-bare.json --
+{
+  "id": "desk",
+  "_refusal_events": {"lend_error": "lend"},
+  "initial": "Shelved",
+  "states": {
+    "Shelved": {
+      "on": {
+        "lend": {
+          "target": "Lent"
+        }
+      },
+      "_ignores": {
+        "lend_error": "nothing is refused on the shelf",
+        "giveBack": "the copy is on the shelf; refused with NOT_LENT",
+        "count_failed": "a shelved copy is not counted"
+      }
+    },
+    "Lent": {
+      "on": {
+        "lend_error": {
+          "actions": "recordRefusal"
+        },
+        "giveBack": {
+          "target": "Shelved"
+        },
+        "count_failed": {
+          "target": "Shelved"
+        }
+      },
+      "_ignores": {
+        "lend": "already lent; the desk writes lend_error"
+      }
+    }
+  }
+}

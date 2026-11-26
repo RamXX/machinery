@@ -1,0 +1,864 @@
+# _refusal_events: the events by which a machine writes that it refused a caller's command
+# (docs/machine-format.md, docs/formats.md section 6.2)
+mkdir design/machines
+
+# undeclared, the name of the event is hinted as a failure
+cp plain.json design/machines/Job.machine.json
+exec machinery lint --stage machines
+stdout '^  warn   design/machines/Job\.machine\.json: event cancel_error looks like a failure event and is not in _failure_events$'
+stdout '^passed$'
+
+# declared, it is a refusal and no failure: nothing is hinted
+cp valid.json design/machines/Job.machine.json
+exec machinery lint --stage machines
+stdout '^checked: 1 machines, 3 states, 4 transitions$'
+! stdout 'warn'
+stdout '^passed$'
+
+# the annotation is an object
+cp not_object.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events must be an object that maps an event name to \{action, reason\}: the model action it refuses and why it is a refusal and no failure$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an action name is a non-empty string
+cp empty.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\]\.action must be a non-empty action name$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a declaration carries its reason: a bare action name, a missing or blank reason, another key are refused
+cp bare.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\] must be an object with action and reason, and nothing else$'
+stdout '^failed: 1 finding\(s\)$'
+cp no-reason.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\]\.reason must be a non-empty reason: say why the event is a refusal and no failure$'
+stdout '^failed: 1 finding\(s\)$'
+cp blank-reason.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\]\.reason must be a non-empty reason: say why the event is a refusal and no failure$'
+cp extra-key.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\] must be an object with action and reason, and nothing else$'
+
+# an event no state handles or ignores makes the marker stale
+cp stale.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events names ''cancel_denied'' but no state handles or ignores it; the marker is stale \(remove it, or wire the event\)$'
+
+# a refusal answers a caller: the event does not arrive from outside
+cp external.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: event ''cancel_error'' is in both _refusal_events and _external_events; the machine writes a refusal itself, so it does not arrive from outside \(keep one\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a refusal is declared, not a failure: the event is in one of the two
+cp failure.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: event ''cancel_error'' is in both _refusal_events and _failure_events; a refusal is declared, not a failure \(keep one\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an event is the refusal of an action or that action under another name, not both
+cp alias.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: event ''cancel_error'' is in both _refusal_events and _aliases; an event refuses an action or is one under another name \(keep one\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a refusal is never hinted, so there is no hint to dismiss
+cp dismissed.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''cancel_error'', which is in _refusal_events and is never hinted, so there is no hint to dismiss \(remove it\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# what the tool may print is one line: an action or a reason with a line break or a control character is refused
+cp tab-action.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\]\.action must be one line without control characters$'
+cp newline-reason.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _refusal_events\[''cancel_error''\]\.reason must be one line without control characters$'
+! stdout '^  ERROR  fake'
+cp newline-alias.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _aliases\[''start''\] must be one line without control characters$'
+cp newline-dismissal.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures\[''cancel_error''\] must be one line without control characters$'
+
+-- machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- plain.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- valid.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- not_object.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": [
+    "cancel_error"
+  ],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- empty.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": " ", "reason": "the command was refused, nothing failed"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- stale.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed"},
+    "cancel_denied": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- external.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_external_events": [
+    "cancel_error"
+  ],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- failure.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": [
+    "cancel_error"
+  ],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- alias.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_aliases": {
+    "cancel_error": "cancel"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- dismissed.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_not_failures": {
+    "cancel_error": "a refused cancel is no failure"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- bare.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": "cancel"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- no-reason.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- blank-reason.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": " "}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- extra-key.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "the command was refused, nothing failed", "note": "x"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- tab-action.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "can\tcel", "reason": "the command was refused, nothing failed"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- newline-reason.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_refusal_events": {
+    "cancel_error": {"action": "cancel", "reason": "nothing failed\n  ERROR  fake: finding"}
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- newline-alias.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_aliases": {"start": "begin\nnow"},
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}
+-- newline-dismissal.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": [
+    "entity:Job"
+  ],
+  "_not_failures": {"cancel_error": "no failure\n  ERROR  fake: finding"},
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "start": {
+          "target": "Running"
+        },
+        "cancel": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "cancel_error": "nothing runs, so no cancel is refused",
+        "finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"
+      }
+    },
+    "Running": {
+      "on": {
+        "cancel_error": {
+          "actions": "recordRefusal"
+        },
+        "finish": {
+          "target": "Done"
+        }
+      },
+      "_ignores": {
+        "start": "already running; refused with JOB_RUNNING",
+        "cancel": "a running job is not cancelled; the machine writes cancel_error"
+      }
+    },
+    "Done": {
+      "type": "final"
+    }
+  }
+}

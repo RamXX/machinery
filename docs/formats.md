@@ -86,6 +86,8 @@ import:                         # optional: design sources kept in the project's
         failure_events: ["*_failed"]       # events that report a failure
         failure_states: ["*_failed"]       # states that record one
         aliases: {handed_back: giveBack}   # an event that is a model action under another name
+        refusal_events:                    # an event by which the machine writes that it refused an action, with the reason
+          lend_refused: {action: lend, reason: "a blocked member is refused a loan; nothing fails"}
         not_failures: {count_aborted: "a stocktake that is called off changes no loan"}   # a name hint dismissed, with the reason
   failure_modes:                # optional: a failure-mode catalog kept as Markdown tables (section 5.4.1)
     file: docs/risks.md         # required
@@ -93,9 +95,11 @@ import:                         # optional: design sources kept in the project's
     columns:                    # required: header names, case-insensitive, first match wins
       failure: ["Failure", "What goes wrong"]
       behavior: ["Required behavior", "Expected"]
+      required: ["Required", "Class"]   # optional: the column that holds the required value, for a catalog that has one
     links: design/risk-links.yaml   # optional: the subject and required value of each row
   planned:                      # optional: the project's own "planned" marks, read by adopt (section 17.2)
     - {in: model-statement, pattern: '^Planned \(story (?P<story>[a-z0-9-]+)\)\.'}   # an invariant statement
+    - {in: scenario-description, pattern: '^Planned \(story (?P<story>[a-z0-9-]+)\)\.'}   # a scenario description
     - {in: failure-row, pattern: '^planned: (?P<story>[a-z0-9-]+)$'}                  # a cell of a catalog row
 contracts:                      # optional
   - kind: openapi               # openapi | proto
@@ -203,17 +207,30 @@ Rules:
   (`import.machines.bind.<key>.serves: an id must not be empty`) are config errors.
   `import.machines.annotate` maps a glob of source files or a machine id to at least one of
   `external_events`, `failure_events`, `failure_states` (lists of names and patterns),
-  `aliases` (event name to action name) and `not_failures` (event or state name to a reason).
+  `aliases` (event name to action name), `refusal_events` (event name to `{action, reason}`: the action it refuses and
+  the reason the event is a refusal and no failure) and `not_failures` (event or state name to a
+  reason).
   An empty key or one that is not a valid glob
   (`import.machines.annotate: "<key>" is not a valid glob`), a key that is no path inside the
   project (`import.machines.annotate: "<key>" must stay inside the project root`), an entry with
-  none of the five
-  (`import.machines.annotate.<key>: set external_events, failure_events, failure_states, aliases or not_failures`),
+  none of the six
+  (`import.machines.annotate.<key>: set external_events, failure_events, failure_states, aliases, refusal_events or not_failures`),
   an empty pattern (`import.machines.annotate.<key>.<list>: a pattern must not be empty`), a
   pattern made of `*` only, which would name everything
   (`import.machines.annotate.<key>.<list>: pattern "<pattern>" has no literal part; a pattern names the events or states it is for`),
   an empty event or action in `aliases`
-  (`import.machines.annotate.<key>.aliases: an event and its action must not be empty`) and an
+  (`import.machines.annotate.<key>.aliases: an event and its action must not be empty`), the
+  same in `refusal_events`
+  (`import.machines.annotate.<key>.refusal_events: an event and its action must not be empty`), a
+  refusal without a reason
+  (`import.machines.annotate.<key>.refusal_events.<event>: reason is required: say why the event is a refusal and no failure`),
+  a refusal entry that is no `{action, reason}`, such as a bare action name
+  (`machinery.yaml: line <n>: a refusal_events entry must be {action: <action>, reason: "<why the event is a refusal and no failure>"}, got <value>`),
+  a name, an action or a reason of `aliases`, `refusal_events` or `not_failures` that is not one
+  line, since the tool prints them and a line break would put text of the author's choice at
+  the start of an output line
+  (`import.machines.annotate.<key>.<list>: "<text>" has a line break or a control character; a name, an action and a reason are one line`,
+  the text quoted with its escapes), and an
   empty name or reason in `not_failures`
   (`import.machines.annotate.<key>.not_failures: a name and its reason must not be empty`) are
   config errors.
@@ -221,17 +238,21 @@ Rules:
   a regular expression (`import.failure_modes.id is required`,
   `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
   `columns.failure` and `columns.behavior` (`import.failure_modes.columns.failure is required`).
+  `columns.required` is optional: the header names of the column that holds the required value,
+  for a catalog that has one (section 5.4.1). An empty header name in any of the three lists is
+  `import.failure_modes.columns.<name>: a header name must not be empty`.
   It may be set beside `design.failure_modes`.
   `import.planned` lists where a project already marks an id as planned, with the story that will
   deliver it. Each entry has `in`, `model-statement` (the statement of every invariant of the
-  models) or `failure-row` (every cell of every row of the imported catalog), and `pattern`, a
+  models), `scenario-description` (the `description` of every scenario of the models that has
+  one) or `failure-row` (every cell of every row of the imported catalog), and `pattern`, a
   regular expression searched in that text, trimmed, whose named group `story` is the story id;
   anchor it with `^` to ask for a statement that begins with the mark. The first entry that
   matches an id decides, and a match whose `story` is empty is no mark. What `story` captured
   must be a story id, `^[A-Za-z0-9._-]+$`: anything else is refused by `machinery adopt`, by
   source line, and never written (section 17.2, step 3). Only `machinery adopt`
   reads the marks. Config errors, each naming its entry by number, from 1:
-  `import.planned: entry <n>: in must be model-statement or failure-row, got "<value>"`,
+  `import.planned: entry <n>: in must be model-statement, scenario-description or failure-row, got "<value>"`,
   `import.planned: entry <n>: pattern is required`,
   `import.planned: entry <n>: pattern is not a regular expression: <error>`,
   `import.planned: entry <n>: pattern "<pattern>" needs a named group story, as in (?P<story>[a-z0-9-]+)` and,
@@ -293,7 +314,7 @@ Rules:
 | `machinery gen --check` | Stage `gen-drift`: fails when a generated file is stale, missing or unexpected. Writes nothing. |
 | `machinery arch` | Stage `arch` (section 9). `--write-baseline` rewrites the baseline file. |
 | `machinery tests` | Stage `tests` (section 9.4). `--write-baseline` rewrites the baseline file. |
-| `machinery trace` | Stage `trace` (section 8). |
+| `machinery trace` | Stage `trace` (section 8). `--non-action-serves` lists the ids that serves tags name and that are not actions, and runs no check. |
 | `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3), and with `--story <id>` as well stage `scope` (section 15.11). |
 | `machinery checks` | Prints the declaration of applicable checks (section 3.4). A report, never a gate. |
 | `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). |
@@ -556,6 +577,13 @@ A machine also declares, with annotations XState ignores and a tag XState carrie
 - **aliases**: the root `_aliases` maps an event to the model action it is under another name
   (`{"handed_back": "giveBack"}`), so the cross-reference rules of section 6.4 read the event
   as that action;
+- **refusal events**: the root `_refusal_events` maps an event by which the machine itself writes
+  that it refused a caller's command to the model action it refuses and the reason it is a
+  refusal and no failure
+  (`{"cancel_refused": {"action": "cancel", "reason": "a paid order is not cancelled"}}`, for a
+  machine that handles `cancel` and, where it does not accept it, records `cancel_refused`).
+  The event is no action, no event from outside and no failure: it is declared, with its
+  reason, and printed (section 6.4);
 - **dismissed hints**: the root `_not_failures` maps an event name or the dotted path of a state
   to the reason its name only looks like a failure (section 6.2);
 - **callers**: a transition branch with `_requires` names who may cause it, an actor or role, or
@@ -660,6 +688,10 @@ below, even when a glob matches it:
      matches, at any depth, gets the tag `failure`, added to the tags it has.
    - `aliases` maps an event of the machine, by its exact name, to an action name. Each is added
      to the root `_aliases` (section 5.2), after the ones the source has, in event order.
+   - `refusal_events` maps an event of the machine, by its exact name, to `{action, reason}`:
+     the name of the action it refuses and the reason. Each is added to the root
+     `_refusal_events` (section 5.2), after the ones the source has, in event order. When
+     several entries name one event with the same action, the reason is that of the first.
    - `not_failures` maps an exact name to a reason: an event of the machine, or a state by its
      dotted path or by its name, in source or translated names. A dotted path names its state; a
      bare name names the one state that carries it, and is refused when several do. Each is
@@ -669,13 +701,17 @@ below, even when a glob matches it:
      has no hint, so dismissing it is refused.
 
    The translated machine then carries the annotations of a native file, and every rule about
-   them is the native one: an event in both lists, an aliased event in either list (section 6.2),
-   an alias that names no action, and an event listed as external or as a failure that is an
-   action of the model (section 6.4), whose finding names the entry and the pattern that listed
-   it. No entry hides a caller's command: an event that is an action of the model is neither
-   listed nor aliased, every alias in effect is printed and counted by `xref-model-machine`
-   (section 6.4), and neither listing an event as external nor giving it an alias stops its name
-   hint (section 6.2). Nothing is a silent no-op:
+   them is the native one: an event in both lists, an aliased event in `_external_events`, a
+   refusal event that is also listed or aliased (section 6.2), an alias or a refusal that names
+   no action, and an event listed as external or as a failure that is an action of the model
+   (section 6.4), whose finding names the entry and the pattern that listed it. An event may be
+   given an alias and be matched by `failure_events` at once: the action it stands for is then
+   itself the failing outcome (section 6.4). No entry hides a caller's command: an event that is
+   an action of the model is neither
+   listed nor aliased nor declared a refusal, every alias and every refusal event in effect is
+   printed and counted by `xref-model-machine` (section 6.4), and neither listing an event as
+   external nor giving it an alias stops its name hint (section 6.2); a declared refusal has
+   none. Nothing is a silent no-op:
    - A pattern that matches no event of a machine it is applied to is
      `ERROR  <file>: import.machines.annotate <key>: <list> pattern <pattern> matches no event of the machine; correct the pattern or remove it`
      (`<list>` is `external_events` or `failure_events`), and one that matches no state is
@@ -689,6 +725,23 @@ below, even when a glob matches it:
      `_aliases` is
      `ERROR  <file>: import.machines.annotate <key> gives event <event> the action <x>, and the source gives it <y>; keep one`
      (the source's is kept).
+   - The same three hold for `refusal_events`:
+     `ERROR  <file>: import.machines.annotate <key>: refusal_events names event <event>, which no state of the machine handles or ignores; correct the name or remove the refusal`,
+     `ERROR  <file>: import.machines.annotate <a> and <b> give event <event> different refused actions (<x>, <y>); keep one`
+     and
+     `ERROR  <file>: import.machines.annotate <key> gives event <event> the refused action <x>, and the source gives it <y>; keep one`.
+   - A refusal the config declares for an event that is also listed or aliased names the entry
+     to change, and what lists the event, since the source file has none of these keys:
+     `ERROR  <file>: import.machines.annotate <key>: refusal_events names <event>, which is also in _external_events (<by>); the machine writes a refusal itself, so it does not arrive from outside: keep one`,
+     `ERROR  <file>: import.machines.annotate <key>: refusal_events names <event>, which is also in _failure_events (<by>); a refusal is declared, not a failure: keep one`
+     and
+     `ERROR  <file>: import.machines.annotate <key>: refusal_events names <event>, which also has an alias (<by>); an event refuses an action or is one under another name: keep one`.
+     `<by>` is `import.machines.annotate <key> lists it for <file> (<list> pattern <pattern>)`
+     or `the source lists it`, and for an alias `import.machines.annotate <key> gives it` or
+     `the source gives it`. Such a refusal is not written to the translated machine, so it is
+     the only finding. A source entry that is no `{action, reason}` is the finding of the
+     lint alone (section 6.2), whatever the config says about the event. A refusal the source itself declares is held by the native rule
+     (section 6.2), which names the source file.
    - A dismissal that names nothing is
      `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is no event and no state of the machine; correct the name or remove it`;
      one name dismissed by two entries is
@@ -707,7 +760,9 @@ below, even when a glob matches it:
      `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is a failure event of the machine; a declared failure is not dismissed (keep one)`,
      and for a state
      `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is the state <path>, tagged failure; a declared failure is not dismissed (keep one)`.
-     Such a dismissal is not written to the translated machine.
+     Such a dismissal is not written to the translated machine. Neither is one of a refusal
+     event, which is never hinted:
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is a refusal event of the machine; a refusal is never hinted, so there is no hint to dismiss (remove it)`.
    - An entry that matches no machine is
      `ERROR  import.machines.annotate <key>: matches no machine file and no machine id; correct the key or remove the entry`.
 8. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
@@ -793,10 +848,18 @@ failure_modes:
 
 Subject forms: `invoke:<machine id>.<src>`, `dependency:<name>`, `act:<Entity>.<action>`,
 `entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path),
-`event:<machine id>.<event>` (a failure event) and `system:<name>` (the system as a whole or a
+`event:<machine id>.<event>` (a failure event, or a refusal event, section 5.2),
+`machine:<id>` (a machine as a whole) and `system:<name>` (the system as a whole or a
 named part of it, declared under `systems`, section 2). `required: refuse` is only valid with
 `kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject. A subject of another form
-is `ERROR  <file>: <id>: subject "<subject>" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>`.
+is `ERROR  <file>: <id>: subject "<subject>" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event>, machine:<id> or system:<name>`.
+
+A `machine:` subject is for a failure mode about a machine as a whole, not about one of its
+states, events or invokes: a queue that stops taking work, a flow that stalls. The id is the id
+of any machine of the design, a lifecycle machine, an operational one, or one that binds to
+nothing. Rule `subject-resolves` holds it to that (section 6.6), and that is the only rule it
+takes part in: it covers no failure state, no failure event and no invoke of the machine, each
+of which still asks for a failure mode of its own, and it is no subject for `kind: abuse`.
 
 A `system:` subject is for a failure mode about nothing the model, the machines or the
 dependencies hold: a release built without a signature, clocks that disagree. Its name must be
@@ -846,6 +909,12 @@ A project that already keeps its failure modes as tables in a Markdown document 
   `ERROR  <file>:<line>: <cell>: the table header has no failure column (<names>)`, and the same
   for behavior. An empty failure or behavior cell is
   `ERROR  <file>:<line>: <cell>: the failure cell is empty`: section 5.4 requires both.
+- **The required column.** With `columns.required`, the column is found the same way, per
+  table, and a cell that holds one of the four values of section 5.4, compared trimmed and
+  case-insensitively, is the row's `required` value. An empty cell, and a table whose header has
+  no such column, give the row no value and are no finding. Any other cell is
+  `ERROR  <file>:<line>: <cell>: the required cell "<value>" must be fail-closed, retry-bounded, surface or refuse`,
+  and gives the row no value.
 - **Ids.** The machinery id is the cell lower-cased (`RISK-12` is `risk-12`, obligation
   `fm:risk-12`). It must match the pattern of section 5.4:
   `ERROR  <file>:<line>: <cell>: the id lower-cased, <id>, must match ^[a-z][a-z0-9-]+$`. A
@@ -856,8 +925,8 @@ A project that already keeps its failure modes as tables in a Markdown document 
 - **Text.** The failure cell is the failure mode's `failure`, and so the obligation title; the
   behavior cell is its `behavior`. Both are kept as written, trimmed.
 
-An imported row has no subject and no required value until it is linked. The links file gives
-them:
+An imported row has no subject until it is linked, and no required value either unless a cell of
+its own gives one (`columns.required`). The links file gives them:
 
 ```yaml
 version: 1
@@ -884,6 +953,18 @@ the catalog id, compared case-insensitively.
   `subject` declares the rows subject-less (section 5.4); `required` and `kind` are then
   optional. Every row an entry names takes its values. The value rules are checked once per
   entry.
+- **`required` beside a required column.** With `columns.required`, an entry may leave
+  `required` out: each row keeps the value of its own cell. Then, one finding per entry, each
+  naming the rows as the entry writes them (the first five and `and <n> more`):
+  a row whose cell is empty, or whose table has no such column, is
+  `ERROR  <links file>: <entry>: required is not set and the required cell of <id> is empty; set required in the entry or fill the cell`
+  (`the required cells of <ids> are empty; ... fill the cells` for several); a row whose cell
+  holds something that is no value has the finding of its cell and no second one;
+  an entry whose `required` is another value than a row's cell is
+  `ERROR  <links file>: <entry>: required <value> differs from the required cell of <ids>; keep one`,
+  and the row keeps the value of its cell; and a cell that says `refuse` for a row whose entry
+  is not `kind: abuse` is
+  `ERROR  <links file>: <entry>: required: refuse (the required cell of <ids>) is only valid with kind: abuse`.
 - **Messages** are prefixed `<links file>: <entry>`, where `<entry>` is the `id`, or the items of
   `ids` as written, joined by `, ` (the first three and `, ...` when there are more). A
   malformed item is `<item> is not an id or a range <first>..<last>`,
@@ -909,7 +990,10 @@ Every imported row is then one of three:
 - A **subject-less** row (an entry declares it `no_subject`, with the reason) is an obligation
   like any failure mode and takes part in no subject rule.
 - An **unlinked** row is every other one: no entry names it, or the entry that names it gives
-  no subject, a malformed one, one that resolves to nothing, or no valid `required` value. An
+  no subject, a malformed one, one that resolves to nothing, or no valid `required` value
+  (neither the entry nor a cell of the row gives one). A row that names a subject which
+  resolves and only lacks the value is counted on its own by stage `xref-failure`
+  (section 6.6), and is unlinked all the same. An
   entry is never a link by being there. It is an obligation all the same: `fm:<id>` is owed,
   claimed and traced like any failure mode. It names nothing, so it takes part in no subject
   rule of `xref-failure`: it neither resolves nor covers an invoke, a dependency, an action, a
@@ -948,28 +1032,58 @@ completeness on resting states (`_ignores`), guard-false dispositions (`_refusal
 fail-closed tags, no state tagged both `failure` and `accepting`, and the shape of `_requires`,
 `_entries`, `_terminal`, `_external_events`, `_failure_events`, `_aliases` (an object that maps
 an event some state handles or ignores to a non-empty action name, no event of it also in
-`_external_events` or `_failure_events`), `_not_failures` (an object that maps an event some
+`_external_events`; one may be in `_failure_events`, section 6.4), `_refusal_events` (an object
+that maps an event some state handles or ignores to an object with a non-empty `action` and a
+non-empty `reason`, no event of it
+also in `_external_events`, in `_failure_events` or in `_aliases`), `_not_failures` (an object
+that maps an event some
 state handles or ignores, or the dotted path of a state, to a non-empty reason; none of them in
 `_failure_events` or a state tagged `failure`, and none without a hint to dismiss: a name with
-no failure word in it, or an action of the machine's lifecycle entity), `_serves` (a non-empty list of
+no failure word in it, an action of the machine's lifecycle entity, or an event in
+`_refusal_events`), `_serves` (a non-empty list of
 distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is section 6.4) and
 `_aspect` (a short name matching `^[A-Za-z][A-Za-z0-9_-]*$`; which machines may declare it is
 section 6.4). Two machines whose id tags
 collide (section 7.2), or that share a machine `id`, are an ERROR.
 
+What the tool prints from an annotation is one line. An action of `_aliases`, an action or a
+reason of `_refusal_events` and a reason of `_not_failures` that holds a line break or another
+control character is
+`ERROR  <file>: _aliases['<event>'] must be one line without control characters` (and
+`_refusal_events['<event>'].action`, `.reason`, `_not_failures['<name>']`), and such an entry is
+in effect nowhere: no stage prints it.
+
+The findings of `_refusal_events`:
+`ERROR  <file>: _refusal_events must be an object that maps an event name to {action, reason}: the model action it refuses and why it is a refusal and no failure`,
+`ERROR  <file>: _refusal_events['<event>'] must be an object with action and reason, and nothing else`,
+`ERROR  <file>: _refusal_events['<event>'].action must be a non-empty action name`,
+`ERROR  <file>: _refusal_events['<event>'].reason must be a non-empty reason: say why the event is a refusal and no failure`,
+`ERROR  <file>: _refusal_events['<event>'].action must be one line without control characters`
+(and the same for `.reason`),
+`ERROR  <file>: _refusal_events names '<event>' but no state handles or ignores it; the marker is stale (remove it, or wire the event)`,
+and, for an event another annotation also holds,
+`ERROR  <file>: event '<event>' is in both _refusal_events and <other> (keep one)`, where `<other>` is
+`_external_events; the machine writes a refusal itself, so it does not arrive from outside`,
+`_failure_events; a refusal is declared, not a failure` or
+`_aliases; an event refuses an action or is one under another name`.
+
 Name hints are warnings and never fail the stage. A state whose name contains, case-insensitively,
 `fail`, `error`, `abort`, `crash` or `timeout` and that is not tagged `failure` prints
 `warn   <file>: state <S> looks like a failure state and is not tagged failure` (`<S>` is the
 dotted path). An event the machine handles or ignores whose name contains one of those words, and
-that is neither in `_failure_events` nor an action of the machine's lifecycle entity, prints
+that is neither in `_failure_events`, nor in `_refusal_events`, nor an action of the machine's
+lifecycle entity, prints
 `warn   <file>: event <e> looks like a failure event and is not in _failure_events`. An event in
 `_external_events` or with an entry in `_aliases` is still hinted: what arrives from outside, or
-under another name, may report a failure. A hint is dismissed by name, with the reason, in the
+under another name, may report a failure. A refusal event is not: a refusal is declared, not a
+failure. A hint is dismissed by name, with the reason, in the
 root `_not_failures`: the event name, or the dotted path of the state. An entry there that
 dismisses no hint is an ERROR, as a stale marker is:
 `ERROR  <file>: _not_failures names '<name>', which does not look like a failure (no fail, error, abort, crash or timeout in the name), so there is no hint to dismiss (remove it)`
 (for a state, the last segment of its path is its name), and
-`ERROR  <file>: _not_failures names '<name>', which is an action of <E> and is never hinted, so there is no hint to dismiss (remove it)`.
+`ERROR  <file>: _not_failures names '<name>', which is an action of <E> and is never hinted, so there is no hint to dismiss (remove it)`,
+and
+`ERROR  <file>: _not_failures names '<name>', which is in _refusal_events and is never hinted, so there is no hint to dismiss (remove it)`.
 
 `checked:` counts machines, states and transitions. Not applicable when neither `design.machines`
 nor `import.machines` is configured. With `import.machines` the translation findings of section
@@ -994,7 +1108,7 @@ For every machine, and every entity of the models:
 |---|---|
 | `machine-binding` | The machine binds to the model (section 5.2): it is the lifecycle machine of an existing entity, or an operational machine whose `_serves` names only entities and actions of the model. An entity has one lifecycle machine, or several that each declare a different `_aspect`. |
 | `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). When no candidate has a value in D, the finding says that E has no state enum for the machine and names no enum. An entity with no enum-typed attribute at all is one finding for the entity, whatever the number of its lifecycle machines. With aspects, each aspect machine is matched against an enum of its own: an enum that exactly matches one machine is that machine's, and no enum is the state enum of two machines (a machine that matches only an enum another one holds is a finding, and the enums other aspects hold are left out of its candidates). |
-| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, be an alias of one (the root `_aliases` maps it to an action of E), or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). An action is a caller's command: an event in either list that is the name of an action of E is a finding, and so is an alias for an event that is itself an action of E. Several events may be aliases of one action, but an action that has an `on` event of its own name in a lifecycle machine of E is the action of no alias: it would absorb any other event. When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. Operational machine that binds to the model (no `machine-binding` finding): every event name under any `on` must be the name of an action of an entity it serves, the action of an `act:` id it serves, an alias of one of those actions, or be listed in `_external_events` or `_failure_events`. An alias names an action the machine serves, one that has no `on` event of its own name in the machine. A listed or aliased event is held to more: it is a finding when it is the name of any action of any entity behind `_serves`, the entity of an `act:` id too, served or not, so no list and no alias hides a command of an entity the machine works for. When it serves only entities that declare no action, the events that are not listed are one finding for the machine: nothing was compared with the model. |
+| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, be an alias of one (the root `_aliases` maps it to an action of E), be a declared refusal of one (the root `_refusal_events` maps it to an action of E that has an `on` event of its own name in the machine), or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). An aliased event may also be listed in `_failure_events`, when the action it stands for is itself the failing outcome (model action `fail`, machine events `send_failed` and `verify_failed`): it is then that action for this rule and for `action-event`, and a failure event for section 6.6; every other rule about an alias holds for it. An action is a caller's command: an event in either list that is the name of an action of E is a finding, and so is an alias for an event that is itself an action of E. Several events may be aliases of one action, but an action that has an `on` event of its own name in a lifecycle machine of E is the action of no alias: it would absorb any other event. When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. Operational machine that binds to the model (no `machine-binding` finding): every event name under any `on` must be the name of an action of an entity it serves, the action of an `act:` id it serves, an alias of one of those actions, a declared refusal, or be listed in `_external_events` or `_failure_events`. An alias names an action the machine serves, one that has no `on` event of its own name in the machine. A refusal names an action of an entity behind `_serves`, the entity of an `act:` id too, that has an `on` event of its own name in the machine. A listed, aliased or refusal event is held to more: it is a finding when it is the name of any action of any entity behind `_serves`, the entity of an `act:` id too, served or not, so no list, no alias and no refusal hides a command of an entity the machine works for. When it serves only entities that declare no action, the events that are not listed are one finding for the machine: nothing was compared with the model. |
 | `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine, under its own name or under an alias (`_aliases`) that holds, or, with aspects, in at least one of them. |
 | `entity-machine` | Every entity that declares at least one action has a lifecycle machine. An entity that has no state of its own is waived, with the reason. |
 
@@ -1053,9 +1167,62 @@ An alias that does not hold makes its event neither an action nor a second findi
 should have been is then reported by `action-event`. These findings are about every entry of the
 lists and of `_aliases`, whether a state handles the event under `on` or only ignores it.
 
-No alias is silent. Every alias that holds is one line of the stage, a warning that never fails
-it, `warn   alias: <machine id>: <event> stands for <action>`, and the aliases are counted in
-`checked:` (below).
+A **refusal event** is the event by which a machine itself writes that it refused a caller's
+command: the machine handles `cancel` and, where it does not accept it, records
+`cancel_refused`. The caller sent the command, so the event is not external, and the action
+has its own event, so the event is no alias. `_refusal_events` declares it, and a declaration
+holds when the event is no action, the action it names is one of the machine's entity (for an
+operational machine, of an entity behind what it serves), that action has an `on` event of its
+own name in the same machine, and no transition on the event brings the machine to a state
+tagged `failure`.
+The findings of `event-action` about one that does not hold:
+
+- `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <event> is itself an action of <E>; an action is a caller's command, not the refusal of one: <where>`;
+- `event-action: <id>.<event>: _refusal_events names action <action>, which is not an action of <E>; name an action of <E>, or <where>`, and for an operational machine
+  `event-action: <id>.<event>: _refusal_events names action <action>, which is not an action of an entity behind what the machine serves (<serves>); name one, or <where>`;
+- `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <action> has no event of its own name in <machine id>; a refusal is of a command the machine handles: <where>`;
+- `event-action: <id>.<event>: _refusal_events declares the event, and on it the machine can come to <state>, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or <where>`:
+  `<state>` is the first state tagged `failure`, in document order, among the states the
+  machine enters on an `on` transition of the event until it comes to rest: the target and the
+  states the target is inside; for a compound target, its initial child, and that child's, down
+  to a leaf (a failure state beside the initial child is not entered and is no ground); and
+  from the leaf reached, the target of every `always` branch of it or of a state it is inside,
+  and of the `onDone` of its parent when the leaf is final, each followed the same way, guarded
+  or not. A delay (`after`), an invoke's outcome and a later event are not followed: they are
+  another cause.
+
+`<where>` is `remove it from _refusal_events in <file>`, or
+`remove the refusal from import.machines.annotate <key> (for <file>)`. As for an alias, a
+declaration that does not hold makes its event no second finding. A refusal event satisfies
+nothing else: rule `action-event` still asks for the action's own event.
+
+**What a declaration takes away, and why that is sound.** Declaring an event a refusal removes
+what a failure event would owe: its name hint (section 6.2) and the failure mode that rule
+`failure-event-mode` asks for (section 6.6); a failure mode may still name it. That is sound
+for a refusal and for nothing else: the caller's command was refused and nothing failed, so
+there is no failure whose required behavior could be missing, and the refused command is
+already an obligation of its own (the action, and the transition and ignore cases of its
+event). The tool cannot read that meaning from a name, so the declaration is held to what can
+be checked and is otherwise put in front of a reviewer:
+
+- it carries a reason, non-blank, for every event (section 6.2);
+- the event is in neither `_failure_events` nor `_external_events` and has no alias, so a
+  declared failure is never declared away (section 6.2);
+- the event brings the machine to no state tagged `failure`, directly or through eventless
+  transitions (the finding above), so an event the machine itself records as a failure stays
+  one, whatever it is called;
+- the reason is one line, so the printed line is one declaration and nothing else;
+- every declaration that holds is printed with its reason and counted, on every run.
+
+These lines and the reasons in them are the guard against a failure renamed a refusal: no rule
+can tell a true refusal such as `payment_refused` from a `provider_timeout` that changes no state
+and is
+declared a refusal. A review of a design reads them.
+
+No alias and no refusal event is silent. Every alias that holds is one line of the stage, a
+warning that never fails it, `warn   alias: <machine id>: <event> stands for <action>`, and so
+is every refusal event that holds, `warn   refusal: <machine id>: <event> refuses <action> (<reason>)`;
+both are counted in `checked:` (below).
 
 `<states>` and `<events>` are sorted and comma-separated.
 
@@ -1069,7 +1236,8 @@ machine file at all), never passed; with findings it is failed (section 3.2).
 domain states, events (of the lifecycle machines and of the operational machines that bind),
 actions (of the entities that have a lifecycle machine, each once) and entities with actions:
 `checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions`.
-With at least one alias in effect it adds their number: `..., 1 entities with actions, 2 aliases`.
+With at least one alias in effect it adds their number, and then that of the refusal events in
+effect: `..., 1 entities with actions, 2 aliases, 1 refusal events`.
 
 ### 6.5 `xref-contract`
 
@@ -1089,7 +1257,7 @@ Operations without a binding are counted and are not an error (reads and queries
 
 | Rule | Check |
 |---|---|
-| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
+| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, an event in the named machine's `_failure_events` or `_refusal_events`, or, for `machine:<id>`, a machine of the design, bound to the model or not. |
 | `invoke-failure-mode` | Every `invoke` `src` of every machine is the subject of at least one failure mode. |
 | `dependency-failure-mode` | Every configured dependency is the subject of at least one failure mode. |
 | `tiered-action-abuse` | Every action that belongs to a consequential, critical or vital area (section 23) is the subject of at least one failure mode of kind `abuse`. |
@@ -1099,7 +1267,14 @@ Operations without a binding are counted and are not an error (reads and queries
 The stage applies when `design.failure_modes` or `import.failure_modes` is configured, or when
 any machine declares a failure state or a failure event (section 5.2). An imported row that is
 not linked (section 5.4.1) and a failure mode declared subject-less (`no_subject`, section 5.4)
-are counted among the failure modes and take part in no rule. A `system:` subject takes part in none of the rules of the table. Its name must be one of
+are counted among the failure modes and take part in no rule. A `machine:` subject takes part in
+`subject-resolves` alone: naming a machine covers none of its invokes, failure states and
+failure events, so `invoke-failure-mode`, `failure-state-mode` and `failure-event-mode` still
+ask for a failure mode per invoke, state and event. An `event:` subject that names a refusal
+event resolves, and no rule asks for one: a refusal is declared, not a failure. An event that
+is neither is
+`subject-resolves: event:<machine id>.<event>: failure mode <id>: <event> is not in the _failure_events of machine <machine id> (nor in its _refusal_events)`.
+A `system:` subject takes part in none of the rules of the table. Its name must be one of
 `systems` (section 2):
 `ERROR  unknown-system: system:<name>: failure mode <id>: <name> is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)`.
 `unknown-system` is not a rule a waiver may name (section 6.7), and a waiver of
@@ -1113,6 +1288,10 @@ configured, or a failure mode is unaccounted for (below), it counts, right after
 modes, those that are linked (`linked`, native ones included) and those unaccounted for
 (`unlinked`); when at least one failure mode is declared subject-less it counts those next:
 `checked: 48 failure modes, 30 linked, 4 unlinked, 14 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
+When at least one of the unlinked ones names a subject that resolves and only lacks a valid
+`required` value (below), their number follows `unlinked`:
+`..., 4 unlinked, 3 name a subject and no required value, ...`. `machinery assess` carries the
+line as it is (section 18).
 With no failure-mode file
 configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
 event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
@@ -1129,13 +1308,22 @@ empty or malformed; a subject that resolves to nothing; a missing or invalid `re
 `no_subject` with a blank reason or beside a `subject`. Only a linked failure mode covers an
 invoke, a dependency, an action, a failure state or a failure event. Stage `failure-modes` has
 the ERROR of a malformed entry; this stage counts it as `unlinked` all the same, so that it
-never passes over one, run alone, in `check`, in `assess` or in a rehearsal. While one failure mode is unaccounted for, the stage did
+never passes over one, run alone, in `check`, in `assess` or in a rehearsal. A failure mode
+that **names a subject and no required value** is an unaccounted one that somebody did look at:
+its subject has one of the forms of section 5.4 and resolves, it has no `no_subject` key, and its
+`required` is missing or not one of the four. It is counted on its own, as a part of
+`unlinked`, so that the rows that only wait for the value are told apart from the rows nobody
+linked. It stays unlinked for every rule and for the result, and no `subject-resolves` finding is
+printed for a subject without a valid `required` value. While one failure mode is unaccounted for,
+the stage did
 not compare every failure mode with the design: one linked row among many is no pass. Its result
 is
 `not demonstrated: <n> of <m> failure modes name no subject; link each in <links file> or declare it there with no_subject and a reason`,
 where `<n>` counts those unaccounted for, `<m>` every failure mode, and `<links file>` is
 `a links file (import.failure_modes.links)` when none is configured; when none of them is an
-imported row the middle part is `give each a subject in <failure-mode file>`. When none is
+imported row the middle part is `give each a subject in <failure-mode file>`. When some of them
+name a subject and no required value the result ends
+`; <k> of them name a subject and no required value: add required to each`. When none is
 unaccounted for and
 still no failure mode names a subject (every one is declared subject-less), it compared none:
 `not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing at
@@ -1390,9 +1578,21 @@ Stage `trace` rules:
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
 
 A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
-which is not an `act` id is no ERROR and no credit: it prints, once per id and line of a tag,
-`warn   serves: <file>:<line>: <id> is not an action; a serves tag credits only actions`. The id
-still needs what its kind needs, a test that claims it.
+which is not an `act` id is no ERROR and no credit. The stage says so once per run, in one
+counted line, whatever the number of tags (a project whose convention is to mark the code that
+holds an invariant has hundreds):
+`warn   serves: <n> tag(s) name <m> id(s) that are not actions; machinery trace --non-action-serves lists them`,
+where `<n>` counts the tags (a file and a line) that name at least one such id and `<m>` the
+distinct ids. Each id still needs what its kind needs, a test that claims it.
+
+`machinery trace --non-action-serves` prints the list and nothing else, one line per tag and id,
+`<file>:<line>: <id>`, sorted by file, line and id. It runs no check and is a report, never a
+gate: exit 0, with no output when there is none. When the code or test files cannot be listed
+or read, the list is not known and none is printed: one line per cause on stderr,
+`machinery: trace --non-action-serves: <what stage trace reports>; the list is not known`, and
+exit 1. Without `trace:` it is
+`config: no trace configured: machinery trace --non-action-serves lists serves tags, and trace says where they are`
+and exit 2.
 
 A proposed or retired id counts as an id of the design for rule `unknown-id`. A `*` token claims
 only the ids among its matches that yield an obligation, so a pattern that also matches a
@@ -3710,7 +3910,7 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
 
    | Reason | For |
    |---|---|
-   | `planned at adoption (<short sha>)` | An obligation whose source carries one of the project's own planned marks (`import.planned`, section 2). The entry gets `story: <id>`, the story the mark names. It is owed like any other, also when a test claims it: the project said it is not delivered. |
+   | `planned at adoption (<short sha>)` | An obligation whose source carries one of the project's own planned marks (`import.planned`, section 2): an invariant by its statement, a scenario by its description, a catalog row by a cell. The entry gets `story: <id>`, the story the mark names. It is owed like any other, also when a test claims it: the project said it is not delivered. |
    | `claimed at adoption (<short sha>)` | An obligation a test file already claims, by a tag or a marker (section 8). No receipt exists yet, so it is owed; `machinery plan` wires its evidence instead of giving it a story (section 15.2). |
    | `unproven at adoption (<short sha>)` | Every other obligation, and every unserved `act` id. |
 
@@ -3718,8 +3918,9 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    the reason it has. A planned mark whose `story` is not a story id (section 2) stops adoption
    before anything is written, with or without `--write`: one line per mark,
    `<file>:<line>: <id>: import.planned entry <n> captured the story "<text>"; a story id has only letters, digits, ".", "-" and "_": tighten the pattern`,
-   the first after `machinery: `, and exit 1. The line is that of the invariant's statement or
-   of the catalog row. When a stage fails the config and the baselines are still
+   the first after `machinery: `, and exit 1. The line is that of the invariant's statement, of the
+   scenario's description or of the catalog row. When a stage fails the config and the baselines
+   are still
    written, no owed entry is written and the exit code is 1. The report then says exactly what
    blocks, and nothing else (warnings do not block and are not printed):
 

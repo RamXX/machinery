@@ -64,29 +64,45 @@ func XrefFailure(ctx *Context) *report.Stage {
 	// not declared subject-less: an imported row no entry names, a subject
 	// that is missing, malformed or resolves to nothing, a no_subject without
 	// a reason or beside a subject.
-	linked, unlinked, subjectLess, unlinkedRows := 0, 0, 0, 0
+	// noRequired: of the unlinked, those whose subject resolves and that
+	// only lack a valid required value.
+	linked, unlinked, subjectLess, unlinkedRows, noRequired := 0, 0, 0, 0, 0
 	for _, fm := range d.FailureModes {
 		if fm.SubjectLess() {
 			subjectLess++
 			continue // names nothing, and says why (section 5.4)
 		}
-		resolves := fm.WellFormed()
+		// valued: the subject comes with a required value; without one the
+		// subject is looked up all the same, and stage failure-modes has
+		// the finding
+		resolves, valued := fm.NamesSubject(), fm.WellFormed()
 		switch {
 		case !resolves:
 			// stage failure-modes has the finding, when there is one
 		case strings.HasPrefix(fm.Subject, "system:"):
 			if !systems[fm.Subject] {
+				resolves = false
+				if !valued {
+					break
+				}
 				// not a subject-resolves finding: no waiver covers an unknown system
 				s.Errorf("unknown-system: %s: failure mode %s: %s is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)",
 					fm.Subject, fm.ID, strings.TrimPrefix(fm.Subject, "system:"))
-				resolves = false
 			}
 		default:
 			if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
-				// waived or not, the subject names nothing: the row is not linked
-				w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
 				resolves = false
+				if valued {
+					// waived or not, the subject names nothing: the row is not linked
+					w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
+				}
 			}
+		}
+		if resolves && !valued {
+			// it names something of the design and does not say what the
+			// system must do: counted on its own, and still not linked
+			noRequired++
+			resolves = false
 		}
 		if !resolves {
 			unlinked++
@@ -135,6 +151,9 @@ func XrefFailure(ctx *Context) *report.Stage {
 	if d.ImportsFM || unlinked > 0 {
 		s.Count(linked, "linked").Count(unlinked, "unlinked")
 	}
+	if noRequired > 0 {
+		s.Count(noRequired, "name a subject and no required value")
+	}
 	if subjectLess > 0 {
 		s.Count(subjectLess, "subject-less")
 	}
@@ -151,8 +170,12 @@ func XrefFailure(ctx *Context) *report.Stage {
 		if unlinkedRows > 0 {
 			todo = "link each in " + linksTarget(p)
 		}
-		s.NotDemonstrated(fmt.Sprintf("%d of %d failure modes name no subject; %s or declare it there with no_subject and a reason",
-			unlinked, len(d.FailureModes), todo))
+		reason := fmt.Sprintf("%d of %d failure modes name no subject; %s or declare it there with no_subject and a reason",
+			unlinked, len(d.FailureModes), todo)
+		if noRequired > 0 {
+			reason += fmt.Sprintf("; %d of them name a subject and no required value: add required to each", noRequired)
+		}
+		s.NotDemonstrated(reason)
 	case len(d.FailureModes) > 0 && linked == 0:
 		// every failure mode is declared subject-less: none was compared
 		s.NotDemonstrated("no failure mode names a subject")
@@ -280,10 +303,20 @@ func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevent
 			return ""
 		}
 		mid, ev, _ := strings.Cut(name, ".")
-		if d.MachineByID(mid) == nil {
+		m := d.MachineByID(mid)
+		if m == nil {
 			return fmt.Sprintf("no machine has the id %s", mid)
 		}
-		return fmt.Sprintf("%s is not in the _failure_events of machine %s", ev, mid)
+		if _, refusal := m.RefusalEvents()[ev]; refusal {
+			// a declared refusal: a failure mode may name it, none is asked for
+			return ""
+		}
+		return fmt.Sprintf("%s is not in the _failure_events of machine %s (nor in its _refusal_events)", ev, mid)
+	case "machine":
+		// the machine as a whole, bound to the model or not
+		if d.MachineByID(name) == nil {
+			return fmt.Sprintf("no machine has the id %s", name)
+		}
 	}
 	return ""
 }

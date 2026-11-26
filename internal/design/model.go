@@ -66,10 +66,14 @@ type Invariant struct {
 }
 
 type Scenario struct {
-	Name       string
-	Actors     []string
-	Invariants []string
-	Steps      []string
+	Name string
+	// Description is the scenario's own description, and Line its line
+	// (the line of the scenario when it has none), 1-based.
+	Description string
+	Line        int
+	Actors      []string
+	Invariants  []string
+	Steps       []string
 }
 
 func mapPairs(n *yaml.Node) [][2]*yaml.Node {
@@ -180,7 +184,12 @@ func ParseModel(rel string, data []byte) (*Model, error) {
 	}
 	m.Invariants = invariants(root)
 	for _, s := range seq(root, "scenarios") {
-		m.Scenarios = append(m.Scenarios, Scenario{Name: str(s, "name"), Actors: strList(s, "actors"), Invariants: strList(s, "invariants_touched"), Steps: strList(s, "steps")})
+		sc := Scenario{Name: str(s, "name"), Description: str(s, "description"), Line: s.Line,
+			Actors: strList(s, "actors"), Invariants: strList(s, "invariants_touched"), Steps: strList(s, "steps")}
+		if c := child(s, "description"); c != nil {
+			sc.Line = c.Line
+		}
+		m.Scenarios = append(m.Scenarios, sc)
 	}
 	return m, nil
 }
