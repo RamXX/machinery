@@ -1,0 +1,34 @@
+# assess on a project with a vital area: proofs awaiting, ids proven by test and model, what is
+# assumed, and the candidates, in the design section (docs/formats.md sections 18.3 and 23)
+fixture shop proj
+fixture shop-formal proj
+fixture shop-vital proj
+cd proj
+gitinit
+cd $WORK
+
+exec machinery -C proj assess --out out
+stdout '^design: '
+grep '^proofs awaiting: 2$' out/report.md
+grep '^vital: act:Order.pay proven \(by test and model; proof awaited\)$' out/report.md
+grep '^vital: inv:paid-before-shipped proven \(by test and model; proof awaited\)$' out/report.md
+grep '^vital: tc:ORDE-e6d28f proven \(by test and model; proof awaited\)$' out/report.md
+! grep '^vital: tc:ORDE-8bd6e7' out/report.md
+grep '^assumed, unproven: order-payment provider-charges-once: The payment provider charges a payment at most once, however often it is asked\.$' out/report.md
+grep '^vital candidates: 2, dismissed: 0$' out/report.md
+grep '^  fm:pay-replayed  failure mode text matches "twice"$' out/report.md
+grep '^  tc:ORDE-70d94f  event pay matches "pay"$' out/report.md
+grep '"proofs_awaiting": 2' out/report.json
+grep '"reason": "event pay matches \\"pay\\""' out/report.json
+grep '"vital_dismissed": 0' out/report.json
+
+# without a risk file the candidates still print, and nothing of a vital area does
+cd proj
+exec sh -c 'grep -v "risk:" machinery.yaml > m.yaml && mv m.yaml machinery.yaml'
+gitcommit 'no risk file'
+cd $WORK
+exec machinery -C proj assess --out out2
+grep '^vital candidates: 5, dismissed: 0$' out2/report.md
+grep '^  act:Order.pay  action pay matches "pay"$' out2/report.md
+! grep 'proofs awaiting' out2/report.md
+grep '"proofs_awaiting": 0' out2/report.json

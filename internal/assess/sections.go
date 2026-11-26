@@ -7,10 +7,13 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/adopt"
+	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/formal"
 	"github.com/RamXX/machinery/internal/gen"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/internal/vital"
 )
 
 // inventory: the facts of the adopt report for the snapshot, and the links
@@ -52,11 +55,41 @@ func (a *assessment) design(s *section) {
 	proposed, owed, proven, retired := a.ctx.Design().StatusCounts()
 	s.lines = append(s.lines, fmt.Sprintf("ids: %d proposed, %d owed, %d proven, %d retired", proposed, owed, proven, retired))
 	s.facts = map[string]any{"statuses": map[string]any{"proposed": proposed, "owed": owed, "proven": proven, "retired": retired}}
+	a.vitalLines(s)
 	if len(a.ctx.Design().Machines) > 0 {
 		bound, unbound := stages.BindingCounts(a.ctx)
 		s.own.Count(bound, "bound machines").Count(unbound, "unbound machines")
 		s.facts["bound_machines"], s.facts["unbound_machines"] = bound, unbound
 	}
+}
+
+// vitalLines adds the lines of the vital areas, by committed status, and the
+// candidates (sections 18.3, 23.2 and 23.3).
+func (a *assessment) vitalLines(s *section) {
+	d := a.ctx.Design()
+	vas := d.VitalAreas()
+	proofs := design.ProofsOf(vas)
+	if len(vas) > 0 {
+		s.lines = append(s.lines, fmt.Sprintf("proofs awaiting: %d", len(proofs)))
+		for _, id := range design.OverIDs(vas) {
+			if d.Known(id) && d.CommittedStatus(id) == "proven" {
+				s.lines = append(s.lines, evidence.ProvenLine(id))
+			}
+		}
+		for _, u := range d.Unevidenced(vas) {
+			s.lines = append(s.lines, u.Line())
+		}
+	}
+	cands, dismissed := vital.Candidates(d)
+	s.lines = append(s.lines, vital.Summary(len(cands), dismissed))
+	list := []any{}
+	for _, c := range cands {
+		s.lines = append(s.lines, "  "+c.Line())
+		list = append(list, map[string]any{"id": c.ID, "reason": c.Reason})
+	}
+	s.facts["proofs_awaiting"] = len(proofs)
+	s.facts["vital_candidates"] = list
+	s.facts["vital_dismissed"] = dismissed
 }
 
 func stageSection(name string) func(a *assessment, s *section) {

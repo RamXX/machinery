@@ -19,8 +19,9 @@ type File struct {
 }
 
 // Extra providers add generated files that belong to other packages (the
-// projection for external checkers). Each returns ok=false when it does not apply.
-var Extra []func(d *design.Design) (File, bool, error)
+// projection for external checkers, the property records of vital areas).
+// Each returns no file when it does not apply.
+var Extra []func(d *design.Design) ([]File, error)
 
 // JSON renders a value the way every generated JSON file is written: two-space
 // indentation, no HTML escaping, a trailing newline.
@@ -103,13 +104,11 @@ func Files(d *design.Design) ([]File, error) {
 		}
 	}
 	for _, extra := range Extra {
-		f, ok, err := extra(d)
+		fs, err := extra(d)
 		if err != nil {
 			return nil, err
 		}
-		if ok {
-			files = append(files, f)
-		}
+		files = append(files, fs...)
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	return files, nil

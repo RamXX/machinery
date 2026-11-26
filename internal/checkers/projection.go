@@ -19,16 +19,16 @@ import (
 const ProjectionFile = "projection.json"
 
 func init() {
-	gen.Extra = append(gen.Extra, func(d *design.Design) (gen.File, bool, error) {
+	gen.Extra = append(gen.Extra, func(d *design.Design) ([]gen.File, error) {
 		if !Configured(d) {
-			return gen.File{}, false, nil
+			return nil, nil
 		}
 		proj, _ := Build(d)
 		data, err := proj.Bytes()
 		if err != nil {
-			return gen.File{}, false, err
+			return nil, err
 		}
-		return gen.File{Path: ProjectionPath(d), Data: data}, true, nil
+		return []gen.File{{Path: ProjectionPath(d), Data: data}}, nil
 	})
 }
 

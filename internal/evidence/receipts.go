@@ -172,11 +172,24 @@ func TreeDirty(p *project.Project) (bool, error) {
 		return false, err
 	}
 	for _, rel := range paths {
-		if rel != p.Cfg.Design.Owed && !isReceipt(p, rel) {
+		if !exempt(p, rel) {
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+// exempt reports whether a change to a path leaves evidence valid (sections
+// 10 and 10.1): the owed file, a receipts file, or a property record of a
+// vital area, whose statuses render the owed file (section 23.4).
+func exempt(p *project.Project, rel string) bool {
+	return rel == p.Cfg.Design.Owed || isReceipt(p, rel) || isVitalRecord(p, rel)
+}
+
+// isVitalRecord reports whether a path is a property record: a .json file
+// directly in <gen>/vital.
+func isVitalRecord(p *project.Project, rel string) bool {
+	return strings.HasSuffix(rel, ".json") && path.Dir(rel) == strings.TrimSuffix(p.Cfg.Design.Gen, "/")+"/vital"
 }
 
 // isReceipt reports whether a project-relative path is a receipts file: a
@@ -213,7 +226,7 @@ func (v *validity) valid(commit string) bool {
 		if err == nil {
 			ok = true
 			for _, n := range names {
-				if n != v.p.Cfg.Design.Owed && !isReceipt(v.p, n) {
+				if !exempt(v.p, n) {
 					ok = false
 					break
 				}

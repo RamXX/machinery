@@ -1,0 +1,145 @@
+# machinery vital candidates: ids that look vital and are in no vital area, from fixed rules over
+# the design; a dismissal is on record in the risk file (docs/formats.md section 23.3)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec machinery vital candidates
+cmp stdout want-vital.txt
+! stderr .
+
+# the same every time
+exec machinery vital candidates
+cmp stdout want-vital.txt
+
+# a dismissal takes a candidate off the list and stays on record
+exec sh -c 'printf "not_vital:\n  - {id: \"tc:ORDE-70d94f\", reason: \"a refused pay records the refusal and moves no money\"}\n" >> design/risk.yaml'
+exec machinery vital candidates
+cmp stdout want-dismissed.txt
+exec machinery lint --stage risk
+stdout '^checked: 3 areas, 1 consequential ids, 1 critical ids, 9 vital ids, 2 properties, 2 assumptions, 1 dismissals$'
+stdout '^passed$'
+
+# a dismissal names ids of the design that are in no vital area, with a reason
+cp risk-bad-dismissals.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: not_vital entry 1: id is required$'
+stdout '^  ERROR  design/risk.yaml: not_vital: fm:pay-replayed: reason is required$'
+stdout '^  ERROR  design/risk.yaml: not_vital: tc:ORDE-70d94f is listed twice$'
+stdout '^  ERROR  design/risk.yaml: not_vital: act:Order.refund matches no act, inv, sc, tc or fm id$'
+stdout '^  ERROR  design/risk.yaml: not_vital: act:Order.pay is in vital area order-payment; a dismissed id is not vital$'
+stdout '^failed: 5 finding\(s\)$'
+
+# without a risk file every id is in no vital area: the action, event and effect rules
+cp plain.yaml machinery.yaml
+exec machinery vital candidates
+cmp stdout want-plain.txt
+
+# the lists are configurable; a configured list replaces its default
+cp lists.yaml machinery.yaml
+exec machinery vital candidates
+cmp stdout want-lists.txt
+
+# the entity rule
+cp entity.yaml machinery.yaml
+exec machinery vital candidates
+cmp stdout want-entity.txt
+
+# refusals
+cp empty-word.yaml machinery.yaml
+exec mrun 2 vital candidates
+stderr '^config: vital.names: a word must not be empty$'
+cp plain.yaml machinery.yaml
+exec mrun 2 vital candidates extra
+stderr '^usage: machinery vital candidates takes no arguments$'
+exec mrun 2 vital
+stderr '^usage: machinery vital needs a subcommand: vital candidates$'
+
+-- want-vital.txt --
+fm:pay-replayed  failure mode text matches "twice"
+tc:ORDE-70d94f  event pay matches "pay"
+vital candidates: 2, dismissed: 0
+-- want-dismissed.txt --
+fm:pay-replayed  failure mode text matches "twice"
+vital candidates: 1, dismissed: 1
+-- risk-bad-dismissals.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+    property:
+      - {name: charged-once, statement: "An order is charged at most once.", kind: exactly-once, over: ["act:Order.pay"]}
+    core: {paths: ["internal/domain/**"], entry: ["internal/domain/order.go#Apply"]}
+    assumes:
+      - {name: final-stays-final, statement: "The store keeps a final order final.", evidence: ["inv:terminal-is-final"]}
+not_vital:
+  - {reason: "no id"}
+  - {id: "fm:pay-replayed"}
+  - {id: "tc:ORDE-70d94f", reason: "a refusal"}
+  - {id: "tc:ORDE-70d94f", reason: "the same again"}
+  - {id: "act:Order.refund", reason: "no such action"}
+  - {id: "act:Order.pay", reason: "it is vital"}
+-- plain.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+-- want-plain.txt --
+act:Order.pay  action pay matches "pay"
+fm:pay-replayed  failure mode text matches "twice"
+tc:ORDE-2e883d  event pay matches "pay"
+tc:ORDE-70d94f  event pay matches "pay"
+tc:ORDE-8bd6e7  effect recordCharge matches "charge"
+vital candidates: 5, dismissed: 0
+-- lists.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+vital:
+  names: [cancel]
+  failure: [provider]
+  effects: [refund, notify]
+-- want-lists.txt --
+act:Order.cancel  action cancel matches "cancel"
+fm:pay-replayed  failure mode text matches "provider"
+fm:payment-provider-down  failure mode text matches "provider"
+tc:ORDE-1ded14  event cancel matches "cancel"
+tc:ORDE-507e4f  event cancel matches "cancel"
+tc:ORDE-e6d28f  effect notifyCustomer matches "notify"
+vital candidates: 6, dismissed: 0
+-- entity.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+vital:
+  names: [order]
+  failure: []
+  effects: []
+-- want-entity.txt --
+act:Order.cancel  entity Order matches "order"
+act:Order.pay  entity Order matches "order"
+act:Order.place  entity Order matches "order"
+act:Order.ship  entity Order matches "order"
+tc:ORDE-1ded14  entity Order matches "order"
+tc:ORDE-2e883d  entity Order matches "order"
+tc:ORDE-507e4f  entity Order matches "order"
+tc:ORDE-70d94f  entity Order matches "order"
+tc:ORDE-e6d28f  entity Order matches "order"
+vital candidates: 9, dismissed: 0
+-- empty-word.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+vital:
+  names: [pay, ""]

@@ -1,0 +1,122 @@
+# the property record of a vital area: what a prover integration will read, and its drift
+# check (docs/formats.md sections 7 and 23.4)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"no formal result yet\"\n  - id: fv:order-payment\n    reason: \"no formal result yet\"\n" >> design/owed.yaml'
+exec machinery gen
+cmp design/gen/vital/order-payment.json want-record.json
+! exists design/gen/vital/order-ownership.json
+exec machinery gen --check
+stdout '^passed$'
+
+# the record holds the sha256 of each core file: a change to the core drifts it
+cp internal/domain/order.go orig-order.go
+exec sh -c 'printf "// a change\n" >> internal/domain/order.go'
+exec mrun 1 gen --check
+stdout '^  DRIFT  design/gen/vital/order-payment.json: stale$'
+cp orig-order.go internal/domain/order.go
+rm orig-order.go
+exec machinery gen --check
+stdout '^passed$'
+
+# its statuses render the owed list; committing the record with the owed file keeps the evidence valid
+gitinit
+exec machinery run -- sh -c 'sh e2e/orders.sh && sh e2e/outage.sh'
+exec machinery owed sync --prune-only
+stdout '^owed: 7 kept, 0 added, 1 removed$'
+exec mrun 1 gen --check
+stdout '^  DRIFT  design/gen/vital/order-payment.json: stale$'
+exec machinery gen
+grep -count=2 '"status": "assumed, evidenced"' design/gen/vital/order-payment.json
+gitcommit 'prune the owed list'
+exec machinery verify
+stdout '^checked: '
+stdout '^passed$'
+
+# a record whose area is not vital is unexpected
+cp design/gen/vital/order-payment.json design/gen/vital/order-ownership.json
+exec mrun 1 gen --check
+stdout '^  ERROR  design/gen/vital/order-ownership.json: unexpected file in gen directory$'
+
+-- want-record.json --
+{
+  "version": 1,
+  "area": "order-payment",
+  "why": "money moves; a customer charged twice cannot be made whole by a retry",
+  "source": "design/risk.yaml",
+  "properties": [
+    {
+      "id": "pf:order-payment:charged-once",
+      "name": "charged-once",
+      "kind": "exactly-once",
+      "statement": "An order is charged at most once, whatever its callers do at the same time.",
+      "over": [
+        "act:Order.pay",
+        "tc:ORDE-8bd6e7"
+      ],
+      "status": "awaiting proof"
+    },
+    {
+      "id": "pf:order-payment:shipped-only-paid",
+      "name": "shipped-only-paid",
+      "kind": "never",
+      "statement": "No order ships before its payment is captured.",
+      "over": [
+        "inv:paid-before-shipped",
+        "tc:ORDE-e6d28f"
+      ],
+      "status": "awaiting proof"
+    }
+  ],
+  "core": {
+    "paths": [
+      "internal/domain/**"
+    ],
+    "entry": [
+      "internal/domain/order.go#Apply"
+    ],
+    "files": [
+      {
+        "path": "internal/domain/order.go",
+        "sha256": "4170c630ad3f878759f42a0df76529374d5ea6abadde93993e88a1560dd0f151"
+      }
+    ]
+  },
+  "assumes": [
+    {
+      "name": "provider-charges-once",
+      "statement": "The payment provider charges a payment at most once, however often it is asked.",
+      "evidence": [
+        "fm:payment-provider-down"
+      ],
+      "status": "assumed, unproven"
+    },
+    {
+      "name": "final-stays-final",
+      "statement": "The store never rewrites the status of a shipped or cancelled order.",
+      "evidence": [
+        "inv:terminal-is-final"
+      ],
+      "status": "assumed, evidenced"
+    }
+  ],
+  "over": [
+    {
+      "id": "act:Order.pay",
+      "status": "proven (by test and model; proof awaited)"
+    },
+    {
+      "id": "inv:paid-before-shipped",
+      "status": "proven (by test and model; proof awaited)"
+    },
+    {
+      "id": "tc:ORDE-8bd6e7",
+      "status": "owed"
+    },
+    {
+      "id": "tc:ORDE-e6d28f",
+      "status": "proven (by test and model; proof awaited)"
+    }
+  ]
+}
