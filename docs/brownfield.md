@@ -53,13 +53,8 @@ never runs the backlog tool:
 machinery adopt --rehearse --config ../depot.machinery.yaml --out ../depot-rehearsal
 ```
 
-A links, status or risk file you are still writing does not have to be committed into the
-project to be tried: put it in a directory of its own, at the path it will have in the project,
-and pass `--overlay <dir>` to `assess` or to `adopt --rehearse`. The files are laid over the
-snapshot, and the reports list each with its role and sha256 and say that the result is not the
-result of `HEAD`. An overlay holds nothing else (`docs/formats.md` section 18.2): not the
-config, which comes from the project or from `--config`, not the owed list, not tests or code.
-It changes what the design says, never the evidence.
+A rehearsal reads only what is committed. To try a links file before adopting it, commit it on
+a scratch branch of a clone of the project and rehearse there.
 
 `rehearsal.md` (and `rehearsal.json`) lists the files adoption would write with their sizes, the
 waivers it would add by rule, the baselines, what it would owe by kind, the result of the check,

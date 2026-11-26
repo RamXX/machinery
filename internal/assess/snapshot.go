@@ -98,20 +98,16 @@ func PrepareOut(root, out, verb string) (string, error) {
 	return abs, nil
 }
 
-// TakeSnapshot extracts HEAD into <out>/snapshot, lays the overlay (nil for
-// none) over it, writes cfg there as machinery.yaml (removes it when cfg is
-// nil) and makes it a repository with one commit. It returns the snapshot
-// and the symbolic links left out.
-func TakeSnapshot(root, out, head string, cfg []byte, overlay *Overlay) (string, []string, error) {
+// TakeSnapshot extracts HEAD into <out>/snapshot, writes cfg there as
+// machinery.yaml (removes it when cfg is nil) and makes it a repository with
+// one commit. It returns the snapshot and the symbolic links left out.
+func TakeSnapshot(root, out, head string, cfg []byte) (string, []string, error) {
 	snap := filepath.Join(out, "snapshot")
 	if err := os.MkdirAll(snap, 0o755); err != nil {
 		return "", nil, err
 	}
 	_, outside, err := gitx.Archive(root, snap)
 	if err != nil {
-		return "", nil, err
-	}
-	if err := overlay.lay(snap); err != nil {
 		return "", nil, err
 	}
 	path := filepath.Join(snap, project.ConfigName)

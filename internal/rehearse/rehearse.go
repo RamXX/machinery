@@ -44,7 +44,6 @@ type Options struct {
 	ProjectFlag string
 	Config      string
 	Out         string
-	Overlay     string
 	Paths, E2E  []string
 	Stdout      io.Writer
 	Gen         func(*stages.Context) (written []string, blocked []*report.Stage, err error)
@@ -74,7 +73,6 @@ type rehearsal struct {
 	name, head, cfgLabel string
 	changed, untracked   int
 	outside              []string
-	overlay              *assess.Overlay
 	files                []file
 	waivers              []count
 	baselines            []count
@@ -115,9 +113,6 @@ func Run(o Options) error {
 		}
 	}
 	r := &rehearsal{name: filepath.Base(root), cfgLabel: "none", outcomes: map[string]string{}}
-	if r.overlay, err = assess.ReadOverlay(o.Overlay); err != nil {
-		return err
-	}
 	var cfg []byte
 	if o.Config != "" {
 		data, rerr := os.ReadFile(o.Config)
@@ -128,16 +123,12 @@ func Run(o Options) error {
 	} else if data, rerr := os.ReadFile(filepath.Join(root, project.ConfigName)); rerr == nil {
 		cfg, r.cfgLabel = data, project.ConfigName
 	}
-	var parsed *project.Config
 	if cfg != nil {
-		if parsed, err = project.Parse(cfg); err != nil {
-			return err
+		if _, perr := project.Parse(cfg); perr != nil {
+			return perr
 		}
 	}
 	if r.head, err = assess.HeadOf(root, verb); err != nil {
-		return err
-	}
-	if err := r.overlay.Check(root, parsed, r.cfgLabel); err != nil {
 		return err
 	}
 	out, err := assess.PrepareOut(root, o.Out, verb)
@@ -146,7 +137,7 @@ func Run(o Options) error {
 	}
 	w := o.Stdout
 	fmt.Fprintf(w, "out: %s\n", out)
-	snap, outside, err := assess.TakeSnapshot(root, out, r.head, cfg, r.overlay)
+	snap, outside, err := assess.TakeSnapshot(root, out, r.head, cfg)
 	if err != nil {
 		return fmt.Errorf("%s: cannot take the snapshot: %v", verb, err)
 	}
@@ -163,9 +154,6 @@ func Run(o Options) error {
 	}
 	if len(r.outside) > 0 {
 		fmt.Fprintf(w, "outside links: %d symbolic link(s) leave the project and are not in the snapshot: %s\n", len(r.outside), strings.Join(r.outside, ", "))
-	}
-	if line := r.overlay.Line(); line != "" {
-		fmt.Fprintln(w, line)
 	}
 	fmt.Fprintln(w, r.adoptLine)
 	fmt.Fprintf(w, "check: %s\n", r.checkLine)

@@ -35,7 +35,6 @@ grep '^# machinery assess: proj at [0-9a-f]{7}$' out/report.md
 grep '^- config: machinery.yaml$' out/report.md
 grep '^- dirty: none; the work tree matches HEAD$' out/report.md
 grep '^- outside links: none$' out/report.md
-grep '^- overlay: none$' out/report.md
 grep '^\| design \| failed: 1 finding\(s\) \| 1 \|$' out/report.md
 grep '^\| model \| failed \| 1 models, 1 entities, 3 actions, 2 invariants, 2 scenarios \| 1 \| stages/model.txt \|$' out/report.md
 grep '^- 1 drift: model: missing$' out/report.md
@@ -55,7 +54,6 @@ grep '^No finding names an entity\.$' out/report.md
 grep '^  "config": "machinery.yaml",$' out/report.json
 grep '^  "head": "[0-9a-f]{7}",$' out/report.json
 grep '^  "outside_links": \[\],$' out/report.json
-grep '^  "overlay": \[\],$' out/report.json
 grep '^  "project": "proj",$' out/report.json
 grep '"rule": "model: missing",' out/report.json
 grep '"code_files": 1,' out/report.json

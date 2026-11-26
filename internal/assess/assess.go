@@ -23,7 +23,6 @@ type Options struct {
 	Config      string   // --config
 	Out         string   // --out
 	Since       []string // --since
-	Overlay     string   // --overlay
 	Stdout      io.Writer
 	// Gen writes the generated files (machinery gen). It refuses, returning
 	// the blocking stages, when the design has errors.
@@ -57,7 +56,6 @@ type assessment struct {
 	changed  int
 	untrack  int
 	outside  []string         // symbolic links of HEAD that leave the project, not in the snapshot
-	overlay  *Overlay         // the files laid over the snapshot, nil for none
 	p        *project.Project // the snapshot
 	ctx      *stages.Context
 	sections []*section
@@ -83,9 +81,6 @@ func Run(o Options) error {
 		fmt.Fprintln(w, line)
 	}
 	if line := a.outsideLine(); line != "" {
-		fmt.Fprintln(w, line)
-	}
-	if line := a.overlay.Line(); line != "" {
 		fmt.Fprintln(w, line)
 	}
 	for _, def := range sectionDefs {
@@ -125,9 +120,6 @@ func (a *assessment) inputs() error {
 	}
 	a.root = root
 	a.name = filepath.Base(a.root)
-	if a.overlay, err = ReadOverlay(o.Overlay); err != nil {
-		return err
-	}
 
 	if o.Config != "" {
 		data, rerr := os.ReadFile(o.Config)
@@ -142,15 +134,11 @@ func (a *assessment) inputs() error {
 		}
 		a.cfgBytes, a.cfgLabel = data, project.ConfigName
 	}
-	cfg, perr := project.Parse(a.cfgBytes)
-	if perr != nil {
+	if _, perr := project.Parse(a.cfgBytes); perr != nil {
 		return perr
 	}
 
 	if a.head, err = HeadOf(a.root, "assess"); err != nil {
-		return err
-	}
-	if err := a.overlay.Check(a.root, cfg, a.cfgLabel); err != nil {
 		return err
 	}
 	for _, ref := range o.Since {
@@ -168,7 +156,7 @@ func (a *assessment) inputs() error {
 // makes it a repository with one commit (section 18.2).
 func (a *assessment) snapshot() error {
 	var err error
-	if a.snap, a.outside, err = TakeSnapshot(a.root, a.out, a.head, a.cfgBytes, a.overlay); err != nil {
+	if a.snap, a.outside, err = TakeSnapshot(a.root, a.out, a.head, a.cfgBytes); err != nil {
 		return err
 	}
 	p, err := project.Load(a.snap)
