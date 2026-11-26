@@ -2,10 +2,16 @@
 package gitx
 
 import (
+	"archive/tar"
 	"bytes"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -246,4 +252,167 @@ func sortStrings(s []string) {
 			s[j], s[j-1] = s[j-1], s[j]
 		}
 	}
+}
+
+// TopLevel returns the top of the git work tree that holds dir.
+func TopLevel(dir string) (string, error) {
+	out, err := run(dir, "rev-parse", "--show-toplevel")
+	return strings.TrimSpace(out), err
+}
+
+// StatusCounts counts, below root, the tracked files that differ from HEAD
+// and the untracked files that are not ignored. Optional locks are off, so
+// git does not refresh the index: nothing in the repository is written.
+func StatusCounts(root string) (changed, untracked int, err error) {
+	out, err := run(root, "--no-optional-locks", "status", "--porcelain", "--untracked-files=all", "--", ".")
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case len(line) < 4:
+		case strings.HasPrefix(line, "?? "):
+			untracked++
+		default:
+			changed++
+		}
+	}
+	return changed, untracked, nil
+}
+
+// FirstAdd returns the first commit that adds a project-relative path, or ""
+// when no commit does.
+func FirstAdd(root, rel string) (string, error) {
+	out, err := run(root, "log", "--diff-filter=A", "--reverse", "--format=%H", "--", rel)
+	if err != nil {
+		return "", err
+	}
+	if ls := lines(out); len(ls) > 0 {
+		return ls[0], nil
+	}
+	return "", nil
+}
+
+// Branches lists the local branches, sorted.
+func Branches(root string) ([]string, error) {
+	out, err := run(root, "for-each-ref", "--format=%(refname:short)", "refs/heads/")
+	if err != nil {
+		return nil, err
+	}
+	res := lines(out)
+	sort.Strings(res)
+	return res, nil
+}
+
+// Archive extracts the tree of HEAD below root into dest: git archive piped
+// to an extraction, with no worktree and no checkout. It returns the number
+// of files and symbolic links written.
+func Archive(root, dest string) (int, error) {
+	cmd := exec.Command("git", "archive", "--format=tar", "HEAD")
+	cmd.Dir = root
+	var errb bytes.Buffer
+	cmd.Stderr = &errb
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return 0, err
+	}
+	if err := cmd.Start(); err != nil {
+		return 0, err
+	}
+	n, xerr := extract(pipe, dest)
+	io.Copy(io.Discard, pipe)
+	werr := cmd.Wait()
+	if werr != nil {
+		msg := strings.TrimSpace(errb.String())
+		if msg == "" {
+			msg = werr.Error()
+		}
+		return n, errors.New("git archive: " + msg)
+	}
+	return n, xerr
+}
+
+func extract(r io.Reader, dest string) (int, error) {
+	tr := tar.NewReader(r)
+	n := 0
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			return n, nil
+		}
+		if err != nil {
+			return n, err
+		}
+		name := path.Clean(h.Name)
+		if name == "." {
+			continue
+		}
+		if path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") {
+			return n, fmt.Errorf("archive entry %q leaves the snapshot", h.Name)
+		}
+		target := filepath.Join(dest, filepath.FromSlash(name))
+		switch h.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0o755); err != nil {
+				return n, err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return n, err
+			}
+			mode := os.FileMode(0o644)
+			if h.Mode&0o111 != 0 {
+				mode = 0o755
+			}
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+			if err != nil {
+				return n, err
+			}
+			_, cerr := io.Copy(f, tr)
+			if err := f.Close(); cerr == nil {
+				cerr = err
+			}
+			if cerr != nil {
+				return n, cerr
+			}
+			n++
+		case tar.TypeSymlink:
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return n, err
+			}
+			if err := os.Symlink(h.Linkname, target); err != nil {
+				return n, err
+			}
+			n++
+		}
+	}
+}
+
+// InitCommit makes dir a repository of its own and commits everything in it,
+// ignored files included, with hooks and signing off. The environment of a
+// surrounding repository (GIT_DIR and the like) is not inherited.
+func InitCommit(dir, message string) error {
+	var env []string
+	for _, kv := range os.Environ() {
+		switch k, _, _ := strings.Cut(kv, "="); k {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_COMMON_DIR", "GIT_CEILING_DIRECTORIES":
+			continue
+		}
+		env = append(env, kv)
+	}
+	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
+		"-c", "user.name=machinery assess", "-c", "user.email=assess@machinery.invalid"}
+	for _, args := range [][]string{
+		{"init", "-q"},
+		{"add", "-A", "-f"},
+		{"commit", "-q", "--no-verify", "--allow-empty", "-m", message},
+	} {
+		cmd := exec.Command("git", append(append([]string{}, base...), args...)...)
+		cmd.Dir = dir
+		cmd.Env = env
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git %s in the snapshot: %s", args[0], strings.TrimSpace(string(out)))
+		}
+	}
+	return nil
 }
