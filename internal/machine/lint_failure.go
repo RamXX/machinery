@@ -11,9 +11,6 @@ import (
 // (docs/formats.md section 5.2).
 const tagFailure = "failure"
 
-// failureWords are the name fragments of the name hints (section 6.2).
-var failureWords = []string{"fail", "error", "abort", "crash", "timeout"}
-
 // FailureStates returns the dotted paths of the states tagged failure, in
 // document order.
 func (m *Machine) FailureStates() []string {
@@ -202,6 +199,9 @@ func lintNotFailures(base string, ro *ir.Object, states []ir.StateEntry) (errs [
 			errs = append(errs, fmt.Sprintf("%s: _not_failures[%s] must be a non-empty reason", base, ir.Repr(n)))
 		case !handled[n] && !isState[n]:
 			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is no event a state handles or ignores and no state; the marker is stale (remove it, or correct the name)", base, ir.Repr(n)))
+		case !looksLikeFailure(n[strings.LastIndex(n, ".")+1:]):
+			// no hint is printed for the name, so the entry dismisses nothing
+			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which does not look like a failure (%s), so there is no hint to dismiss (remove it)", base, ir.Repr(n), ir.NoFailureWord))
 		default:
 			if handled[n] && failure[n] {
 				errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is in _failure_events; a declared failure is not dismissed (keep one)", base, ir.Repr(n)))
@@ -236,14 +236,26 @@ func lintFailure(base string, ro *ir.Object, states []ir.StateEntry) (errs []str
 	return errs
 }
 
-func looksLikeFailure(name string) bool {
-	l := strings.ToLower(name)
-	for _, w := range failureWords {
-		if strings.Contains(l, w) {
-			return true
+func looksLikeFailure(name string) bool { return ir.LooksLikeFailure(name) }
+
+// IdleDismissals returns, as findings, the entries of _not_failures that
+// dismiss nothing because the name is one of actions, the actions of the
+// machine's lifecycle entity, which are never hinted. entity is its name.
+func (m *Machine) IdleDismissals(entity string, actions map[string]bool) (errs []string) {
+	ro := m.Root.AsObject()
+	if ro == nil {
+		return nil
+	}
+	isState := map[string]bool{}
+	for _, s := range ir.WalkStates(ro.Get2("states"), "") {
+		isState[s.Path] = true
+	}
+	for _, n := range ro.GetObject("_not_failures").Keys() {
+		if actions[n] && !isState[n] && looksLikeFailure(n) {
+			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is an action of %s and is never hinted, so there is no hint to dismiss (remove it)", m.Path, ir.Repr(n), entity))
 		}
 	}
-	return false
+	return errs
 }
 
 // Hints returns the name hints of section 6.2, warnings that never fail the

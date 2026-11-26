@@ -236,6 +236,15 @@ func externalEvents(fs *xfindings, m *machine.Machine, entityOf map[string]strin
 	return external
 }
 
+// eventSetOf returns the events a machine handles under on.
+func eventSetOf(m *machine.Machine) map[string]bool {
+	set := map[string]bool{}
+	for _, ev := range m.Table.Events() {
+		set[ev] = true
+	}
+	return set
+}
+
 func sortedNames(set map[string]bool) []string {
 	res := make([]string, 0, len(set))
 	for n := range set {
@@ -252,6 +261,7 @@ type aliasRules struct {
 	of       string            // what those are the actions of
 	missing  string            // what to do about an action that is not one
 	ownIn    map[string]string // an action that has an on event of its own name, with the machine that has it
+	handled  map[string]bool   // the events the machine handles under on
 }
 
 // aliasedEvents returns the events of a machine that are an action under
@@ -281,6 +291,8 @@ func aliasedEvents(fs *xfindings, lines *[]string, m *machine.Machine, r aliasRu
 			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and %s is itself an action of %s; an action is not hidden behind another: %s", act, ev, ent, where)
 		case !r.isAction[act]:
 			fs.add("event-action", m.ID+"."+ev, "_aliases names action %s, which is not an action of %s; %s, or %s", act, r.of, r.missing, where)
+		case !r.handled[ev]:
+			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and no state handles %s under on; an event that is only ignored stands for no action: %s", act, ev, where)
 		case r.ownIn[act] != "":
 			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and %s has an event of its own name in %s; an action has its own event or stands behind aliases, not both: %s", act, act, r.ownIn[act], where)
 		default:
@@ -340,7 +352,7 @@ func checkOperationalEvents(fs *xfindings, aliasLines *[]string, d *design.Desig
 	for _, ev := range evs {
 		ownIn[ev] = m.ID
 	}
-	_, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: allowed, of: of, missing: "serve the action (act:<Entity>.<action>)", ownIn: ownIn})
+	_, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: allowed, of: of, missing: "serve the action (act:<Entity>.<action>)", ownIn: ownIn, handled: eventSetOf(m)})
 	var unmatched []string
 	for _, ev := range evs {
 		if !allowed[ev] && !external[ev] && !aliased[ev] {
@@ -390,7 +402,7 @@ func checkLifecycleEvents(fs *xfindings, aliasLines *[]string, g *lifecycleGroup
 	}
 	for _, m := range g.machines {
 		external := externalEvents(fs, m, entityOf)
-		alias, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: acts, of: e.Name, missing: "name an action of " + e.Name, ownIn: ownIn})
+		alias, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: acts, of: e.Name, missing: "name an action of " + e.Name, ownIn: ownIn, handled: eventSetOf(m)})
 		evs := m.Table.Events()
 		events += len(evs)
 		ids = append(ids, m.ID)

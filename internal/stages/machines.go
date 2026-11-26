@@ -26,7 +26,11 @@ func Machines(ctx *Context) *report.Stage {
 		for _, e := range errs {
 			s.Errorf("%s", e)
 		}
-		for _, h := range m.Hints(lifecycleActions(d, m)) {
+		actions := lifecycleActions(d, m)
+		for _, e := range m.IdleDismissals(d.LifecycleEntity(m), actions) {
+			s.Errorf("%s", e)
+		}
+		for _, h := range m.Hints(actions) {
 			s.Warnf("%s", h)
 		}
 		states += counts.States

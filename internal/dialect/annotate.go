@@ -159,22 +159,51 @@ func (t *translator) dismiss(k string, nf map[string]string, events map[string]b
 		}
 	}
 	for _, n := range names {
-		found := false
-		if events[n] {
-			found = true
-			add(n, n, false)
-		}
+		// a dotted path names its state; a bare name names the one state
+		// that carries it
+		var byPath, byName []ir.StateEntry
 		for _, s := range states {
 			src := t.sourceOf[s.Path]
-			if n == s.Name || n == s.Path || n == lastSegment(src) || n == src {
-				found = true
-				if !(events[n] && s.Path == n) { // one key in the file says both
-					add(s.Path, n, true)
-				}
+			switch {
+			case n == s.Path || n == src:
+				byPath = append(byPath, s)
+			case n == s.Name || n == lastSegment(src):
+				byName = append(byName, s)
 			}
 		}
-		if !found {
+		matched := byPath
+		if len(matched) == 0 {
+			matched = byName
+		}
+		switch {
+		case !events[n] && len(matched) == 0:
 			t.fail("import.machines.annotate %s: not_failures names %s, which is no event and no state of the machine; correct the name or remove it", k, n)
+			continue
+		case len(matched) > 1:
+			paths := make([]string, len(matched))
+			for i, s := range matched {
+				paths[i] = s.Path
+			}
+			t.fail("import.machines.annotate %s: not_failures names %s, which is the name of several states (%s); name one by its dotted path", k, n, strings.Join(paths, ", "))
+			continue
+		}
+		// no hint is printed for a name without a failure word, so
+		// dismissing it would be a silent no-op
+		looks := events[n] && ir.LooksLikeFailure(n)
+		for _, s := range matched {
+			looks = looks || ir.LooksLikeFailure(s.Name)
+		}
+		if !looks {
+			t.fail("import.machines.annotate %s: not_failures names %s, which does not look like a failure (%s), so there is no hint to dismiss; remove it", k, n, ir.NoFailureWord)
+			continue
+		}
+		if events[n] {
+			add(n, n, false)
+		}
+		for _, s := range matched {
+			if !(events[n] && s.Path == n) { // one key in the file says both
+				add(s.Path, n, true)
+			}
 		}
 	}
 }

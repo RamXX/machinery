@@ -196,7 +196,8 @@ action (`docs/formats.md` section 6.4), which must be an action of the machine's
 what an operational machine serves. Each value is a non-empty string, and each event is one some
 state handles or ignores (a stale entry is an error). An aliased event is a caller's action, so it
 is in neither `_external_events` nor `_failure_events`. An alias hides nothing: an event that is
-itself an action of the model takes no alias, an action that has an event of its own name is the
+itself an action of the model takes no alias, an event that states only ignore takes none (it
+would stand for nothing), an action that has an event of its own name is the
 action of no alias (several events may share an action that has none), the stage prints one line
 for every alias in effect and counts them, and an aliased event whose name looks like a failure
 is still hinted. Prefer one name in the model and the machine; the alias is for a machine whose
@@ -207,7 +208,8 @@ like a failure, which dismisses its name hint ("Failure idioms"):
 `"_not_failures": {"count_aborted": "a stocktake that is called off changes no loan"}`. A key is
 an event some state handles or ignores, or the dotted path of a state (a stale key is an error);
 a reason is a non-empty string. A declared failure is not dismissed: a key that is in
-`_failure_events`, or a state tagged `failure`, is an error.
+`_failure_events`, or a state tagged `failure`, is an error. So is a key that dismisses nothing:
+a name with no failure word in it, or an action of the lifecycle entity, which is never hinted.
 
 **`_serves`** (root, required on an operational machine). A non-empty array of the model ids the
 machine exists for, each `entity:<Name>` or `act:<Entity>.<action>`, none twice:
@@ -430,8 +432,8 @@ it.
 name that is neither in `_failure_events` nor an action of the lifecycle entity; an event in
 `_external_events` or in `_aliases` is still hinted. When the name means something else, dismiss
 the hint with the reason in the root `_not_failures`, keyed by the event name or the dotted path
-of the state. A warning never
-fails the stage; tag the state, list the event, or dismiss the hint when the name means something else.
+of the state. A warning never fails the stage; tag the state, list the event, or dismiss the hint
+when the name means something else.
 
 A per-state `after` is cancelled when its state exits. A bound that must hold across several
 states needs a timer on each of them.

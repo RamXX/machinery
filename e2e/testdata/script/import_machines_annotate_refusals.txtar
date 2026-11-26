@@ -6,6 +6,16 @@ exec sh -c 'cat head.yaml good.part > machinery.yaml'
 exec machinery lint --stage machines
 exec machinery lint --stage xref-model-machine
 
+# an event that states only ignore is an event of the machine for a pattern
+cp machines/loan-desk.json desk.orig
+exec sh -c 'sed "s/\"nothing is being scanned\"/&, \"stock_take\": \"no count here\"/; s/ALREADY_LENT\"}/ALREADY_LENT\", \"stock_take\": \"no count here\"}/; s/\"already recorded\"/&, \"stock_take\": \"no count here\"/" desk.orig > machines/loan-desk.json'
+exec sh -c 'cat head.yaml ignored.part > machinery.yaml'
+exec machinery lint --stage machines
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/loan_desk.machine.json > desk.flat'
+grep '"_external_events":\["due_tick","stock_take"\]' desk.flat
+cp desk.orig machines/loan-desk.json
+
 # a pattern that matches no event or state of a machine it is applied to names itself
 exec sh -c 'cat head.yaml nomatch.part > machinery.yaml'
 exec mrun 1 lint --stage machines
@@ -98,16 +108,23 @@ exec sh -c 'cat head.yaml dismiss-nothing.part > machinery.yaml'
 exec mrun 1 lint --stage machines
 stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: not_failures names due_tock, which is no event and no state of the machine; correct the name or remove it$'
 stdout '^failed: 1 finding\(s\)$'
-exec sh -c 'cat head.yaml dismiss-two.part > machinery.yaml'
+
+# a dismissal of a name that has no hint dismisses nothing: the name does not look like a failure
+exec sh -c 'cat head.yaml dismiss-idle.part > machinery.yaml'
 exec mrun 1 lint --stage machines
-stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk and machines/loan-\*\.json both dismiss due_tick; keep one$'
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: not_failures names due_tick, which does not look like a failure \(no fail, error, abort, crash or timeout in the name\), so there is no hint to dismiss; remove it$'
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: not_failures names Lent, which does not look like a failure \(no fail, error, abort, crash or timeout in the name\), so there is no hint to dismiss; remove it$'
+stdout '^failed: 2 finding\(s\)$'
+
+# (the timer of the next cases is named due_timeout, so that it has a hint to dismiss)
+exec sh -c 'sed "s/due_tick/due_timeout/g" desk.orig > machines/loan-desk.json'
+exec sh -c 'cat head.yaml dismiss-two.part | sed "s/due_tick/due_timeout/g" > machinery.yaml'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk and machines/loan-\*\.json both dismiss due_timeout; keep one$'
 stdout '^failed: 1 finding\(s\)$'
-exec sh -c 'cat head.yaml dismiss-two.part > machinery.yaml'
-exec sh -c 'sed "s/\"initial\": \"shelved\"/\"_not_failures\": {\"due_tick\": \"a timer\"}, &/" machines/loan-desk.json > desk.tmp'
-cp machines/loan-desk.json desk.orig
-cp desk.tmp machines/loan-desk.json
+exec sh -c 'sed "s/due_tick/due_timeout/g; s/\"initial\": \"shelved\"/\"_not_failures\": {\"due_timeout\": \"a timer\"}, &/" desk.orig > machines/loan-desk.json'
 exec mrun 1 lint --stage machines
-stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk dismisses due_tick, which the source dismisses already; keep one$'
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk dismisses due_timeout, which the source dismisses already; keep one$'
 cp desk.orig machines/loan-desk.json
 exec sh -c 'cat head.yaml dismiss-failure.part > machinery.yaml'
 exec mrun 1 lint --stage machines
@@ -116,10 +133,22 @@ stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: 
 stdout '^failed: 2 finding\(s\)$'
 
 # one entry names a state once, whatever way it writes the name
+exec sh -c 'sed "s/lent/late_error/g" desk.orig > machines/loan-desk.json'
 exec sh -c 'cat head.yaml dismiss-same.part > machinery.yaml'
 exec mrun 1 lint --stage machines
-stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: not_failures names Lent and lent, which are one state \(Lent\); keep one$'
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: not_failures names LateError and late_error, which are one state \(LateError\); keep one$'
 stdout '^failed: 1 finding\(s\)$'
+cp desk.orig machines/loan-desk.json
+
+# a name that several states carry does not say which: the dotted path does
+cp twin.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  twin/twin\.json: import.machines.annotate twin: not_failures names timeout, which is the name of several states \(a\.timeout, b\.timeout\); name one by its dotted path$'
+exec sh -c 'sed "s/{timeout:/{a.timeout:/" twin.yaml > machinery.yaml'
+exec machinery lint --stage machines
+! stdout 'not_failures'
+stdout '^  warn   twin/twin\.json: state b\.timeout looks like a failure state and is not tagged failure$'
+! stdout 'state a\.timeout looks'
 
 # an alias names an action of the model, for an event that is not one already
 exec sh -c 'cat head.yaml alias-unknown.part > machinery.yaml'
@@ -245,7 +274,7 @@ import:
       "machines/*.json":
         failure_events: ["*_failed"]
       loan_desk:
-        external_events: ["due_*", "l*"]
+        external_events: ["due_*", "l*", "le*"]
         failure_states: ["*_failed"]
         aliases: {handed_back: giveBack}
       hold_queue:
@@ -552,7 +581,47 @@ entities:
         external_events: ["due_*"]
         failure_states: ["*_failed"]
         aliases: {handed_back: giveBack}
-        not_failures: {lent: "a lent copy is fine", Lent: "a lent copy is fine"}
+        not_failures: {late_error: "a late copy is no fault of the desk", LateError: "a late copy is no fault of the desk"}
       hold_queue:
         external_events: [notice_sent]
         aliases: {lend_requested: lend}
+-- dismiss-idle.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+        not_failures: {due_tick: "a tick is no failure", Lent: "a lent copy is fine"}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- ignored.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*", "stock_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- twin.yaml --
+version: 2
+import:
+  machines:
+    files: ["twin/*.json"]
+    annotate:
+      twin:
+        not_failures: {timeout: "the name of the waiting room"}
+-- twin/twin.json --
+{
+  "id": "twin",
+  "initial": "a",
+  "states": {
+    "a": {"initial": "timeout", "on": {"go": {"target": "b"}}, "states": {"timeout": {}}},
+    "b": {"initial": "timeout", "on": {"go": {"target": "a"}}, "states": {"timeout": {}}}
+  }
+}

@@ -59,7 +59,7 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   action of the entities behind what it serves counts, for a listed and for an aliased event.
 - The name hint about a failure-looking name is dismissed by name, with a reason, in the root
   `_not_failures` (`not_failures` in `import.machines.annotate`). Listing an event as external
-  or giving it an alias does not stop it.
+  or giving it an alias does not stop it, and a dismissal that dismisses no hint is an error.
 
 ### Carried forward from v1
 

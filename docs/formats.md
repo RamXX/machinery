@@ -626,10 +626,12 @@ below, even when a glob matches it:
    - `aliases` maps an event of the machine, by its exact name, to an action name. Each is added
      to the root `_aliases` (section 5.2), after the ones the source has, in event order.
    - `not_failures` maps an exact name to a reason: an event of the machine, or a state by its
-     name or dotted path, in source or translated names. Each is added to the root
-     `_not_failures` (section 5.2), an event under its name and a state under its translated
-     dotted path, after the ones the source has. A name that is both an event and a state of
-     the machine dismisses both.
+     dotted path or by its name, in source or translated names. A dotted path names its state; a
+     bare name names the one state that carries it, and is refused when several do. Each is
+     added to the root `_not_failures` (section 5.2), an event under its name and a state under
+     its translated dotted path, after the ones the source has. A name that is both an event
+     and a state of the machine dismisses both. A name with no failure word in it (section 6.2)
+     has no hint, so dismissing it is refused.
 
    The translated machine then carries the annotations of a native file, and every rule about
    them is the native one: an event in both lists, an aliased event in either list (section 6.2),
@@ -638,8 +640,7 @@ below, even when a glob matches it:
    it. No entry hides a caller's command: an event that is an action of the model is neither
    listed nor aliased, every alias in effect is printed and counted by `xref-model-machine`
    (section 6.4), and neither listing an event as external nor giving it an alias stops its name
-   hint (section 6.2). Nothing is a silent
-   no-op:
+   hint (section 6.2). Nothing is a silent no-op:
    - A pattern that matches no event of a machine it is applied to is
      `ERROR  <file>: import.machines.annotate <key>: <list> pattern <pattern> matches no event of the machine; correct the pattern or remove it`
      (`<list>` is `external_events` or `failure_events`), and one that matches no state is
@@ -659,6 +660,11 @@ below, even when a glob matches it:
      `ERROR  <file>: import.machines.annotate <a> and <b> both dismiss <name>; keep one`, and one
      the source dismisses already is
      `ERROR  <file>: import.machines.annotate <key> dismisses <name>, which the source dismisses already; keep one`.
+     A bare name that several states carry is
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is the name of several states (<paths>); name one by its dotted path`
+     (translated paths, in document order), and a name that has no hint to dismiss is
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which does not look like a failure (no fail, error, abort, crash or timeout in the name), so there is no hint to dismiss; remove it`.
+     Neither is written to the translated machine.
      One entry that names one state in two ways is
      `ERROR  <file>: import.machines.annotate <key>: not_failures names <a> and <b>, which are one state (<path>); keep one`
      (the first is kept).
@@ -845,7 +851,8 @@ fail-closed tags, no state tagged both `failure` and `accepting`, and the shape 
 an event some state handles or ignores to a non-empty action name, no event of it also in
 `_external_events` or `_failure_events`), `_not_failures` (an object that maps an event some
 state handles or ignores, or the dotted path of a state, to a non-empty reason; none of them in
-`_failure_events` or a state tagged `failure`), `_serves` (a non-empty list of
+`_failure_events` or a state tagged `failure`, and none without a hint to dismiss: a name with
+no failure word in it, or an action of the machine's lifecycle entity), `_serves` (a non-empty list of
 distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is section 6.4) and
 `_aspect` (a short name matching `^[A-Za-z][A-Za-z0-9_-]*$`; which machines may declare it is
 section 6.4). Two machines whose id tags
@@ -858,9 +865,12 @@ dotted path). An event the machine handles or ignores whose name contains one of
 that is neither in `_failure_events` nor an action of the machine's lifecycle entity, prints
 `warn   <file>: event <e> looks like a failure event and is not in _failure_events`. An event in
 `_external_events` or with an entry in `_aliases` is still hinted: what arrives from outside, or
-under another name, may report a failure. A hint is
-dismissed by name, with the reason, in the root `_not_failures`: the event name, or the dotted
-path of the state.
+under another name, may report a failure. A hint is dismissed by name, with the reason, in the
+root `_not_failures`: the event name, or the dotted path of the state. An entry there that
+dismisses no hint is an ERROR, as a stale marker is:
+`ERROR  <file>: _not_failures names '<name>', which does not look like a failure (no fail, error, abort, crash or timeout in the name), so there is no hint to dismiss (remove it)`
+(for a state, the last segment of its path is its name), and
+`ERROR  <file>: _not_failures names '<name>', which is an action of <E> and is never hinted, so there is no hint to dismiss (remove it)`.
 
 `checked:` counts machines, states and transitions. Not applicable when neither `design.machines`
 nor `import.machines` is configured. With `import.machines` the translation findings of section
@@ -930,6 +940,9 @@ for a lifecycle machine and `what the machine serves (<serves>)` for an operatio
 - `event-action: <id>.<event>: _aliases gives the event the action <action>, and <event> is itself an action of <E>; an action is not hidden behind another: <where>`;
 - `event-action: <id>.<event>: _aliases names action <action>, which is not an action of <E>; name an action of <E>, or <where>`, and for an operational machine
   `event-action: <id>.<event>: _aliases names action <action>, which is not an action of what the machine serves (<serves>); serve the action (act:<Entity>.<action>), or <where>`;
+- `event-action: <id>.<event>: _aliases gives the event the action <action>, and no state handles <event> under on; an event that is only ignored stands for no action: <where>`:
+  rule `action-event` asks for an `on` event, so an alias for an event that states only ignore
+  would satisfy nothing, and it is neither printed nor counted;
 - `event-action: <id>.<event>: _aliases gives the event the action <action>, and <action> has an event of its own name in <machine id>; an action has its own event or stands behind aliases, not both: <where>`.
 
 `<where>` is `remove it from _aliases in <file>`, or, when an entry of

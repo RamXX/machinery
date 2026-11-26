@@ -41,6 +41,12 @@ exec sh -c 'test "$(grep -o "\"tags\"" desk.flat | wc -l | tr -d " ")" = 1'
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/hold_queue.machine.json > hold.flat'
 grep '"_role":"operational","_serves":\["act:Loan.lend"\],"_external_events":\["notice_sent"\],"_failure_events":\["notice_failed"\],"_aliases":\{"lend_requested":"lend"\},"_oracle_tag":' hold.flat
 
+# the real XState runs the translated machines with their annotations
+exec sh -c 'cat config.yaml xstate.part > machinery.yaml'
+exec machinery lint --stage xstate
+stdout '(?s)== xstate ==\nchecked: 2 machines, 8 cases\npassed\n'
+cp config.yaml machinery.yaml
+
 # every later stage reads them: the failure state and the failure events now ask for a failure mode
 exec mrun 1 lint --stage xref-failure
 stdout '^  ERROR  failure-state-mode: state:loan_desk\.ScanFailed: '
@@ -75,6 +81,12 @@ exec machinery gen
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/loan_desk.machine.json > desk.flat'
 grep '"_external_events":\["count_aborted","due_tick"\],"_aliases":\{"handed_back":"giveBack"\},"initial"' desk.flat
 grep '"tags":\["accounted","failure"\]' desk.flat
+
+# a state that has a list of tags keeps them all
+exec sh -c 'sed "s/\"tags\": \"accounted\"/\"tags\": [\"accounted\", \"kept\"]/" desk-declared.json > machines/loan-desk.json'
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/loan_desk.machine.json > desk.flat'
+grep '"tags":\["accounted","kept","failure"\]' desk.flat
 grep '"_failure_events":\["scan_failed"\],"_not_failures":\{"count_aborted":"[a-z]*"\},"_oracle_tag"' desk.flat
 
 # a pattern names a state at any depth by its dotted path, and so does a dismissal
@@ -85,8 +97,8 @@ exec machinery lint --stage machines
 ! stdout 'looks like a failure'
 exec machinery gen
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
-grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
-grep '"_not_failures":\{"read_bad":"x","Reading.RetryError":"asecondtryisthenormalpathofawornlabel"\}' scanner.flat
+grep '"GaveUp":\{"on":\{"read_error":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"_not_failures":\{"read_error":"x","Reading.RetryError":"asecondtryisthenormalpathofawornlabel"\}' scanner.flat
 exec sh -c 'test "$(grep -o "\"tags\"" scanner.flat | wc -l | tr -d " ")" = 1'
 
 # the same two, by the translated dotted path
@@ -98,7 +110,19 @@ exec machinery lint --stage machines
 ! stdout 'looks like a failure'
 exec machinery gen
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
-grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"GaveUp":\{"on":\{"read_error":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"Reading.RetryError":"asecondtryisthenormalpathofawornlabel"' scanner.flat
+
+# by the translated name of the nested state
+exec sh -c 'sed "s/reading.gave_up/GaveUp/; s/reading.retry_error/RetryError/" scanner.yaml > machinery.yaml'
+grep '\["GaveUp"\]' machinery.yaml
+exec machinery lint --stage machines
+! stdout 'matches no state'
+! stdout 'is no event and no state'
+! stdout 'looks like a failure'
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
+grep '"GaveUp":\{"on":\{"read_error":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
 grep '"Reading.RetryError":"asecondtryisthenormalpathofawornlabel"' scanner.flat
 
 # and by the name the source gives the nested state
@@ -110,7 +134,7 @@ exec machinery lint --stage machines
 ! stdout 'looks like a failure'
 exec machinery gen
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
-grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"GaveUp":\{"on":\{"read_error":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
 grep '"Reading.RetryError":"asecondtryisthenormalpathofawornlabel"' scanner.flat
 
 -- before.yaml --
@@ -200,6 +224,9 @@ import:
       hold_queue:
         external_events: [notice_sent]
         aliases: {lend_requested: lend}
+-- xstate.part --
+tools:
+  xstate: true
 -- scanner.yaml --
 version: 2
 import:
@@ -211,27 +238,27 @@ import:
     annotate:
       scanner:
         failure_states: ["reading.gave_up"]
-        not_failures: {"reading.retry_error": "a second try is the normal path of a worn label", read_bad: "x"}
+        not_failures: {"reading.retry_error": "a second try is the normal path of a worn label", read_error: "x"}
 -- scanner/scanner.json --
 {
   "id": "scanner",
   "_role": "operational",
   "_serves": ["entity:Loan"],
-  "_external_events": ["scan", "read_ok", "read_bad"],
+  "_external_events": ["scan", "read_ok", "read_error"],
   "initial": "idle",
   "states": {
     "idle": {
       "on": {"scan": {"target": "reading"}},
-      "skip": {"read_ok": "nothing is being read", "read_bad": "nothing is being read"}
+      "skip": {"read_ok": "nothing is being read", "read_error": "nothing is being read"}
     },
     "reading": {
       "initial": "first_try",
       "on": {"read_ok": {"target": "idle"}},
       "skip": {"scan": "a copy is under the scanner"},
       "states": {
-        "first_try": {"on": {"read_bad": {"target": "retry_error"}}},
-        "retry_error": {"on": {"read_bad": {"target": "gave_up"}}},
-        "gave_up": {"on": {"read_bad": {"target": "gave_up"}}}
+        "first_try": {"on": {"read_error": {"target": "retry_error"}}},
+        "retry_error": {"on": {"read_error": {"target": "gave_up"}}},
+        "gave_up": {"on": {"read_error": {"target": "gave_up"}}}
       }
     }
   }

@@ -28,6 +28,16 @@ stdout '^  warn   alias: order: paid_up stands for pay$'
 stdout '^  warn   alias: order: settled_up stands for pay$'
 stdout '^passed$'
 
+# an event that states only ignore stands for no action: the alias is refused, not printed, and
+# action-event still asks for the action
+cp order-ignored.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.paid_up: _aliases gives the event the action pay, and no state handles paid_up under on; an event that is only ignored stands for no action: remove it from _aliases in design/machines/Order\.machine\.json$'
+stdout '^  ERROR  action-event: act:Order\.pay: no on event pay in machine order '
+! stdout 'alias: order'
+! stdout 'aliases$'
+stdout '^failed: 2 finding\(s\)$'
+
 # an action that has an event of its own name takes no alias: it would absorb any other event
 cp order-own.json design/machines/Order.machine.json
 exec mrun 1 lint --stage xref-model-machine
@@ -163,6 +173,17 @@ entities:
   "states": {
     "Waiting": { "on": { "send": { "target": "Sent" }, "settled": { "target": "Waiting" } } },
     "Sent": { "type": "final" }
+  }
+}
+-- order-ignored.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_aliases": {"paid_up": "pay"},
+  "states": {
+    "Pending": { "on": { "cancel": { "target": "Cancelled" } }, "_ignores": { "paid_up": "the till is closed" } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
   }
 }
 -- order-two.json --
