@@ -7,7 +7,7 @@ constraints:
   layers:   # lowest first: a package never imports one that is listed after it
     - {name: foundation, paths: ["internal/version/**", "internal/report/**", "internal/project/**", "internal/gitx/**", "internal/ir/**"]}
     - {name: design, paths: ["internal/machine/**", "internal/design/**", "internal/modelith/**", "internal/contract/**", "internal/baseline/**"]}
-    - {name: engines, paths: ["internal/gen/**", "internal/tags/**", "internal/arch/**", "internal/testpolicy/**", "internal/evidence/**", "internal/formal/**", "internal/checkers/**", "internal/xstate/**", "internal/backlog/**", "internal/probe/**", "internal/affected/**"]}
+    - {name: engines, paths: ["internal/gen/**", "internal/tags/**", "internal/arch/**", "internal/testpolicy/**", "internal/evidence/**", "internal/formal/**", "internal/checkers/**", "internal/xstate/**", "internal/backlog/**", "internal/probe/**", "internal/affected/**", "internal/vital/**"]}
     - {name: planning, paths: ["internal/pm/**"]}
     - {name: stages, paths: ["internal/stages/**"]}
     - {name: flows, paths: ["internal/adopt/**", "internal/assess/**", "internal/landing/**"]}

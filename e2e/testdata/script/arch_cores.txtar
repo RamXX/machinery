@@ -1,0 +1,414 @@
+# the core of a vital area: present, in scope, small, pure, entered where it says, and the only
+# implementation of the actions its properties are over (docs/formats.md section 9)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+cp design/risk.yaml orig-risk.yaml
+cp internal/domain/order.go orig-order.txt
+exec machinery arch
+stdout '^checked: 2 files, 1 imports, 2 functions, 1 core files of order-payment, 9 core lines of order-payment, 1 entry points of order-payment$'
+stdout '^passed$'
+
+# entry points: a function, a method or a type of a core file
+cp ledger.go.txt internal/domain/ledger.go
+cp risk-entries-ok.yaml design/risk.yaml
+exec machinery arch
+stdout '^checked: 3 files, 1 imports, 3 functions, 2 core files of order-payment, 19 core lines of order-payment, 3 entry points of order-payment$'
+stdout '^passed$'
+cp risk-entries-bad.yaml design/risk.yaml
+exec mrun 1 arch
+stdout '^  ERROR  core-entry: order-payment: internal/domain/order.go#Missing: no function, method or type Missing in internal/domain/order.go$'
+stdout '^  ERROR  core-entry: order-payment: internal/api/handlers.go#Handle: internal/api/handlers.go is not matched by core.paths$'
+stdout '^  ERROR  core-entry: order-payment: internal/domain/gone.go#Apply: no such file$'
+stdout '^failed: 3 finding\(s\)$'
+rm internal/domain/ledger.go
+
+# every core glob matches a file, and every core file is in scope
+cp risk-missing.yaml design/risk.yaml
+exec mrun 1 arch
+stdout '^  ERROR  core-missing: order-payment: internal/ledger/\*\* matches no file$'
+stdout '^failed: 1 finding\(s\)$'
+cp orig-risk.yaml design/risk.yaml
+cp machinery-scope.yaml machinery.yaml
+exec mrun 1 arch
+stdout '^  ERROR  core-scope: order-payment: internal/domain/order.go is outside scope; widen the scope or move the core$'
+
+# the limits of constraints.cores, tighter than those of constraints.size
+cp machinery-tight.yaml machinery.yaml
+exec mrun 1 arch
+stdout '^  ERROR  core-file-size: internal/domain/order.go has 9 lines \(max 5 for a core\)$'
+stdout '^  ERROR  core-func-size: internal/domain/order.go:Apply has 3 lines \(max 2 for a core\)$'
+stdout '^failed: 2 finding\(s\)$'
+
+# a core imports no denied package, nor one below it
+cp machinery-vital.yaml machinery.yaml
+cp impure.go.txt internal/domain/order.go
+exec mrun 1 arch
+stdout '^  ERROR  core-impure: internal/domain/order.go imports os, which constraints.cores.deny_imports denies$'
+stdout '^  ERROR  core-impure: internal/domain/order.go imports os/exec, which constraints.cores.deny_imports denies$'
+! stdout 'imports strings'
+stdout '^failed: 2 finding\(s\)$'
+
+# core findings are baselined at adoption like any arch finding
+cp machinery-baseline.yaml machinery.yaml
+exec machinery arch --write-baseline
+stdout '^arch: wrote 2 baseline entries to design/arch-baseline.yaml$'
+grep 'rule: core-impure, subject: "internal/domain/order.go -> os"' design/arch-baseline.yaml
+stdout '^  warn   baselined: core-impure: internal/domain/order.go imports os, which constraints.cores.deny_imports denies$'
+stdout '^passed$'
+cp orig-order.txt internal/domain/order.go
+exec mrun 1 arch
+stdout '^  ERROR  stale baseline entry: core-impure internal/domain/order.go -> os$'
+rm design/arch-baseline.yaml
+cp machinery-vital.yaml machinery.yaml
+
+# a second implementation of an action a property is over, outside the core
+mkdir internal/billing
+cp bypass.go.txt internal/billing/charge.go
+exec mrun 1 arch
+stdout '^  ERROR  core-bypass: internal/billing/charge.go serves act:Order.pay outside the core of order-payment and does not import it: the path that must not fail has a second implementation$'
+stdout '^failed: 1 finding\(s\)$'
+cp through-core.go.txt internal/billing/charge.go
+exec machinery arch
+! stdout 'core-bypass'
+stdout '^passed$'
+cp serves-ship.go.txt internal/billing/charge.go
+exec machinery arch
+stdout '^passed$'
+rm internal/billing/charge.go
+
+# what cannot be read in another language is not demonstrated, never passed
+cp rules.py.txt internal/domain/rules.py
+cp risk-python.yaml design/risk.yaml
+exec mrun 1 arch
+stdout '^  warn   core order-payment: entry internal/domain/rules.py#settle: symbols are found in Go files only$'
+stdout '^  warn   core order-payment: internal/domain/rules.py: deny_imports is checked in Go files only$'
+stdout '^  warn   core order-payment: internal/domain/rules.py: max_func_lines is checked in Go files only$'
+stdout '^not demonstrated: core order-payment: entry internal/domain/rules.py#settle: symbols are found in Go files only$'
+rm internal/domain/rules.py
+cp orig-risk.yaml design/risk.yaml
+
+# core-bypass reads serves tags: without trace it is not demonstrated
+cp machinery-notrace.yaml machinery.yaml
+exec mrun 1 arch
+stdout '^  warn   core order-payment: core-bypass reads serves tags and trace is not configured$'
+stdout '^not demonstrated: core order-payment: core-bypass reads serves tags and trace is not configured$'
+
+# a vital area makes the stage apply, and its core needs constraints.cores
+cp machinery-noconstraints.yaml machinery.yaml
+exec mrun 1 arch
+stdout '^  ERROR  cores: order-payment is vital and constraints.cores is not set; set max_file_lines and max_func_lines for its core$'
+stdout '^failed: 1 finding\(s\)$'
+
+# constraints.cores needs both limits
+cp machinery-badcores.yaml machinery.yaml
+exec mrun 2 arch
+stderr '^config: constraints.cores.max_func_lines is required and must be positive$'
+cp machinery-emptydeny.yaml machinery.yaml
+exec mrun 2 arch
+stderr '^config: constraints.cores.deny_imports: an entry must not be empty$'
+
+-- machinery-vital.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    deny_imports: ["net/http", "database/sql", "os", "time", "math/rand"]
+    max_file_lines: 300
+    max_func_lines: 60
+-- machinery-scope.yaml --
+version: 2
+scope: ["internal/api/**", "e2e/**"]
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    deny_imports: ["net/http", "database/sql", "os", "time", "math/rand"]
+    max_file_lines: 300
+    max_func_lines: 60
+-- machinery-tight.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    max_file_lines: 5
+    max_func_lines: 2
+-- machinery-baseline.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    deny_imports: ["net/http", "database/sql", "os", "time", "math/rand"]
+    max_file_lines: 300
+    max_func_lines: 60
+  baseline: design/arch-baseline.yaml
+-- machinery-notrace.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    deny_imports: ["net/http", "database/sql", "os", "time", "math/rand"]
+    max_file_lines: 300
+    max_func_lines: 60
+-- machinery-noconstraints.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+-- machinery-badcores.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    max_file_lines: 300
+-- machinery-emptydeny.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+  cores:
+    deny_imports: ["os", ""]
+    max_file_lines: 300
+    max_func_lines: 60
+-- risk-entries-ok.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply", "internal/domain/ledger.go#Ledger", "internal/domain/ledger.go#Ledger.Post"]
+    assumes:
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+-- risk-entries-bad.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Missing", "internal/api/handlers.go#Handle", "internal/domain/gone.go#Apply", "internal/domain/order.go#Apply"]
+    assumes:
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+-- risk-missing.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+    core:
+      paths: ["internal/domain/**", "internal/ledger/**"]
+      entry: ["internal/domain/order.go#Apply"]
+    assumes:
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+-- risk-python.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply", "internal/domain/rules.py#settle"]
+    assumes:
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+-- ledger.go.txt --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+// Ledger records the charges of orders.
+type Ledger struct{ entries []string }
+
+// Post records one charge.
+func (l *Ledger) Post(order string) {
+	l.entries = append(l.entries, order)
+}
+-- impure.go.txt --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+import (
+	"os"
+	"os/exec"
+	"strings"
+)
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel
+func Apply(event string) string {
+	_ = exec.Command
+	return strings.ToLower(event) + os.Getenv("SUFFIX")
+}
+-- bypass.go.txt --
+// Package billing charges orders.
+package billing
+
+// Charge takes the payment of an order.
+//
+// machinery:serves act:Order.pay
+func Charge(order string) string {
+	return order
+}
+-- through-core.go.txt --
+// Package billing charges orders.
+package billing
+
+import "example.test/shop/internal/domain"
+
+// Charge takes the payment of an order through the core.
+//
+// machinery:serves act:Order.pay
+func Charge(order string) string {
+	return domain.Apply(order)
+}
+-- serves-ship.go.txt --
+// Package billing charges orders.
+package billing
+
+// Ship hands an order to the carrier; no property is over it.
+//
+// machinery:serves act:Order.ship
+func Ship(order string) string {
+	return order
+}
+-- rules.py.txt --
+def settle(order):
+    return order

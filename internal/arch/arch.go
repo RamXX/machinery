@@ -20,6 +20,11 @@ type Counts struct {
 	Files   int // files read: source files and size-limited files inside scope
 	Imports int // imports of layered files that resolve to a project path
 	Funcs   int // Go functions in size-limited files
+	// Cores holds the counts of each core, in the order of the cores given.
+	Cores []CoreCount
+	// Undemonstrated are the core rules that could not be read, sorted
+	// (section 9): the stage is not demonstrated with the first.
+	Undemonstrated []string
 }
 
 // Applies reports whether the project has a constraints block.
@@ -60,8 +65,8 @@ type checker struct {
 }
 
 // Violations reads the files inside scope and returns the violations sorted
-// by rule, then subject.
-func Violations(p *project.Project) ([]Violation, Counts, error) {
+// by rule, then subject. cores are the cores of the vital areas.
+func Violations(p *project.Project, cores []Core) ([]Violation, Counts, error) {
 	cons := p.Cfg.Constraints
 	if cons == nil {
 		return nil, Counts{}, nil
@@ -107,6 +112,8 @@ func Violations(p *project.Project) ([]Violation, Counts, error) {
 			k.checkLayers(f, layer, importsOf(lang, f, src, k.all))
 		}
 	}
+	k.checkCores(cores, files)
+	sort.Strings(k.c.Undemonstrated)
 	sort.Slice(k.vs, func(i, j int) bool {
 		if k.vs[i].Rule != k.vs[j].Rule {
 			return k.vs[i].Rule < k.vs[j].Rule

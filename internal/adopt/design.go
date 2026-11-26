@@ -11,6 +11,7 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/tags"
 	"github.com/RamXX/machinery/internal/testpolicy"
+	"github.com/RamXX/machinery/internal/vital"
 )
 
 // baselines is step 2: the tests baseline and, when constraints are
@@ -30,7 +31,11 @@ func (w *worker) baselines() error {
 		}
 	}
 	if arch.Applies(p) && arch.BaselinePath(p) != "" {
-		vs, _, err := arch.Violations(p)
+		cores, err := vital.Cores(design.Load(p))
+		if err != nil {
+			return err
+		}
+		vs, _, err := arch.Violations(p, cores)
 		if err != nil {
 			return err
 		}

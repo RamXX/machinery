@@ -25,7 +25,7 @@ func runArch(e *Env, args []string) int {
 		return 2
 	}
 	if *write && arch.Applies(p) {
-		vs, _, err := arch.Violations(p)
+		vs, _, _, err := stages.ArchViolations(&stages.Context{P: p})
 		if err == nil {
 			err = arch.WriteBaseline(p, vs)
 		}
