@@ -283,8 +283,8 @@ Rules:
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
-| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3); with it, `--overlay <dir>` lays design-side files over the snapshot first (section 18.2). |
-| `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). `--overlay <dir>` lays design-side files over the snapshot first (section 18.2). |
+| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3); with it, `--overlay <dir>` lays links, status and risk files over the snapshot first (section 18.2). |
+| `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). `--overlay <dir>` lays links, status and risk files over the snapshot first (section 18.2). |
 | `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
 | `machinery hook <event>` | Reads a harness's hook JSON on stdin and answers with hook JSON on stdout: `session-start`, `pre-tool`, `stop` (section 21.1). Always exits 0. |
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
@@ -694,7 +694,10 @@ A failure mode that names no subject at all says so, with the reason, in place o
 
 It is an obligation like any other and takes part in no subject rule of `xref-failure`. Both
 keys together are `ERROR  <file>: <id>: subject and no_subject are both set; name the subject or say why there is none`,
-a blank reason is `ERROR  <file>: <id>: no_subject needs a reason`, and `kind: abuse` is refused
+a blank reason is `ERROR  <file>: <id>: no_subject needs a reason`, a value that is not a YAML
+string (a boolean, a number, a list) is
+`ERROR  <file>: line <n>: no_subject must be a string that gives the reason` and the file is then
+not read, in the links file too, and `kind: abuse` is refused
 as for any failure mode without an `act` or `entity` subject.
 
 #### 5.4.1 Failure modes kept as Markdown tables
@@ -3371,8 +3374,9 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--overlay <dir>] [--
   exists; without either the snapshot has none and adoption starts from scratch, as `adopt` does.
   `--write` is a usage error (`usage: --rehearse writes only in its out directory; it takes no --write`).
 - `--overlay <dir>` is the overlay of `assess` (section 18.2), with its refusals: the files of
-  `<dir>` are laid over the snapshot before adopt runs there. A project with no
-  `machinery.yaml` at `HEAD` needs `--config` for it, since that config judges the overlay.
+  `<dir>` are laid over the snapshot before adopt runs there. A rehearsal from scratch, with
+  neither `--config` nor a `machinery.yaml` in the project, takes none: the config of the run
+  names the files an overlay may hold.
   Without `--rehearse` it is a usage error (`usage: --overlay goes with --rehearse`).
 - In the snapshot it runs `machinery adopt --write` with the `--paths` and `--e2e` given,
   commits the result (hooks and signing off), runs the stages of `machinery check`, and builds
@@ -3389,7 +3393,7 @@ timestamp or an absolute path:
 | Part | What |
 |---|---|
 | `backlog` | The backlog line of the adopt report (section 17.2): `backlog: none found`, or `backlog: bd, not read in a rehearsal`. |
-| `overlay` | The files laid over the snapshot (section 18.2), each with its sha256. `rehearsal.md` has the line `- overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD` and one line ``  - `<path>` sha256 <hex>`` per file, and nothing when there is no overlay. |
+| `overlay` | The files laid over the snapshot (section 18.2), each with its role and its sha256. `rehearsal.md` has the line `- overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD` and one line ``  - `<path>` (<role>) sha256 <hex>`` per file, and nothing when there is no overlay. |
 | `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
 | `waivers` | The waivers adopt added, by rule, with counts. |
 | `baselines` | The tests and architecture baselines, each with its number of entries. |
@@ -3405,7 +3409,7 @@ stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6
 `<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
 otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links,
-overlay: [{path, sha256}], files: [{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
+overlay: [{path, role, sha256}], files: [{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
 count}], total, edges}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
 waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
@@ -3417,7 +3421,7 @@ out: <absolute path of the out directory>
 project: <directory name> at <short sha>
 dirty: <n> changed, <n> untracked file(s) are not rehearsed
 outside links: ...
-overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>
+overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <path> (<role>), ...
 adopt: wrote <n> file(s), <n> waiver(s), <n> owed
 adopt: blocked: machinery gen refuses while <n> finding(s) stand; nothing is owed
 check: machinery check: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
@@ -3456,9 +3460,9 @@ machinery assess [--config <file>] [--out <dir>] [--overlay <dir>] [--since <git
   directory `machinery-assess-*` under the system temp directory, which must then be outside the
   project too.
 - `--since` (repeatable) names commits for the history section (section 18.6).
-- `--overlay` names a directory of design-side files that are laid over the snapshot before
-  anything runs (section 18.2). It is read and never written, and it may lie anywhere. When it
-  holds a `machinery.yaml`, that file is the config of the run.
+- `--overlay` names a directory of links, status and risk files that are laid over the snapshot
+  before anything runs (section 18.2). It is read and never written, and it may lie anywhere.
+  It never holds the config.
 
 Each refusal exits 2 before anything is written:
 
@@ -3471,18 +3475,16 @@ Each refusal exits 2 before anything is written:
 | `--out` not empty, or not a directory | `usage: --out <dir> is not empty; name an absent or empty directory` |
 | An unknown `--since` | `usage: --since <ref>: not a commit of the project` |
 | `--overlay` is no directory, or holds no file | `usage: --overlay <dir> is not a directory`, `usage: --overlay <dir> holds no file` |
-| The overlay holds a `machinery.yaml` and `--config` is given | `usage: --overlay <dir> holds machinery.yaml and --config is given; keep one` |
+| The overlay holds the config | `usage: --overlay <dir>: machinery.yaml: an overlay never holds the config; the config of the run is the machinery.yaml of the project or --config` |
 | A symbolic link in the overlay, to a file or to a directory | `usage: --overlay <dir>: <path> is a symbolic link; an overlay holds regular files only` |
 | Anything else that is not a regular file | `usage: --overlay <dir>: <path> is not a regular file; an overlay holds regular files only` |
 | A path under `.git` | `usage: --overlay <dir>: <path>: an overlay never writes under .git` |
-| No config to judge the overlay by | `usage: --overlay <dir> needs a config to be judged by (the machinery.yaml of HEAD, or --config): it says which files are design sources, and a config in the overlay never does` |
-| The `machinery.yaml` of `HEAD` is invalid | `config: machinery.yaml at HEAD, which judges the overlay: <message>` |
+| The run has no config (a rehearsal from scratch) | `usage: --overlay <dir> needs a config (the machinery.yaml of the project, or --config): it names the links, status and risk files an overlay may hold` |
 | A path that is not ASCII | `usage: --overlay <dir>: <path> is not written in ASCII; an overlay path holds ASCII characters only` |
 | A path, or a directory of it, that differs from one of `HEAD` only by case | `usage: --overlay <dir>: <path> differs from <path of HEAD> of HEAD only by case; an overlay path is written as HEAD has it` |
-| A file that is not a design source | `usage: --overlay <dir>: <path> is not a design source of <judge>: an overlay holds only the config and the design sources it names (design.risk, design.status, import.failure_modes.links)` |
-| An overlaid config with a waiver `HEAD` lacks | `usage: --overlay <dir>: machinery.yaml carries the waiver {rule: <rule>, id: "<id>"} that HEAD does not have; an overlay never adds a waiver (commit it, or pass the config with --config)` |
-| A design source that a code or test glob matches | `usage: --overlay <dir>: <path> is under <key> of <config>; an overlay never replaces what is read as code or tests` |
 | A path at or below a symbolic link of `HEAD` | `usage: --overlay <dir>: <path>: <link> is a symbolic link at HEAD; an overlay never writes through or over a link` |
+| A file the config of the run does not name as one of the three | `usage: --overlay <dir>: <path> is not the links file (import.failure_modes.links), the status file (design.status) or the risk file (design.risk) of <config>; an overlay holds nothing else` |
+| A file the config names under a second key, or that one of its globs matches | `usage: --overlay <dir>: <path> is <role> and also <key> in <config>; an overlaid file has exactly one role` |
 
 ### 18.2 The snapshot
 
@@ -3499,38 +3501,37 @@ and the inventory has `warn   outside-link: <path>: leaves the project; not in t
 assessed` for each. Links that stay inside are kept. An archive entry whose name is absolute or
 holds a `..` segment stops the snapshot (exit 1).
 
-**The overlay.** A design source that is not committed yet (a links file, a status or risk
-file, the config) can be tried without committing it into the project: `--overlay <dir>` lays
-every file of `<dir>` over the snapshot at the same relative path, replacing the file of `HEAD`
-or adding one, after the extraction and before the config is written and the snapshot is
-committed. A `machinery.yaml` at the top of the overlay is the config of the run, as `--config`
-would give it. The files are read once, before anything is written, and what was read is what is
-laid and hashed.
+**The overlay.** A links, status or risk file that is not committed yet can be tried without
+committing it into the project: `--overlay <dir>` lays every file of `<dir>` over the snapshot
+at the same relative path, replacing the file of `HEAD` or adding one, after the extraction and
+before the config is written and the snapshot is committed. The files are read once, before
+anything is written, and what was read is what is laid and hashed.
 
-An overlay is for the design side, never for the evidence, and the design side is defined
-positively. An overlay may hold two things and nothing else:
+There is one config, the config of the run (the project's `machinery.yaml`, or the `--config`
+file), and an overlay never holds it: a `machinery.yaml` in the overlay is refused. That config
+alone says what each overlaid file is. A file is admitted only when the config names its path,
+character for character, under exactly one key, and that key is one of three, the file's
+**role**:
 
-- **The config**: `machinery.yaml` at its top. It carries no waiver that the `machinery.yaml`
-  of `HEAD` does not have (compared by rule and id; none at all when `HEAD` has no config).
-- **Three design sources, as the judge names them**: `design.risk`, `design.status` (with its
-  default) and `import.failure_modes.links`. The path is the one the judge gives, character
-  for character.
+| Role | The file |
+|---|---|
+| `import.failure_modes.links` | the links file of an imported failure catalog (section 5.4.1) |
+| `design.status` | the status file (section 4.1), also at its default path |
+| `design.risk` | the risk file (section 23) |
 
-The **judge** is the `machinery.yaml` of `HEAD` when `HEAD` has one, else the `--config` file;
-`<judge>` in a message is `machinery.yaml at HEAD` or `--config <file name>`. A config in the
-overlay never judges: an overlay that holds anything beside the config needs a judge, and a file
-that only an overlaid config names as a design source is refused. Everything else is refused:
-the owed list (`design.owed`) and waivers, which say what is accepted as not proven, so that no
-overlay turns a failed stage into a passed one by owing or waiving; models, machines, the
-failure-mode file, facts, generated files, formal models, sources read through `import` other
-than the links file; tests, code and every other file.
-
-A design source is still refused when a glob under which files are read as code or as tests
-matches it, in the judge or in the config of the run: `trace.code`, `trace.tests`, `tests.e2e`,
-`tests.files`, the `paths` of `constraints.layers` and `constraints.size.paths`, with the
-defaults of section 2 (a `trace` block without `code` takes `scope`) and whatever `scope` says;
-`<key>` in the message is the first of these that matches, a layer as `constraints.layers`.
-Paths are compared as written and again with case folded, the globs included.
+Every other key that names a path, a directory or a glob is a second role, and a file with two
+is refused, the message naming both: `design.models`, `design.machines` and `design.formal` and
+`design.gen` (a file below the directory), `design.failure_modes`, `design.facts`,
+`design.owed`, `import.machines.files`, `import.machines.register.file`,
+`import.failure_modes.file`, `trace.code`, `trace.tests`, `tests.e2e`, `tests.files`,
+`tests.baseline`, the `paths` of `constraints.layers`, `constraints.size.paths` and
+`constraints.baseline`, each with the defaults of section 2 (a `trace` block without `code` takes
+`scope`) and whatever `scope` says. A glob is compared as written and again with case folded.
+So a config that points `design.owed` or `design.failure_modes` at the status path does not
+turn an overlaid status file into the owed list or into failure modes: the file then has two
+roles, or none of the three. A file with no role is refused: the owed list, a model, a machine,
+the failure-mode file, a test, code, anything else. `<config>` in a message is `machinery.yaml`
+or `--config <file name>`, and `<role>` and `<key>` are the first of each in the order above.
 
 A file system may fold case or normalise names, so that two spellings are one file there. An
 overlay path therefore holds ASCII characters only, and a path that differs from a path of
@@ -3544,9 +3545,9 @@ snapshot, like the extraction. Should a path of the overlay still meet a symboli
 snapshot, the snapshot stops (exit 1).
 
 The result of such a run is not the result of `HEAD`, and every output says so: stdout has
-`overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>`, and the
-reports list every overlaid file with the sha256 of what was laid (section 18.9), the config
-among them when the overlay holds it.
+`overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <path> (<role>), ...`,
+and the reports list every overlaid file with the role the run reads it as and the sha256 of
+what was laid (section 18.9).
 
 What assess reads of the project itself: `git` commands that write nothing (`archive`, `show`,
 `log`, `rev-parse`, `ls-tree`, `for-each-ref`, and `status` with optional locks off, so the index is
@@ -3700,7 +3701,7 @@ the numbers of the lines as facts. Neither has a timestamp or an absolute path.
   "head": "<short sha>",
   "machines": [{"drift": 0, "errors": 2, "machine": "loan", "rules": [{"count": 2, "rule": "trace: unverified", "severity": "error"}], "source": "machines/loan.json", "warnings": 0}],
   "outside_links": [],
-  "overlay": [{"path": "design/risk-links.yaml", "sha256": "<64 hex digits>"}],
+  "overlay": [{"path": "design/risk-links.yaml", "role": "import.failure_modes.links", "sha256": "<64 hex digits>"}],
   "project": "<directory name>",
   "sections": [
     {"checked": [{"n": 9, "noun": "files"}], "facts": {"code_files": 1}, "findings": 0,
@@ -3726,11 +3727,11 @@ rules (section 18.4) with their counts, most frequent first, as `  - <count> <se
 `No finding names a machine.` (`No finding names an entity.`) when none does. `report.json`
 gives the same as `machines` and `entities`, sorted by name.
 
-Keys are sorted. `config` is `machinery.yaml`, `--config <file name>` or `--overlay machinery.yaml`.
-`overlay` lists the files laid over the snapshot (section 18.2), sorted by path, and is empty
-without `--overlay`; `report.md` has `- overlay: none`, or
+Keys are sorted. `config` is `machinery.yaml` or `--config <file name>`.
+`overlay` lists the files laid over the snapshot (section 18.2), sorted by path, each with its
+`role`, and is empty without `--overlay`; `report.md` has `- overlay: none`, or
 `- overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD` followed by one
-line ``  - `<path>` sha256 <hex>`` per file. `result` is `passed`,
+line ``  - `<path>` (<role>) sha256 <hex>`` per file. `result` is `passed`,
 `failed`, `not demonstrated` or `not applicable`, and `reason` holds the reason of the last two.
 A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`. The facts:
 
@@ -3751,7 +3752,7 @@ out: <absolute path of the out directory>
 project: <directory name> at <short sha>
 dirty: <n> changed, <n> untracked file(s) are not assessed
 outside links: <n> symbolic link(s) leave the project and are not in the snapshot: <paths>
-overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>
+overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <path> (<role>), ...
 <section>: <outcome>; checked: <counts>
 assess: <n> sections, <p> passed, <f> failed, <d> not demonstrated, <a> not applicable
 ```

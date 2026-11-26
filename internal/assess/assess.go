@@ -129,12 +129,7 @@ func (a *assessment) inputs() error {
 		return err
 	}
 
-	if cfg := a.overlay.Config(); cfg != nil {
-		if o.Config != "" {
-			return usagef("--overlay %s holds %s and --config is given; keep one", o.Overlay, project.ConfigName)
-		}
-		a.cfgBytes, a.cfgLabel = cfg, "--overlay "+project.ConfigName
-	} else if o.Config != "" {
+	if o.Config != "" {
 		data, rerr := os.ReadFile(o.Config)
 		if rerr != nil {
 			return project.Errf("--config %s: cannot read: %v", o.Config, shortErr(rerr))
@@ -155,11 +150,7 @@ func (a *assessment) inputs() error {
 	if a.head, err = HeadOf(a.root, "assess"); err != nil {
 		return err
 	}
-	var external *project.Config
-	if o.Config != "" {
-		external = cfg
-	}
-	if err := a.overlay.Check(a.root, external, a.cfgLabel, cfg, a.cfgLabel); err != nil {
+	if err := a.overlay.Check(a.root, cfg, a.cfgLabel); err != nil {
 		return err
 	}
 	for _, ref := range o.Since {

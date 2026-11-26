@@ -14,7 +14,7 @@ func runAssess(e *Env, args []string) int {
 	fs := e.Flags("assess")
 	config := fs.String("config", "", "the machinery.yaml to use; it may live outside the project")
 	out := fs.String("out", "", "the directory for everything assess writes: outside the project, absent or empty")
-	overlay := fs.String("overlay", "", "a directory of design-side files laid over the snapshot before the run")
+	overlay := fs.String("overlay", "", "a directory of links, status and risk files laid over the snapshot before the run")
 	var since StringList
 	fs.Var(&since, "since", "a commit the history section compares HEAD with (repeatable)")
 	if !e.Parse(fs, args) {

@@ -30,7 +30,7 @@ func (r *rehearsal) markdown() string {
 	if r.overlay != nil {
 		p("- %s", r.overlay.Summary())
 		for _, f := range r.overlay.Files {
-			p("  - `%s` sha256 %s", f.Path, f.SHA256)
+			p("  - `%s` (%s) sha256 %s", f.Path, f.Role, f.SHA256)
 		}
 	}
 	p("- %s", r.adoptLine)
@@ -197,7 +197,7 @@ func (r *rehearsal) doc() map[string]any {
 	overlay := []any{}
 	if r.overlay != nil {
 		for _, f := range r.overlay.Files {
-			overlay = append(overlay, map[string]any{"path": f.Path, "sha256": f.SHA256})
+			overlay = append(overlay, map[string]any{"path": f.Path, "role": f.Role, "sha256": f.SHA256})
 		}
 	}
 	return map[string]any{

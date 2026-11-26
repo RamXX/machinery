@@ -17,11 +17,12 @@ import (
 )
 
 // The overlay of section 18.2, shared by machinery assess and machinery
-// adopt --rehearse: design-side files laid over the snapshot before the run.
+// adopt --rehearse: links, status and risk files laid over the snapshot before the run.
 
 // OverlayFile is one file of an overlay.
 type OverlayFile struct {
 	Path   string // relative to the overlay and to the snapshot, forward slashes
+	Role   string // the key under which the config of the run names it, set by Check
 	SHA256 string
 	data   []byte
 	exec   bool
@@ -35,7 +36,7 @@ type Overlay struct {
 
 // ReadOverlay reads the files of dir. An empty dir is no overlay (nil). It
 // refuses a directory that is none or holds no file, a symbolic link, a file
-// that is not regular and a path under .git.
+// that is not regular, a path under .git and the config.
 func ReadOverlay(dir string) (*Overlay, error) {
 	if dir == "" {
 		return nil, nil
@@ -68,6 +69,8 @@ func ReadOverlay(dir string) (*Overlay, error) {
 			return o.refuse("%s is not a regular file; an overlay holds regular files only", rel)
 		case strings.EqualFold(strings.SplitN(rel, "/", 2)[0], ".git"):
 			return o.refuse("%s: an overlay never writes under .git", rel)
+		case strings.EqualFold(rel, project.ConfigName):
+			return o.refuse("%s: an overlay never holds the config; the config of the run is the %s of the project or --config", rel, project.ConfigName)
 		}
 		if cerr := project.CheckPath("--overlay "+dir, rel); cerr != nil {
 			return usagef("%s", cerr.Error())
@@ -99,71 +102,21 @@ func (o *Overlay) refuse(format string, a ...any) error {
 	return usagef("--overlay %s: %s", o.Dir, fmt.Sprintf(format, a...))
 }
 
-// Config returns the machinery.yaml of the overlay, or nil.
-func (o *Overlay) Config() []byte {
-	if o == nil {
-		return nil
-	}
-	for _, f := range o.Files {
-		if f.Path == project.ConfigName {
-			return f.data
-		}
-	}
-	return nil
-}
-
-// others lists the files of the overlay but the config, which is the config
-// of the run and is not laid over the snapshot.
-func (o *Overlay) others() []OverlayFile {
-	var res []OverlayFile
-	for _, f := range o.Files {
-		if f.Path != project.ConfigName {
-			res = append(res, f)
-		}
-	}
-	return res
-}
+// The three roles an overlaid file may have: the keys of the config of the
+// run under which an overlay source is named (section 18.2).
+var overlayRoles = map[string]bool{"import.failure_modes.links": true, "design.status": true, "design.risk": true}
 
 // Check refuses what an overlay may not hold, before anything is written
-// (section 18.2). The judge is the machinery.yaml of HEAD when HEAD has one,
-// else external (the --config file, labelled externalLabel, nil for none):
-// never a config of the overlay. A file of the overlay must be a design
-// source the judge names, spelled as HEAD spells it, in ASCII, not at or
-// below a symbolic link of HEAD, and matched by no code or test glob of the
-// judge or of run, the config of the run (labelled runLabel, nil for none).
-func (o *Overlay) Check(root string, external *project.Config, externalLabel string, run *project.Config, runLabel string) error {
+// (section 18.2), and gives each file its role. cfg is the config of the run,
+// labelled label; nil when the run has none. A file must be named by cfg
+// under exactly one key, one of the three roles; be spelled as HEAD spells
+// it, in ASCII; and not lie at or below a symbolic link of HEAD.
+func (o *Overlay) Check(root string, cfg *project.Config, label string) error {
 	if o == nil {
 		return nil
 	}
-	judge, label := external, externalLabel
-	var atHead *project.Config
-	if data, ok := gitx.Show(root, "HEAD", project.ConfigName); ok {
-		cfg, err := project.Parse(data)
-		if err != nil {
-			return project.Errf("%s at HEAD, which judges the overlay: %v", project.ConfigName, err)
-		}
-		atHead, judge, label = cfg, cfg, project.ConfigName+" at HEAD"
-	}
-	if o.Config() != nil && run != nil {
-		// a waiver is no overlay source: an overlaid config carries only those HEAD has
-		has := map[project.Waiver]bool{}
-		if atHead != nil {
-			for _, w := range atHead.Waivers {
-				has[project.Waiver{Rule: w.Rule, ID: w.ID}] = true
-			}
-		}
-		for _, w := range run.Waivers {
-			if !has[project.Waiver{Rule: w.Rule, ID: w.ID}] {
-				return o.refuse("%s carries the waiver {rule: %s, id: %q} that HEAD does not have; an overlay never adds a waiver (commit it, or pass the config with --config)", project.ConfigName, w.Rule, w.ID)
-			}
-		}
-	}
-	others := o.others()
-	if len(others) == 0 {
-		return nil
-	}
-	if judge == nil {
-		return usagef("--overlay %s needs a config to be judged by (the %s of HEAD, or --config): it says which files are design sources, and a config in the overlay never does", o.Dir, project.ConfigName)
+	if cfg == nil {
+		return usagef("--overlay %s needs a config (the %s of the project, or --config): it names the links, status and risk files an overlay may hold", o.Dir, project.ConfigName)
 	}
 	paths, err := gitx.HeadPaths(root)
 	if err != nil {
@@ -179,7 +132,8 @@ func (o *Overlay) Check(root string, external *project.Config, externalLabel str
 			head[foldPath(pre)] = pre
 		}
 	}
-	for _, f := range others {
+	for i := range o.Files {
+		f := &o.Files[i]
 		if !isASCII(f.Path) {
 			return o.refuse("%s is not written in ASCII; an overlay path holds ASCII characters only", f.Path)
 		}
@@ -193,74 +147,90 @@ func (o *Overlay) Check(root string, external *project.Config, externalLabel str
 				return o.refuse("%s: %s is a symbolic link at HEAD; an overlay never writes through or over a link", f.Path, l)
 			}
 		}
-		if !designSource(judge, f.Path) {
-			return o.refuse("%s is not a design source of %s: an overlay holds only the config and the design sources it names (design.risk, design.status, import.failure_modes.links)", f.Path, label)
-		}
-		for _, c := range []struct {
-			cfg   *project.Config
-			label string
-		}{{judge, label}, {run, runLabel}} {
-			if key := evidenceKey(c.cfg, f.Path); key != "" {
-				return o.refuse("%s is under %s of %s; an overlay never replaces what is read as code or tests", f.Path, key, c.label)
+		role, other := "", ""
+		for _, k := range keysNaming(cfg, f.Path) {
+			switch {
+			case role == "" && overlayRoles[k]:
+				role = k
+			case other == "":
+				other = k
 			}
 		}
+		switch {
+		case role == "":
+			return o.refuse("%s is not the links file (import.failure_modes.links), the status file (design.status) or the risk file (design.risk) of %s; an overlay holds nothing else", f.Path, label)
+		case other != "":
+			return o.refuse("%s is %s and also %s in %s; an overlaid file has exactly one role", f.Path, role, other, label)
+		}
+		f.Role = role
 	}
 	return nil
 }
 
-// designSource reports whether cfg names rel as a design source an overlay
-// may hold: design.risk, design.status or import.failure_modes.links. The
-// spelling must be the config's. Models, machines, the failure-mode file,
-// facts and the owed list are not: an overlay never changes what is owed.
-func designSource(cfg *project.Config, rel string) bool {
-	named := []string{cfg.Design.Risk, cfg.Design.Status}
-	if im := cfg.ImportedFailureModes(); im != nil {
-		named = append(named, im.Links)
-	}
-	for _, n := range named {
-		if n != "" && path.Clean(n) == rel {
-			return true
+// keysNaming lists, in a fixed order, the keys of cfg that name rel: the
+// paths and directories under design and import, and the globs of import,
+// trace, tests and constraints, whatever the scope. A path is compared as
+// written; a glob as written and with case folded.
+func keysNaming(cfg *project.Config, rel string) []string {
+	var res []string
+	file := func(key, p string) {
+		if p != "" && path.Clean(p) == rel {
+			res = append(res, key)
 		}
 	}
-	return false
-}
-
-// evidenceKey names the first key of cfg whose globs match rel, compared as
-// written and with case folded, whatever the scope: the globs under which
-// files are read as code or as tests. "" when none does, or cfg is nil.
-func evidenceKey(cfg *project.Config, rel string) string {
-	if cfg == nil {
-		return ""
+	dir := func(key, p string) {
+		if p != "" && strings.HasPrefix(rel, path.Clean(p)+"/") {
+			res = append(res, key)
+		}
 	}
-	type set struct {
-		key   string
-		globs []string
+	globs := func(key string, gs []string) {
+		folded := make([]string, len(gs))
+		for i, g := range gs {
+			folded[i] = foldPath(g)
+		}
+		if project.Match(gs, rel) || project.Match(folded, foldPath(rel)) {
+			res = append(res, key)
+		}
 	}
-	var sets []set
+	d := cfg.Design
+	for _, m := range d.Models {
+		file("design.models", m)
+	}
+	dir("design.machines", d.Machines)
+	file("design.failure_modes", d.FailureModes)
+	file("design.risk", d.Risk)
+	file("design.status", d.Status)
+	dir("design.formal", d.Formal)
+	file("design.facts", d.Facts)
+	file("design.owed", d.Owed)
+	dir("design.gen", d.Gen)
+	if im := cfg.ImportedMachines(); im != nil {
+		globs("import.machines.files", im.Files)
+		file("import.machines.register.file", im.RegisterFile())
+	}
+	if im := cfg.ImportedFailureModes(); im != nil {
+		file("import.failure_modes.links", im.Links)
+		file("import.failure_modes.file", im.File)
+	}
 	if t := cfg.Trace; t != nil {
-		sets = append(sets, set{"trace.code", t.Code}, set{"trace.tests", t.Tests})
+		globs("trace.code", t.Code)
+		globs("trace.tests", t.Tests)
 	}
 	if t := cfg.Tests; t != nil {
-		sets = append(sets, set{"tests.e2e", t.E2E}, set{"tests.files", t.Files})
+		globs("tests.e2e", t.E2E)
+		globs("tests.files", t.Files)
+		file("tests.baseline", t.Baseline)
 	}
 	if c := cfg.Constraints; c != nil {
 		for _, l := range c.Layers {
-			sets = append(sets, set{"constraints.layers", l.Paths})
+			globs("constraints.layers", l.Paths)
 		}
 		if c.Size != nil {
-			sets = append(sets, set{"constraints.size.paths", c.Size.Paths})
+			globs("constraints.size.paths", c.Size.Paths)
 		}
+		file("constraints.baseline", c.Baseline)
 	}
-	for _, s := range sets {
-		folded := make([]string, len(s.globs))
-		for i, g := range s.globs {
-			folded[i] = foldPath(g)
-		}
-		if project.Match(s.globs, rel) || project.Match(folded, foldPath(rel)) {
-			return s.key
-		}
-	}
-	return ""
+	return res
 }
 
 // prefixes lists a path and every directory above it, shortest first.
@@ -304,17 +274,6 @@ func foldPath(p string) string {
 	}, p)
 }
 
-// Paths lists the overlaid files.
-func (o *Overlay) Paths() []string {
-	var res []string
-	if o != nil {
-		for _, f := range o.Files {
-			res = append(res, f.Path)
-		}
-	}
-	return res
-}
-
 // Summary says how many files were laid over the snapshot, or "".
 func (o *Overlay) Summary() string {
 	if o == nil {
@@ -328,11 +287,14 @@ func (o *Overlay) Line() string {
 	if o == nil {
 		return ""
 	}
-	return o.Summary() + ": " + strings.Join(o.Paths(), ", ")
+	var named []string
+	for _, f := range o.Files {
+		named = append(named, fmt.Sprintf("%s (%s)", f.Path, f.Role))
+	}
+	return o.Summary() + ": " + strings.Join(named, ", ")
 }
 
-// lay writes the files over the snapshot through a root bound to it. The
-// config is not laid: TakeSnapshot writes the config of the run. A path that
+// lay writes the files over the snapshot through a root bound to it. A path that
 // meets a symbolic link or a file where a directory is needed stops it.
 func (o *Overlay) lay(snap string) error {
 	if o == nil {
@@ -344,9 +306,6 @@ func (o *Overlay) lay(snap string) error {
 	}
 	defer rt.Close()
 	for _, f := range o.Files {
-		if f.Path == project.ConfigName {
-			continue
-		}
 		segs := strings.Split(f.Path, "/")
 		for i := range segs {
 			at := path.Join(segs[:i+1]...)

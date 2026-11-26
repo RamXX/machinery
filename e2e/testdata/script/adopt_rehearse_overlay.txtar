@@ -10,42 +10,44 @@ cd ..
 exec mrun 2 -C proj adopt --overlay ov
 stderr '^usage: --overlay goes with --rehearse$'
 exec mrun 2 -C proj adopt --rehearse --overlay ov --out out
-stderr '^usage: --overlay ov needs a config to be judged by \(the machinery.yaml of HEAD, or --config\): it says which files are design sources, and a config in the overlay never does$'
-exec mrun 2 -C proj adopt --rehearse --overlay ov-cfg --out out
-stderr '^usage: --overlay ov-cfg needs a config to be judged by \(the machinery.yaml of HEAD, or --config\): it says which files are design sources, and a config in the overlay never does$'
+stderr '^usage: --overlay ov needs a config \(the machinery.yaml of the project, or --config\): it names the links, status and risk files an overlay may hold$'
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-cfg --out out
+stderr '^usage: --overlay ov-cfg: machinery.yaml: an overlay never holds the config; the config of the run is the machinery.yaml of the project or --config$'
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-test --out out
-stderr '^usage: --overlay ov-test: e2e/orders.sh is not a design source of --config shop.yaml: an overlay holds only the config and the design sources it names \(design.risk, design.status, import.failure_modes.links\)$'
+stderr '^usage: --overlay ov-test: e2e/orders.sh is not the links file \(import.failure_modes.links\), the status file \(design.status\) or the risk file \(design.risk\) of --config shop.yaml; an overlay holds nothing else$'
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-code --out out
-stderr '^usage: --overlay ov-code: internal/domain/order.go is not a design source of --config shop.yaml: '
-# a config that names a test or code as a design source admits neither: what the globs of
-# trace, tests and constraints match is never replaced, in any letter case, inside scope or not
-exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-risk --out out
-stderr '^usage: --overlay ov-risk: e2e/risk.yaml is under trace.tests of --config tricky.yaml; an overlay never replaces what is read as code or tests$'
-exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-status --out out
-stderr '^usage: --overlay ov-status: lib/domain/status.yaml is under constraints.layers of --config tricky.yaml; '
-exec mrun 2 -C proj adopt --rehearse --config tricky2.yaml --overlay ov-code-glob --out out
-stderr '^usage: --overlay ov-code-glob: cmd/status.yaml is under trace.code of --config tricky2.yaml; '
-exec mrun 2 -C proj adopt --rehearse --config tricky2.yaml --overlay ov-fold --out out
-stderr '^usage: --overlay ov-fold: Smoke/risk.yaml is under tests.e2e of --config tricky2.yaml; '
-# the owed list and the failure-mode file are evidence and design the overlay does not carry
+stderr '^usage: --overlay ov-code: internal/domain/order.go is not the links file '
+# the owed list and the failure-mode file are not what an overlay carries
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-owed --out out
-stderr '^usage: --overlay ov-owed: design/owed.yaml is not a design source of --config shop.yaml: '
+stderr '^usage: --overlay ov-owed: design/owed.yaml is not the links file '
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-modes --out out
-stderr '^usage: --overlay ov-modes: design/failure-modes.yaml is not a design source of --config shop.yaml: '
+stderr '^usage: --overlay ov-modes: design/failure-modes.yaml is not the links file '
+# a config that names a test or code path as its risk or status file admits neither: what a
+# glob of trace, tests or constraints matches has a second role, in any letter case, inside
+# scope or not
+exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-risk --out out
+stderr '^usage: --overlay ov-risk: e2e/risk.yaml is design.risk and also trace.tests in --config tricky.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: lib/domain/status.yaml is design.status and also constraints.layers in --config tricky.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj adopt --rehearse --config tricky2.yaml --overlay ov-code-glob --out out
+stderr '^usage: --overlay ov-code-glob: cmd/status.yaml is design.status and also trace.code in --config tricky2.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj adopt --rehearse --config tricky2.yaml --overlay ov-fold --out out
+stderr '^usage: --overlay ov-fold: Smoke/risk.yaml is design.risk and also tests.e2e in --config tricky2.yaml; an overlaid file has exactly one role$'
 ! exists out
 
 # the overlay holds a status file that makes one scenario proposed, and a risk file: one
 # obligation fewer is owed than at HEAD
 exec machinery -C proj adopt --rehearse --config shop-risk.yaml --overlay ov --out out
 stdout '^project: proj at [0-9a-f]{7}$'
-stdout '^overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD: design/risk.yaml, design/status.yaml$'
+stdout '^overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD: design/risk.yaml \(design.risk\), design/status.yaml \(design.status\)$'
 stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 15 owed$'
 cmp out/snapshot/design/status.yaml ov/design/status.yaml
 cmp out/snapshot/design/risk.yaml ov/design/risk.yaml
 grep '^- overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/rehearsal.md
-exec sh -c 'grep -x "  - \`design/status.yaml\` sha256 $(shasum -a 256 ov/design/status.yaml | cut -c1-64)" out/rehearsal.md'
+exec sh -c 'grep -x "  - \`design/status.yaml\` (design.status) sha256 $(shasum -a 256 ov/design/status.yaml | cut -c1-64)" out/rehearsal.md'
 grep '^- sc: 1$' out/rehearsal.md
 grep '^      "path": "design/status.yaml",$' out/rehearsal.json
+grep '^      "role": "design.risk",$' out/rehearsal.json
 exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/status.yaml | cut -c1-64)\"" out/rehearsal.json'
 
 # the project is as it was

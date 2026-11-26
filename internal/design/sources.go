@@ -18,7 +18,7 @@ type FailureMode struct {
 	Kind    string `yaml:"kind,omitempty"`
 	Subject string `yaml:"subject"`
 	// NoSubject, when set, is the reason the failure mode names no subject.
-	NoSubject *string `yaml:"no_subject,omitempty"`
+	NoSubject *Reason `yaml:"no_subject,omitempty"`
 	Failure   string  `yaml:"failure"`
 	Required  string  `yaml:"required"`
 	Behavior  string  `yaml:"behavior"`
@@ -32,6 +32,19 @@ type FailureMode struct {
 	Linked   bool `yaml:"-"`
 }
 
+// Reason is the text of a no_subject key. Only a YAML string is one: a
+// boolean or a number is refused, not read as its spelling.
+type Reason string
+
+// UnmarshalYAML refuses a value that is not a string.
+func (r *Reason) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.ScalarNode || n.Tag != "!!str" {
+		return fmt.Errorf("line %d: no_subject must be a string that gives the reason", n.Line)
+	}
+	*r = Reason(n.Value)
+	return nil
+}
+
 // Unlinked reports an imported row without a link: it names nothing, so it
 // takes part in no subject rule (section 5.4.1).
 func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
@@ -40,7 +53,7 @@ func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
 // with a reason, and no subject beside it. Like an unlinked row it takes part
 // in no subject rule.
 func (fm FailureMode) SubjectLess() bool {
-	return fm.NoSubject != nil && strings.TrimSpace(*fm.NoSubject) != "" && fm.Subject == ""
+	return fm.NoSubject != nil && strings.TrimSpace(string(*fm.NoSubject)) != "" && fm.Subject == ""
 }
 
 // Named reports a failure mode that names a subject. One that is neither
@@ -143,7 +156,7 @@ func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
 	case fm.NoSubject != nil && fm.Subject != "":
 		problems = append(problems, where+": subject and no_subject are both set; name the subject or say why there is none")
 	case fm.NoSubject != nil:
-		if strings.TrimSpace(*fm.NoSubject) == "" {
+		if strings.TrimSpace(string(*fm.NoSubject)) == "" {
 			problems = append(problems, where+": no_subject needs a reason")
 		}
 	case !subjectRe.MatchString(fm.Subject):

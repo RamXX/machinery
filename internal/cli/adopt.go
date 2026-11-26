@@ -23,7 +23,7 @@ func runAdopt(e *Env, args []string) int {
 	rehearseIt := fs.Bool("rehearse", false, "adopt a snapshot outside the project and report what blocks")
 	config := fs.String("config", "", "with --rehearse: the machinery.yaml to use; it may live outside the project")
 	out := fs.String("out", "", "with --rehearse: the directory for everything it writes, outside the project, absent or empty")
-	overlay := fs.String("overlay", "", "with --rehearse: a directory of design-side files laid over the snapshot before the run")
+	overlay := fs.String("overlay", "", "with --rehearse: a directory of links, status and risk files laid over the snapshot before the run")
 	if !e.Parse(fs, args) {
 		return 2
 	}

@@ -119,12 +119,7 @@ func Run(o Options) error {
 		return err
 	}
 	var cfg []byte
-	if oc := r.overlay.Config(); oc != nil {
-		if o.Config != "" {
-			return &assess.UsageError{Msg: fmt.Sprintf("--overlay %s holds %s and --config is given; keep one", o.Overlay, project.ConfigName)}
-		}
-		cfg, r.cfgLabel = oc, "--overlay "+project.ConfigName
-	} else if o.Config != "" {
+	if o.Config != "" {
 		data, rerr := os.ReadFile(o.Config)
 		if rerr != nil {
 			return project.Errf("--config %s: cannot read: %v", o.Config, shortErr(rerr))
@@ -142,11 +137,7 @@ func Run(o Options) error {
 	if r.head, err = assess.HeadOf(root, verb); err != nil {
 		return err
 	}
-	var external *project.Config
-	if o.Config != "" {
-		external = parsed
-	}
-	if err := r.overlay.Check(root, external, r.cfgLabel, parsed, r.cfgLabel); err != nil {
+	if err := r.overlay.Check(root, parsed, r.cfgLabel); err != nil {
 		return err
 	}
 	out, err := assess.PrepareOut(root, o.Out, verb)

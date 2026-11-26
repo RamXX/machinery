@@ -16,7 +16,7 @@ type Link struct {
 	IDs       []string `yaml:"ids,omitempty"`
 	Kind      string   `yaml:"kind,omitempty"`
 	Subject   string   `yaml:"subject,omitempty"`
-	NoSubject *string  `yaml:"no_subject,omitempty"`
+	NoSubject *Reason  `yaml:"no_subject,omitempty"`
 	Required  string   `yaml:"required,omitempty"`
 }
 

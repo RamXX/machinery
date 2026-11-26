@@ -81,6 +81,7 @@ type jsonEntity struct {
 // jsonOverlay is one file laid over the snapshot (section 18.2).
 type jsonOverlay struct {
 	Path   string `json:"path"`
+	Role   string `json:"role"`
 	SHA256 string `json:"sha256"`
 }
 
@@ -134,7 +135,7 @@ func (a *assessment) build() jsonReport {
 		Machines: []jsonMachine{}, Entities: []jsonEntity{}, Overlay: []jsonOverlay{}}
 	if a.overlay != nil {
 		for _, f := range a.overlay.Files {
-			r.Overlay = append(r.Overlay, jsonOverlay{f.Path, f.SHA256})
+			r.Overlay = append(r.Overlay, jsonOverlay{f.Path, f.Role, f.SHA256})
 		}
 	}
 	machines, entities := a.groups()
@@ -199,7 +200,7 @@ func (a *assessment) markdown(r jsonReport) string {
 	} else {
 		w("- %s", a.overlay.Summary())
 		for _, f := range a.overlay.Files {
-			w("  - `%s` sha256 %s", f.Path, f.SHA256)
+			w("  - `%s` (%s) sha256 %s", f.Path, f.Role, f.SHA256)
 		}
 	}
 	w("- %s", a.totalLine())

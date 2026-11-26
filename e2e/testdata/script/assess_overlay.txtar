@@ -1,6 +1,7 @@
 # assess --overlay <dir>: the files of <dir> are laid over the snapshot, same relative paths,
-# before anything runs; the report lists each with its sha256 and says the result is not the
-# result of HEAD (docs/formats.md sections 18.1, 18.2 and 18.9)
+# before anything runs. An overlay holds only the links, status and risk files the config of the
+# run names, never the config; the report lists each with its role and sha256 and says the
+# result is not the result of HEAD (docs/formats.md sections 18.1, 18.2 and 18.9)
 fixture library proj
 cd proj
 symlink alias -> design
@@ -14,16 +15,41 @@ stderr '^usage: --overlay nowhere is not a directory$'
 mkdir hollow/design
 exec mrun 2 -C proj assess --overlay hollow --out out
 stderr '^usage: --overlay hollow holds no file$'
-exec mrun 2 -C proj assess --overlay ov --config other.yaml --out out
-stderr '^usage: --overlay ov holds machinery.yaml and --config is given; keep one$'
-# only the config and the design sources the config of HEAD names: a test, code, a file of
-# another spelling, any other file
+# never the config: the run has one config, the project's or the one --config names
+exec mrun 2 -C proj assess --overlay ov-cfg --out out
+stderr '^usage: --overlay ov-cfg: machinery.yaml: an overlay never holds the config; the config of the run is the machinery.yaml of the project or --config$'
+# a file the config does not name as its links, status or risk file: a test, code, a note, the
+# owed list, a model
 exec mrun 2 -C proj assess --overlay ov-test --out out
-stderr '^usage: --overlay ov-test: e2e/loans.sh is not a design source of machinery.yaml at HEAD: an overlay holds only the config and the design sources it names \(design.risk, design.status, import.failure_modes.links\)$'
+stderr '^usage: --overlay ov-test: e2e/loans.sh is not the links file \(import.failure_modes.links\), the status file \(design.status\) or the risk file \(design.risk\) of machinery.yaml; an overlay holds nothing else$'
 exec mrun 2 -C proj assess --overlay ov-code --out out
-stderr '^usage: --overlay ov-code: internal/desk/extra.go is not a design source of machinery.yaml at HEAD: '
+stderr '^usage: --overlay ov-code: internal/desk/extra.go is not the links file '
 exec mrun 2 -C proj assess --overlay ov-extra --out out
-stderr '^usage: --overlay ov-extra: design/notes/why.md is not a design source of machinery.yaml at HEAD: '
+stderr '^usage: --overlay ov-extra: design/notes/why.md is not the links file '
+exec mrun 2 -C proj assess --overlay ov-owed --out out
+stderr '^usage: --overlay ov-owed: design/owed.yaml is not the links file '
+exec mrun 2 -C proj assess --overlay ov-model --out out
+stderr '^usage: --overlay ov-model: design/model/library.modelith.yaml is not the links file '
+# a config that points the owed list, or the failure-mode file, at the status path: the file
+# would be read as two things, or as something an overlay never holds
+exec mrun 2 -C proj assess --config owed-too.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: design/status.yaml is design.status and also design.owed in --config owed-too.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj assess --config owed-only.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: design/status.yaml is not the links file \(import.failure_modes.links\), the status file \(design.status\) or the risk file \(design.risk\) of --config owed-only.yaml; an overlay holds nothing else$'
+exec mrun 2 -C proj assess --config modes-too.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: design/status.yaml is design.status and also design.failure_modes in --config modes-too.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj assess --config risk-too.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: design/status.yaml is design.risk and also design.status in --config risk-too.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj assess --config catalog-too.yaml --overlay ov-links --out out
+stderr '^usage: --overlay ov-links: design/risk-links.yaml is import.failure_modes.links and also import.failure_modes.file in --config catalog-too.yaml; an overlaid file has exactly one role$'
+# or a glob of trace, tests or constraints matches it
+exec mrun 2 -C proj assess --config test-glob.yaml --overlay ov-links --out out
+stderr '^usage: --overlay ov-links: design/risk-links.yaml is import.failure_modes.links and also trace.tests in --config test-glob.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj assess --config size-glob.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: design/status.yaml is design.status and also constraints.size.paths in --config size-glob.yaml; an overlaid file has exactly one role$'
+exec mrun 2 -C proj assess --config machines-dir.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: design/status.yaml is design.status and also import.machines.files in --config machines-dir.yaml; an overlaid file has exactly one role$'
+# another spelling of a path of HEAD, a path that is not ASCII
 exec mrun 2 -C proj assess --overlay ov-upper --out out
 stderr '^usage: --overlay ov-upper: E2E/loans.sh differs from e2e of HEAD only by case; an overlay path is written as HEAD has it$'
 exec mrun 2 -C proj assess --overlay ov-case --out out
@@ -34,38 +60,7 @@ mkdir ov-uni/design
 exec sh -c 'f=$(printf "ov-uni/design/st\303\244tus.yaml"); printf "version: 1\n" > "$f"'
 exec mrun 2 -C proj assess --overlay ov-uni --out out
 stderr '^usage: --overlay ov-uni: design/st.*tus.yaml is not written in ASCII; an overlay path holds ASCII characters only$'
-# the owed list, the native failure modes, a model: not overlay sources, whatever names them
-exec mrun 2 -C proj assess --overlay ov-owed --out out
-stderr '^usage: --overlay ov-owed: design/owed.yaml is not a design source of machinery.yaml at HEAD: '
-exec mrun 2 -C proj assess --overlay ov-model --out out
-stderr '^usage: --overlay ov-model: design/model/library.modelith.yaml is not a design source of machinery.yaml at HEAD: '
-# a design source that a code or test glob of the config of the run matches: HEAD judges it a
-# links file, and the overlaid config would have it read as a test
-exec mrun 2 -C proj assess --overlay ov-run --out out
-stderr '^usage: --overlay ov-run: design/risk-links.yaml is under trace.tests of --overlay machinery.yaml; an overlay never replaces what is read as code or tests$'
-# and one that only a glob of the judge matches, which the overlaid config drops
-mkdir proj2
-cp head2.yaml proj2/machinery.yaml
-cd proj2
-gitinit
-cd $WORK
-exec mrun 2 -C proj2 assess --overlay ov-judge --out out
-stderr '^usage: --overlay ov-judge: design/status.yaml is under constraints.size.paths of machinery.yaml at HEAD; an overlay never replaces what is read as code or tests$'
-# a waiver is no overlay source either: an overlaid config carries none that HEAD lacks
-exec mrun 2 -C proj assess --overlay ov-waiver --out out
-stderr '^usage: --overlay ov-waiver: machinery.yaml carries the waiver \{rule: invoke-failure-mode, id: "invoke:hold_queue.sendNotice"\} that HEAD does not have; an overlay never adds a waiver \(commit it, or pass the config with --config\)$'
-# a machinery.yaml at HEAD that cannot judge
-mkdir proj3
-cp bad-head.yaml proj3/machinery.yaml
-cd proj3
-gitinit
-cd $WORK
-exec mrun 2 -C proj3 assess --config other.yaml --overlay ov-status --out out
-stderr '^config: machinery.yaml at HEAD, which judges the overlay: machinery.yaml: version must be 2$'
-# the config of HEAD judges, never the one in the overlay: an overlaid config that names a
-# test as a design source and drops the trace block admits nothing
-exec mrun 2 -C proj assess --overlay ov-cfg --out out
-stderr '^usage: --overlay ov-cfg: e2e/loans.sh is not a design source of machinery.yaml at HEAD: '
+# .git, links of HEAD, links in the overlay
 exec mrun 2 -C proj assess --overlay ov-git --out out
 stderr '^usage: --overlay ov-git: .git/config: an overlay never writes under .git$'
 exec mrun 2 -C proj assess --overlay ov-through --out out
@@ -80,31 +75,29 @@ mkdir ov-dirlink
 symlink ov-dirlink/design -> ../ov/design
 exec mrun 2 -C proj assess --overlay ov-dirlink --out out
 stderr '^usage: --overlay ov-dirlink: design is a symbolic link; an overlay holds regular files only$'
-exec mrun 2 -C proj assess --overlay ov-badcfg --out out
-stderr '^config: machinery.yaml: version must be 2$'
 ! exists out
 
-# the overlay: a links file that leaves one row unlinked, a status file HEAD does not have, and the config
+# the overlay: a links file that leaves one row unlinked, and a status file HEAD does not have
 exec machinery -C proj assess --overlay ov --out out
 stdout '^project: proj at [0-9a-f]{7}$'
-stdout '^overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD: design/risk-links.yaml, design/status.yaml, machinery.yaml$'
+stdout '^overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD: design/risk-links.yaml \(import.failure_modes.links\), design/status.yaml \(design.status\)$'
 cmp out/snapshot/design/risk-links.yaml ov/design/risk-links.yaml
 cmp out/snapshot/design/status.yaml ov/design/status.yaml
-grep '^systems:$' out/snapshot/machinery.yaml
+cmp out/snapshot/machinery.yaml proj/machinery.yaml
 
 # the run is the run of the overlaid design: the fourth row is unlinked there, not at HEAD
 grep '^checked: 4 failure modes, 3 linked, 1 unlinked, ' out/stages/xref-failure.txt
 grep '^not demonstrated: 1 of 4 failure modes name no subject; ' out/stages/xref-failure.txt
 
-# the report lists every overlaid file with its sha256
-grep '^- config: --overlay machinery.yaml$' out/report.md
-grep '^- overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/report.md
-exec sh -c 'grep -x "  - \`design/risk-links.yaml\` sha256 $(shasum -a 256 ov/design/risk-links.yaml | cut -c1-64)" out/report.md'
-exec sh -c 'grep -x "  - \`design/status.yaml\` sha256 $(shasum -a 256 ov/design/status.yaml | cut -c1-64)" out/report.md'
-exec sh -c 'grep -x "  - \`machinery.yaml\` sha256 $(shasum -a 256 ov/machinery.yaml | cut -c1-64)" out/report.md'
-grep '^  "config": "--overlay machinery.yaml",$' out/report.json
+# the report lists every overlaid file with the role the run reads it as and its sha256
+grep '^- config: machinery.yaml$' out/report.md
+grep '^- overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/report.md
+exec sh -c 'grep -x "  - \`design/risk-links.yaml\` (import.failure_modes.links) sha256 $(shasum -a 256 ov/design/risk-links.yaml | cut -c1-64)" out/report.md'
+exec sh -c 'grep -x "  - \`design/status.yaml\` (design.status) sha256 $(shasum -a 256 ov/design/status.yaml | cut -c1-64)" out/report.md'
 grep '^  "overlay": \[$' out/report.json
 grep '^      "path": "design/risk-links.yaml",$' out/report.json
+grep '^      "role": "import.failure_modes.links",$' out/report.json
+grep '^      "role": "design.status",$' out/report.json
 exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/risk-links.yaml | cut -c1-64)\"" out/report.json'
 ! grep $WORK out/report.json
 ! grep $WORK out/report.md
@@ -123,35 +116,162 @@ exec git -C proj status --porcelain
 ! stdout .
 cmp ov/design/risk-links.yaml links.orig
 
--- other.yaml --
+-- owed-too.yaml --
 version: 2
--- links.orig --
-version: 1
-links:
-  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
-  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
-  - {id: RISK-3, subject: "state:loan.Lost", required: surface}
--- ov/design/risk-links.yaml --
-version: 1
-links:
-  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
-  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
-  - {id: RISK-3, subject: "state:loan.Lost", required: surface}
--- ov/design/status.yaml --
-version: 1
--- ov-garbage/design/risk-links.yaml --
-version: 1
-links:
-  - {ids: [RISK-1..RISK-4]}
--- ov-owed/design/owed.yaml --
-version: 1
-owed: []
--- ov-model/design/model/library.modelith.yaml --
-kind: DomainModel
--- ov-run/design/risk-links.yaml --
-version: 1
-links: []
--- ov-run/machinery.yaml --
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+  owed: design/status.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- owed-only.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+  owed: design/status.yaml
+  status: design/none.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- modes-too.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+  failure_modes: design/status.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- risk-too.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+  risk: design/status.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- catalog-too.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: design/risk-links.yaml
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- test-glob.yaml --
 version: 2
 scope: ["internal/**"]
 design:
@@ -181,7 +301,7 @@ trace:
     serves: ["Implements:"]
     verifies: ["Checks:", "Proves:"]
     scenarios: ["Scenario:"]
--- ov-waiver/machinery.yaml --
+-- size-glob.yaml --
 version: 2
 scope: ["internal/**"]
 design:
@@ -211,22 +331,100 @@ trace:
     serves: ["Implements:"]
     verifies: ["Checks:", "Proves:"]
     scenarios: ["Scenario:"]
-waivers:
-  - {rule: invoke-failure-mode, id: "invoke:hold_queue.sendNotice", reason: "the notice service is modeled next"}
--- head2.yaml --
-version: 2
 constraints:
   size:
     paths: ["design/**"]
     max_file_lines: 100
--- bad-head.yaml --
-version: 1
--- ov-judge/machinery.yaml --
+-- machines-dir.yaml --
 version: 2
--- ov-judge/design/status.yaml --
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json", "design/*.yaml"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- links.orig --
 version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
+  - {id: RISK-3, subject: "state:loan.Lost", required: surface}
+-- ov/design/risk-links.yaml --
+version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
+  - {id: RISK-3, subject: "state:loan.Lost", required: surface}
+-- ov/design/status.yaml --
+version: 1
+-- ov-links/design/risk-links.yaml --
+version: 1
+links: []
 -- ov-status/design/status.yaml --
 version: 1
+-- ov-garbage/design/risk-links.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-4]}
+-- ov-cfg/machinery.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- ov-cfg/design/status.yaml --
+version: 1
+-- ov-owed/design/owed.yaml --
+version: 1
+owed: []
+-- ov-model/design/model/library.modelith.yaml --
+kind: DomainModel
 -- ov-extra/design/notes/why.md --
 Why the fourth row is not linked yet.
 -- ov-upper/E2E/loans.sh --
@@ -236,44 +434,6 @@ version: 1
 links: []
 -- ov-newcase/DESIGN/status.yaml --
 version: 1
--- ov-cfg/machinery.yaml --
-version: 2
-design:
-  risk: e2e/loans.sh
--- ov-cfg/e2e/loans.sh --
-echo replaced
--- ov/machinery.yaml --
-version: 2
-scope: ["internal/**"]
-design:
-  models:
-    - design/model/library.modelith.yaml
-import:
-  machines:
-    files: ["machines/*.json"]
-    states: capitalize
-    rename:
-      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
-      state: {skip: _ignores}
-      transition: {allowed: _requires, denied: _refusal}
-    bind:
-      hold_queue: {serves: ["entity:Loan"]}
-  failure_modes:
-    file: docs/risks.md
-    id: "^RISK-[0-9]+$"
-    columns:
-      failure: ["Failure", "What goes wrong"]
-      behavior: ["Required behavior", "Expected"]
-    links: design/risk-links.yaml
-systems:
-  - {name: reading-room}
-trace:
-  code: ["internal/**/*.go"]
-  tests: ["e2e/**"]
-  markers:
-    serves: ["Implements:"]
-    verifies: ["Checks:", "Proves:"]
-    scenarios: ["Scenario:"]
 -- ov-test/e2e/loans.sh --
 echo replaced
 -- ov-code/internal/desk/extra.go --
@@ -285,5 +445,3 @@ version: 1
 links: []
 -- ov-over/alias --
 not a link any more
--- ov-badcfg/machinery.yaml --
-version: 1

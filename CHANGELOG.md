@@ -55,9 +55,9 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   names declared under `systems` in `machinery.yaml`; no waiver covers an unknown name.
 - Links entries that cover many rows: `ids` takes ids and inclusive ranges
   (`FM-01..FM-23`); two entries that name the same row are a finding that names both.
-- `assess --overlay <dir>` and `adopt --rehearse --overlay <dir>`: design-side files laid over
-  the snapshot, listed in the report with their sha256. An overlay holds only the config and
-  the links, status and risk files the config of `HEAD` (or `--config`) names.
+- `assess --overlay <dir>` and `adopt --rehearse --overlay <dir>`: the links, status and risk
+  files the config names, laid over the snapshot and listed in the report with their role and
+  sha256. An overlay holds nothing else, and never the config.
 
 ### Carried forward from v1
 
