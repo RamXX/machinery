@@ -54,6 +54,8 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `Wire evidence` story per test file (per directory past `plan.wire_max_files`).
 - `trace.markers.scenarios_exact`: a marker that claims only when its text is a scenario name.
   A serves tag that names an id which is not an action is a warn, counted by stage `trace`.
+- An owed file that does not parse is never read as empty: every command refuses with the
+  parse error, and machinery writes the file through a YAML encoder.
 
 ### Carried forward from v1
 

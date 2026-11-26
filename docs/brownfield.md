@@ -123,8 +123,11 @@ Here no test names an id yet. In a project whose tests already point at the desi
 test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as
 planned (`import.planned`: a sentence that opens an invariant's statement, a cell of a row of
 your failure catalog, each naming its story) is owed with `planned at adoption` and that story.
-`machinery status` then counts the owed ids on three lines: claimed by a test with no receipt
-yet, named by no test, planned.
+`machinery status` then counts the owed ids by what stands behind each: claimed by a test with
+no receipt yet, named by no test, planned, and, once a run has proven some, proven and still
+listed. A story id your mark names is kept as it is: `plan --apply` creates nothing for an id
+whose story is not in this backlog and says so, and a mark that captures more than a story id
+stops `adopt` before it writes.
 
 **Mark the failures.** The code you model already fails somewhere: a status value such as
 `failed`, a worker that reports a crash, a lease that runs out. Tag the state that records it with
