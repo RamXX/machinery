@@ -201,14 +201,16 @@ Rules:
   models) or `failure-row` (every cell of every row of the imported catalog), and `pattern`, a
   regular expression searched in that text, trimmed, whose named group `story` is the story id;
   anchor it with `^` to ask for a statement that begins with the mark. The first entry that
-  matches an id decides, and a match whose `story` is empty is no mark. Only `machinery adopt`
-  reads the marks (section 17.2, step 3). Config errors:
-  `import.planned: in must be model-statement or failure-row, got "<value>"`,
-  `import.planned: pattern is required`,
-  `import.planned: pattern is not a regular expression: <error>`,
-  `import.planned: pattern "<pattern>" needs a named group story, as in (?P<story>[a-z0-9-]+)` and,
+  matches an id decides, and a match whose `story` is empty is no mark. What `story` captured
+  must be a story id, `^[A-Za-z0-9._-]+$`: anything else is refused by `machinery adopt`, by
+  source line, and never written (section 17.2, step 3). Only `machinery adopt`
+  reads the marks. Config errors, each naming its entry by number, from 1:
+  `import.planned: entry <n>: in must be model-statement or failure-row, got "<value>"`,
+  `import.planned: entry <n>: pattern is required`,
+  `import.planned: entry <n>: pattern is not a regular expression: <error>`,
+  `import.planned: entry <n>: pattern "<pattern>" needs a named group story, as in (?P<story>[a-z0-9-]+)` and,
   without `import.failure_modes`,
-  `import.planned: in: failure-row needs import.failure_modes; it reads the rows of that catalog`.
+  `import.planned: entry <n>: in: failure-row needs import.failure_modes; it reads the rows of that catalog`.
 - `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
   config error (`plan.wire_max_files must not be negative`).
 - `review.backlog` and `review.design` are `required` or `off`
@@ -1145,9 +1147,9 @@ Stage `trace` rules:
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
 
 A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
-which is not an `act` id is no ERROR and no credit: it prints, once per id,
-`warn   serves: <id> is not an action; a serves tag credits only actions`. The id still needs
-what its kind needs, a test that claims it.
+which is not an `act` id is no ERROR and no credit: it prints, once per id and line of a tag,
+`warn   serves: <file>:<line>: <id> is not an action; a serves tag credits only actions`. The id
+still needs what its kind needs, a test that claims it.
 
 A proposed or retired id counts as an id of the design for rule `unknown-id`. A `*` token claims
 only the ids among its matches that yield an obligation, so a pattern that also matches a
@@ -1157,7 +1159,7 @@ is never read as a `pf` id. `unserved` and `unverified` ask only for ids that yi
 an obligation, and the owed list is checked as in section 4.1.
 
 `checked:` counts code files, test files, `act` ids and obligations and, when a serves tag names
-one, the ids that are served and are not actions (`2 non-action serves`). Only files inside `scope`
+one, the distinct ids that are served and are not actions (`2 non-action serves`). Only files inside `scope`
 are read. Zero files matched by a configured glob list is an ERROR. Not applicable when `trace:`
 is absent.
 
@@ -1402,6 +1404,16 @@ keys, duplicate ids and unknown ids are an ERROR wherever the file is read. A pr
 not owed (section 23.2): an entry that names a `pf` id is
 `ERROR  proof: <id> is in <owed file>; a proof obligation is not owed: it awaits a machine-checked proof, which this version cannot give; remove the entry`
 wherever the file is read. A missing file is an empty list.
+
+**A file that does not parse.** An owed file that cannot be read, is not YAML or has an unknown
+key has no entries to trust, and it is never read as an empty list. Every command that works in
+the project then prints, on stderr and with nothing on stdout,
+`ERROR  <owed file>: <error>; an owed list that does not parse is not read as empty: fix the file`
+and exits 1: `status`, `verify`, `check`, `plan`, `landing` and the rest alike. `machinery adopt`
+refuses with the same text before it writes anything (`machinery: <owed file>: ...`, exit 1),
+`machinery assess` reports the problems of the snapshot's owed file as ERRORs of its `design`
+section, and the hooks hold it as their one finding (section 21.1). machinery itself writes
+the file through a YAML encoder, every value included, so what it writes always parses back.
 
 `machinery adopt` writes three reasons (section 17.2, step 3), each followed by
 ` (<short sha>)`: `unproven at adoption`, `claimed at adoption` for an id a test already claimed,
@@ -1700,6 +1712,8 @@ owed without a story: <n>
 owed, claimed by a test, no receipt yet: <n> (<kind> <n>, ...)
 owed, no test names it: <n> (<kind> <n>, ...)
 owed, planned: <n> (<kind> <n>, ...)
+owed, proven by a receipt, still listed: <n> (<kind> <n>, ...)
+owed, actions: <n> served by code, <n> not served
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
 
@@ -1714,14 +1728,24 @@ risk file has a vital area (section 23.2): the number of proof obligations, one 
 id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
 whose evidence is owed, each group sorted.
 
-The three `owed,` lines print only in an adopted project: while the owed list holds an entry
-with a reason `machinery adopt` wrote (section 11.1). They count the owed ids the design knows
-by claim, read statically as stage `trace` reads tags and markers (section 8): an obligation is
-claimed when a test file names it, an `act` id when code serves it. An entry planned at adoption
-is counted as planned, whatever names it, and the `planned` line prints only when there is one.
-The kinds are listed in the order `tc, sc, inv, fm, cx, ck, act`, only those that occur, and a
-count of zero prints as `0`. An `fv` id is proven by the formal stage and is in none of the
-three. A claim is not evidence: these lines say where a receipt is all that is missing.
+The `owed,` lines print only in an adopted project: while the owed list holds an entry
+with a reason `machinery adopt` wrote (section 11.1). They count the owed ids the design knows,
+each obligation on the first line that applies:
+
+| Line | Counts |
+|---|---|
+| `planned` | An entry planned at adoption (section 11.1), whatever names or proves it. |
+| `proven by a receipt, still listed` | An id the evidence proves at the current commit (section 12): its entry is stale, and `owed sync` removes it. |
+| `claimed by a test, no receipt yet` | An id a test file names, read statically as stage `trace` reads tags and markers (section 8), that no valid receipt proves. |
+| `no test names it` | Every other one. |
+
+The `claimed` and `no test names it` lines always print, in that order, then `planned`, `proven`
+and `actions`, each only when it counts something. The kinds are listed in the order
+`tc, sc, inv, fm, cx, ck`, only those that occur, and a count of zero prints as `0`. An owed
+`act` id is in none of the four: an action is served, not claimed, and the `actions` line
+counts the owed ones by whether code serves them. An `fv` id is proven by the formal stage
+and is in no line. A claim is not evidence: the `claimed` line says where a receipt is all that
+is missing.
 
 When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
@@ -1731,7 +1755,8 @@ id: the summary line of `machinery intake status` (section 15.7),
 `review <design|intake> <intake id>: <verdict> at <12 hex> by <actor>[, <n> issue(s)]` for the latest
 review of that kind on each open intake item, by intake id, the 12 hex being the contract hash
 the review was for; and then, when a question is open (section 15.9),
-`questions: <n> open, <k> held`. Exit 0 unless the config is invalid.
+`questions: <n> open, <k> held`. Exit 0 unless the config is invalid (2) or the owed file does
+not parse (1, section 11.1).
 
 ## 15. Backlog and scheduling
 
@@ -1930,8 +1955,16 @@ group whose ids all carry a `story` that exists in the backlog, writes the new s
 When the plan has a wire-evidence story a second line follows, counting those of the plan,
 created or not:
 `plan: <n> wire-evidence stories for <n> claimed id(s), one per test <file|directory>`
-(`1 wire-evidence story`). An id planned at adoption carries the project's own story, so its
-group is skipped when that story is in the backlog.
+(`1 wire-evidence story`).
+
+**A story the project supplied.** An entry planned at adoption carries the story of the
+project's own mark, and plan never replaces it. When that story is in the backlog its group is
+an existing one. When it is not, as when the project's ids come from another tracker,
+`--apply` creates nothing for the group and prints, after the lines above, one line per such id:
+`plan: <id>: external story <story>, not in the backlog; nothing created`. The entry keeps its
+story on every run. `plan --link <story> <id>` to another story is a usage error:
+`<id> carries the story <story> the project planned it under; plan never replaces it: edit <owed file> to change it`.
+Printing the plan does not read the backlog: there such an id has its story like any other.
 `machinery plan --link <story> <id>...` attaches ids to an existing story instead: it appends a
 `machinery:ids` note to the story, sets the `story` field of those owed entries and prints
 `plan: <n> id(s) linked to <story>`.
@@ -3289,7 +3322,11 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    | `unproven at adoption (<short sha>)` | Every other obligation, and every unserved `act` id. |
 
    It never removes an entry and never changes a reason, so an entry owed before adoption keeps
-   the reason it has. When a stage fails the config and the baselines are still
+   the reason it has. A planned mark whose `story` is not a story id (section 2) stops adoption
+   before anything is written, with or without `--write`: one line per mark,
+   `<file>:<line>: <id>: import.planned entry <n> captured the story "<text>"; a story id has only letters, digits, ".", "-" and "_": tighten the pattern`,
+   the first after `machinery: `, and exit 1. The line is that of the invariant's statement or
+   of the catalog row. When a stage fails the config and the baselines are still
    written, no owed entry is written and the exit code is 1. The report then says exactly what
    blocks, and nothing else (warnings do not block and are not printed):
 
@@ -3378,10 +3415,10 @@ timestamp or an absolute path:
 | `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
 | `waivers` | The waivers adopt added, by rule, with counts. |
 | `baselines` | The tests and architecture baselines, each with its number of entries. |
-| `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total; then the same ids by claim, as the `owed,` lines of `machinery status` count them (section 14): `- claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `- no test names it: <n> (...)` and, when there is one, `- planned: <n> (...)`. |
+| `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total; then the same ids as the `owed,` lines of `machinery status` count them (section 14), each after `- ` instead of `owed, `: `- claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `- no test names it: <n> (...)` and, when they count something, `- planned: <n> (...)`, `- proven by a receipt, still listed: <n> (...)` and `- actions: <n> served by code, <n> not served`. |
 | `blocked` | When adopt was blocked (section 17.2): the lines of its `blocked` report. |
 | `check` | The summary line of `machinery check` and the outcome line of each stage. |
-| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids, and `wire`, listed last, for a wire-evidence story) and tier, with counts, their total and the number of edges. Both groups show: when the plan has a wire-evidence story, `- wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>` (`1 story`), and when it has stories for ids planned at adoption, `- already planned in the project: <n> story(ies) are for ids planned at adoption; `plan --apply` skips each whose story is in the backlog`. |
+| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids, and `wire`, listed last, for a wire-evidence story) and tier, with counts, their total and the number of edges. Both groups show: when the plan has a wire-evidence story, `- wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>` (`1 story`), and when it has stories for ids planned at adoption, `- already planned in the project: <n> story(ies) are for ids planned at adoption; `plan --apply` creates nothing for them: each keeps the story the project gave it`. |
 | `blocks` | What blocks adoption: each stage of the check that failed or was not demonstrated, with its outcome line and its first 5 findings, and the number of the others. |
 | `fix_first` | Fix in the project first: every ERROR of stage `model`, `machines`, `failure-modes` or `risk`. No waiver covers one (section 6.7); a finding about the form of an imported failure catalog is one of them. |
 
@@ -3391,7 +3428,8 @@ stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
 otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links, files:
 [{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total,
-claimed: {by_kind, total}, unnamed: {by_kind, total}, planned: {by_kind, total}},
+claimed: {by_kind, total}, unnamed: {by_kind, total}, planned: {by_kind, total}, proven: {by_kind, total},
+actions: {served, unserved}},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
 count}], total, edges, planned_stories, wire: {stories, ids, by}}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
 waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
@@ -3489,9 +3527,9 @@ each section is saved under `<out>/stages/`.
 | Section | What runs | Saved as |
 |---|---|---|
 | `inventory` | The facts of the adopt report (section 17.2) for the snapshot: scope, languages, code files, test files (under e2e roots, elsewhere, with test doubles), design sources. `checked:` counts the files. | `inventory.txt` |
-| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). When the risk file has a vital area, `proofs awaiting: <n>` follows, then `vital: <id> proven (by test and model; proof awaited)` for every id a property is over that is not owed, and `assumed, unproven: <area> <name>: <statement>` for every assumption whose evidence is owed (section 23.2). Then the candidates of section 23.3, always: `vital candidates: <n>, dismissed: <n>`, and one line `  <id>  <reason>` per candidate. | `<stage>.txt` each |
+| `design` | The stages of `machinery lint` (section 3.1), and one ERROR of the section's own per problem of the owed file (section 11.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). When the risk file has a vital area, `proofs awaiting: <n>` follows, then `vital: <id> proven (by test and model; proof awaited)` for every id a property is over that is not owed, and `assumed, unproven: <area> <name>: <statement>` for every assumption whose evidence is owed (section 23.2). Then the candidates of section 23.3, always: `vital candidates: <n>, dismissed: <n>`, and one line `  <id>  <reason>` per candidate. | `<stage>.txt` each |
 | `generation` | `machinery gen` (section 7). When gen refuses, not demonstrated: `gen refused: <stages> have errors`. | `generation.txt` |
-| `trace` | The stage of that name. With a `trace` block, two lines count every `act` and obligation id by claim, as section 14 does for the owed ids: `claimed by a test: <n> (<kind> <n>, ...)` and `no test names it: <n> (...)`. They count every id, owed or not: a snapshot holds no receipt, so a claim here is a claim and no more. | `trace.txt` |
+| `trace` | The stage of that name. With a `trace` block, the `owed,` lines of `machinery status` (section 14) follow, counting the owed ids of the snapshot the same way, whether or not the project is adopted: `owed, claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `owed, no test names it: <n> (...)` and the others when they count something. | `trace.txt` |
 | `tests`, `arch` | The stage of that name. | `<stage>.txt` |
 | `formal` | The sanity run, section 18.5. | `formal.txt` |
 | `history` | Section 18.6. | `history.txt` |
@@ -3657,7 +3695,7 @@ A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`
 | `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
 | `design` | `statuses`: `{owed, proposed, proven, retired}`; `bound_machines`, `unbound_machines` (when at least one machine was read); `proofs_awaiting`; `vital_candidates`: `{id, reason}`; `vital_dismissed` |
 | `generation` | `files` (generated files), `written` |
-| `trace` | `claimed`, `unnamed`: each `{by_kind, total}` (with a `trace` block) |
+| `trace` | `claimed`, `unnamed`, `planned`, `proven`: each `{by_kind, total}`; `actions`: `{served, unserved}` (with a `trace` block) |
 | `formal` | `machines`: `{deadlock, distinct, machine, reason, result, states, unreachable}`; `models`: `{model, reason, result}`; `result` is `passed`, `failed` or `incomplete` (`instance found`, `no instance` or `incomplete` for a model), and `reason` says why a run did not complete, else is empty |
 | `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
 | `decisions` | `files`: `{lines, path, records, words}`; `instructions`: `{linked, lines, path, words}`; `backlog`: `{current, decisions}` when the export can be read |
@@ -3846,7 +3884,10 @@ is in the tool; a plugin only wires it. The fields are those of the Claude Code 
 would block. Any internal error (stdin that is not hook JSON, an invalid `machinery.yaml`, a git
 or backlog command that fails, an unknown event) prints
 `{"systemMessage":"machinery hook <event> could not run: <why>"}` and changes nothing. A directory
-that is not in a machinery project prints nothing. Other harnesses call the same command with
+that is not in a machinery project prints nothing. An owed file that does not parse
+(section 11.1) is not an internal error: `pre-tool` and `stop` run no stage and hold
+`owed: ERROR  <owed file>: <error>; ...` as their one finding, so a commit or push is refused in
+block mode, and `session-start` prints the `could not run` message with it. Other harnesses call the same command with
 JSON of the same shape.
 
 Config in `machinery.yaml` (section 2), each `block`, `warn` or `off`:
