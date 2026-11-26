@@ -186,19 +186,9 @@ func Judge(d *design.Design) (*Judgement, error) {
 	covered := map[string]bool{}
 	for _, a := range critical {
 		covered[a.Name] = true
-		for _, q := range a.Questions {
-			tool := design.Questions[q]
-			found := false
-			for _, s := range specs {
-				if s.Tool == tool && contains(s.Areas, a.Name) && contains(s.Questions, q) {
-					found = true
-				}
-			}
-			if !found {
-				covered[a.Name] = false
-				j.Findings = append(j.Findings, Finding{Sev: report.Error, Area: a.Name,
-					Msg: fmt.Sprintf("fv:%s: no %s spec answers %s", a.Name, tool, q)})
-			}
+		for _, msg := range Unanswered(specs, a) {
+			covered[a.Name] = false
+			j.Findings = append(j.Findings, Finding{Sev: report.Error, Area: a.Name, Msg: msg})
 		}
 	}
 	// owed demotion: a spec all of whose areas are owed does not block
@@ -345,6 +335,25 @@ func (j *Judgement) Stage() *report.Stage {
 		s.NotDemonstrated(j.ND)
 	}
 	return s
+}
+
+// Unanswered lists the questions of a critical area that no spec of the
+// matching tool answers for it (section 16.1), as findings.
+func Unanswered(specs []*Spec, a design.Area) []string {
+	var res []string
+	for _, q := range a.Questions {
+		tool := design.Questions[q]
+		found := false
+		for _, s := range specs {
+			if s.Tool == tool && contains(s.Areas, a.Name) && contains(s.Questions, q) {
+				found = true
+			}
+		}
+		if !found {
+			res = append(res, fmt.Sprintf("fv:%s: no %s spec answers %s", a.Name, tool, q))
+		}
+	}
+	return res
 }
 
 // ProvenAreas returns the fv ids the formal stage proves (the hook the
