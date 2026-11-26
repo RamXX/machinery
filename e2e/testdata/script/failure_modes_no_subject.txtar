@@ -32,6 +32,12 @@ cp blank.yaml design/failure-modes.yaml
 exec mrun 1 lint --stage xref-failure
 stdout '^checked: 2 failure modes, 1 linked, 1 unlinked, 1 invokes, '
 stdout '^not demonstrated: 1 of 2 failure modes name no subject; give each a subject in design/failure-modes.yaml or declare it there with no_subject and a reason$'
+# nor over a native failure mode whose subject is malformed or missing
+cp garbage.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 1 invokes, '
+stdout '^not demonstrated: 2 of 3 failure modes name no subject; give each a subject in design/failure-modes.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
 
 # the links file: no_subject takes no subject; required and kind are optional beside it
 exec sh -c 'cat import.yaml >> machinery.yaml'
@@ -108,6 +114,23 @@ failure_modes:
     behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
   - id: no-reason
     no_subject: "  "
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- garbage.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: no-such-form
+    subject: whatever
+    failure: "x"
+    required: surface
+    behavior: "y"
+  - id: no-subject-key
     failure: "x"
     required: surface
     behavior: "y"

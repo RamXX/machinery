@@ -777,11 +777,14 @@ the catalog id, compared case-insensitively.
 
 Every imported row is then one of three:
 
-- A **linked** row (an entry gives it a subject) is a failure mode like a native one, and takes
-  part in every rule of stage `xref-failure`.
+- A **linked** row: an entry gives it a subject of one of the forms of section 5.4 and a
+  `required` value, and the subject resolves in the design (section 6.6). It is a failure mode
+  like a native one, and takes part in every rule of stage `xref-failure`.
 - A **subject-less** row (an entry declares it `no_subject`, with the reason) is an obligation
   like any failure mode and takes part in no subject rule.
-- An **unlinked** row (no entry names it) is an obligation all the same: `fm:<id>` is owed,
+- An **unlinked** row is every other one: no entry names it, or the entry that names it gives
+  no subject, a malformed one, one that resolves to nothing, or no valid `required` value. An
+  entry is never a link by being there. It is an obligation all the same: `fm:<id>` is owed,
   claimed and traced like any failure mode. It names nothing, so it takes part in no subject
   rule of `xref-failure`: it neither resolves nor covers an invoke, a dependency, an action, a
   failure state or a failure event. While one row is unlinked, stage `xref-failure` is not
@@ -938,7 +941,7 @@ finding that asks for a failure mode says where to declare it: in the file of
 failure modes, invokes,
 dependencies, tiered actions, failure states and failure events. When `import.failure_modes` is
 configured, or a failure mode is unaccounted for (below), it counts, right after the failure
-modes, those that name a subject (`linked`, native ones included) and those unaccounted for
+modes, those that are linked (`linked`, native ones included) and those unaccounted for
 (`unlinked`); when at least one failure mode is declared subject-less it counts those next:
 `checked: 48 failure modes, 30 linked, 4 unlinked, 14 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
 With no failure-mode file
@@ -947,11 +950,17 @@ event is a finding that says to configure `design.failure_modes`, and `checked:`
 states and failure events only. Not applicable when there is neither a failure-mode file nor a
 failure state or failure event.
 
-A failure mode is unaccounted for when it names no subject and is not declared subject-less with
-a reason: an imported row no links entry names (section 5.4.1), and a failure mode, native or
-imported, whose `no_subject` has a blank reason or stands beside a `subject`. Stage
-`failure-modes` has the ERROR of the latter; this stage counts it as `unlinked` all the same, so
-that it does not pass when run alone. While one failure mode is unaccounted for, the stage did
+A failure mode, native or imported, is **linked** when all of this holds: its subject has one of
+the forms of section 5.4, its `required` value is one of the four, it has no `no_subject` key,
+and the subject resolves: rule `subject-resolves` has no finding for it, waived or not, and a
+`system:` subject names a configured system. It is **subject-less** when `no_subject` gives a
+reason and there is no `subject`. Every other failure mode is **unaccounted for** and counts as
+`unlinked`: an imported row no links entry names (section 5.4.1); a subject that is missing,
+empty or malformed; a subject that resolves to nothing; a missing or invalid `required`; a
+`no_subject` with a blank reason or beside a `subject`. Only a linked failure mode covers an
+invoke, a dependency, an action, a failure state or a failure event. Stage `failure-modes` has
+the ERROR of a malformed entry; this stage counts it as `unlinked` all the same, so that it
+never passes over one, run alone, in `check`, in `assess` or in a rehearsal. While one failure mode is unaccounted for, the stage did
 not compare every failure mode with the design: one linked row among many is no pass. Its result
 is
 `not demonstrated: <n> of <m> failure modes name no subject; link each in <links file> or declare it there with no_subject and a reason`,
@@ -962,7 +971,8 @@ unaccounted for and
 still no failure mode names a subject (every one is declared subject-less), it compared none:
 `not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing at
 all to compare). Neither is ever passed, waivers or not; with findings the stage is failed
-(section 3.2). A waiver does not link a row.
+(section 3.2). A waiver does not link a row: a waived `subject-resolves` finding prints as a
+warning and its failure mode stays unlinked.
 
 ### 6.7 Waivers
 
@@ -3469,7 +3479,8 @@ Each refusal exits 2 before anything is written:
 | The `machinery.yaml` of `HEAD` is invalid | `config: machinery.yaml at HEAD, which judges the overlay: <message>` |
 | A path that is not ASCII | `usage: --overlay <dir>: <path> is not written in ASCII; an overlay path holds ASCII characters only` |
 | A path, or a directory of it, that differs from one of `HEAD` only by case | `usage: --overlay <dir>: <path> differs from <path of HEAD> of HEAD only by case; an overlay path is written as HEAD has it` |
-| A file that is not a design source | `usage: --overlay <dir>: <path> is not a design source of <judge>: an overlay holds only the config and the design sources it names (design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links)` |
+| A file that is not a design source | `usage: --overlay <dir>: <path> is not a design source of <judge>: an overlay holds only the config and the design sources it names (design.risk, design.status, import.failure_modes.links)` |
+| An overlaid config with a waiver `HEAD` lacks | `usage: --overlay <dir>: machinery.yaml carries the waiver {rule: <rule>, id: "<id>"} that HEAD does not have; an overlay never adds a waiver (commit it, or pass the config with --config)` |
 | A design source that a code or test glob matches | `usage: --overlay <dir>: <path> is under <key> of <config>; an overlay never replaces what is read as code or tests` |
 | A path at or below a symbolic link of `HEAD` | `usage: --overlay <dir>: <path>: <link> is a symbolic link at HEAD; an overlay never writes through or over a link` |
 
@@ -3499,16 +3510,20 @@ laid and hashed.
 An overlay is for the design side, never for the evidence, and the design side is defined
 positively. An overlay may hold two things and nothing else:
 
-- **The config**: `machinery.yaml` at its top, with the waivers it carries.
-- **Design sources the judge names**: `design.models`, a file below `design.machines`, `design.failure_modes`, `design.risk`, `design.facts`, `design.owed`, `design.status` (the last two with their defaults) and `import.failure_modes.links`. The path is the one the judge gives, character for
-  character.
+- **The config**: `machinery.yaml` at its top. It carries no waiver that the `machinery.yaml`
+  of `HEAD` does not have (compared by rule and id; none at all when `HEAD` has no config).
+- **Three design sources, as the judge names them**: `design.risk`, `design.status` (with its
+  default) and `import.failure_modes.links`. The path is the one the judge gives, character
+  for character.
 
 The **judge** is the `machinery.yaml` of `HEAD` when `HEAD` has one, else the `--config` file;
 `<judge>` in a message is `machinery.yaml at HEAD` or `--config <file name>`. A config in the
 overlay never judges: an overlay that holds anything beside the config needs a judge, and a file
-that only an overlaid config names as a design source is refused. Generated files
-(`design.gen`), formal models (`design.formal`), sources read through `import` other than the
-links file, tests, code and every other file are not design sources in this sense.
+that only an overlaid config names as a design source is refused. Everything else is refused:
+the owed list (`design.owed`) and waivers, which say what is accepted as not proven, so that no
+overlay turns a failed stage into a passed one by owing or waiving; models, machines, the
+failure-mode file, facts, generated files, formal models, sources read through `import` other
+than the links file; tests, code and every other file.
 
 A design source is still refused when a glob under which files are read as code or as tests
 matches it, in the judge or in the config of the run: `trace.code`, `trace.tests`, `tests.e2e`,

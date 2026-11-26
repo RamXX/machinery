@@ -14,7 +14,7 @@ stderr '^usage: --overlay ov needs a config to be judged by \(the machinery.yaml
 exec mrun 2 -C proj adopt --rehearse --overlay ov-cfg --out out
 stderr '^usage: --overlay ov-cfg needs a config to be judged by \(the machinery.yaml of HEAD, or --config\): it says which files are design sources, and a config in the overlay never does$'
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-test --out out
-stderr '^usage: --overlay ov-test: e2e/orders.sh is not a design source of --config shop.yaml: an overlay holds only the config and the design sources it names \(design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links\)$'
+stderr '^usage: --overlay ov-test: e2e/orders.sh is not a design source of --config shop.yaml: an overlay holds only the config and the design sources it names \(design.risk, design.status, import.failure_modes.links\)$'
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-code --out out
 stderr '^usage: --overlay ov-code: internal/domain/order.go is not a design source of --config shop.yaml: '
 # a config that names a test or code as a design source admits neither: what the globs of
@@ -23,29 +23,36 @@ exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-risk --ou
 stderr '^usage: --overlay ov-risk: e2e/risk.yaml is under trace.tests of --config tricky.yaml; an overlay never replaces what is read as code or tests$'
 exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-status --out out
 stderr '^usage: --overlay ov-status: lib/domain/status.yaml is under constraints.layers of --config tricky.yaml; '
-exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-facts --out out
-stderr '^usage: --overlay ov-facts: cmd/facts.yaml is under trace.code of --config tricky.yaml; '
-exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-owed --out out
-stderr '^usage: --overlay ov-owed: Smoke/owed.yaml is under tests.e2e of --config tricky.yaml; '
+exec mrun 2 -C proj adopt --rehearse --config tricky2.yaml --overlay ov-code-glob --out out
+stderr '^usage: --overlay ov-code-glob: cmd/status.yaml is under trace.code of --config tricky2.yaml; '
+exec mrun 2 -C proj adopt --rehearse --config tricky2.yaml --overlay ov-fold --out out
+stderr '^usage: --overlay ov-fold: Smoke/risk.yaml is under tests.e2e of --config tricky2.yaml; '
+# the owed list and the failure-mode file are evidence and design the overlay does not carry
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-owed --out out
+stderr '^usage: --overlay ov-owed: design/owed.yaml is not a design source of --config shop.yaml: '
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-modes --out out
+stderr '^usage: --overlay ov-modes: design/failure-modes.yaml is not a design source of --config shop.yaml: '
 ! exists out
 
-# the overlay adds a failure mode: one more obligation is owed than at HEAD
-exec machinery -C proj adopt --rehearse --config shop.yaml --overlay ov --out out
+# the overlay holds a status file that makes one scenario proposed, and a risk file: one
+# obligation fewer is owed than at HEAD
+exec machinery -C proj adopt --rehearse --config shop-risk.yaml --overlay ov --out out
 stdout '^project: proj at [0-9a-f]{7}$'
-stdout '^overlay: 1 file\(s\) laid over the snapshot; this is not the result of HEAD: design/failure-modes.yaml$'
-stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 17 owed$'
-cmp out/snapshot/design/failure-modes.yaml ov/design/failure-modes.yaml
-grep '^- overlay: 1 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/rehearsal.md
-exec sh -c 'grep -x "  - \`design/failure-modes.yaml\` sha256 $(shasum -a 256 ov/design/failure-modes.yaml | cut -c1-64)" out/rehearsal.md'
-grep '^- fm: 2$' out/rehearsal.md
-grep '^      "path": "design/failure-modes.yaml",$' out/rehearsal.json
-exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/failure-modes.yaml | cut -c1-64)\"" out/rehearsal.json'
+stdout '^overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD: design/risk.yaml, design/status.yaml$'
+stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 15 owed$'
+cmp out/snapshot/design/status.yaml ov/design/status.yaml
+cmp out/snapshot/design/risk.yaml ov/design/risk.yaml
+grep '^- overlay: 2 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/rehearsal.md
+exec sh -c 'grep -x "  - \`design/status.yaml\` sha256 $(shasum -a 256 ov/design/status.yaml | cut -c1-64)" out/rehearsal.md'
+grep '^- sc: 1$' out/rehearsal.md
+grep '^      "path": "design/status.yaml",$' out/rehearsal.json
+exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/status.yaml | cut -c1-64)\"" out/rehearsal.json'
 
 # the project is as it was
 exec git -C proj status --porcelain
 ! stdout .
 ! exists proj/machinery.yaml
-! grep 'warehouse' proj/design/failure-modes.yaml
+! exists proj/design/status.yaml
 
 # without an overlay the report has none
 exec machinery -C proj adopt --rehearse --config shop.yaml --out out2
@@ -53,6 +60,16 @@ exec machinery -C proj adopt --rehearse --config shop.yaml --out out2
 stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 16 owed$'
 ! grep 'overlay' out2/rehearsal.md
 grep '^  "overlay": \[\],$' out2/rehearsal.json
+
+# a links file that names no subject, laid over a project whose catalog was linked: the
+# rehearsed check shows every row unlinked, and the stage blocks
+fixture library lib
+cd lib
+gitinit
+cd ..
+exec machinery -C lib adopt --rehearse --overlay ov-garbage --out out3
+grep '^checked: 4 failure modes, 0 linked, 4 unlinked, ' out3/stages/check.txt
+grep '^### xref-failure: failed: ' out3/rehearsal.md
 
 -- shop.yaml --
 version: 2
@@ -74,27 +91,69 @@ constraints:
   size:
     max_file_lines: 200
     max_func_lines: 40
--- ov/design/failure-modes.yaml --
+-- shop-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+-- ov/design/status.yaml --
 version: 1
-failure_modes:
-  - id: payment-provider-down
-    subject: invoke:order.chargePayment
-    failure: "The payment provider does not answer or answers with an error."
-    required: surface
-    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
-  - id: warehouse-flooded
-    no_subject: "the warehouse is not part of the system"
-    failure: "The warehouse floods."
-    required: surface
-    behavior: "Orders are held until the stock is counted again."
+proposed:
+  - {id: "sc:cancelled-order-refuses-payment", note: "not committed yet"}
+-- ov/design/risk.yaml --
+version: 1
+areas:
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+-- ov-garbage/design/risk-links.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-4]}
+-- ov-owed/design/owed.yaml --
+version: 1
+owed: []
+-- ov-modes/design/failure-modes.yaml --
+version: 1
+failure_modes: []
+-- tricky2.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  risk: Smoke/risk.yaml
+  status: cmd/status.yaml
+trace:
+  code: ["cmd/**"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["smoke/**"]
+-- ov-code-glob/cmd/status.yaml --
+version: 1
+-- ov-fold/Smoke/risk.yaml --
+version: 1
 -- tricky.yaml --
 version: 2
 scope: ["internal/**"]
 design:
   risk: e2e/risk.yaml
   status: lib/domain/status.yaml
-  facts: cmd/facts.yaml
-  owed: Smoke/owed.yaml
 trace:
   code: ["cmd/**"]
   tests: ["e2e/**"]
@@ -107,15 +166,10 @@ constraints:
 version: 1
 -- ov-status/lib/domain/status.yaml --
 version: 1
--- ov-facts/cmd/facts.yaml --
-version: 1
--- ov-owed/Smoke/owed.yaml --
-version: 1
 -- ov-cfg/machinery.yaml --
 version: 2
--- ov-cfg/design/owed.yaml --
+-- ov-cfg/design/status.yaml --
 version: 1
-owed: []
 -- ov-test/e2e/orders.sh --
 echo replaced
 -- ov-code/internal/domain/order.go --

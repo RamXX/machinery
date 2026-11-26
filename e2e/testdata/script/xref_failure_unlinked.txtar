@@ -12,6 +12,52 @@ cp with-links.yaml machinery.yaml
 exec mrun 1 lint --stage xref-failure
 stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
 
+# an entry that names no subject links nothing, whatever else it holds: missing, empty or
+# malformed, for one row or a range, alone or in check, the rows stay unlinked
+cp garbage-1.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
+cp garbage-2.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
+cp garbage-3.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
+cp garbage-4.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
+cp garbage-5.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
+exec mrun 1 check --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+! stdout '^passed$'
+# a subject without a required value, or with one that is none, is no link either
+cp garbage-6.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+# a subject that parses and names nothing in the design is not linked: with the finding the
+# stage fails, and with the finding waived it is still not demonstrated
+cp links-bad.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^failed: 1 finding\(s\)$'
+cp with-subject-waiver.yaml machinery.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^  warn   waived: subject-resolves: act:Loan.burn: '
+stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+cp with-links.yaml machinery.yaml
+
 # one linked row of two is compared with the design, and the other still names nothing: the
 # stage says how many, and does not pass
 cp links-one.yaml design/links.yaml
@@ -118,6 +164,46 @@ import:
     links: design/links.yaml
 waivers:
   - {rule: invoke-failure-mode, id: "invoke:desk.checkCard", reason: "the card check is modeled next"}
+-- garbage-1.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-2]}
+-- garbage-2.yaml --
+version: 1
+links:
+  - {ids: [RISK-1, RISK-2], required: surface}
+-- garbage-3.yaml --
+version: 1
+links:
+  - {ids: [RISK-1, RISK-2], subject: "whatever", required: surface}
+-- garbage-4.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-2], subject: "nonsense:thing", required: surface}
+-- garbage-5.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-2], subject: "", required: bogus, kind: nonsense}
+-- garbage-6.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend"}
+  - {id: RISK-2, subject: "act:Loan.lend", required: bogus}
+-- with-subject-waiver.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+waivers:
+  - {rule: subject-resolves, id: "act:Loan.burn", reason: "the action is modeled next"}
 -- links-empty.yaml --
 version: 1
 links: []

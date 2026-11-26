@@ -113,6 +113,21 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 	return f.FailureModes, problems, true
 }
 
+// WellFormed reports a failure mode that names a subject of one of the
+// forms of section 5.4 and carries a required value: the precondition of
+// being compared with the design. Whether the subject resolves is stage
+// xref-failure's question.
+func (fm FailureMode) WellFormed() bool {
+	if !fm.Named() || !subjectRe.MatchString(fm.Subject) {
+		return false
+	}
+	switch fm.Required {
+	case "fail-closed", "retry-bounded", "surface", "refuse":
+		return true
+	}
+	return false
+}
+
 // checkValues holds kind, subject (or no_subject) and required to section
 // 5.4, defaulting kind to fault. where prefixes every problem. link is true
 // for an entry of the links file, where a no_subject entry may leave

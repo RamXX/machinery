@@ -58,7 +58,7 @@ the config itself) does not have to be committed into the project to be tried: p
 directory of its own, at the path it will have in the project, and pass `--overlay <dir>` to
 `assess` or to `adopt --rehearse`. The files are laid over the snapshot, and the reports list each
 with its sha256 and say that the result is not the result of `HEAD`. An overlay holds only the
-config and the design sources a config names (`docs/formats.md` section 18.2), judged by the
+config, a links file, a status file and a risk file (`docs/formats.md` section 18.2), judged by the
 `machinery.yaml` of `HEAD` or else by `--config`: it changes what the design says, never the
 evidence.
 

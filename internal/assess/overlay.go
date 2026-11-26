@@ -135,17 +135,32 @@ func (o *Overlay) Check(root string, external *project.Config, externalLabel str
 	if o == nil {
 		return nil
 	}
-	others := o.others()
-	if len(others) == 0 {
-		return nil
-	}
 	judge, label := external, externalLabel
+	var atHead *project.Config
 	if data, ok := gitx.Show(root, "HEAD", project.ConfigName); ok {
 		cfg, err := project.Parse(data)
 		if err != nil {
 			return project.Errf("%s at HEAD, which judges the overlay: %v", project.ConfigName, err)
 		}
-		judge, label = cfg, project.ConfigName+" at HEAD"
+		atHead, judge, label = cfg, cfg, project.ConfigName+" at HEAD"
+	}
+	if o.Config() != nil && run != nil {
+		// a waiver is no overlay source: an overlaid config carries only those HEAD has
+		has := map[project.Waiver]bool{}
+		if atHead != nil {
+			for _, w := range atHead.Waivers {
+				has[project.Waiver{Rule: w.Rule, ID: w.ID}] = true
+			}
+		}
+		for _, w := range run.Waivers {
+			if !has[project.Waiver{Rule: w.Rule, ID: w.ID}] {
+				return o.refuse("%s carries the waiver {rule: %s, id: %q} that HEAD does not have; an overlay never adds a waiver (commit it, or pass the config with --config)", project.ConfigName, w.Rule, w.ID)
+			}
+		}
+	}
+	others := o.others()
+	if len(others) == 0 {
+		return nil
 	}
 	if judge == nil {
 		return usagef("--overlay %s needs a config to be judged by (the %s of HEAD, or --config): it says which files are design sources, and a config in the overlay never does", o.Dir, project.ConfigName)
@@ -179,7 +194,7 @@ func (o *Overlay) Check(root string, external *project.Config, externalLabel str
 			}
 		}
 		if !designSource(judge, f.Path) {
-			return o.refuse("%s is not a design source of %s: an overlay holds only the config and the design sources it names (design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links)", f.Path, label)
+			return o.refuse("%s is not a design source of %s: an overlay holds only the config and the design sources it names (design.risk, design.status, import.failure_modes.links)", f.Path, label)
 		}
 		for _, c := range []struct {
 			cfg   *project.Config
@@ -193,13 +208,12 @@ func (o *Overlay) Check(root string, external *project.Config, externalLabel str
 	return nil
 }
 
-// designSource reports whether cfg names rel as a design source: one of
-// design.models, a file below design.machines, design.failure_modes,
-// design.risk, design.facts, design.owed, design.status, or
-// import.failure_modes.links. The spelling must be the config's.
+// designSource reports whether cfg names rel as a design source an overlay
+// may hold: design.risk, design.status or import.failure_modes.links. The
+// spelling must be the config's. Models, machines, the failure-mode file,
+// facts and the owed list are not: an overlay never changes what is owed.
 func designSource(cfg *project.Config, rel string) bool {
-	d := cfg.Design
-	named := append([]string{d.FailureModes, d.Risk, d.Facts, d.Owed, d.Status}, d.Models...)
+	named := []string{cfg.Design.Risk, cfg.Design.Status}
 	if im := cfg.ImportedFailureModes(); im != nil {
 		named = append(named, im.Links)
 	}
@@ -208,7 +222,7 @@ func designSource(cfg *project.Config, rel string) bool {
 			return true
 		}
 	}
-	return d.Machines != "" && strings.HasPrefix(rel, path.Clean(d.Machines)+"/")
+	return false
 }
 
 // evidenceKey names the first key of cfg whose globs match rel, compared as

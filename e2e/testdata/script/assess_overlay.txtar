@@ -19,7 +19,7 @@ stderr '^usage: --overlay ov holds machinery.yaml and --config is given; keep on
 # only the config and the design sources the config of HEAD names: a test, code, a file of
 # another spelling, any other file
 exec mrun 2 -C proj assess --overlay ov-test --out out
-stderr '^usage: --overlay ov-test: e2e/loans.sh is not a design source of machinery.yaml at HEAD: an overlay holds only the config and the design sources it names \(design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links\)$'
+stderr '^usage: --overlay ov-test: e2e/loans.sh is not a design source of machinery.yaml at HEAD: an overlay holds only the config and the design sources it names \(design.risk, design.status, import.failure_modes.links\)$'
 exec mrun 2 -C proj assess --overlay ov-code --out out
 stderr '^usage: --overlay ov-code: internal/desk/extra.go is not a design source of machinery.yaml at HEAD: '
 exec mrun 2 -C proj assess --overlay ov-extra --out out
@@ -34,6 +34,34 @@ mkdir ov-uni/design
 exec sh -c 'f=$(printf "ov-uni/design/st\303\244tus.yaml"); printf "version: 1\n" > "$f"'
 exec mrun 2 -C proj assess --overlay ov-uni --out out
 stderr '^usage: --overlay ov-uni: design/st.*tus.yaml is not written in ASCII; an overlay path holds ASCII characters only$'
+# the owed list, the native failure modes, a model: not overlay sources, whatever names them
+exec mrun 2 -C proj assess --overlay ov-owed --out out
+stderr '^usage: --overlay ov-owed: design/owed.yaml is not a design source of machinery.yaml at HEAD: '
+exec mrun 2 -C proj assess --overlay ov-model --out out
+stderr '^usage: --overlay ov-model: design/model/library.modelith.yaml is not a design source of machinery.yaml at HEAD: '
+# a design source that a code or test glob of the config of the run matches: HEAD judges it a
+# links file, and the overlaid config would have it read as a test
+exec mrun 2 -C proj assess --overlay ov-run --out out
+stderr '^usage: --overlay ov-run: design/risk-links.yaml is under trace.tests of --overlay machinery.yaml; an overlay never replaces what is read as code or tests$'
+# and one that only a glob of the judge matches, which the overlaid config drops
+mkdir proj2
+cp head2.yaml proj2/machinery.yaml
+cd proj2
+gitinit
+cd $WORK
+exec mrun 2 -C proj2 assess --overlay ov-judge --out out
+stderr '^usage: --overlay ov-judge: design/status.yaml is under constraints.size.paths of machinery.yaml at HEAD; an overlay never replaces what is read as code or tests$'
+# a waiver is no overlay source either: an overlaid config carries none that HEAD lacks
+exec mrun 2 -C proj assess --overlay ov-waiver --out out
+stderr '^usage: --overlay ov-waiver: machinery.yaml carries the waiver \{rule: invoke-failure-mode, id: "invoke:hold_queue.sendNotice"\} that HEAD does not have; an overlay never adds a waiver \(commit it, or pass the config with --config\)$'
+# a machinery.yaml at HEAD that cannot judge
+mkdir proj3
+cp bad-head.yaml proj3/machinery.yaml
+cd proj3
+gitinit
+cd $WORK
+exec mrun 2 -C proj3 assess --config other.yaml --overlay ov-status --out out
+stderr '^config: machinery.yaml at HEAD, which judges the overlay: machinery.yaml: version must be 2$'
 # the config of HEAD judges, never the one in the overlay: an overlaid config that names a
 # test as a design source and drops the trace block admits nothing
 exec mrun 2 -C proj assess --overlay ov-cfg --out out
@@ -81,6 +109,13 @@ exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/risk-links.ya
 ! grep $WORK out/report.json
 ! grep $WORK out/report.md
 
+# an overlaid links file that names no subject links nothing: the assessment shows every row
+# unlinked, never a passed stage
+exec machinery -C proj assess --overlay ov-garbage --out out-garbage
+grep '^checked: 4 failure modes, 0 linked, 4 unlinked, ' out-garbage/stages/xref-failure.txt
+! grep '^passed$' out-garbage/stages/xref-failure.txt
+grep '^\| xref-failure \| failed \| 4 failure modes, 0 linked, 4 unlinked, ' out-garbage/report.md
+
 # nothing in the project changed, and the overlay was only read
 exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../after.txt'
 cmp before.txt after.txt
@@ -103,6 +138,94 @@ links:
   - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
   - {id: RISK-3, subject: "state:loan.Lost", required: surface}
 -- ov/design/status.yaml --
+version: 1
+-- ov-garbage/design/risk-links.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-4]}
+-- ov-owed/design/owed.yaml --
+version: 1
+owed: []
+-- ov-model/design/model/library.modelith.yaml --
+kind: DomainModel
+-- ov-run/design/risk-links.yaml --
+version: 1
+links: []
+-- ov-run/machinery.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**", "design/*-links.yaml"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- ov-waiver/machinery.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+waivers:
+  - {rule: invoke-failure-mode, id: "invoke:hold_queue.sendNotice", reason: "the notice service is modeled next"}
+-- head2.yaml --
+version: 2
+constraints:
+  size:
+    paths: ["design/**"]
+    max_file_lines: 100
+-- bad-head.yaml --
+version: 1
+-- ov-judge/machinery.yaml --
+version: 2
+-- ov-judge/design/status.yaml --
+version: 1
+-- ov-status/design/status.yaml --
 version: 1
 -- ov-extra/design/notes/why.md --
 Why the fourth row is not linked yet.

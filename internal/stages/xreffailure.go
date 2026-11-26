@@ -59,15 +59,36 @@ func XrefFailure(ctx *Context) *report.Stage {
 		systems["system:"+sy.Name] = true
 	}
 	named, abused := map[string]bool{}, map[string]bool{}
+	// linked: the failure mode names a subject of a known form that resolves
+	// in the design, with a required value. unlinked: every other one that is
+	// not declared subject-less: an imported row no entry names, a subject
+	// that is missing, malformed or resolves to nothing, a no_subject without
+	// a reason or beside a subject.
 	linked, unlinked, subjectLess, unlinkedRows := 0, 0, 0, 0
 	for _, fm := range d.FailureModes {
-		switch {
-		case fm.SubjectLess():
+		if fm.SubjectLess() {
 			subjectLess++
 			continue // names nothing, and says why (section 5.4)
-		case !fm.Named():
-			// names nothing and does not say why: an unlinked row (section
-			// 5.4.1), or a no_subject without a reason or beside a subject
+		}
+		resolves := fm.WellFormed()
+		switch {
+		case !resolves:
+			// stage failure-modes has the finding, when there is one
+		case strings.HasPrefix(fm.Subject, "system:"):
+			if !systems[fm.Subject] {
+				// not a subject-resolves finding: no waiver covers an unknown system
+				s.Errorf("unknown-system: %s: failure mode %s: %s is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)",
+					fm.Subject, fm.ID, strings.TrimPrefix(fm.Subject, "system:"))
+				resolves = false
+			}
+		default:
+			if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
+				// waived or not, the subject names nothing: the row is not linked
+				w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
+				resolves = false
+			}
+		}
+		if !resolves {
 			unlinked++
 			if fm.Imported {
 				unlinkedRows++
@@ -78,17 +99,6 @@ func XrefFailure(ctx *Context) *report.Stage {
 		named[fm.Subject] = true
 		if fm.Kind == "abuse" {
 			abused[fm.Subject] = true
-		}
-		if strings.HasPrefix(fm.Subject, "system:") {
-			if !systems[fm.Subject] {
-				// not a subject-resolves finding: no waiver covers an unknown system
-				s.Errorf("unknown-system: %s: failure mode %s: %s is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)",
-					fm.Subject, fm.ID, strings.TrimPrefix(fm.Subject, "system:"))
-			}
-			continue
-		}
-		if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
-			w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
 		}
 	}
 	for _, id := range sortedSet(invokes) {
@@ -201,7 +211,7 @@ func UnmodeledFailures(ctx *Context) []project.Waiver {
 	states, events := failureSubjects(d)
 	named := map[string]bool{}
 	for _, fm := range d.FailureModes {
-		if fm.Named() {
+		if fm.WellFormed() {
 			named[fm.Subject] = true
 		}
 	}
