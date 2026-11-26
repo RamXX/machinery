@@ -1,0 +1,14 @@
+version: 1
+owed:
+  - id: fm:pay-for-another-customer
+    reason: "no test tries it yet"
+  - id: fm:pay-replayed
+    reason: "no test retries a pay yet"
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: fm:place-without-customer
+    reason: "no test tries it yet"
+  - id: fm:ship-by-non-clerk
+    reason: "no test tries it yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"

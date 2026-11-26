@@ -57,7 +57,7 @@ func Judge(d *design.Design) (*Judgement, error) {
 	areaByName := map[string]design.Area{}
 	for _, a := range d.Areas {
 		areaByName[a.Name] = a
-		if a.Tier == design.Critical {
+		if design.Modeled(a.Tier) {
 			critical = append(critical, a)
 		}
 	}

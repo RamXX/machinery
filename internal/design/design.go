@@ -57,6 +57,7 @@ type Design struct {
 	Areas        []Area
 	RiskProblems []string
 	HasRisk      bool
+	NotVital     []Dismissal // dismissed candidates (section 23.3)
 
 	Owed         []OwedEntry
 	OwedProblems []string
@@ -69,7 +70,10 @@ type Design struct {
 
 	Obligations []Obligation // sorted by id
 	Served      []Served     // sorted by id
-	Duplicates  []string     // ids declared more than once
+	// Proofs are the proof obligations of the vital areas (section 23.2),
+	// sorted by id. They are not obligations: nothing owes or proves them.
+	Proofs     []Obligation
+	Duplicates []string // ids declared more than once
 
 	byID     map[string]*Obligation
 	acts     map[string]bool // every declared action, whatever its status
@@ -94,6 +98,11 @@ func Load(p *project.Project) *Design {
 	d.FMProblems = append(d.FMProblems, probs...)
 	d.ImportsFM = on
 	d.Areas, d.RiskProblems, d.HasRisk = LoadRisk(p)
+	if d.HasRisk {
+		if data, err := p.Read(p.Cfg.Design.Risk); err == nil {
+			d.NotVital = ParseNotVital(data)
+		}
+	}
 	d.Owed, d.OwedProblems = LoadOwed(p)
 	d.StatusList, d.StatusProblems, d.HasStatus = LoadStatus(p)
 	d.Traces = loadTraces(p)
@@ -169,10 +178,11 @@ func (d *Design) inventory() {
 		add(Obligation{ID: "fm:" + fm.ID, Kind: "fm", Source: fm.Source, Title: fm.Failure})
 	}
 	for _, a := range d.Areas {
-		if a.Tier == Critical {
+		if Modeled(a.Tier) {
 			add(Obligation{ID: "fv:" + a.Name, Kind: "fv", Source: d.P.Cfg.Design.Risk, Title: fmt.Sprintf("Formal model of %s: %s", a.Name, a.Why)})
 		}
 	}
+	d.inventoryProofs()
 	for _, t := range d.Traces {
 		add(Obligation{ID: t.ID, Kind: "cx", Source: t.Path, Title: fmt.Sprintf("Replay %s (%s run %s)", t.Violates, t.Spec, t.Run)})
 	}
@@ -288,13 +298,17 @@ func (d *Design) AllIDs() []string {
 
 // Tier returns the tier of an id and the areas that give it.
 //
-// An fv id has the tier of the area it names. A cx id has the highest tier
-// among the areas its formal model covers.
+// An fv or pf id has the tier of the area it names. A cx id has the highest
+// tier among the areas its formal model covers.
 func (d *Design) Tier(id string) (string, []Area) {
 	var names []string
 	switch {
 	case strings.HasPrefix(id, "fv:"):
 		names = []string{strings.TrimPrefix(id, "fv:")}
+	case strings.HasPrefix(id, "pf:"):
+		if parts := strings.SplitN(id, ":", 3); len(parts) == 3 {
+			names = []string{parts[1]}
+		}
 	case strings.HasPrefix(id, "cx:"):
 		if parts := strings.SplitN(id, ":", 3); len(parts) == 3 {
 			names = d.specAreas()[parts[1]]

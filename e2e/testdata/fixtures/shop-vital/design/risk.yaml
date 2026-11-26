@@ -1,0 +1,35 @@
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+      - name: shipped-only-paid
+        statement: "No order ships before its payment is captured."
+        kind: never
+        over: ["inv:paid-before-shipped", "tc:ORDE-e6d28f"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down"]
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]

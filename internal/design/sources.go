@@ -131,11 +131,14 @@ const (
 	Routine       = "routine"
 	Consequential = "consequential"
 	Critical      = "critical"
+	Vital         = "vital"
 )
 
 // TierRank orders tiers.
 func TierRank(t string) int {
 	switch t {
+	case Vital:
+		return 3
 	case Critical:
 		return 2
 	case Consequential:
@@ -144,13 +147,21 @@ func TierRank(t string) int {
 	return 0
 }
 
-// Area is one entry of risk.yaml (section 23).
+// Modeled reports whether a tier asks for a formal model: critical and vital
+// (sections 16 and 23).
+func Modeled(tier string) bool { return TierRank(tier) >= TierRank(Critical) }
+
+// Area is one entry of risk.yaml (section 23). Property, Core and Assumes
+// belong to a vital area (section 23.1).
 type Area struct {
-	Name      string   `yaml:"name"`
-	Tier      string   `yaml:"tier"`
-	Why       string   `yaml:"why"`
-	IDs       []string `yaml:"ids"`
-	Questions []string `yaml:"questions,omitempty"`
+	Name      string       `yaml:"name"`
+	Tier      string       `yaml:"tier"`
+	Why       string       `yaml:"why"`
+	IDs       []string     `yaml:"ids"`
+	Questions []string     `yaml:"questions,omitempty"`
+	Property  []Property   `yaml:"property,omitempty"`
+	Core      *Core        `yaml:"core,omitempty"`
+	Assumes   []Assumption `yaml:"assumes,omitempty"`
 }
 
 // Lowering records a deliberate lowering of a tier (section 23).
@@ -161,9 +172,20 @@ type Lowering struct {
 }
 
 type riskFile struct {
-	Version int        `yaml:"version"`
-	Areas   []Area     `yaml:"areas"`
-	Lowered []Lowering `yaml:"lowered,omitempty"`
+	Version  int         `yaml:"version"`
+	Areas    []Area      `yaml:"areas"`
+	Lowered  []Lowering  `yaml:"lowered,omitempty"`
+	NotVital []Dismissal `yaml:"not_vital,omitempty"`
+}
+
+// ParseNotVital returns the dismissed candidates of risk file bytes (nil when
+// the file does not parse; ParseRisk reports that).
+func ParseNotVital(data []byte) []Dismissal {
+	var f riskFile
+	if strictYAML(data, &f) != nil {
+		return nil
+	}
+	return f.NotVital
 }
 
 // ParseLowered returns the lowered entries of risk file bytes (nil when the
@@ -215,8 +237,8 @@ func ParseRisk(rel string, data []byte) (areas []Area, problems []string, config
 			problems = append(problems, where+": duplicate name")
 		}
 		seen[a.Name] = true
-		if a.Tier != Consequential && a.Tier != Critical {
-			problems = append(problems, fmt.Sprintf("%s: tier must be consequential or critical, got %q (an id in no area is routine)", where, a.Tier))
+		if a.Tier != Consequential && a.Tier != Critical && a.Tier != Vital {
+			problems = append(problems, fmt.Sprintf("%s: tier must be consequential, critical or vital, got %q (an id in no area is routine)", where, a.Tier))
 		}
 		if strings.TrimSpace(a.Why) == "" {
 			problems = append(problems, where+": why is required")
@@ -229,25 +251,27 @@ func ParseRisk(rel string, data []byte) (areas []Area, problems []string, config
 				problems = append(problems, fmt.Sprintf("%s: unknown question %q (ordering, concurrency, recovery, structure)", where, q))
 			}
 		}
-		if a.Tier == Critical && len(a.Questions) == 0 {
-			problems = append(problems, where+": a critical area lists at least one question")
+		if Modeled(a.Tier) && len(a.Questions) == 0 {
+			problems = append(problems, fmt.Sprintf("%s: a %s area lists at least one question", where, a.Tier))
 		}
-		if a.Tier != Critical && len(a.Questions) > 0 {
-			problems = append(problems, where+": only a critical area lists questions")
+		if !Modeled(a.Tier) && len(a.Questions) > 0 {
+			problems = append(problems, where+": only a critical or vital area lists questions")
 		}
+		problems = append(problems, vitalShape(where, a)...)
 	}
 	for i, l := range f.Lowered {
 		where := fmt.Sprintf("%s: lowered entry %d", rel, i+1)
 		if len(l.IDs) == 0 {
 			problems = append(problems, where+": ids needs at least one id pattern")
 		}
-		if l.From != Consequential && l.From != Critical {
-			problems = append(problems, where+": from must be consequential or critical")
+		if l.From != Consequential && l.From != Critical && l.From != Vital {
+			problems = append(problems, where+": from must be consequential, critical or vital")
 		}
 		if strings.TrimSpace(l.Reason) == "" {
 			problems = append(problems, where+": reason is required")
 		}
 	}
+	problems = append(problems, notVitalShape(rel, f.NotVital)...)
 	return f.Areas, problems, true
 }
 

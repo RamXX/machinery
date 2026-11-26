@@ -46,7 +46,7 @@ func LabelTier(is *backlog.Issue) string {
 	best := ""
 	for _, l := range is.Labels {
 		t, ok := strings.CutPrefix(l, "tier:")
-		if !ok || (t != design.Routine && t != design.Consequential && t != design.Critical) {
+		if !ok || (t != design.Routine && t != design.Consequential && t != design.Critical && t != design.Vital) {
 			continue
 		}
 		if best == "" || design.TierRank(t) > design.TierRank(best) {
@@ -71,26 +71,35 @@ func ObligationIDs(d *design.Design, ids []string) []string {
 	return res
 }
 
-// CriticalAreas returns the names of the critical areas the ids belong to,
-// an fv id naming its own area, sorted.
+// CriticalAreas returns the names of the areas with a formal model (critical
+// and vital) the ids belong to, an fv id naming its own area, sorted.
 func CriticalAreas(d *design.Design, ids []string) []string {
 	set := map[string]bool{}
 	for _, id := range ids {
 		_, in := d.Tier(id)
 		for _, a := range in {
-			if a.Tier == design.Critical {
+			if design.Modeled(a.Tier) {
 				set[a.Name] = true
 			}
 		}
 		if name, ok := strings.CutPrefix(id, "fv:"); ok {
 			for _, a := range d.Areas {
-				if a.Name == name && a.Tier == design.Critical {
+				if a.Name == name && design.Modeled(a.Tier) {
 					set[name] = true
 				}
 			}
 		}
 	}
 	return sortedKeys(set)
+}
+
+// Priority is the backlog priority of a tier (section 15.2): 2 routine, 1
+// consequential, 0 critical and vital.
+func Priority(tier string) int {
+	if p := 2 - design.TierRank(tier); p > 0 {
+		return p
+	}
+	return 0
 }
 
 func sortedKeys(set map[string]bool) []string {

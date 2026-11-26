@@ -1,4 +1,4 @@
-# a critical area needs a question; only a critical area may have one
+# a critical area needs a question; only a critical or vital area may have one
 fixture shop
 cp machinery-risk.yaml machinery.yaml
 cp critical-none.yaml design/risk.yaml
@@ -8,7 +8,7 @@ stdout 'failed: '
 
 cp consequential-questions.yaml design/risk.yaml
 exec mrun 1 lint --stage risk
-stdout 'ERROR  design/risk.yaml: area-one: only a critical area lists questions'
+stdout 'ERROR  design/risk.yaml: area-one: only a critical or vital area lists questions'
 stdout 'failed: '
 
 # every question is accepted on a critical area

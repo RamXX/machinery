@@ -84,6 +84,21 @@ modes, a TLA+ spec of the order payment (`order-payment`) and an Alloy spec of o
 counterexample. The helper `shopformal` (`e2e/testdata/bin`) generates, commits, stamps
 `sources.read_at` and writes the skeletons.
 
+## `shop-vital`
+
+Laid over `shop` and `shop-formal`: the order payment as a vital area. `design/risk.yaml` makes
+`order-payment` vital, with two properties (`charged-once` over `act:Order.pay` and
+`tc:ORDE-8bd6e7`, `shipped-only-paid` over `inv:paid-before-shipped` and `tc:ORDE-e6d28f`), the core
+`internal/domain/**` entered at `internal/domain/order.go#Apply`, and two assumptions: one whose
+evidence, `fm:payment-provider-down`, is owed, and one whose evidence, `inv:terminal-is-final`, is
+not. `machinery.yaml` adds `constraints.cores` to the layers and sizes of `shop`. The failure
+mode `pay-replayed` (owed) names a duplication and is in no vital area, so it is a candidate, as
+is `tc:ORDE-70d94f` (the refused pay). `e2e/outage.sh` emits the receipt of
+`fm:payment-provider-down`.
+
+Counts the scripts rely on: 22 obligations (12 routine, 1 critical, 9 vital), 2 proof
+obligations, 9 vital ids, 2 candidates.
+
 ## `library`
 
 A project that keeps its design in its own formats, read through `import` and `trace.markers`

@@ -194,6 +194,8 @@ func (d *Design) OwedIssues() []string {
 			res = append(res, fmt.Sprintf("proposed: %s is in %s; a proposed id is not owed: remove it, or commit it first", e.ID, rel))
 		case d.Status(e.ID) == Retired:
 			res = append(res, fmt.Sprintf("retired: %s is in %s; a retired id is not owed: remove it, or un-retire it", e.ID, rel))
+		case d.IsProof(e.ID):
+			res = append(res, fmt.Sprintf("proof: %s is in %s; a proof obligation is not owed: it awaits a machine-checked proof, which this version cannot give; remove the entry", e.ID, rel))
 		case !d.Known(e.ID):
 			res = append(res, "unknown owed id: "+e.ID)
 		}

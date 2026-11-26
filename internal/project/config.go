@@ -34,6 +34,7 @@ type Config struct {
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
 	Routing      map[string]string `yaml:"routing,omitempty"`
+	Vital        *Vital            `yaml:"vital,omitempty"`
 	Tools        Tools             `yaml:"tools"`
 	Waivers      []Waiver          `yaml:"waivers,omitempty"`
 	Assess       *Assess           `yaml:"assess,omitempty"`
@@ -237,7 +238,23 @@ type Size struct {
 type Constraints struct {
 	Layers   []Layer `yaml:"layers,omitempty"`
 	Size     *Size   `yaml:"size,omitempty"`
+	Cores    *Cores  `yaml:"cores,omitempty"`
 	Baseline string  `yaml:"baseline,omitempty"`
+}
+
+// Cores is the shape of the core of every vital area (section 9).
+type Cores struct {
+	DenyImports  []string `yaml:"deny_imports,omitempty"`
+	MaxFileLines int      `yaml:"max_file_lines,omitempty"`
+	MaxFuncLines int      `yaml:"max_func_lines,omitempty"`
+}
+
+// Vital holds the word lists of machinery vital candidates (section 23.3). A
+// list that is set replaces its default, even when empty.
+type Vital struct {
+	Names   *[]string `yaml:"names,omitempty"`
+	Failure *[]string `yaml:"failure,omitempty"`
+	Effects *[]string `yaml:"effects,omitempty"`
 }
 
 type Receipts struct {
@@ -474,6 +491,19 @@ func (c *Config) validate() error {
 			}
 			steps = append(steps, check("constraints.size.paths", s.Paths...))
 		}
+		if cr := c.Constraints.Cores; cr != nil {
+			if cr.MaxFileLines <= 0 {
+				return Errf("constraints.cores.max_file_lines is required and must be positive")
+			}
+			if cr.MaxFuncLines <= 0 {
+				return Errf("constraints.cores.max_func_lines is required and must be positive")
+			}
+			for _, d := range cr.DenyImports {
+				if strings.TrimSpace(d) == "" {
+					return Errf("constraints.cores.deny_imports: an entry must not be empty")
+				}
+			}
+		}
 		steps = append(steps, check("constraints.baseline", c.Constraints.Baseline))
 	}
 	if err := c.validateImport(); err != nil {
@@ -486,8 +516,23 @@ func (c *Config) validate() error {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
 	}
 	for k := range c.Routing {
-		if k != "routine" && k != "consequential" && k != "critical" {
+		if k != "routine" && k != "consequential" && k != "critical" && k != "vital" {
 			return Errf("routing: unknown tier %q", k)
+		}
+	}
+	if v := c.Vital; v != nil {
+		for _, l := range []struct {
+			name  string
+			words *[]string
+		}{{"names", v.Names}, {"failure", v.Failure}, {"effects", v.Effects}} {
+			if l.words == nil {
+				continue
+			}
+			for _, w := range *l.words {
+				if strings.TrimSpace(w) == "" {
+					return Errf("vital.%s: a word must not be empty", l.name)
+				}
+			}
 		}
 	}
 	for _, w := range c.Waivers {
@@ -647,6 +692,7 @@ var DefaultRouting = map[string]string{
 	"routine":       "small model",
 	"consequential": "standard model; fresh verifier",
 	"critical":      "strongest model for the formal model; standard model for code; fresh verifier",
+	"vital":         "strongest model for the formal model and the core; standard model elsewhere; fresh verifier",
 }
 
 func (c *Config) applyDefaults() {

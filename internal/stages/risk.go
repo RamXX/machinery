@@ -32,8 +32,11 @@ func Risk(ctx *Context) *report.Stage {
 	for _, p := range d.StatusProblems {
 		s.Errorf("%s", p)
 	}
+	for _, p := range d.VitalProblems() {
+		s.Errorf("%s", p)
+	}
 	ids := d.DeclaredIDs()
-	cons, crit := 0, 0
+	cons, crit, vital := 0, 0, 0
 	for _, id := range ids {
 		if !tierable[kindOf(id)] {
 			continue
@@ -43,6 +46,8 @@ func Risk(ctx *Context) *report.Stage {
 			cons++
 		case design.Critical:
 			crit++
+		case design.Vital:
+			vital++
 		}
 	}
 	rel := ctx.P.Cfg.Design.Risk
@@ -62,6 +67,17 @@ func Risk(ctx *Context) *report.Stage {
 	}
 	if d.HasRisk {
 		s.Count(len(d.Areas), "areas").Count(cons, "consequential ids").Count(crit, "critical ids")
+		if vas := d.VitalAreas(); len(vas) > 0 {
+			props, assumes := 0, 0
+			for _, a := range vas {
+				props += len(a.Property)
+				assumes += len(a.Assumes)
+			}
+			s.Count(vital, "vital ids").Count(props, "properties").Count(assumes, "assumptions")
+		}
+		if len(d.NotVital) > 0 {
+			s.Count(len(d.NotVital), "dismissals")
+		}
 	}
 	if d.HasStatus {
 		s.Count(len(d.WithStatus(design.Proposed)), "proposed ids").Count(len(d.WithStatus(design.Retired)), "retired ids")

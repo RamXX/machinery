@@ -18,7 +18,7 @@ stdout 'failed: '
 
 cp bad-tier.yaml design/risk.yaml
 exec mrun 1 lint --stage risk
-stdout 'ERROR  design/risk.yaml: area-one: tier must be consequential or critical, got "routine" \(an id in no area is routine\)'
+stdout 'ERROR  design/risk.yaml: area-one: tier must be consequential, critical or vital, got "routine" \(an id in no area is routine\)'
 stdout 'failed: '
 
 cp bad-name.yaml design/risk.yaml

@@ -1,0 +1,194 @@
+# a vital area: properties over its own ids, a core, what the core assumes; stage risk holds the
+# shape and the references (docs/formats.md sections 23 and 23.1)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec machinery lint --stage risk
+stdout '^checked: 3 areas, 1 consequential ids, 1 critical ids, 9 vital ids, 2 properties, 2 assumptions$'
+stdout '^passed$'
+
+# a vital area yields its fv obligation like a critical one; its proof obligations are not in obligations.json
+exec machinery gen
+grep '"id": "fv:order-payment"' design/gen/obligations.json
+grep '"id": "fv:order-ownership"' design/gen/obligations.json
+! grep 'pf:' design/gen/obligations.json
+
+# vital needs its three keys and a question; another tier has none of them
+cp vital-bare.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: a vital area states at least one property$'
+stdout '^  ERROR  design/risk.yaml: order-payment: a vital area names its core \(core.paths and core.entry\)$'
+stdout '^  ERROR  design/risk.yaml: order-payment: a vital area states what its core assumes \(at least one entry under assumes\)$'
+stdout '^  ERROR  design/risk.yaml: order-payment: a vital area lists at least one question$'
+stdout '^failed: 4 finding\(s\)$'
+cp critical-with-property.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: only a vital area has property, core and assumes$'
+stdout '^failed: 1 finding\(s\)$'
+
+# the shape of a property
+cp bad-property.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: property 1: name must match \^\[a-z\]\[a-z0-9-\]\+\$$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property charged-once: duplicate name$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property no-statement: statement is required$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property bad-kind: kind must be invariant, pre-post, exactly-once or never, got "eventually"$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property no-over: over needs at least one id$'
+stdout '^failed: 5 finding\(s\)$'
+
+# what a property is over: exact ids of kind inv, act or tc that yield an obligation and belong to the area
+cp bad-over.yaml design/risk.yaml
+cp status-proposed.yaml design/status.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: property wrong-kind: over sc:customer-pays-and-the-order-ships: a property is over inv, act or tc ids$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property pattern: over tc:ORDE-\*: name an exact id, not a pattern$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property unknown: over inv:no-such-invariant is not an id of the design$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property outside: over tc:ORDE-1ded14 is not in the area; add it to ids, or name an id the area holds$'
+stdout '^  ERROR  design/risk.yaml: order-payment: property candidate: over inv:customer-email-unique is proposed: it yields no obligation$'
+stdout '^failed: 5 finding\(s\)$'
+rm design/status.yaml
+
+# the shape of the core
+cp bad-core.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: core.paths: "internal/\[domain" is not a valid glob$'
+stdout '^  ERROR  design/risk.yaml: order-payment: core.entry: "internal/domain/order.go" is not <file>#<symbol>$'
+stdout '^  ERROR  design/risk.yaml: order-payment: core.entry: "#Apply" is not <file>#<symbol>$'
+stdout '^failed: 3 finding\(s\)$'
+cp empty-core.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: core.paths needs at least one glob$'
+stdout '^  ERROR  design/risk.yaml: order-payment: core.entry needs at least one <file>#<symbol>$'
+stdout '^failed: 2 finding\(s\)$'
+
+# what the core assumes, each with evidence that is an obligation
+cp bad-assumes.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: order-payment: assumes 1: name must match \^\[a-z\]\[a-z0-9-\]\+\$$'
+stdout '^  ERROR  design/risk.yaml: order-payment: assumes store-cas: duplicate name$'
+stdout '^  ERROR  design/risk.yaml: order-payment: assumes no-statement: statement is required$'
+stdout '^  ERROR  design/risk.yaml: order-payment: assumes no-evidence: evidence needs at least one id$'
+stdout '^  ERROR  design/risk.yaml: order-payment: assumes act-evidence: evidence act:Order.ship is not an obligation of the design$'
+stdout '^  ERROR  design/risk.yaml: order-payment: assumes unknown-evidence: evidence fm:no-such-mode is not an obligation of the design$'
+stdout '^failed: 6 finding\(s\)$'
+
+# a lowering may start from vital
+cp lowered-from-vital.yaml design/risk.yaml
+exec machinery lint --stage risk
+stdout '^passed$'
+
+-- vital-bare.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay"]
+-- critical-with-property.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+    property:
+      - {name: charged-once, statement: "An order is charged at most once.", kind: exactly-once, over: ["act:Order.pay"]}
+-- bad-property.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+    questions: [concurrency]
+    property:
+      - {name: Charged_Once, statement: "A bad name.", kind: never, over: ["act:Order.pay"]}
+      - {name: charged-once, statement: "An order is charged at most once.", kind: exactly-once, over: ["act:Order.pay"]}
+      - {name: charged-once, statement: "Twice the same name.", kind: exactly-once, over: ["act:Order.pay"]}
+      - {name: no-statement, kind: invariant, over: ["act:Order.pay"]}
+      - {name: bad-kind, statement: "Some kind.", kind: eventually, over: ["act:Order.pay"]}
+      - {name: no-over, statement: "Over nothing.", kind: pre-post, over: []}
+    core: {paths: ["internal/domain/**"], entry: ["internal/domain/order.go#Apply"]}
+    assumes:
+      - {name: final-stays-final, statement: "The store keeps a final order final.", evidence: ["inv:terminal-is-final"]}
+-- bad-over.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "sc:customer-pays-and-the-order-ships", "inv:customer-email-unique"]
+    questions: [concurrency]
+    property:
+      - {name: wrong-kind, statement: "Over a scenario.", kind: invariant, over: ["sc:customer-pays-and-the-order-ships"]}
+      - {name: pattern, statement: "Over a pattern.", kind: invariant, over: ["tc:ORDE-*"]}
+      - {name: unknown, statement: "Over nothing that exists.", kind: invariant, over: ["inv:no-such-invariant"]}
+      - {name: outside, statement: "Over an id of another area.", kind: invariant, over: ["act:Order.pay", "tc:ORDE-1ded14"]}
+      - {name: candidate, statement: "Over a proposed id.", kind: invariant, over: ["inv:customer-email-unique"]}
+    core: {paths: ["internal/domain/**"], entry: ["internal/domain/order.go#Apply"]}
+    assumes:
+      - {name: final-stays-final, statement: "The store keeps a final order final.", evidence: ["inv:terminal-is-final"]}
+  - name: order-cancel
+    tier: consequential
+    why: "a refund"
+    ids: ["tc:ORDE-1ded14"]
+-- status-proposed.yaml --
+version: 1
+proposed:
+  - {id: "inv:customer-email-unique", note: "candidate"}
+-- bad-core.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+    property:
+      - {name: charged-once, statement: "An order is charged at most once.", kind: exactly-once, over: ["act:Order.pay"]}
+    core: {paths: ["internal/[domain"], entry: ["internal/domain/order.go", "#Apply"]}
+    assumes:
+      - {name: final-stays-final, statement: "The store keeps a final order final.", evidence: ["inv:terminal-is-final"]}
+-- empty-core.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+    property:
+      - {name: charged-once, statement: "An order is charged at most once.", kind: exactly-once, over: ["act:Order.pay"]}
+    core: {paths: [], entry: []}
+    assumes:
+      - {name: final-stays-final, statement: "The store keeps a final order final.", evidence: ["inv:terminal-is-final"]}
+-- bad-assumes.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+    property:
+      - {name: charged-once, statement: "An order is charged at most once.", kind: exactly-once, over: ["act:Order.pay"]}
+    core: {paths: ["internal/domain/**"], entry: ["internal/domain/order.go#Apply"]}
+    assumes:
+      - {name: Store_CAS, statement: "A bad name.", evidence: ["inv:terminal-is-final"]}
+      - {name: store-cas, statement: "The store writes a status with one compare-and-set.", evidence: ["inv:terminal-is-final"]}
+      - {name: store-cas, statement: "Twice the same name.", evidence: ["inv:terminal-is-final"]}
+      - {name: no-statement, evidence: ["inv:terminal-is-final"]}
+      - {name: no-evidence, statement: "Taken on trust.", evidence: []}
+      - {name: act-evidence, statement: "An action is no evidence.", evidence: ["act:Order.ship"]}
+      - {name: unknown-evidence, statement: "Evidence that does not exist.", evidence: ["fm:no-such-mode"]}
+-- lowered-from-vital.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves"
+    ids: ["act:Order.pay"]
+    questions: [concurrency]
+lowered:
+  - {ids: ["act:Order.pay"], from: vital, reason: "payments moved to a hosted page"}

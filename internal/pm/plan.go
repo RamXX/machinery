@@ -85,7 +85,7 @@ func BuildPlanFor(d *design.Design, ids []string, in *Intake) *Plan {
 	for _, s := range plan.Stories {
 		s.Key = uniqueKey(slug(s.Title), keys)
 		s.Tier, _ = StoryTier(d, &backlog.Issue{}, s.IDs)
-		s.Priority = 2 - design.TierRank(s.Tier)
+		s.Priority = Priority(s.Tier)
 		s.Labels = []string{"machinery", "tier:" + s.Tier}
 	}
 	plan.edges(d)

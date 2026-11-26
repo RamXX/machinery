@@ -1,0 +1,30 @@
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: pay-for-another-customer
+    kind: abuse
+    subject: act:Order.pay
+    failure: "A customer asks to pay an order that belongs to someone else."
+    required: refuse
+    behavior: "The request is refused with FORBIDDEN and the order does not change."
+  - id: pay-replayed
+    subject: act:Order.pay
+    failure: "A retried pay request reaches the payment provider twice."
+    required: fail-closed
+    behavior: "The second request finds the order paying or paid and charges nothing."
+  - id: place-without-customer
+    kind: abuse
+    subject: act:Order.place
+    failure: "A caller places an order that names no customer."
+    required: refuse
+    behavior: "The request is refused with CUSTOMER_REQUIRED and no order is created."
+  - id: ship-by-non-clerk
+    kind: abuse
+    subject: act:Order.ship
+    failure: "A caller who is not a Clerk asks to ship an order."
+    required: refuse
+    behavior: "The request is refused with FORBIDDEN and the order does not change."

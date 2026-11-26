@@ -612,7 +612,7 @@ func (st *IntakeStatus) Plan(d *design.Design) *Plan {
 			tier = n.Tier
 		}
 	}
-	c.Tier, c.Priority = tier, 2-design.TierRank(tier)
+	c.Tier, c.Priority = tier, Priority(tier)
 	c.Labels = []string{"machinery", "tier:" + tier}
 	for _, s := range plan.Stories {
 		c.needs = append(c.needs, need{s.Key, s.Title, capstoneNeed})

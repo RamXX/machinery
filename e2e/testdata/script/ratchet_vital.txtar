@@ -1,0 +1,57 @@
+# lowering a vital area is a ratchet finding like any tier lowering (sections 11.3 and 23)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 0 check --stage ratchet --base base
+stdout '^passed$'
+
+# vital to critical: every id of the area, unless the risk file records it
+cp risk-critical.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout '^  ERROR  ratchet: tier lowered: act:Order.pay vital -> critical; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: tier lowered: inv:paid-before-shipped vital -> critical; record it under lowered: in the risk file with a reason$'
+cp risk-critical-recorded.yaml design/risk.yaml
+exec mrun 0 check --stage ratchet --base base
+stdout '^  warn   ratchet: tier lowered: act:Order.pay vital -> critical \(card payments moved to a hosted page\)$'
+stdout '^passed$'
+
+-- risk-critical.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+-- risk-critical-recorded.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+lowered:
+  - {ids: ["act:Order.pay", "tc:ORDE-*", "inv:paid-before-shipped", "fm:pay*"], from: vital, reason: "card payments moved to a hosted page"}
