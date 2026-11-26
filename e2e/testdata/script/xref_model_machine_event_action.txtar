@@ -25,12 +25,106 @@ exec mrun 1 lint --stage xref-model-machine
 stdout 'ERROR  event-action: order: _external_events must be a list of event names'
 stdout 'ERROR  event-action: order.refund: event is not an action of Order'
 
+# an entity that declares no action: the events of its machine are one finding for the entity,
+# not one per event, and a listed event is left out of it
+cp order.json design/machines/Order.machine.json
+cp no-actions.yaml design/model/mini.modelith.yaml
+cp shelf.json design/machines/Shelf.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: entity:Shelf: declares no actions, so none of the 2 event\(s\) of shelf is one of its actions \(close, open\); add the actions to the model, or list the events in _external_events \(or in _failure_events when one reports a failure\)$'
+! stdout 'event-action: shelf\.'
+! stdout 'restock'
+stdout '^failed: 1 finding\(s\)$'
+
+# its waiver id is the entity
+cp waived.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: event-action: entity:Shelf: declares no actions'
+stdout '^passed$'
+
+# every event listed: nothing left to report
+cp shelf-external.json design/machines/Shelf.machine.json
+cp machinery.orig machinery.yaml
+exec machinery lint --stage xref-model-machine
+! stdout 'entity:Shelf'
+stdout '^passed$'
+
 -- machinery.yaml --
 version: 2
 design:
   models:
     - design/model/mini.modelith.yaml
   machines: design/machines
+-- machinery.orig --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: event-action, id: "entity:Shelf", reason: "the shelf is driven by the inventory feed"}
+-- no-actions.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+  ShelfState:
+    values:
+      - {name: Open, definition: "Open."}
+      - {name: Closed, definition: "Closed."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+  Shelf:
+    definition: "A shelf."
+    attributes:
+      - {name: state, type: ShelfState}
+-- shelf.json --
+{
+  "id": "shelf",
+  "initial": "Open",
+  "_external_events": ["restock"],
+  "states": {
+    "Open": { "on": { "close": { "target": "Closed" }, "restock": { "target": "Open" } } },
+    "Closed": { "on": { "open": { "target": "Open" } }, "_ignores": { "restock": "a closed shelf is not restocked" } }
+  }
+}
+-- shelf-external.json --
+{
+  "id": "shelf",
+  "initial": "Open",
+  "_external_events": ["restock", "close", "open"],
+  "states": {
+    "Open": { "on": { "close": { "target": "Closed" }, "restock": { "target": "Open" } } },
+    "Closed": { "on": { "open": { "target": "Open" } }, "_ignores": { "restock": "a closed shelf is not restocked" } }
+  }
+}
+-- order.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
 -- design/model/mini.modelith.yaml --
 kind: DomainModel
 version: v1

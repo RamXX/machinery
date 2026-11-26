@@ -4,7 +4,7 @@ fixture empty
 cp config.yaml machinery.yaml
 exec machinery lint --stage machines --stage xref-model-machine
 stdout '(?s)== machines ==\nchecked: 3 machines, 6 states, 6 transitions\npassed\n'
-stdout '(?s)== xref-model-machine ==\nchecked: 3 machines, 2 lifecycle machines, 1 operational machines, 4 domain states, 4 events, 4 actions, 1 entities with actions\npassed\n'
+stdout '(?s)== xref-model-machine ==\nchecked: 3 machines, 2 lifecycle machines, 1 operational machines, 4 domain states, 4 events, 2 actions, 1 entities with actions\npassed\n'
 
 # a glob binds the lifecycle, a machine id binds the operational machine, and the keys come
 # last, before the tag; a machine that binds itself is kept as it is

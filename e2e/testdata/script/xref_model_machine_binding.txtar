@@ -72,7 +72,7 @@ cp base.yaml machinery.yaml
 rm design/machines/Ops.machine.json
 cp alt.json design/machines/Alt.machine.json
 exec machinery lint --stage xref-model-machine
-stdout '^checked: 2 machines, 2 lifecycle machines, 0 operational machines, 6 domain states, 4 events, 4 actions, 1 entities with actions$'
+stdout '^checked: 2 machines, 2 lifecycle machines, 0 operational machines, 6 domain states, 4 events, 2 actions, 1 entities with actions$'
 stdout '^passed$'
 
 -- machinery.yaml --

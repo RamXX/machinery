@@ -102,10 +102,17 @@ type xrefCounts struct {
 	machines, lifecycle, operational, states, events, actions, withActions int
 }
 
+// lifecycleGroup is an entity with its lifecycle machines, in machine order.
+type lifecycleGroup struct {
+	entity   *design.Entity
+	machines []*machine.Machine
+}
+
 // checkModelMachine applies the rules of section 6.4 to the design.
 func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 	c.machines = len(d.Machines)
-	hasLifecycle := map[string]bool{}
+	var groups []*lifecycleGroup
+	byEntity := map[string]*lifecycleGroup{}
 	for _, m := range d.Machines {
 		b := bindingOf(d, m)
 		for _, p := range b.problems {
@@ -120,42 +127,21 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 			continue
 		}
 		c.lifecycle++
-		hasLifecycle[e.Name] = true
-		domain := domainStates(m)
-		c.states += len(domain)
-		checkStateEnum(&fs, d, m, e, domain)
-
-		external, ok := eventSet(m, "_external_events")
-		if !ok {
-			fs.add("event-action", m.ID, "_external_events must be a list of event names")
+		g := byEntity[e.Name]
+		if g == nil {
+			g = &lifecycleGroup{entity: e}
+			byEntity[e.Name] = g
+			groups = append(groups, g)
 		}
-		// a failure event arrives from outside: it is external
-		failure, ok := eventSet(m, "_failure_events")
-		if !ok {
-			fs.add("event-action", m.ID, "_failure_events must be a list of event names")
+		g.machines = append(g.machines, m)
+	}
+	for _, g := range groups {
+		for _, m := range g.machines {
+			c.states += len(domainStates(m))
 		}
-		for ev := range failure {
-			external[ev] = true
-		}
-		acts := map[string]bool{}
-		for _, a := range e.Actions {
-			acts[a.Name] = true
-		}
-		evs := m.Table.Events()
-		c.events += len(evs)
-		c.actions += len(e.Actions)
-		evSet := map[string]bool{}
-		for _, ev := range evs {
-			evSet[ev] = true
-			if !acts[ev] && !external[ev] {
-				fs.add("event-action", m.ID+"."+ev, "event is not an action of %s; add the action to the model or list the event in _external_events (or in _failure_events when it reports a failure)", e.Name)
-			}
-		}
-		for _, a := range e.Actions {
-			if !evSet[a.Name] {
-				fs.add("action-event", design.ActID(e.Name, a.Name), "no on event %s in machine %s (%s)", a.Name, m.ID, m.Path)
-			}
-		}
+		checkStateEnum(&fs, d, g)
+		c.events += checkLifecycleEvents(&fs, g)
+		c.actions += len(g.entity.Actions)
 	}
 	for _, md := range d.Models {
 		for _, e := range md.Entities {
@@ -163,12 +149,84 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 				continue
 			}
 			c.withActions++
-			if !hasLifecycle[e.Name] {
+			if byEntity[e.Name] == nil {
 				fs.add(ruleEntityMachine, "entity:"+e.Name, "declares %d action(s) and no machine is its lifecycle; write its lifecycle machine (_lifecycle_of: %s), or waive the rule with the reason it has no state", len(e.Actions), e.Name)
 			}
 		}
 	}
 	return fs, c
+}
+
+// externalEvents returns the events a machine declares as arriving from
+// outside: _external_events and _failure_events (a failure event arrives
+// from outside). A list of the wrong shape is a finding of event-action.
+func externalEvents(fs *xfindings, m *machine.Machine) map[string]bool {
+	external, ok := eventSet(m, "_external_events")
+	if !ok {
+		fs.add("event-action", m.ID, "_external_events must be a list of event names")
+	}
+	failure, ok := eventSet(m, "_failure_events")
+	if !ok {
+		fs.add("event-action", m.ID, "_failure_events must be a list of event names")
+	}
+	for ev := range failure {
+		external[ev] = true
+	}
+	return external
+}
+
+// checkLifecycleEvents applies event-action and action-event to the
+// lifecycle machines of one entity and returns how many events they have.
+// An entity that declares no action is one finding, not one per event: the
+// one missing declaration is the cause of all of them.
+func checkLifecycleEvents(fs *xfindings, g *lifecycleGroup) (events int) {
+	e := g.entity
+	acts := map[string]bool{}
+	for _, a := range e.Actions {
+		acts[a.Name] = true
+	}
+	evSet := map[string]bool{}
+	var unmatched, ids []string
+	seen := map[string]bool{}
+	for _, m := range g.machines {
+		external := externalEvents(fs, m)
+		evs := m.Table.Events()
+		events += len(evs)
+		ids = append(ids, m.ID)
+		for _, ev := range evs {
+			evSet[ev] = true
+			if acts[ev] || external[ev] {
+				continue
+			}
+			if len(e.Actions) > 0 {
+				fs.add("event-action", m.ID+"."+ev, "event is not an action of %s; add the action to the model or list the event in _external_events (or in _failure_events when it reports a failure)", e.Name)
+			} else if !seen[ev] {
+				seen[ev] = true
+				unmatched = append(unmatched, ev)
+			}
+		}
+	}
+	if len(unmatched) > 0 {
+		sort.Strings(unmatched)
+		fs.add("event-action", "entity:"+e.Name, "declares no actions, so none of the %d event(s) of %s is one of its actions (%s); add the actions to the model, or list the events in _external_events (or in _failure_events when one reports a failure)",
+			len(unmatched), strings.Join(ids, ", "), strings.Join(unmatched, ", "))
+	}
+	for _, a := range e.Actions {
+		if evSet[a.Name] {
+			continue
+		}
+		if len(g.machines) == 1 {
+			m := g.machines[0]
+			fs.add("action-event", design.ActID(e.Name, a.Name), "no on event %s in machine %s (%s)", a.Name, m.ID, m.Path)
+			continue
+		}
+		var where []string
+		for _, m := range g.machines {
+			where = append(where, fmt.Sprintf("%s (%s)", m.ID, m.Path))
+		}
+		fs.add("action-event", design.ActID(e.Name, a.Name), "no on event %s in any lifecycle machine of %s: %s", a.Name, e.Name, strings.Join(where, ", "))
+	}
+	return events
 }
 
 // XrefModelMachine is stage xref-model-machine (section 6.4).
@@ -297,9 +355,9 @@ type enumCand struct {
 	exact          bool
 }
 
-// checkStateEnum applies the state-enum rule to one lifecycle machine.
-func checkStateEnum(fs *xfindings, d *design.Design, m *machine.Machine, e *design.Entity, domain []string) {
-	_, model := design.FindEntity(d.Models, e.Name)
+// enumCands compares the domain states of a machine with every enum used as
+// the type of an attribute of its entity, in attribute order.
+func enumCands(model *design.Model, e *design.Entity, domain []string) []enumCand {
 	want := map[string]bool{}
 	for _, n := range domain {
 		want[n] = true
@@ -334,21 +392,44 @@ func checkStateEnum(fs *xfindings, d *design.Design, m *machine.Machine, e *desi
 			cands = append(cands, c)
 		}
 	}
-	var exact []string
-	for _, c := range cands {
-		if c.exact {
-			exact = append(exact, c.name)
+	return cands
+}
+
+// checkStateEnum applies the state-enum rule to the lifecycle machines of
+// one entity. An entity with no enum-typed attribute is one finding, not one
+// per machine.
+func checkStateEnum(fs *xfindings, d *design.Design, g *lifecycleGroup) {
+	e := g.entity
+	_, model := design.FindEntity(d.Models, e.Name)
+	if len(enumCands(model, e, nil)) == 0 {
+		var parts []string
+		for _, m := range g.machines {
+			parts = append(parts, fmt.Sprintf("%s (%s)", m.ID, strings.Join(domainStates(m), ", ")))
 		}
-	}
-	switch {
-	case len(exact) == 1:
+		need := "need one"
+		if len(parts) > 1 {
+			need = "need one each"
+		}
+		fs.add("state-enum", "entity:"+e.Name, "has no state enum (no attribute of %s has an enum type); the domain states of %s %s", e.Name, strings.Join(parts, " and of "), need)
 		return
-	case len(exact) > 1:
-		sort.Strings(exact)
-		fs.add("state-enum", m.ID, "more than one enum of %s has the domain states of the machine: %s", e.Name, strings.Join(exact, ", "))
-	case len(cands) == 0:
-		fs.add("state-enum", m.ID, "entity %s has no attribute whose type is an enum; the domain states (%s) need one", e.Name, strings.Join(domain, ", "))
-	default:
+	}
+	for _, m := range g.machines {
+		domain := domainStates(m)
+		cands := enumCands(model, e, domain)
+		var exact []string
+		for _, c := range cands {
+			if c.exact {
+				exact = append(exact, c.name)
+			}
+		}
+		switch {
+		case len(exact) == 1:
+			continue
+		case len(exact) > 1:
+			sort.Strings(exact)
+			fs.add("state-enum", m.ID, "more than one enum of %s has the domain states of the machine: %s", e.Name, strings.Join(exact, ", "))
+			continue
+		}
 		sort.SliceStable(cands, func(i, j int) bool {
 			if cands[i].overlap != cands[j].overlap {
 				return cands[i].overlap > cands[j].overlap
@@ -356,6 +437,15 @@ func checkStateEnum(fs *xfindings, d *design.Design, m *machine.Machine, e *desi
 			return cands[i].name < cands[j].name
 		})
 		c := cands[0]
+		if c.overlap == 0 {
+			var names []string
+			for _, cd := range cands {
+				names = append(names, cd.name)
+			}
+			sort.Strings(names)
+			fs.add("state-enum", m.ID, "entity %s has no state enum for this machine: no enum of its attributes (%s) has a value among the domain states (%s); add an enum attribute with these values", e.Name, strings.Join(names, ", "), strings.Join(domain, ", "))
+			continue
+		}
 		var parts []string
 		if len(c.missing) > 0 {
 			parts = append(parts, "missing from the machine: "+strings.Join(c.missing, ", "))

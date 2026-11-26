@@ -41,10 +41,22 @@ cp order.json design/machines/Order.machine.json
 exec mrun 1 lint --stage xref-model-machine
 stdout 'ERROR  state-enum: order: more than one enum of Order has the domain states of the machine: Copy, Status'
 
-# an entity with no enum-typed attribute
+# an enum that shares no value with the domain states is not named: the entity has no state
+# enum for the machine
+cp unrelated-enum.yaml design/model/mini.modelith.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  state-enum: order: entity Order has no state enum for this machine: no enum of its attributes \(Channel, Status\) has a value among the domain states \(Cancelled, Paid, Pending\); add an enum attribute with these values$'
+! stdout 'differ from enum'
+
+# an entity with no enum-typed attribute is one finding for the entity, waived by entity id
 cp no-enum.yaml design/model/mini.modelith.yaml
 exec mrun 1 lint --stage xref-model-machine
-stdout 'ERROR  state-enum: order: entity Order has no attribute whose type is an enum; the domain states \(Cancelled, Paid, Pending\) need one'
+stdout '^  ERROR  state-enum: entity:Order: has no state enum \(no attribute of Order has an enum type\); the domain states of order \(Cancelled, Paid, Pending\) need one$'
+stdout '^failed: 1 finding\(s\)$'
+cp waived.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: state-enum: entity:Order: has no state enum'
+stdout '^passed$'
 
 -- machinery.yaml --
 version: 2
@@ -195,6 +207,36 @@ entities:
     attributes:
       - {name: status, type: Status}
       - {name: copy, type: Copy}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: state-enum, id: "entity:Order", reason: "the status lives in the ledger, not on the order"}
+-- unrelated-enum.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Open, definition: "x"}
+      - {name: Closed, definition: "x"}
+  Channel:
+    values:
+      - {name: Web, definition: "x"}
+      - {name: Phone, definition: "x"}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+      - {name: channel, type: Channel}
     actions:
       - {name: pay, actor: Customer}
       - {name: cancel, actor: Customer}
