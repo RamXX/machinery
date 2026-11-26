@@ -6,6 +6,7 @@ import (
 	"github.com/RamXX/machinery/internal/backlog"
 	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/landing"
 	"github.com/RamXX/machinery/internal/pm"
 	"github.com/RamXX/machinery/internal/report"
 )
@@ -19,6 +20,7 @@ func runAccept(e *Env, args []string) int {
 	verdict := fs.String("verdict", "", "accept or reject")
 	observed := fs.String("observed", "", "what was seen")
 	closeIt := fs.Bool("close", false, "close the story when the gate passes")
+	repair := fs.Bool("repair", false, "with --close: close the story while the integration branch is red, as its repair")
 	actor := fs.String("actor", "", "who decides (default BEADS_ACTOR, else git user.name)")
 	pos, ok := parseMixed(e, fs, args)
 	if !ok {
@@ -33,10 +35,23 @@ func runAccept(e *Env, args []string) int {
 		return e.Usage("machinery accept needs --observed")
 	case *closeIt && *verdict != "accept":
 		return e.Usage("--close needs --verdict accept")
+	case *repair && !*closeIt:
+		return e.Usage("--repair needs --close")
 	}
 	p, ok := e.Project()
 	if !ok {
 		return 2
+	}
+	var red *landing.Red
+	if *closeIt {
+		var err error
+		if red, err = landing.LoadRed(p); err != nil {
+			return e.Fail(err)
+		}
+		if red != nil && !*repair {
+			fmt.Fprintln(e.Stdout, red.Refusal())
+			return 1
+		}
 	}
 	c, err := backlog.New(p, *actor)
 	if err != nil {
@@ -52,6 +67,11 @@ func runAccept(e *Env, args []string) int {
 	head, err := gitx.Head(p.Root)
 	if err != nil {
 		return e.Fail(fmt.Errorf("cannot read the current commit: %v", err))
+	}
+	if red != nil {
+		if err := c.Note(is.ID, "machinery:repair "+gitx.Short(red.Commit)); err != nil {
+			return e.Fail(err)
+		}
 	}
 	line := fmt.Sprintf("machinery:verdict %s commit=%s actor=%s observed=%s", *verdict, head, c.Actor, backlog.Quote(*observed))
 	if err := c.Note(is.ID, line); err != nil {

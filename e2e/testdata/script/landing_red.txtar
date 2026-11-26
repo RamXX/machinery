@@ -1,0 +1,96 @@
+# a failed landing marks the integration branch red: accept --close and a landing at another head
+# refuse until a repair (--repair) or a revert (--clear-red) (section 12.2)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec git branch base
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-r1 --title 'Prove order pay' --body-file r1.txt --silent
+
+# a passing landing leaves no marker
+exec machinery landing --base base -- sh e2e/orders.sh
+stdout '^landing: passed at '
+! exists .git/machinery/red.json
+
+# a failed landing writes the marker: the commit, the base and the stages that did not pass
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 1, fix-forward 0 of 2\)$'
+exists .git/machinery/red.json
+grep '"version": 1' .git/machinery/red.json
+grep '"base": "base"' .git/machinery/red.json
+grep '"stages": \[\n    "run"\n  \]' .git/machinery/red.json
+exec sh -c 'grep -c "\"commit\": \"$(git rev-parse HEAD)\"" .git/machinery/red.json'
+stdout '^1$'
+exec sh -c 'git rev-parse --short=7 HEAD > .git/red.txt'
+
+# status prints the red line first
+exec sh -c 'machinery status | head -n 1'
+stdout '^red: since [0-9a-f]{7} \(run\): repair or revert first$'
+
+# another attempt at the red head is allowed
+exec mrun 1 landing --base base -- sh -c 'exit 3'
+stdout '^landing: failed at [0-9a-f]{7} \(attempt 2, fix-forward 0 of 2\)$'
+
+# a landing at another head refuses before anything runs or is counted
+exec git -c user.name=t -c user.email=t@t commit -q --allow-empty -m 'next story'
+exec mrun 1 landing --base base -- sh e2e/orders.sh
+stdout '^ERROR  the integration branch is red since [0-9a-f]{7} \(run\): repair or revert first$'
+! stdout '== model =='
+! stderr 'machinery run'
+grep '"attempts": 2' .git/machinery/landing.json
+exec sh -c 'machinery landing --base base -- true | grep -c "red since $(cat .git/red.txt) "'
+stdout '^1$'
+
+# accept --close refuses too, and records nothing; accept without --close does not refuse
+exec machinery run -- sh e2e/orders.sh
+exec machinery proof --story shop-r1 --post
+exec mrun 1 accept shop-r1 --verdict accept --observed 'pay moves the order to paying' --close --actor verifier
+stdout '^ERROR  the integration branch is red since [0-9a-f]{7} \(run\): repair or revert first$'
+exec bd show shop-r1 --json
+! stdout 'machinery:verdict'
+stdout '"status": "open"'
+exec machinery accept shop-r1 --verdict accept --observed 'pay moves the order to paying' --actor verifier
+stdout '^machinery:verdict accept '
+
+# --repair: the story records the red commit it repairs, then closes
+exec machinery accept shop-r1 --verdict accept --observed 'pay moves the order to paying' --close --repair --actor verifier
+stdout '^closed: shop-r1$'
+exec sh -c 'bd show shop-r1 --json | grep -c "machinery:repair $(cat .git/red.txt)"'
+stdout '^1$'
+exec mrun 2 accept shop-r1 --verdict accept --observed 'x' --repair
+stderr '^usage: --repair needs --close$'
+
+# --repair lets a landing at another head run; a passing landing removes the marker
+exec machinery landing --base base --repair -- sh e2e/orders.sh
+stdout '^landing: passed at [0-9a-f]{7} \(attempt 3, fix-forward 1 of 2\)$'
+! exists .git/machinery/red.json
+exec machinery status
+! stdout '^red:'
+
+# a failure in check names its stages, in the order they ran
+exec sh -c 'printf "  - id: inv:terminal-is-final\n    reason: \"dropped\"\n" >> design/owed.yaml'
+exec mrun 1 landing --base base -- sh e2e/orders.sh
+grep '"stages": \[\n    "ratchet"\n  \]' .git/machinery/red.json
+exec sh -c 'machinery status | head -n 1'
+stdout '^red: since [0-9a-f]{7} \(ratchet\): repair or revert first$'
+
+# every worktree shares the marker
+exec git worktree add -q wt HEAD
+exec sh -c 'machinery -C wt status | head -n 1'
+stdout '^red: since [0-9a-f]{7} \(ratchet\): repair or revert first$'
+exec git worktree remove --force wt
+
+# --clear-red removes the marker after a revert and says what it cleared
+exec mrun 2 landing --clear-red
+stderr '^usage: --clear-red needs --reason <text>$'
+exec mrun 2 landing --clear-red --reason 'reverted' --base base
+stderr '^usage: machinery landing --clear-red --reason <text> takes nothing else$'
+exec machinery landing --clear-red --reason 'reverted the failing story'
+stdout '^red: cleared [0-9a-f]{7} \(ratchet\): reverted the failing story$'
+! exists .git/machinery/red.json
+exec machinery landing --clear-red --reason 'again'
+stdout '^red: none$'
+
+-- r1.txt --
+machinery:ids tc:ORDE-2e883d

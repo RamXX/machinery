@@ -30,6 +30,7 @@ type Options struct {
 	Probe          bool     // also probe the proven transition cases
 	ProbeMax       int      // with Probe: keep the first n mutations (0: all)
 	Workers        int      // TLC worker threads for the formal re-run
+	Repair         bool     // land at another head while the branch is red
 	Stdout, Stderr io.Writer
 }
 
@@ -140,12 +141,28 @@ func Run(p *project.Project, o Options) (exit int, err error) {
 	if err != nil {
 		return 1, fmt.Errorf("cannot read the current commit (landing needs a git repository with a commit): %v", err)
 	}
+	red, err := LoadRed(p)
+	if err != nil {
+		return 1, err
+	}
+	if red != nil && red.Commit != head && !o.Repair {
+		fmt.Fprintln(o.Stdout, red.Refusal())
+		return 1, nil
+	}
 	att, err := Begin(p, head)
 	if err != nil {
 		return 1, err
 	}
-	passed := gate(p, o, argv)
+	failed := gate(p, o, argv)
+	passed := len(failed) == 0
 	if err := Finish(p, att, head, passed); err != nil {
+		return 1, err
+	}
+	if passed {
+		if _, err := ClearRed(p); err != nil {
+			return 1, err
+		}
+	} else if err := writeRed(p, Red{Commit: head, Base: o.Base, Stages: failed}); err != nil {
 		return 1, err
 	}
 	state := "failed"
@@ -162,11 +179,13 @@ func Run(p *project.Project, o Options) (exit int, err error) {
 	return 0, nil
 }
 
-// gate runs the three steps in order and stops at the first that fails.
-func gate(p *project.Project, o Options, argv []string) bool {
+// gate runs the steps in order, stops at the first that does not pass and
+// returns the stages that failed or were not demonstrated; none when the
+// landing passed. The end-to-end suite is the stage "run".
+func gate(p *project.Project, o Options, argv []string) []string {
 	names := append(append([]string{}, stages.CheckStages...), "ratchet")
-	if report.PrintAll(o.Stdout, "check", stages.Run(&stages.Context{P: p, Base: o.Base}, names)) != 0 {
-		return false
+	if failed := printStep(o, "check", stages.Run(&stages.Context{P: p, Base: o.Base}, names)); len(failed) > 0 {
+		return failed
 	}
 	// committed formal results are only data until the tools reproduce them
 	if specs, err := formal.Load(p); err == nil && len(specs) > 0 {
@@ -175,26 +194,41 @@ func gate(p *project.Project, o Options, argv []string) bool {
 			workers = 2
 		}
 		st := formal.VerifyStage(p, design.Load(p), specs, workers)
-		if report.PrintAll(o.Stdout, "formal check", []*report.Stage{st}) != 0 {
-			return false
+		if failed := printStep(o, "formal check", []*report.Stage{st}); len(failed) > 0 {
+			return failed
 		}
 	}
 	exit, file, err := evidence.Run(p, evidence.RunOptions{Stack: o.Stack, Stdout: o.Stdout, Stderr: o.Stderr}, argv)
 	if err != nil {
 		fmt.Fprintf(o.Stderr, "machinery: run: %v\n", err)
-		return false
+		return []string{"run"}
 	}
 	fmt.Fprintf(o.Stderr, "machinery run: %s (exit %d)\n", p.Rel(file), exit)
 	if exit != 0 {
-		return false
+		return []string{"run"}
 	}
 	ctx := &stages.Context{P: p}
-	if report.PrintAll(o.Stdout, "verify", []*report.Stage{stages.Verify(ctx, false)}) != 0 {
-		return false
-	}
-	if !o.Probe {
-		return true
+	if failed := printStep(o, "verify", []*report.Stage{stages.Verify(ctx, false)}); len(failed) > 0 || !o.Probe {
+		return failed
 	}
 	st := stages.Probe(ctx, probe.Options{Max: o.ProbeMax, Argv: argv, Stack: o.Stack, Stdout: o.Stdout, Stderr: o.Stderr})
-	return report.PrintAll(o.Stdout, "probe", []*report.Stage{st}) == 0
+	return printStep(o, "probe", []*report.Stage{st})
+}
+
+// printStep prints the stages of one step and returns those that failed or were
+// not demonstrated, in order.
+func printStep(o Options, command string, ss []*report.Stage) []string {
+	if report.PrintAll(o.Stdout, command, ss) == 0 {
+		return nil
+	}
+	var failed []string
+	for _, s := range ss {
+		if out := s.Outcome(); out == report.Failed || out == report.NotDemonstrated {
+			failed = append(failed, s.Name)
+		}
+	}
+	if len(failed) == 0 {
+		failed = []string{command}
+	}
+	return failed
 }

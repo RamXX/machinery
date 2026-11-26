@@ -8,6 +8,7 @@ import (
 	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/landing"
 )
 
 func init() {
@@ -30,6 +31,9 @@ func runStatus(e *Env, args []string) int {
 	}
 	d := design.Load(p)
 	w := e.Stdout
+	if red, err := landing.LoadRed(p); err == nil && red != nil {
+		fmt.Fprintf(w, "red: since %s: repair or revert first\n", red.What())
+	}
 	fmt.Fprintf(w, "project: %s\n", filepath.Base(p.Root))
 	kinds := map[string]int{}
 	tiers := map[string]int{}

@@ -27,8 +27,11 @@ stdout 'reach SomeOrder not reached'
 exec git checkout -q HEAD~1 -- design/formal/order-ownership.result.json
 gitcommit 'restore the result'
 
-# --probe: this emitter only prints receipts, so every mutation survives and the landing fails
+# --probe: this emitter only prints receipts, so every mutation survives and the landing fails;
+# the branch is red since the tampered result, so this head lands as its repair
 exec mrun 1 landing --base base --probe --probe-max 2
+stdout '^ERROR  the integration branch is red since [0-9a-f]{7} \(formal\): repair or revert first$'
+exec mrun 1 landing --base base --probe --probe-max 2 --repair
 stdout '== probe =='
 stdout 'checked: 2 mutations, 0 killed, 2 survived'
 stdout 'landing: failed'
