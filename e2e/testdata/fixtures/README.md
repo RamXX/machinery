@@ -118,6 +118,11 @@ subtest of `TestCancelIsFinal`) and `SHOP_ROUTING=fail` (`TestRouting`, which cl
 
 Without a tag the suite has 6 test functions with a verdict; with `-tags faults`, 7.
 
+`run-suite.sh` is the project's wrapper: it copies the test files to `stage/suite` (package
+`example.test/shop/stage/suite`), starts `go test` twice (plain, then `-tags faults -run
+TestProviderDown`), writes each event stream to `$MACHINERY_GO_TEST_JSON` when that is set, and
+removes `stage`. `SUITE_FLAGS` replaces its default flags, `-count=1`.
+
 ## `library`
 
 A project that keeps its design in its own formats, read through `import` and `trace.markers`

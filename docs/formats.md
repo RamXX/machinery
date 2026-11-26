@@ -320,7 +320,7 @@ Rules:
 | `machinery trace` | Stage `trace` (section 8). |
 | `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3), and with `--story <id>` as well stage `scope` (section 15.11). |
 | `machinery checks` | Prints the declaration of applicable checks (section 3.4). A report, never a gate. |
-| `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). `--adapter go-test-json -- go test ...` also writes the receipts of an existing Go suite from its event stream (section 10.3). |
+| `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). `--adapter go-test-json -- go test ...` also writes the receipts of an existing Go suite from its event stream, and with `--streams -- <command>` from the streams a wrapper leaves (section 10.3). |
 | `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`. |
 | `machinery affected --base <ref>` | Prints the obligation ids a change touches (section 12.1). |
 | `machinery landing --base <ref>` | The end gate: `check`, the full suite through `run`, `verify` (section 12.2). A failed landing marks the integration branch red. `--repair`; `--clear-red --reason <text>`. |
@@ -1618,7 +1618,7 @@ for such a run too.
 
 The command runs in the project root. The variables machinery sets for a run
 (`MACHINERY_RECEIPTS`, `MACHINERY_COMMIT`, `MACHINERY_ONLY`, `MACHINERY_TABLES_DIR`,
-`MACHINERY_PROBE_CASE`) are never inherited from the caller.
+`MACHINERY_PROBE_CASE`, `MACHINERY_GO_TEST_JSON`) are never inherited from the caller.
 
 The file is JSON Lines. Three line types:
 
@@ -1801,12 +1801,14 @@ critical or vital area.
 `test`. The flags before a `-args` are read:
 
 - `-json` is added when it is absent, right after `test`, or after a leading `-C <dir>`.
-- `-count` may be absent or `1`. Any other value is refused: a function that runs several
-  times has several verdicts.
+- `-count=1` is added when `-count` is absent, after `-json`, so that `go test` never answers
+  from its cache. Any other value is refused: a function that runs several times has several
+  verdicts.
 - `-tags` gives the build tags of the run, in the order written (separated by commas or
   spaces); without the flag they are read from a `-tags=` word of `GOFLAGS`.
 
-The header records the command as it ran, `-json` included, and `"adapter":"go-test-json"`.
+The header records the command as it ran, `-json` and `-count=1` included, and
+`"adapter":"go-test-json"`.
 machinery prints the `Output` text of every event on its standard output, and a line of the
 stream that is no event as it is.
 
@@ -1815,14 +1817,17 @@ Refusals, each `usage: <message>` with exit 2, before anything runs and with no 
 | Message | When |
 |---|---|
 | `--adapter: unknown adapter "<name>"; the only adapter is go-test-json` | Another name. |
-| `--adapter go-test-json: the command must be go test, got <first two words>` | The command is not `go test`: a wrapper cannot be given `-json` and its output is not known to be the event stream. |
+| `--adapter go-test-json: the command must be go test, got <first two words>` | The command is not `go test`: a wrapper cannot be given `-json` and its output is not known to be the event stream. A wrapper goes through `--streams`. |
 | `--adapter go-test-json: -count=<value> is refused: write -count=1` | A `-count` other than 1. |
 | `--adapter go-test-json: -json=false is refused: the adapter reads the event stream` | `-json` switched off. |
+| `--streams needs --adapter go-test-json` | `--streams` alone. |
 | `--adapter go-test-json: trace.tests is not set: the adapter joins the run to the claims of the test files; list them in machinery.yaml` | No `trace.tests`. |
 | `--adapter go-test-json: evidence.adapter.sources: entry <n>: files match no file under trace.tests` | A source map entry that maps onto nothing. |
 
 **Cached results never count.** Without `-count=1`, `go test` may answer for a package from its
-cache and replay the events of an earlier run. It marks that in the stream: a package-level
+cache and replay the events of an earlier run. machinery adds the flag to a command it runs
+itself; it cannot add it to the `go test` a wrapper starts (`--streams`, below), and there this
+rule is the whole protection. It marks that in the stream: a package-level
 `output` event (one with no `Test`) whose text begins with `ok` and has the field `(cached)`,
 `ok  \t<package>\t(cached)`. A package with such an event is refused whole: none of its
 verdicts is read, a pass or a skip, and the summary names it. `go test` caches only passing
@@ -1847,9 +1852,9 @@ and 8.1). Each is attributed:
 **Which verdict.** The verdict of a function is its `pass`, `fail` or `skip` event. Events of
 subtests (a `Test` with a `/`) are not read: `go test` fails the parent when a subtest fails,
 and the parent's verdict stands for them. A function with no such event did not run, whatever
-other events name it. A function with several verdicts, in one package (a `-count` that came
-from `GOFLAGS`) or in several (one file staged into two packages), failed when one of them is
-a `fail` and, if none is, was skipped when one of them is a `skip`. The stream names a package and a function, never a file, so the function
+other events name it. A function with several verdicts in one stream, in one package (a `-count`
+that came from `GOFLAGS`) or in several (one file staged into two packages), failed when one of
+them is a `fail` and, if none is, was skipped when one of them is a `skip`. The stream names a package and a function, never a file, so the function
 is found by package and name:
 
 1. The import path of a test file is the module path of the nearest `go.mod` at or above it,
@@ -1901,6 +1906,56 @@ An adapter receipt is a receipt line with three more keys:
 
 Receipts are written sorted by id, then file, then function, the file-level one first.
 
+**Suites run through a wrapper: `--streams`.** A project may run its tests through a make
+target or a script that stages sources and starts `go test` itself, perhaps several times.
+machinery cannot add `-json` to that, so the wrapper hands over the streams:
+
+```
+machinery run --adapter go-test-json --streams [--stack "<description>"] -- <command> [args...]
+```
+
+The command is any command. machinery creates an empty directory outside the project, exports
+its absolute path as `MACHINERY_GO_TEST_JSON` (a variable never inherited from the caller, like
+those of section 10), runs the command with its standard output untouched, and when it has
+exited reads every regular file directly in that directory whose name ends in `.json` or
+`.jsonl`, in the order of their names, each as one stream of `go test -json`. Nothing else in
+the directory is read. The directory is removed after reading, whatever was found.
+`--streams` without `--adapter` is `usage: --streams needs --adapter go-test-json`.
+
+- **Every rule above holds for every stream**: test functions, attribution, verdicts, the cached
+  package, the package that must end with pass, `evidence.adapter.sources`, which matters most
+  here because staged tests run as packages of other directories. The command is not read: there
+  is no check of `-count`, and the build tags recorded are those of `GOFLAGS` alone, since the
+  flags a wrapper passes are not seen.
+- **A stream must be well formed.** Every line that is not blank is a JSON object with an
+  `Action`, and the file has at least one. Otherwise the run is left incomplete: machinery
+  writes no receipt and no end line, prints
+  `machinery: run: stream <file>: line <n>: not a go test -json event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again`
+  (`stream <file>: no event; ...` for a file without one) and exits with the command's exit
+  code, or 1 when that was 0. `verify` reports the file as an incomplete run (section 12).
+- **No stream at all** is a run that ran nothing the adapter can read. The run is complete, it
+  has no adapter receipt, and the summary begins with
+  `adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven`.
+- **One function in several streams.** The verdicts of a cached package are not read, in the
+  stream where it was cached. Among the others, a function of a package whose verdict is not
+  the same in every stream that has one failed, whichever the verdicts are, and the summary
+  says `adapter: <import path>.<function>: <verdict> in <file>, <verdict> in <file>: verdicts differ, read as fail`.
+  With one verdict in all of them, a pass counts only when the package ended with pass in each
+  of those streams.
+- **A test binary run directly.** A wrapper may build a test binary and run it under
+  `go tool test2json`. Such a stream has no `ok` line of `go test`, but with
+  `-p <import path>` it names its package on every event and ends with a package-level `pass`
+  or `fail` event, and it is never answered from a cache. It is read under the same rules and
+  nothing more is asked of it. What it says is weaker in one respect, and no rule can check
+  it: the package is the one the wrapper named, not one `go test` resolved and built. Without
+  `-p` the events name no package: their verdicts belong to no file, are used for nothing, and
+  are counted in the summary.
+
+The first line of the summary then counts the streams as well:
+`adapter go-test-json: <n> stream(s), <n> package(s), <n> test function(s) with a verdict: ...`,
+a package or a function seen in several streams counted once, a function whose verdicts differ
+as failed.
+
 **What the adapter never proves.** A `tc` id needs a receipt whose `effects` the test observed
 (section 12), and a `cx` id a receipt with what the replay did (section 16.10). A verdict of
 `go test` carries neither. A claim of such an id in a Go test file writes nothing and is
@@ -1918,9 +1973,11 @@ adapter: claimed, verdict not counted: <n> id(s)
 adapter: needs a receipt with effects: <n> tc id(s)
 adapter: needs a receipt with a replay: <n> cx id(s)
 adapter: <n> test function(s) with a verdict are in no file under trace.tests
+adapter: <n> verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>
 adapter: package <import path>: answered from the cache; nothing in it counts: run with -count=1
 adapter: package <import path>: did not end with pass; no pass is written from it
 adapter: <import path>.<function>: defined in <file>, <file>: ambiguous, its verdict counts for none of them
+adapter: <import path>.<function>: <verdict> in <file>, <verdict> in <file>: verdicts differ, read as fail
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: not Go source that parses; its claims count nothing
 ```

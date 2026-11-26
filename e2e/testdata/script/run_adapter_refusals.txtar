@@ -1,4 +1,4 @@
-# what the adapter refuses before it runs anything, and a package answered from the test cache
+# what the adapter refuses before it runs anything, and the flags it adds to go test
 # (section 10.3)
 fixture shop
 fixture shop-gotests
@@ -35,15 +35,18 @@ rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite -args -- -count=2
 stderr 'adapter: receipts written: 5 pass, 0 fail, 0 skip$'
 
-# without -count=1 go test may answer from its cache: such a package counts nothing
+# -count=1 is added when it is absent: go test never answers from its cache
 rm .machinery/receipts
-exec machinery run --adapter go-test-json -- go test ./e2e/suite
-exec machinery run --adapter go-test-json -- go test ./e2e/suite
-stdout '^ok  \texample\.test/shop/e2e/suite\t\(cached\)$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
-stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; nothing in it counts: run with -count=1$'
-exec sh -c '! grep -q "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+exec machinery run --adapter go-test-json -- go test -short ./e2e/suite
+exec machinery run --adapter go-test-json -- go test -short ./e2e/suite
+! stdout cached
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c 'grep -h "\"type\":\"run\"" .machinery/receipts/*.jsonl'
+stdout -count=2 '"command":\["go","test","-json","-count=1","-short","./e2e/suite"\],'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -C e2e/suite -json .
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"command":\["go","test","-C","e2e/suite","-count=1","-json","."\],'
 
 # without trace.tests there is no claim to join the run to
 cp notrace.yaml machinery.yaml

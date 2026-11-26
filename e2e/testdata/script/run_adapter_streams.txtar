@@ -1,0 +1,145 @@
+# a suite run through a wrapper that stages the tests and starts go test itself, twice:
+# machinery reads the streams the wrapper left in MACHINERY_GO_TEST_JSON (section 10.3)
+fixture shop
+fixture shop-gotests
+cp mapped.yaml machinery.yaml
+exec machinery gen
+gitinit
+
+exec mrun 2 run --streams -- sh run-suite.sh
+stderr '^usage: --streams needs --adapter go-test-json$'
+
+# two streams of one staged package, joined to the files under trace.tests through the map
+exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
+stdout '^run-suite: 2 go test run\(s\), exit 0$'
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 1 package\(s\), 7 test function\(s\) with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"command":\["sh","run-suite.sh"\],"stack":"","started":"[^"]+","adapter":"go-test-json"\}$'
+exec sh -c 'grep -h inv:paid-before-shipped .machinery/receipts/*.jsonl'
+stdout '"test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":\[\]\}$'
+exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
+stdout '"outcome":"pass","test":"e2e/suite/outage_test.go"'
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 6 proven, 3 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
+stdout '^  ERROR  stale owed entry: fm:payment-provider-down is proven$'
+
+# no stream: the command ran nothing the adapter can read. A file of another name is not read.
+# The directory is machinery's own, it starts empty, and it is gone after the run
+rm .machinery/receipts
+env MACHINERY_GO_TEST_JSON=/nonexistent
+exec machinery run --adapter go-test-json --streams -- sh -c 'ls -A "$MACHINERY_GO_TEST_JSON" | wc -l; echo "$MACHINERY_GO_TEST_JSON" > .machinery/dir.txt; echo notes > "$MACHINERY_GO_TEST_JSON/notes.txt"'
+env MACHINERY_GO_TEST_JSON=
+stdout '^ *0$'
+stderr '^machinery run: adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 6 id\(s\)$'
+! grep nonexistent .machinery/dir.txt
+exec sh -c 'test ! -e "$(cat .machinery/dir.txt)"'
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
+
+# machinery cannot add -count=1 to what a wrapper starts: a package answered from the cache
+# counts nothing
+rm .machinery/receipts
+env SUITE_FLAGS=-short
+exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
+exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
+env SUITE_FLAGS=
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 6 id\(s\)$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: answered from the cache; nothing in it counts: run with -count=1$'
+exec sh -c '! grep -q "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+
+# one function with a pass in one stream and a skip in another: its verdicts differ, it failed
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh twice.sh
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 1 package\(s\), 6 test function\(s\) with a verdict: 5 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestEmailUnique: pass in a\.json, skip in b\.json: verdicts differ, read as fail$'
+stderr '^machinery run: adapter: receipts written: 4 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+
+# a test binary run directly under go tool test2json -p: read under the same rules
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh direct.sh -p example.test/shop/e2e/suite
+stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 1 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+# its package did not end with pass: no pass from it
+rm .machinery/receipts
+env SHOP_ROUTING=fail
+exec machinery run --adapter go-test-json --streams -- sh direct.sh -p example.test/shop/e2e/suite
+env SHOP_ROUTING=
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr 'package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
+# without -p its events name no package: the verdicts are used for nothing
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh direct.sh
+stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 0 package\(s\), 0 test function\(s\) with a verdict: 0 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: 6 verdict\(s\) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>$'
+
+# a file that is not a well-formed stream: the run is left incomplete and nothing of it counts
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh broken.sh
+stderr '^machinery: run: stream 2-broken\.jsonl: line 2: not a go test -json event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again$'
+! stderr 'receipts written'
+exec sh -c '! grep -q "\"type\":\"end\"" .machinery/receipts/*.jsonl'
+exec sh -c '! grep -q "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  incomplete run: \.machinery/receipts/'
+exec machinery status
+stdout '^refused: \.machinery/receipts/.*: incomplete run$'
+# the exit code of the command stands when it is not 0; a file without an event is no stream
+rm .machinery/receipts
+exec mrun 3 run --adapter go-test-json --streams -- sh -c ': > "$MACHINERY_GO_TEST_JSON/empty.json"; exit 3'
+stderr '^machinery: run: stream empty\.json: no event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again$'
+
+-- twice.sh --
+#!/bin/sh
+# the same suite twice, the second time without a customer store
+set -eu
+go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/a.json"
+SHOP_EMAIL=skip go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/b.json"
+-- direct.sh --
+#!/bin/sh
+# builds the test binary and runs it itself, under go tool test2json
+set -u
+go test -c -o .machinery/suite.test ./e2e/suite || exit 1
+go tool test2json "$@" .machinery/suite.test -test.v=test2json > "$MACHINERY_GO_TEST_JSON/direct.json"
+exit 0
+-- broken.sh --
+#!/bin/sh
+set -eu
+go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/1-good.json"
+printf '{"Action":"start","Package":"example.test/shop/e2e/suite"}\nFAIL example.test/shop/e2e/suite\n' > "$MACHINERY_GO_TEST_JSON/2-broken.jsonl"
+-- mapped.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/stage/**"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

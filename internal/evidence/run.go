@@ -31,6 +31,10 @@ type RunOptions struct {
 	// Adapter, when set, reads the command's standard output and gives the
 	// receipts machinery writes itself (section 10.3).
 	Adapter RunAdapter
+	// Streams: the adapter does not read standard output; it reads the
+	// files the command leaves in a directory machinery makes and names in
+	// MACHINERY_GO_TEST_JSON.
+	Streams bool
 }
 
 // RunAdapter writes receipts from what a test command prints.
@@ -42,13 +46,15 @@ type RunAdapter interface {
 	Consume(stream io.Reader, out io.Writer) error
 	// Receipts returns the receipt lines to write, once the command is done.
 	Receipts() [][]byte
+	// ReadStreams reads the stream files of a directory instead of Consume.
+	ReadStreams(dir string) error
 }
 
 // ExitNotStarted is the exit code when the command could not be started.
 const ExitNotStarted = 127
 
 // The variables machinery owns; inherited values are dropped.
-var ownVars = []string{"MACHINERY_RECEIPTS", "MACHINERY_COMMIT", "MACHINERY_ONLY", "MACHINERY_TABLES_DIR", "MACHINERY_PROBE_CASE"}
+var ownVars = []string{"MACHINERY_RECEIPTS", "MACHINERY_COMMIT", "MACHINERY_ONLY", "MACHINERY_TABLES_DIR", "MACHINERY_PROBE_CASE", StreamsEnv}
 
 type header struct {
 	V       int      `json:"v"`
@@ -152,7 +158,19 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	}
 	cmd.Env = append(env, opts.Env...)
 	var stream io.ReadCloser
-	if opts.Adapter != nil {
+	streamsDir := ""
+	if opts.Adapter != nil && opts.Streams {
+		if streamsDir, err = os.MkdirTemp("", "machinery-streams-"); err != nil {
+			os.Remove(file)
+			if ledger {
+				forget(p, file)
+			}
+			return 1, "", err
+		}
+		defer os.RemoveAll(streamsDir) // machinery made it; it is gone after reading
+		cmd.Env = append(cmd.Env, StreamsEnv+"="+streamsDir)
+		cmd.Stdout = opts.Stdout
+	} else if opts.Adapter != nil {
 		if stream, err = cmd.StdoutPipe(); err != nil {
 			os.Remove(file)
 			if ledger {
@@ -174,6 +192,15 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		io.Copy(io.Discard, stream) // never leave the command blocked on a full pipe
 	}
 	exit = exitCode(cmd.Wait())
+	if streamsDir != "" {
+		if err := opts.Adapter.ReadStreams(streamsDir); err != nil {
+			// nothing of this run counts: no receipt, no end line (section 10.3)
+			if exit == 0 {
+				exit = 1
+			}
+			return exit, file, err
+		}
+	}
 	f, err = os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return exit, file, err

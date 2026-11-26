@@ -247,7 +247,7 @@ machinery adds `-json`, reads the event stream and writes the receipts itself
 to passed and the package ended ok: the function under the marker when the marker is in the
 comment directly above it, every test function of the file otherwise. A failed function writes
 a fail, a skipped one a skip, and one that did not run writes nothing; a package answered from
-the test cache counts nothing, so write `-count=1`. The summary of the run says how many ids
+the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. The summary of the run says how many ids
 were claimed and not run.
 
 This evidence is weaker than a receipt, and every report says so. It shows that a test which
@@ -257,7 +257,10 @@ proven this way because it needs the effects the test observed, and by default a
 critical or vital area is not either: those need a receipt the test emits after its own
 assertions. `evidence.adapter` in `machinery.yaml` tightens or widens this: which kinds and
 tiers the adapter may prove, and whether a marker at the top of a file is enough or the marker
-must stand above the function (`min_granularity: function`). If you build your tests from
+must stand above the function (`min_granularity: function`). If your suite runs through a make target or a script that starts
+`go test` itself, run that through `machinery run --adapter go-test-json --streams -- make e2e`
+and have it write each `go test -json` output to a file in the directory machinery names in
+`MACHINERY_GO_TEST_JSON`; there the wrapper must pass `-count=1` itself. If you build your tests from
 copies staged in another directory, `evidence.adapter.sources` maps the staged package back to
 the files that carry the markers.
 

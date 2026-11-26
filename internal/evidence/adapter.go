@@ -48,12 +48,22 @@ type GoTest struct {
 	effects map[string]bool // claimed tc ids
 	replay  map[string]bool // claimed cx ids
 
-	pkgs     map[string]*goPackage
+	// streams are the event streams read: the command's standard output, or
+	// with fromDir the files the command left in MACHINERY_GO_TEST_JSON
+	streams  []*goStream
+	fromDir  bool
 	summary  []string
 	receipts [][]byte
 }
 
-// goPackage is what the stream said about one package.
+// goStream is one stream of go test -json.
+type goStream struct {
+	name     string // the file, in streams mode
+	pkgs     map[string]*goPackage
+	nameless int // verdicts of test functions that name no package
+}
+
+// goPackage is what a stream said about one package.
 type goPackage struct {
 	end      string              // the package-level pass, fail or skip
 	cached   bool                // answered from the test cache
@@ -62,9 +72,14 @@ type goPackage struct {
 
 // NewGoTest reads the command and the claims of the test files, and refuses
 // what the adapter cannot join (section 10.3).
-func NewGoTest(p *project.Project, d *design.Design, argv []string) (*GoTest, error) {
-	a := &GoTest{direct: map[string][]string{}, effects: map[string]bool{}, replay: map[string]bool{}, pkgs: map[string]*goPackage{}}
-	if err := a.readCommand(argv); err != nil {
+//
+// With streams the command is any command: it is not read, and the streams
+// are the files it leaves in MACHINERY_GO_TEST_JSON.
+func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool) (*GoTest, error) {
+	a := &GoTest{direct: map[string][]string{}, effects: map[string]bool{}, replay: map[string]bool{}, fromDir: streams}
+	if streams {
+		a.Argv, a.tags = argv, tagsOf("")
+	} else if err := a.readCommand(argv); err != nil {
 		return nil, err
 	}
 	if p.Cfg.Trace == nil || len(p.Cfg.Trace.Tests) == 0 {
@@ -162,7 +177,7 @@ func (a *GoTest) readCommand(argv []string) error {
 		return refuse("the command must be go test, got %s", strings.Join(argv[:n], " "))
 	}
 	rest := argv[2:]
-	insert, hasJSON := 0, false
+	insert, hasJSON, hasCount := 0, false, false
 	var tagList string
 	for i := 0; i < len(rest); i++ {
 		name, val, hasVal := flagOf(rest[i])
@@ -192,10 +207,25 @@ func (a *GoTest) readCommand(argv []string) error {
 			if v := next(); v != "1" {
 				return refuse("-count=%s is refused: write -count=1", v)
 			}
+			hasCount = true
 		case "tags":
 			tagList = next()
 		}
 	}
+	a.tags = tagsOf(tagList)
+	a.Argv = append([]string{}, argv[:2+insert]...)
+	if !hasJSON {
+		a.Argv = append(a.Argv, "-json")
+	}
+	if !hasCount {
+		a.Argv = append(a.Argv, "-count=1") // go test never answers from its cache
+	}
+	a.Argv = append(a.Argv, rest[insert:]...)
+	return nil
+}
+
+// tagsOf splits the value of -tags; without one it reads GOFLAGS. Never nil.
+func tagsOf(tagList string) []string {
 	if tagList == "" {
 		for _, w := range strings.Fields(os.Getenv("GOFLAGS")) {
 			if name, val, _ := flagOf(w); name == "tags" {
@@ -203,16 +233,11 @@ func (a *GoTest) readCommand(argv []string) error {
 			}
 		}
 	}
-	a.tags = strings.FieldsFunc(tagList, func(r rune) bool { return r == ',' || r == ' ' })
-	if a.tags == nil {
-		a.tags = []string{}
+	tags := strings.FieldsFunc(tagList, func(r rune) bool { return r == ',' || r == ' ' })
+	if tags == nil {
+		tags = []string{}
 	}
-	a.Argv = append([]string{}, argv[:2+insert]...)
-	if !hasJSON {
-		a.Argv = append(a.Argv, "-json")
-	}
-	a.Argv = append(a.Argv, rest[insert:]...)
-	return nil
+	return tags
 }
 
 // flagOf splits a command-line word into a flag name and its value; name is
@@ -242,6 +267,8 @@ type goEvent struct {
 // Consume reads the event stream to its end. It prints the output text of
 // every event, and a line that is no event as it is.
 func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
+	st := &goStream{pkgs: map[string]*goPackage{}}
+	a.streams = append(a.streams, st)
 	r := bufio.NewReader(stream)
 	for {
 		line, err := r.ReadBytes('\n')
@@ -251,7 +278,7 @@ func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
 				out.Write(line)
 			} else {
 				io.WriteString(out, ev.Output)
-				a.read(ev)
+				st.read(ev)
 			}
 		}
 		if err == io.EOF {
@@ -263,16 +290,64 @@ func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
 	}
 }
 
-func (a *GoTest) read(ev goEvent) {
+// StreamsEnv names the directory a wrapper leaves its streams in.
+const StreamsEnv = "MACHINERY_GO_TEST_JSON"
+
+// ReadStreams reads every .json and .jsonl file directly in dir as one
+// stream, in the order of their names. A file that is not a well-formed
+// stream is an error: nothing of the run counts.
+func (a *GoTest) ReadStreams(dir string) error {
+	entries, err := os.ReadDir(dir) // sorted by name
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !e.Type().IsRegular() || !(strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".jsonl")) {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			return err
+		}
+		st := &goStream{name: name, pkgs: map[string]*goPackage{}}
+		events := 0
+		for i, line := range strings.Split(string(data), "\n") {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			var ev goEvent
+			if json.Unmarshal([]byte(line), &ev) != nil || ev.Action == "" {
+				return fmt.Errorf("stream %s: line %d: not a go test -json event; %s", name, i+1, leftIncomplete)
+			}
+			events++
+			st.read(ev)
+		}
+		if events == 0 {
+			return fmt.Errorf("stream %s: no event; %s", name, leftIncomplete)
+		}
+		a.streams = append(a.streams, st)
+	}
+	return nil
+}
+
+const leftIncomplete = "the run is left incomplete: fix what writes the stream, delete the receipts file and run again"
+
+func isVerdict(action string) bool { return action == Pass || action == Fail || action == Skip }
+
+func (s *goStream) read(ev goEvent) {
 	if ev.Package == "" {
+		if ev.Test != "" && isVerdict(ev.Action) && !strings.Contains(ev.Test, "/") {
+			s.nameless++
+		}
 		return
 	}
-	pkg := a.pkgs[ev.Package]
+	pkg := s.pkgs[ev.Package]
 	if pkg == nil {
 		pkg = &goPackage{verdicts: map[string][]string{}}
-		a.pkgs[ev.Package] = pkg
+		s.pkgs[ev.Package] = pkg
 	}
-	verdict := ev.Action == Pass || ev.Action == Fail || ev.Action == Skip
+	verdict := isVerdict(ev.Action)
 	switch {
 	case ev.Test == "" && verdict:
 		pkg.end = ev.Action
@@ -322,36 +397,93 @@ func (a *GoTest) Receipts() [][]byte {
 			state[file][fn] = st
 		}
 	}
-	var passed, failed, skipped, homeless int
-	var ambiguous, refused []string
-	for _, name := range sortedKeys(a.pkgs) {
-		pkg := a.pkgs[name]
-		switch {
-		case pkg.cached:
+	var passed, failed, skipped, homeless, nameless int
+	var ambiguous, refused, differ []string
+	names := map[string]bool{}
+	for _, s := range a.streams {
+		nameless += s.nameless
+		for name := range s.pkgs {
+			names[name] = true
+		}
+	}
+	for _, name := range sortedKeys(names) {
+		// what each stream says of the package; a cached one is not read
+		cached, notOK := false, false
+		type seen struct {
+			verdict, stream string
+			ok              bool
+		}
+		byFn := map[string][]seen{}
+		cachedFns := map[string]string{}
+		for _, s := range a.streams {
+			pkg := s.pkgs[name]
+			if pkg == nil {
+				continue
+			}
+			if pkg.cached {
+				cached = true
+			} else if pkg.end != Pass && len(pkg.verdicts) > 0 {
+				notOK = true
+			}
+			for fn, vs := range pkg.verdicts {
+				v := Pass
+				for _, one := range vs {
+					if one == Fail || (one == Skip && v != Fail) {
+						v = one
+					}
+				}
+				if pkg.cached {
+					cachedFns[fn] = v
+					continue
+				}
+				byFn[fn] = append(byFn[fn], seen{v, s.name, pkg.end == Pass})
+			}
+		}
+		if cached {
 			refused = append(refused, fmt.Sprintf("adapter: package %s: answered from the cache; nothing in it counts: run with -count=1", name))
-		case pkg.end != Pass && len(pkg.verdicts) > 0:
+		}
+		if notOK {
 			refused = append(refused, fmt.Sprintf("adapter: package %s: did not end with pass; no pass is written from it", name))
 		}
-		for _, fn := range sortedKeys(pkg.verdicts) {
-			st := stPass
-			for _, v := range pkg.verdicts[fn] {
+		fns := map[string]bool{}
+		for fn := range byFn {
+			fns[fn] = true
+		}
+		for fn := range cachedFns {
+			fns[fn] = true
+		}
+		for _, fn := range sortedKeys(fns) {
+			verdict, st := cachedFns[fn], stBlocked // seen in a cached package alone
+			if got := byFn[fn]; len(got) > 0 {
+				verdict = got[0].verdict
+				allOK := true
+				var parts []string
+				same := true
+				for _, g := range got {
+					same = same && g.verdict == verdict
+					allOK = allOK && g.ok
+					parts = append(parts, g.verdict+" in "+g.stream)
+				}
+				if !same { // one function, several streams, verdicts that differ: a fail
+					verdict = Fail
+					differ = append(differ, fmt.Sprintf("adapter: %s.%s: %s: verdicts differ, read as fail", name, fn, strings.Join(parts, ", ")))
+				}
 				switch {
-				case v == Fail:
+				case verdict == Fail:
 					st = stFail
-				case v == Skip && st != stFail:
+				case verdict == Skip:
 					st = stSkip
+				case allOK:
+					st = stPass
 				}
 			}
-			switch st {
-			case stPass:
+			switch verdict {
+			case Pass:
 				passed++
-			case stFail:
+			case Fail:
 				failed++
 			default:
 				skipped++
-			}
-			if pkg.cached || (st == stPass && pkg.end != Pass) {
-				st = stBlocked
 			}
 			defs := a.definers(name, fn)
 			switch len(defs) {
@@ -439,11 +571,21 @@ func (a *GoTest) Receipts() [][]byte {
 	}
 
 	nFuncs := passed + failed + skipped
-	a.summary = []string{
-		fmt.Sprintf("adapter %s: %d package(s), %d test function(s) with a verdict: %d passed, %d failed, %d skipped", GoTestJSON, len(a.pkgs), nFuncs, passed, failed, skipped),
+	a.summary = nil
+	counted := ""
+	if a.fromDir {
+		counted = fmt.Sprintf("%d stream(s), ", len(a.streams))
+		if len(a.streams) == 0 {
+			a.summary = append(a.summary, fmt.Sprintf("adapter %s: no stream in %s: the command ran nothing the adapter can read, and nothing is proven", GoTestJSON, StreamsEnv))
+		}
+	}
+	if !a.fromDir || len(a.streams) > 0 {
+		a.summary = append(a.summary, fmt.Sprintf("adapter %s: %s%d package(s), %d test function(s) with a verdict: %d passed, %d failed, %d skipped", GoTestJSON, counted, len(names), nFuncs, passed, failed, skipped))
+	}
+	a.summary = append(a.summary,
 		fmt.Sprintf("adapter: receipts written: %d pass, %d fail, %d skip", wrote[Pass], wrote[Fail], wrote[Skip]),
 		fmt.Sprintf("adapter: claimed, not run: %d id(s)", notRun),
-	}
+	)
 	add := func(n int, format string) {
 		if n > 0 {
 			a.summary = append(a.summary, fmt.Sprintf(format, n))
@@ -453,7 +595,9 @@ func (a *GoTest) Receipts() [][]byte {
 	add(len(a.effects), "adapter: needs a receipt with effects: %d tc id(s)")
 	add(len(a.replay), "adapter: needs a receipt with a replay: %d cx id(s)")
 	add(homeless, "adapter: %d test function(s) with a verdict are in no file under trace.tests")
-	a.summary = append(append(a.summary, refused...), ambiguous...)
+	add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
+	sort.Strings(differ)
+	a.summary = append(append(append(a.summary, refused...), ambiguous...), differ...)
 	claiming := map[string]bool{}
 	for _, u := range a.units {
 		claiming[u.File] = true
