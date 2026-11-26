@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -104,9 +105,27 @@ func (c *Config) HasFailureModes() bool {
 
 // ImportMachines reads machines written in a JSON dialect (section 5.2.1).
 type ImportMachines struct {
-	Files  []string `yaml:"files"`
-	States string   `yaml:"states,omitempty"`
-	Rename Rename   `yaml:"rename,omitempty"`
+	Files  []string        `yaml:"files"`
+	States string          `yaml:"states,omitempty"`
+	Rename Rename          `yaml:"rename,omitempty"`
+	Bind   map[string]Bind `yaml:"bind,omitempty"`
+}
+
+// Bind is what an imported machine binds to in the model (section 5.2.1):
+// the entity of a lifecycle machine, or the ids an operational machine serves.
+type Bind struct {
+	LifecycleOf string   `yaml:"lifecycle_of,omitempty"`
+	Serves      []string `yaml:"serves,omitempty"`
+}
+
+// BindKeys returns the keys of import.machines.bind, sorted.
+func (im *ImportMachines) BindKeys() []string {
+	keys := make([]string, 0, len(im.Bind))
+	for k := range im.Bind {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // Rename maps the project's keys to machinery keys, per level of a machine.
@@ -505,6 +524,27 @@ func (c *Config) validateImport() error {
 		for k, v := range lv.m {
 			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
 				return Errf("import.machines.rename.%s: a key and its new name must not be empty", lv.name)
+			}
+		}
+	}
+	for _, k := range im.BindKeys() {
+		b := im.Bind[k]
+		if strings.TrimSpace(k) == "" || !ValidGlob(k) {
+			return Errf("import.machines.bind: %q is not a valid glob", k)
+		}
+		if err := CheckPath("import.machines.bind", k); err != nil {
+			return err
+		}
+		lifecycle := strings.TrimSpace(b.LifecycleOf) != ""
+		switch {
+		case lifecycle && len(b.Serves) > 0:
+			return Errf("import.machines.bind.%s: set lifecycle_of or serves, not both", k)
+		case !lifecycle && len(b.Serves) == 0:
+			return Errf("import.machines.bind.%s: set lifecycle_of or serves", k)
+		}
+		for _, id := range b.Serves {
+			if strings.TrimSpace(id) == "" {
+				return Errf("import.machines.bind.%s.serves: an id must not be empty", k)
 			}
 		}
 	}

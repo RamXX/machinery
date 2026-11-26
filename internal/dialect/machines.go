@@ -41,9 +41,15 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 	}
 	gen := strings.TrimSuffix(p.Cfg.Design.Gen, "/") + "/"
 	byID := map[string]string{}
+	used := map[string]bool{} // the bind keys that match a machine
 	for _, f := range files {
 		if strings.HasPrefix(f, gen) {
 			continue // generated, never a source
+		}
+		for _, k := range im.BindKeys() {
+			if project.Match([]string{k}, f) {
+				used[k] = true
+			}
 		}
 		data, err := p.Read(f)
 		if err != nil {
@@ -59,7 +65,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 			problems = append(problems, f+": machine must be a JSON object")
 			continue
 		}
-		t := &translator{src: f, rename: im.Rename, capital: im.States == project.StatesCapitalize}
+		t := &translator{src: f, rename: im.Rename, capital: im.States == project.StatesCapitalize, im: im, used: used}
 		out := t.machine(root.AsObject())
 		problems = append(problems, t.problems...)
 		if first, dup := byID[t.id]; dup {
@@ -74,6 +80,11 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 		}
 		ms = append(ms, Machine{Source: f, ID: t.id, Bytes: b, SourceBytes: data})
 	}
+	for _, k := range im.BindKeys() {
+		if !used[k] {
+			problems = append(problems, fmt.Sprintf("import.machines.bind %s: matches no machine file and no machine id", k))
+		}
+	}
 	return ms, problems
 }
 
@@ -82,6 +93,8 @@ type translator struct {
 	src      string
 	rename   project.Rename
 	capital  bool
+	im       *project.ImportMachines
+	used     map[string]bool // bind keys that matched a machine, shared by all files
 	origID   string
 	id       string
 	problems []string
@@ -152,13 +165,44 @@ func (t *translator) machine(root *ir.Object) *ir.Object {
 	if sv := out.Get2("states"); sv != nil {
 		out.Set("states", t.states(sv, ""))
 	}
-	if !out.Has("_lifecycle_of") && !out.Has("_role") {
-		out.Set("_role", ir.StringValue("operational"))
-	}
+	t.bind(out)
 	if !out.Has("_oracle_tag") {
 		out.Set("_oracle_tag", ir.StringValue(OracleTag(t.id, t.origID)))
 	}
 	return out
+}
+
+// bind adds the binding import.machines.bind gives a machine that has none
+// of its own (section 5.2.1). It never invents one.
+func (t *translator) bind(out *ir.Object) {
+	var keys []string
+	for _, k := range t.im.BindKeys() {
+		if k == t.id || project.Match([]string{k}, t.src) {
+			keys = append(keys, k)
+			t.used[k] = true
+		}
+	}
+	switch {
+	case len(keys) == 0:
+		return
+	case out.Has("_lifecycle_of") || out.Has("_role") || out.Has("_serves"):
+		t.fail("bound in the source and by import.machines.bind %s; keep one", keys[0])
+		return
+	case len(keys) > 1:
+		t.fail("import.machines.bind %s and %s both match; keep one", keys[0], keys[1])
+		return
+	}
+	b := t.im.Bind[keys[0]]
+	if strings.TrimSpace(b.LifecycleOf) != "" {
+		out.Set("_lifecycle_of", ir.StringValue(b.LifecycleOf))
+		return
+	}
+	ids := make([]*ir.Value, len(b.Serves))
+	for i, id := range b.Serves {
+		ids[i] = ir.StringValue(id)
+	}
+	out.Set("_role", ir.StringValue("operational"))
+	out.Set("_serves", ir.ArrayValue(ids))
 }
 
 type landed struct {

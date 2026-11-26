@@ -22,7 +22,7 @@ cmp design/gen/imported/machines/loan_desk.machine.json want-loan.json
 grep '"after:holdExpiry": "a notified hold waits for pickup"' design/gen/imported/machines/hold_queue.machine.json
 grep '"sendNotice.onDone": "an undelivered notice keeps the hold waiting"' design/gen/imported/machines/hold_queue.machine.json
 ! grep 'denied' design/gen/imported/machines/hold_queue.machine.json
-# a machine bound to an entity gets no _role; every machine gets a tag from its id
+# the translation never invents a binding; every machine gets a tag from its id
 grep '"_lifecycle_of": "Hold"' design/gen/imported/machines/hold_queue.machine.json
 ! grep '_role' design/gen/imported/machines/hold_queue.machine.json
 grep '"_oracle_tag": "HOLDED73"' design/gen/imported/machines/hold_queue.machine.json
@@ -183,7 +183,6 @@ import:
       }
     }
   },
-  "_role": "operational",
   "_oracle_tag": "LOAN0E11"
 }
 -- loan-colour.json --

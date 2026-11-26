@@ -11,6 +11,8 @@ import:
       root: {notes: _comment, entity: _lifecycle_of, startable: _entries}
       state: {skip: _ignores}
       transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
   failure_modes:
     file: docs/risks.md
     id: "^RISK-[0-9]+$"

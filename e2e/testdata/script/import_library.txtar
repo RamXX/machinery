@@ -39,7 +39,9 @@ grep '"_lifecycle_of": "Loan"' design/gen/imported/machines/loan.machine.json
 grep '"initial": "Reserved"' design/gen/imported/machines/loan.machine.json
 grep '"lend": "a member with unpaid fines is refused with MEMBER_BLOCKED; the loan stays reserved"' design/gen/imported/machines/loan.machine.json
 grep '"_comment": "notes: tells members that a reserved copy is waiting"' design/gen/imported/machines/hold_queue.machine.json
+# the operational machine says nothing of its binding; import.machines.bind gives it one
 grep '"_role": "operational"' design/gen/imported/machines/hold_queue.machine.json
+grep -count=1 '"entity:Loan"' design/gen/imported/machines/hold_queue.machine.json
 grep '"source": "machines/loan.json"' design/gen/tables/loan.table.json
 grep '"requires": \[' design/gen/tables/loan.table.json
 grep '"id": "fm:risk-3"' design/gen/obligations.json
