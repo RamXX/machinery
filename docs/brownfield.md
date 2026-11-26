@@ -180,6 +180,12 @@ machinery story "$STORY"
 machinery status
 ```
 
+A receipt counts only when `machinery run` wrote its file and the test it names lies in a test
+file that claims the id (`docs/formats.md` section 10.2): the script's receipts name
+`shipment_e2e.sh`, the file that carries the `machinery:verifies` comment. A receipts file typed
+by hand, or edited after the run, is refused and proves nothing. That guards against mistakes,
+not against someone who can run commands as the tool.
+
 `owed sync --prune-only` removes exactly the ids the run proved. `verify` passes: everything is
 proven or still owed. `story` is the gate for that one story; a consequential or critical story
 would also need a fresh verifier (`docs/pm.md`).
