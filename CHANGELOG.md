@@ -84,6 +84,13 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   replaces the counts of `proof` and stops `owed sync`. A receipt needs a `test`. This guards
   against mistakes and casual edits, not against a party who can run commands as the tool
   (`docs/formats.md` section 10.2).
+- Run adapter `go-test-json`: `machinery run --adapter go-test-json -- go test ...` reads the
+  event stream of an existing Go suite and writes the receipts itself, joining each verdict to
+  the ids the test files already claim (the function under a marker, or every test function of
+  the file). Cached packages are refused, `tc` and `cx` ids are never proven this way, and
+  `status`, `verify` and `proof` count adapter evidence apart, by granularity. The policy
+  `evidence.adapter` (kinds, tiers, minimum granularity, a map for test packages built from
+  copies) decides what it proves; by default never an id of a critical or vital area.
 
 ### Carried forward from v1
 

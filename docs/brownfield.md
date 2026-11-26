@@ -71,7 +71,8 @@ test names (`claimed by a test, no receipt yet`), the ids no test names, and the
 sources mark as planned; the plan has the usual stories for the ids no test names, one `Wire evidence`
 story per test file for the claimed ones and none for an id you had planned, so a project with a thousand claimed ids is not asked
 for a thousand stories. A claim is not evidence: every one of them is still owed until its test
-emits a receipt.
+emits a receipt, or, for a Go suite, until a run through the adapter sees the test pass
+(section 7).
 
 ## 3. Look before you write
 
@@ -231,6 +232,34 @@ claims the id (`docs/formats.md` section 10.2): the script's receipts name
 `shipment_e2e.sh`, the file that carries the `machinery:verifies` comment. A receipts file typed
 by hand, or edited after the run, is refused and proves nothing. That guards against mistakes,
 not against someone who can run commands as the tool.
+
+**A Go suite you already have.** When your tests already name the ids they verify in comments,
+you do not have to rewrite them to get evidence. Run the suite through the adapter:
+
+```
+machinery run --adapter go-test-json -- go test -count=1 ./e2e/...
+machinery owed sync --prune-only
+machinery status
+```
+
+machinery adds `-json`, reads the event stream and writes the receipts itself
+(`docs/formats.md` section 10.3). An id gets a pass when every test function its marker belongs
+to passed and the package ended ok: the function under the marker when the marker is in the
+comment directly above it, every test function of the file otherwise. A failed function writes
+a fail, a skipped one a skip, and one that did not run writes nothing; a package answered from
+the test cache counts nothing, so write `-count=1`. The summary of the run says how many ids
+were claimed and not run.
+
+This evidence is weaker than a receipt, and every report says so. It shows that a test which
+names the id passed, not that the test checked the id. `status`, `verify` and `proof` count it
+apart (`proven: 40 (31 by adapter at file granularity)`), a transition case (`tc`) is never
+proven this way because it needs the effects the test observed, and by default an id of a
+critical or vital area is not either: those need a receipt the test emits after its own
+assertions. `evidence.adapter` in `machinery.yaml` tightens or widens this: which kinds and
+tiers the adapter may prove, and whether a marker at the top of a file is enough or the marker
+must stand above the function (`min_granularity: function`). If you build your tests from
+copies staged in another directory, `evidence.adapter.sources` maps the staged package back to
+the files that carry the markers.
 
 `owed sync --prune-only` removes exactly the ids the run proved. `verify` passes: everything is
 proven or still owed. `story` is the gate for that one story; a consequential or critical story
