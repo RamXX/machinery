@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
@@ -20,6 +21,8 @@ type Env struct {
 	Stdout      io.Writer
 	Stderr      io.Writer
 	ProjectFlag string
+	// exit, when set, is the exit code whatever the command returns.
+	exit int
 }
 
 // Command is one entry of section 3.1. Name may hold a space ("owed list").
@@ -88,11 +91,11 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 	}
 	if len(args) >= 2 {
 		if c, ok := commands[args[0]+" "+args[1]]; ok {
-			return c.Run(e, args[2:])
+			return e.run(c, args[2:])
 		}
 	}
 	if c, ok := commands[args[0]]; ok {
-		return c.Run(e, args[1:])
+		return e.run(c, args[1:])
 	}
 	var subs []string
 	for _, n := range names() {
@@ -133,7 +136,25 @@ func (e *Env) Project() (*project.Project, bool) {
 		e.Fail(err)
 		return nil, false
 	}
+	// an owed list that does not parse has no entries to trust: no command
+	// goes on as if it were empty (section 11.1)
+	if lines := design.OwedRefusal(p); len(lines) > 0 {
+		for _, l := range lines {
+			fmt.Fprintf(e.Stderr, "ERROR  %s\n", l)
+		}
+		e.exit = 1
+		return nil, false
+	}
 	return p, true
+}
+
+// run runs a command; a refusal that sets its own exit code keeps it.
+func (e *Env) run(c *Command, args []string) int {
+	code := c.Run(e, args)
+	if e.exit != 0 {
+		return e.exit
+	}
+	return code
 }
 
 // Fail prints an error and returns its exit code: 2 for a config error, 1 otherwise.

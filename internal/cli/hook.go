@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/backlog"
+	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/hook"
 	"github.com/RamXX/machinery/internal/landing"
@@ -255,6 +256,11 @@ func branchStory(p *project.Project) string {
 // when base is not empty and stage scope for story when it is not empty, and
 // lists what blocks.
 func hookCheck(p *project.Project, base, story string) []string {
+	// an owed list that does not parse is a finding of its own: no stage is
+	// run as if the list were empty (section 11.1)
+	if lines := design.OwedRefusal(p); len(lines) > 0 {
+		return []string{"owed: ERROR  " + strings.Join(lines, "; ")}
+	}
 	names := append([]string{}, stages.CheckStages...)
 	ctx := &stages.Context{P: p}
 	var tail []string

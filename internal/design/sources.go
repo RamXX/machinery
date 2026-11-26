@@ -28,6 +28,10 @@ type FailureMode struct {
 	// gives it a subject and a required value.
 	Imported bool `yaml:"-"`
 	Linked   bool `yaml:"-"`
+	// Cells are the cells of an imported row, as written and trimmed, and
+	// Line the line of the row.
+	Cells []string `yaml:"-"`
+	Line  int      `yaml:"-"`
 }
 
 // Unlinked reports an imported row without a link: it names nothing, so it
@@ -330,6 +334,34 @@ type OwedEntry struct {
 	Story  string `yaml:"story,omitempty"`
 }
 
+// The reasons machinery adopt writes (section 17.2). plan and status read
+// the last two back (sections 14 and 15.2).
+const (
+	ReasonUnproven = "unproven at adoption"
+	ReasonClaimed  = "claimed at adoption"
+	ReasonPlanned  = "planned at adoption"
+)
+
+// ClaimedAtAdoption reports an entry adopt wrote for an id a test already
+// claimed.
+func (e OwedEntry) ClaimedAtAdoption() bool { return strings.HasPrefix(e.Reason, ReasonClaimed) }
+
+// PlannedAtAdoption reports an entry adopt wrote for an id the project had
+// marked planned.
+func (e OwedEntry) PlannedAtAdoption() bool { return strings.HasPrefix(e.Reason, ReasonPlanned) }
+
+// Adopted reports whether the list holds an entry adopt wrote.
+func Adopted(entries []OwedEntry) bool {
+	for _, e := range entries {
+		for _, r := range []string{ReasonUnproven, ReasonClaimed, ReasonPlanned} {
+			if strings.HasPrefix(e.Reason, r) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 type owedFile struct {
 	Version int         `yaml:"version"`
 	Owed    []OwedEntry `yaml:"owed"`
@@ -373,28 +405,78 @@ func LoadOwed(p *project.Project) (entries []OwedEntry, problems []string) {
 	return ParseOwed(rel, data)
 }
 
-// MarshalOwed renders the owed file with entries sorted by id.
+// MarshalOwed renders the owed file with entries sorted by id. Every value
+// goes through the YAML encoder, so the file always parses back.
 func MarshalOwed(entries []OwedEntry) []byte {
 	es := append([]OwedEntry(nil), entries...)
 	sort.Slice(es, func(i, j int) bool { return es[i].ID < es[j].ID })
-	var b strings.Builder
-	b.WriteString("version: 1\nowed:")
+	str := func(v string, style yaml.Style) *yaml.Node {
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v, Style: style}
+	}
+	list := &yaml.Node{Kind: yaml.SequenceNode}
 	if len(es) == 0 {
-		b.WriteString(" []\n")
-		return []byte(b.String())
+		list.Style = yaml.FlowStyle
 	}
-	b.WriteString("\n")
 	for _, e := range es {
-		fmt.Fprintf(&b, "  - id: %s\n    reason: %s\n", e.ID, yamlQuote(e.Reason))
+		m := &yaml.Node{Kind: yaml.MappingNode}
+		m.Content = append(m.Content, str("id", 0), str(e.ID, 0),
+			str("reason", 0), str(strings.ReplaceAll(e.Reason, "\n", " "), yaml.DoubleQuotedStyle))
 		if e.Story != "" {
-			fmt.Fprintf(&b, "    story: %s\n", e.Story)
+			m.Content = append(m.Content, str("story", 0), str(e.Story, 0))
 		}
+		list.Content = append(list.Content, m)
 	}
-	return []byte(b.String())
+	root := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
+		str("version", 0), {Kind: yaml.ScalarNode, Tag: "!!int", Value: "1"}, str("owed", 0), list}}
+	var b bytes.Buffer
+	enc := yaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(root); err != nil {
+		panic(err) // a tree of scalars always encodes
+	}
+	enc.Close()
+	return b.Bytes()
 }
 
-func yamlQuote(s string) string {
-	return "\"" + strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "\n", " ").Replace(s) + "\""
+// OwedRefusal returns why the owed file is not read, one line per problem,
+// or nil: it does not parse, or it parses and has a problem of its own (an
+// id listed twice, an entry without a reason, a wrong version). No command
+// goes on with such a list (section 11.1).
+func OwedRefusal(p *project.Project) []string {
+	if msg := OwedUnreadable(p); msg != "" {
+		return []string{msg}
+	}
+	_, problems := LoadOwed(p)
+	if len(problems) == 0 {
+		return nil
+	}
+	return append(problems, p.Cfg.Design.Owed+": fix the file; an owed list with a problem is not read")
+}
+
+// StoryID is the shape of a story id written by machinery from a project's
+// own text (section 2): letters, digits, dot, dash and underscore.
+var StoryID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// OwedUnreadable returns why the owed file cannot be read as a list (it
+// cannot be read, or is not the YAML of section 11.1), or "". Such a file
+// has no entries to trust, so nothing may go on as if the list were empty.
+func OwedUnreadable(p *project.Project) string {
+	rel := p.Cfg.Design.Owed
+	if !p.Exists(rel) {
+		return ""
+	}
+	why := ""
+	if data, err := p.Read(rel); err != nil {
+		why = "cannot read: " + shortErr(err)
+	} else if strings.TrimSpace(string(data)) == "" {
+		why = "the file is empty; write \"version: 1\" and \"owed: []\" in it, or delete it (a missing file is an empty list)"
+	} else if err := strictYAML(data, &owedFile{}); err != nil {
+		why = err.Error()
+	}
+	if why == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s: %s; an owed list that does not parse is not read as empty: fix the file", rel, why)
 }
 
 // WriteOwed writes the owed file.

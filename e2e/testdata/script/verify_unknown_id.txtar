@@ -12,10 +12,11 @@ stdout '^  ERROR  unknown owed id: inv:nope$'
 ! stdout 'act:Order.place'
 stdout '^failed: 3 finding\(s\)$'
 
-# a duplicate id in the owed file
+# a duplicate id in the owed file is refused before the stage runs (section 11.1)
 cp owed-dup.yaml design/owed.yaml
 exec mrun 1 verify
-stdout '^  ERROR  design/owed.yaml: duplicate id fm:payment-provider-down$'
+stderr '^ERROR  design/owed.yaml: duplicate id fm:payment-provider-down$'
+! stdout .
 
 # a malformed receipt line is an ERROR naming the file and the line
 cp design/owed.yaml.orig design/owed.yaml

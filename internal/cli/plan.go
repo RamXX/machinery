@@ -60,6 +60,12 @@ func runPlan(e *Env, args []string) int {
 			return e.Fail(err)
 		}
 		fmt.Fprintf(e.Stdout, "plan: %d created, %d existing, %d edge(s)\n", res.Created, res.Existing, res.Edges)
+		if line := plan.WireLine("wire-evidence story", "wire-evidence stories"); line != "" {
+			fmt.Fprintf(e.Stdout, "plan: %s\n", line)
+		}
+		for _, x := range res.External {
+			fmt.Fprintf(e.Stdout, "plan: %s: external story %s, not in the backlog; nothing created\n", x.ID, x.Story)
+		}
 		return 0
 	}
 	if len(plan.Stories) == 0 {
@@ -78,6 +84,9 @@ func runLink(e *Env, d *design.Design, story string, ids []string) int {
 		if !d.Known(id) {
 			return e.Usage("%s is not a design id", id)
 		}
+	}
+	if x, ok := pm.Supplied(d, ids); ok && x.Story != story {
+		return e.Usage("%s carries the story %s the project planned it under; plan never replaces it: edit %s to change it", x.ID, x.Story, d.P.Cfg.Design.Owed)
 	}
 	c, err := backlog.New(d.P, "")
 	if err != nil {

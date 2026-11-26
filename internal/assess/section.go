@@ -22,7 +22,7 @@ var sectionDefs = []sectionDef{
 	{"inventory", (*assessment).inventory},
 	{"design", (*assessment).design},
 	{"generation", (*assessment).generation},
-	{"trace", stageSection("trace")},
+	{"trace", (*assessment).trace},
 	{"tests", stageSection("tests")},
 	{"arch", stageSection("arch")},
 	{"formal", (*assessment).formal},

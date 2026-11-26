@@ -33,6 +33,7 @@ type Config struct {
 	Receipts     Receipts          `yaml:"receipts"`
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
+	Plan         *PlanConfig       `yaml:"plan,omitempty"`
 	Hooks        *Hooks            `yaml:"hooks,omitempty"`
 	Review       *Review           `yaml:"review,omitempty"`
 	Delegate     *Delegate         `yaml:"delegate,omitempty"`
@@ -73,6 +74,48 @@ type Design struct {
 type Import struct {
 	Machines     *ImportMachines     `yaml:"machines,omitempty"`
 	FailureModes *ImportFailureModes `yaml:"failure_modes,omitempty"`
+	Planned      []Planned           `yaml:"planned,omitempty"`
+}
+
+// Planned reads a project's own "planned" marks (section 2): where the mark
+// is looked for and the expression whose group story names the story.
+type Planned struct {
+	In      string `yaml:"in"`
+	Pattern string `yaml:"pattern"`
+}
+
+// Where a planned mark is looked for.
+const (
+	PlannedInStatement  = "model-statement"
+	PlannedInFailureRow = "failure-row"
+)
+
+// Regexp compiles the pattern of a planned mark.
+func (pl Planned) Regexp() (*regexp.Regexp, error) { return regexp.Compile(pl.Pattern) }
+
+// ImportedPlanned returns the import.planned entries.
+func (c *Config) ImportedPlanned() []Planned {
+	if c.Import == nil {
+		return nil
+	}
+	return c.Import.Planned
+}
+
+// PlanConfig tunes machinery plan (section 15.2).
+type PlanConfig struct {
+	WireMaxFiles int `yaml:"wire_max_files,omitempty"`
+}
+
+// DefaultWireMaxFiles is the number of test files up to which wire-evidence
+// stories are one per file (section 15.2).
+const DefaultWireMaxFiles = 20
+
+// WireMaxFiles returns plan.wire_max_files, or its default.
+func (c *Config) WireMaxFiles() int {
+	if c.Plan == nil || c.Plan.WireMaxFiles == 0 {
+		return DefaultWireMaxFiles
+	}
+	return c.Plan.WireMaxFiles
 }
 
 // ImportFailureModes reads a failure-mode catalog kept as Markdown tables
@@ -244,6 +287,8 @@ type Markers struct {
 	Serves    []string `yaml:"serves,omitempty"`
 	Verifies  []string `yaml:"verifies,omitempty"`
 	Scenarios []string `yaml:"scenarios,omitempty"`
+	// ScenariosExact claim only when the text is a scenario name (section 8.1).
+	ScenariosExact []string `yaml:"scenarios_exact,omitempty"`
 }
 
 type Tests struct {
@@ -557,10 +602,17 @@ func (c *Config) validate() error {
 			for _, kind := range []struct {
 				name    string
 				markers []string
-			}{{"serves", m.Serves}, {"verifies", m.Verifies}, {"scenarios", m.Scenarios}} {
+			}{{"serves", m.Serves}, {"verifies", m.Verifies}, {"scenarios", m.Scenarios}, {"scenarios_exact", m.ScenariosExact}} {
 				for _, mk := range kind.markers {
 					if strings.TrimSpace(mk) == "" {
 						return Errf("trace.markers.%s: a marker must not be empty", kind.name)
+					}
+				}
+			}
+			for _, mk := range m.ScenariosExact {
+				for _, other := range m.Scenarios {
+					if mk == other {
+						return Errf("trace.markers.scenarios_exact: %q is also in trace.markers.scenarios; a marker has one mode", mk)
 					}
 				}
 			}
@@ -607,6 +659,9 @@ func (c *Config) validate() error {
 	}
 	if err := c.validateAssess(); err != nil {
 		return err
+	}
+	if c.Plan != nil && c.Plan.WireMaxFiles < 0 {
+		return Errf("plan.wire_max_files must not be negative")
 	}
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
@@ -693,6 +748,28 @@ func (c *Config) validateAssess() error {
 func (c *Config) validateImport() error {
 	if err := c.validateImportedFailureModes(); err != nil {
 		return err
+	}
+	for n, pl := range c.ImportedPlanned() {
+		at := fmt.Sprintf("import.planned: entry %d", n+1)
+		switch pl.In {
+		case PlannedInStatement:
+		case PlannedInFailureRow:
+			if c.ImportedFailureModes() == nil {
+				return Errf("%s: in: failure-row needs import.failure_modes; it reads the rows of that catalog", at)
+			}
+		default:
+			return Errf("%s: in must be model-statement or failure-row, got %q", at, pl.In)
+		}
+		if strings.TrimSpace(pl.Pattern) == "" {
+			return Errf("%s: pattern is required", at)
+		}
+		re, err := pl.Regexp()
+		if err != nil {
+			return Errf("%s: pattern is not a regular expression: %v", at, err)
+		}
+		if re.SubexpIndex("story") < 0 {
+			return Errf("%s: pattern %q needs a named group story, as in (?P<story>[a-z0-9-]+)", at, pl.Pattern)
+		}
 	}
 	im := c.ImportedMachines()
 	if im == nil {

@@ -1,0 +1,144 @@
+# adoption tells apart what a test already claims, what no test names and what the project had
+# planned: in owed.yaml, in status, in the plan and in the rehearsal (sections 17.2, 14, 15.2, 17.3)
+fixture library
+# no test names one scenario; the project marks one invariant and one risk row as planned, each with its story
+exec sh -c 'grep -v "Blocked member" e2e/loans.sh > l.tmp && mv l.tmp e2e/loans.sh'
+exec sh -c 'sed "s/statement: \"A returned or lost/statement: \"Planned (story lib-12). A returned or lost/" design/model/library.modelith.yaml > m.tmp && mv m.tmp design/model/library.modelith.yaml'
+grep 'Planned \(story lib-12\)\. A returned' design/model/library.modelith.yaml
+exec sh -c 'sed "s/^RISK-3 | high /RISK-3 | planned: lib-7 /" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
+grep '^RISK-3 \| planned: lib-7 \|' docs/risks.md
+cp planned.yaml p.tmp
+exec sh -c 'sed "/^import:/r p.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+# the project already owed one row, under a story of its own
+exec sh -c 'printf "    story: lib-3\n" >> design/owed.yaml'
+rm p.tmp
+gitinit
+
+# the rehearsal, before anything is written: owed by claim, and the plan in both groups
+exec machinery adopt --rehearse --out ../reh
+stdout '^adopt: wrote [0-9]+ file\(s\), 0 waiver\(s\), 19 owed$'
+# the three planned ids keep the project's story and get none; the row owed under lib-3 may have its story
+# in the backlog, which a rehearsal never reads, so the total is an upper bound
+stdout '^plan: up to 3 stories, 0 edge\(s\); 1 may exist already: a rehearsal never reads the backlog$'
+stdout '^wire evidence: 1 story for 14 claimed id\(s\), one per test file$'
+grep '^- total: 19$' ../reh/rehearsal.md
+grep '^- claimed by a test, no receipt yet: 14 \(tc 11, sc 1, fm 2\)$' ../reh/rehearsal.md
+grep '^- no test names it: 2 \(sc 1, fm 1\)$' ../reh/rehearsal.md
+grep '^- planned: 3 \(inv 2, fm 1\)$' ../reh/rehearsal.md
+grep '^Up to 3 stories, 0 edge\(s\), as `machinery plan` would create them \(`plan.md`; never applied\); 1 may exist already: every id of the group carries a story, and a rehearsal never reads the backlog\.$' ../reh/rehearsal.md
+grep '^- wire evidence: 1 story for 14 claimed id\(s\), one per test file$' ../reh/rehearsal.md
+grep '^- already planned in the project: 3 id\(s\) planned at adoption keep the story the project gave them; no story is planned for them$' ../reh/rehearsal.md
+grep '^\| wire \| routine \| 1 \|$' ../reh/rehearsal.md
+grep '^\| sc \| routine \| 1 \|$' ../reh/rehearsal.md
+! grep '^\| inv \|' ../reh/rehearsal.md
+grep '^\| fm \| routine \| 1 \|$' ../reh/rehearsal.md
+! grep '^## Prove fm:risk-3$' ../reh/plan.md
+! grep '^\| tc \|' ../reh/rehearsal.md
+grep '^## Wire evidence e2e/loans.sh$' ../reh/plan.md
+grep '"wire": \{\n      "by": "file",\n      "ids": 14,\n      "stories": 1\n    \}' ../reh/rehearsal.json
+grep '"may_exist": 1,' ../reh/rehearsal.json
+grep '"total": 3,' ../reh/rehearsal.json
+grep '"planned_ids": 3,' ../reh/rehearsal.json
+grep '"claimed": \{\n      "by_kind": \{\n        "fm": 2,\n        "sc": 1,\n        "tc": 11\n      \},\n      "total": 14\n    \},' ../reh/rehearsal.json
+grep '"unnamed": \{\n      "by_kind": \{\n        "fm": 1,\n        "sc": 1\n      \},\n      "total": 2\n    \}' ../reh/rehearsal.json
+exec git status --porcelain
+! stdout .
+
+# adopt: a claimed id, an unnamed id and a planned id each get their reason; a planned id carries its story
+exec machinery adopt --write
+grep -count=19 '^  - id: ' design/owed.yaml
+grep -count=14 '^    reason: "claimed at adoption \([0-9a-f]{7}\)"$' design/owed.yaml
+grep '  - id: fm:risk-1\n    reason: "claimed at adoption \([0-9a-f]{7}\)"\n  - id' design/owed.yaml
+# an invariant of an entity is read like a top-level one, and the first entry that matches an id decides:
+# the last entry matches both invariants, and only the one no earlier entry matched takes its story
+grep '  - id: inv:lent-before-returned\n    reason: "planned at adoption \([0-9a-f]{7}\)"\n    story: returned\n' design/owed.yaml
+grep '  - id: sc:blocked-member-is-refused-a-loan\n    reason: "unproven at adoption \([0-9a-f]{7}\)"\n  - id' design/owed.yaml
+grep '  - id: inv:returned-is-final\n    reason: "planned at adoption \([0-9a-f]{7}\)"\n    story: lib-12\n' design/owed.yaml
+grep '  - id: fm:risk-3\n    reason: "planned at adoption \([0-9a-f]{7}\)"\n    story: lib-7\n' design/owed.yaml
+grep '  - id: fm:risk-4\n    reason: "the weekly recount has no test yet"\n    story: lib-3\n' design/owed.yaml
+grep -count=4 '^    story: ' design/owed.yaml
+exec machinery check
+stdout 'machinery check: 9 passed, 0 failed, 0 not demonstrated, 7 not applicable'
+gitcommit adopted
+
+# a second adoption writes nothing and changes no reason
+exec machinery adopt --write
+stdout '^adopt: wrote 0 file\(s\)$'
+exec git status --porcelain
+! stdout .
+
+# status counts the owed ids by claim; a planned id is planned even though a test claims it
+exec machinery status
+stdout '^ids: 0 proposed, 19 owed, 3 proven, 0 retired$'
+stdout '^owed without a story: 15$'
+stdout '^owed, claimed by a test, no receipt yet: 14 \(tc 11, sc 1, fm 2\)$'
+stdout '^owed, no test names it: 2 \(sc 1, fm 1\)$'
+stdout '^owed, planned: 3 \(inv 2, fm 1\)$'
+exec sh -c 'machinery status | grep -A3 "^owed without a story" | tail -n 3 | cut -c1-12 | tr "\n" "|"'
+stdout '^owed, claime\|owed, no tes\|owed, planne\|$'
+
+# the plan: the usual stories for the ids no test names, one wire-evidence story for the claimed ones, and
+# none for a planned id: --apply would create none, so neither the print nor --json shows one
+exec machinery plan
+stdout -count=3 '^## '
+! stdout 'inv:lent-before-returned'
+! stdout 'fm:risk-3'
+stdout '^## Prove fm:risk-4$'
+! stdout 'inv:returned-is-final'
+stdout '^## Prove sc:blocked-member-is-refused-a-loan$'
+stdout '^## Wire evidence e2e/loans.sh$'
+! stdout '^## Prove loan'
+! stdout '^## Prove hold_queue'
+stdout '^The tests of e2e/loans.sh emit a receipt for each id they already claim\.$'
+stdout '^- sc:member-borrows-and-returns-a-copy: claimed by e2e/loans.sh; runs end to end on the running system: Member borrows and returns a copy$'
+stdout '^- fm:risk-1: claimed by e2e/loans.sh; refused: '
+stdout '^- No new test: the tests that claim these ids exist; this story makes them emit receipts\.$'
+exec machinery plan --json
+! stdout 'returned-is-final'
+! stdout 'fm:risk-3'
+exec machinery plan
+stdout '^machinery:ids fm:risk-1 fm:risk-2 sc:member-borrows-and-returns-a-copy tc:'
+
+# a mark whose pattern captures more than a story id is refused, by source line, and nothing is written
+cp machinery.yaml keep.yaml
+exec sh -c 'sed -e "s/pattern: .^Planned.*$/pattern: \"(?P<story>.+)\"}/" -e "s/pattern: .^planned: .*$/pattern: \"(?P<story>.+ .+)\"}/" keep.yaml > machinery.yaml'
+exec mrun 1 adopt --write
+stderr '^machinery: design/model/library.modelith.yaml:[0-9]+: inv:returned-is-final: import.planned entry 1 captured the story "Planned \(story lib-12\)\. A returned or lost .Loan. never changes status again\."; a story id has only letters, digits, "\.", "-" and "_": tighten the pattern$'
+stderr '^design/model/library.modelith.yaml:[0-9]+: inv:lent-before-returned: import.planned entry 1 captured the story "A .Loan. reaches'
+stderr '^docs/risks.md:15: fm:risk-1: import.planned entry 2 captured the story "A member with unpaid fines asks to borrow a copy\."; a story id has only'
+! stdout .
+exec git status --porcelain
+stdout '^ M machinery.yaml$'
+! stdout 'design/'
+exec mrun 1 adopt
+stderr 'import.planned entry 1 captured the story'
+cp keep.yaml machinery.yaml
+
+# the marks are config: what an entry needs, and what it may read
+exec sh -c 'sed "s/in: failure-row/in: scenario/" keep.yaml > machinery.yaml'
+exec mrun 2 status
+stderr '^config: import.planned: entry 2: in must be model-statement or failure-row, got "scenario"$'
+exec sh -c 'sed "s/(?P<story>/(?P<ticket>/" keep.yaml > machinery.yaml'
+exec mrun 2 status
+stderr '^config: import.planned: entry 1: pattern ".*" needs a named group story, as in \(\?P<story>\[a-z0-9-\]\+\)$'
+exec sh -c 'sed "s/pattern: .\^Planned.*$/pattern: \"(\"}/" keep.yaml > machinery.yaml'
+exec mrun 2 status
+stderr '^config: import.planned: entry 1: pattern is not a regular expression: '
+exec sh -c 'sed "s/, pattern: .\^Planned.*$/}/" keep.yaml > machinery.yaml'
+exec mrun 2 status
+stderr '^config: import.planned: entry 1: pattern is required$'
+cp nocatalog.yaml machinery.yaml
+exec mrun 2 status
+stderr '^config: import.planned: entry 1: in: failure-row needs import.failure_modes; it reads the rows of that catalog$'
+
+-- planned.yaml --
+  planned:
+    - {in: model-statement, pattern: '^Planned \(story (?P<story>[a-z0-9-]+)\)\.'}
+    - {in: failure-row, pattern: '^planned: (?P<story>[a-z0-9-]+)$'}
+    - {in: model-statement, pattern: '(?P<story>returned)'}
+-- nocatalog.yaml --
+version: 2
+import:
+  planned:
+    - {in: failure-row, pattern: 'planned: (?P<story>[a-z0-9-]+)'}

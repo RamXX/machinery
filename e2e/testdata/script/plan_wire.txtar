@@ -1,0 +1,150 @@
+# plan gives the ids a test claimed at adoption no story of their own: one wire-evidence story per
+# test file, or per directory past plan.wire_max_files (section 15.2)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+cp owed.yaml design/owed.yaml
+cp orders.sh.in e2e/orders.sh
+mkdir e2e/more
+cp pay.sh.in e2e/more/pay.sh
+cp ship.sh.in e2e/more/ship.sh
+cp risk.yaml design/risk.yaml
+cp risk-cfg.yaml r.tmp
+exec sh -c 'sed "/^design:/r r.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+rm r.tmp
+exec machinery gen
+
+# three test files claim: one story each; an id two files claim goes to the first, and its line names both
+exec machinery plan
+stdout -count=7 '^## '
+stdout '^## Model order-shipping \(tla\)$'
+stdout '^## Wire evidence e2e/more/pay.sh$'
+stdout '^## Wire evidence e2e/more/ship.sh$'
+stdout '^## Wire evidence e2e/orders.sh$'
+stdout '^The tests of e2e/more/ship.sh emit a receipt for each id they already claim\.$'
+stdout '^- inv:paid-before-shipped: claimed by e2e/more/ship.sh, e2e/orders.sh; holds on the running system: '
+stdout '^- tc:ORDE-e6d28f: claimed by e2e/more/ship.sh; Paid on:ship -> Shipped, effects: recordShipment, notifyCustomer; observed on the running system$'
+stdout '^machinery:ids inv:paid-before-shipped tc:ORDE-e6d28f$'
+stdout '^machinery:ids tc:ORDE-2e883d$'
+stdout '^machinery:ids inv:customer-email-unique$'
+# an id no test names keeps its story, as before
+stdout '^## Prove fm:payment-provider-down$'
+# so does an id owed as unproven, though a test claims it now: only what adopt found claimed is wired
+stdout '^## Prove inv:terminal-is-final$'
+# and an id claimed at adoption whose claim is gone
+stdout '^## Prove sc:cancelled-order-refuses-payment$'
+# a planned id, though a test claims it, is not wired, and gets no story at all: it has the project's
+! stdout 'sc:customer-pays-and-the-order-ships'
+! stdout '^## Prove order'
+exec sh -c 'machinery plan | grep -A1 "^## Wire evidence e2e/orders.sh" >/dev/null && machinery plan > first.md && machinery plan | cmp - first.md'
+
+# a wire-evidence story with an id in a critical area waits for the model, like a Prove story
+exec sh -c 'machinery plan | sed -n "/^## Wire evidence e2e\/more\/ship.sh/,/^### Acceptance/p"'
+stdout '^machinery, tier:critical$'
+stdout '^- Model order-shipping \(tla\): the formal model the tier requires$'
+exec sh -c 'machinery plan | sed -n "/^## Wire evidence e2e\/orders.sh/,/^### Acceptance/p"'
+stdout '^- none$'
+
+# --json carries the same stories
+exec machinery plan --json
+stdout '"key": "wire-evidence-e2e-more-ship-sh",$'
+stdout '"title": "Wire evidence e2e/more/ship.sh",$'
+! stdout 'sc:customer-pays-and-the-order-ships'
+
+# past plan.wire_max_files the stories are one per directory
+exec sh -c 'printf "plan:\n  wire_max_files: 2\n" >> machinery.yaml'
+exec machinery plan
+stdout -count=6 '^## '
+stdout '^## Wire evidence e2e/$'
+stdout '^## Wire evidence e2e/more/$'
+! stdout '^## Wire evidence e2e/orders.sh$'
+stdout '^The tests under e2e/more/ emit a receipt for each id they already claim\.$'
+stdout '^- tc:ORDE-2e883d: claimed by e2e/more/pay.sh; '
+stdout '^machinery:ids inv:paid-before-shipped tc:ORDE-2e883d tc:ORDE-e6d28f$'
+# at the limit they stay one per file
+exec sh -c 'sed "s/wire_max_files: 2/wire_max_files: 3/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec machinery plan
+stdout '^## Wire evidence e2e/more/pay.sh$'
+! stdout '^## Wire evidence e2e/$'
+
+# --apply creates them in the real backlog and says how many wire evidence; the planned id keeps its story
+# the planned id's story, shop-9, is the project's own and is not in this backlog: it is reported, nothing is
+# created for it, and its story is never replaced
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec machinery plan --apply
+stdout '^plan: 7 created, 0 existing, 1 edge\(s\)$'
+stdout '^plan: 3 wire-evidence stories for 4 claimed id\(s\), one per test file$'
+stdout '^plan: sc:customer-pays-and-the-order-ships: external story shop-9, not in the backlog; nothing created$'
+grep '  - id: sc:customer-pays-and-the-order-ships\n    reason: "planned at adoption \(abc1234\)"\n    story: shop-9\n' design/owed.yaml
+exec bd list --all --json --limit 0
+stdout '"title": "Wire evidence e2e/more/ship.sh"'
+! stdout '"title": "Prove sc:customer-pays-and-the-order-ships"'
+exec sh -c 'grep -c "^    story: shop-" design/owed.yaml'
+stdout '^9$'
+exec machinery plan --apply
+stdout '^plan: 0 created, 7 existing, 0 edge\(s\)$'
+stdout '^plan: sc:customer-pays-and-the-order-ships: external story shop-9, not in the backlog; nothing created$'
+
+# plan --link does not replace it either
+exec bd create --id shop-l1 --title 'Another story' --silent
+exec mrun 2 plan --link shop-l1 sc:customer-pays-and-the-order-ships
+stderr '^usage: sc:customer-pays-and-the-order-ships carries the story shop-9 the project planned it under; plan never replaces it: edit design/owed.yaml to change it$'
+grep '    story: shop-9\n' design/owed.yaml
+
+# once the story is in the backlog there is nothing to say about it
+exec bd create --id shop-9 --title 'Ship the happy path' --silent
+exec machinery plan --apply
+stdout '^plan: 0 created, 7 existing, 0 edge\(s\)$'
+! stdout 'external story'
+
+# the limit is a count
+exec sh -c 'sed "s/wire_max_files: 3/wire_max_files: -1/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec mrun 2 plan
+stderr '^config: plan.wire_max_files must not be negative$'
+
+-- owed.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "unproven at adoption (abc1234)"
+  - id: fv:order-shipping
+    reason: "unproven at adoption (abc1234)"
+  - id: inv:customer-email-unique
+    reason: "claimed at adoption (abc1234)"
+  - id: inv:paid-before-shipped
+    reason: "claimed at adoption (abc1234)"
+  - id: inv:terminal-is-final
+    reason: "unproven at adoption (abc1234)"
+  - id: sc:cancelled-order-refuses-payment
+    reason: "claimed at adoption (abc1234)"
+  - id: sc:customer-pays-and-the-order-ships
+    reason: "planned at adoption (abc1234)"
+    story: shop-9
+  - id: tc:ORDE-2e883d
+    reason: "claimed at adoption (abc1234)"
+  - id: tc:ORDE-e6d28f
+    reason: "claimed at adoption (abc1234)"
+-- risk-cfg.yaml --
+  risk: design/risk.yaml
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-shipping
+    tier: critical
+    why: "a shipment cannot be recalled"
+    ids: ["tc:ORDE-e6d28f"]
+    questions: [concurrency]
+-- orders.sh.in --
+#!/bin/sh
+# machinery:verifies inv:customer-email-unique inv:paid-before-shipped inv:terminal-is-final
+# machinery:verifies sc:customer-pays-and-the-order-ships
+# machinery:verifies tc:ORDE-1ded14 tc:ORDE-507e4f tc:ORDE-267d12 tc:ORDE-8bd6e7 tc:ORDE-ad945c tc:ORDE-70d94f tc:ORDE-8799a1 tc:ORDE-2fa2af
+true
+-- pay.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-2e883d
+true
+-- ship.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-e6d28f inv:paid-before-shipped
+true

@@ -17,11 +17,13 @@ import (
 	"github.com/RamXX/machinery/internal/assess"
 	"github.com/RamXX/machinery/internal/baseline"
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/pm"
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/internal/tags"
 	"github.com/RamXX/machinery/internal/testpolicy"
 )
 
@@ -38,6 +40,10 @@ var fixFirstStages = map[string]bool{"model": true, "machines": true, "failure-m
 
 // owedKinds orders the kinds of the owed list.
 var owedKinds = []string{"tc", "sc", "inv", "fm", "fv", "cx", "ck", "act"}
+
+// wireKind is the kind the plan table gives a wire-evidence story, after
+// the kinds of ids (section 15.2).
+const wireKind = "wire"
 
 // Options are the arguments of machinery adopt --rehearse.
 type Options struct {
@@ -78,6 +84,12 @@ type rehearsal struct {
 	baselines            []count
 	owed                 []count
 	owedTotal            int
+	claims               tags.Split // the owed ids by claim (section 14)
+	planWire             string     // how many stories wire evidence, or ""
+	wireStories, wireIDs int
+	wireBy               string
+	plannedIDs           int // ids planned at adoption: they keep the project's story and get none
+	mayExist             int // stories every id of which carries a story already
 	blocked              []string
 	checkLine            string
 	stageOutcomes        []count // Key: stage, outcome in waiverOf
@@ -160,7 +172,10 @@ func Run(o Options) error {
 	if r.planError != "" {
 		fmt.Fprintf(w, "plan: %s\n", r.planError)
 	} else {
-		fmt.Fprintf(w, "plan: %d stories, %d edge(s)\n", r.planTotal, r.planEdges)
+		fmt.Fprintf(w, "plan: %s\n", r.planLine())
+	}
+	if r.planWire != "" {
+		fmt.Fprintf(w, "wire evidence: %s\n", r.planWire)
 	}
 	if len(r.blocks) == 0 {
 		fmt.Fprintln(w, "blocks adoption: nothing")
@@ -240,12 +255,32 @@ func (r *rehearsal) rehearse(o Options, root, out, snap string) error {
 	d := ctx.Design()
 	r.findings(sts)
 	r.counts(p, d)
+	claims, err := tags.Read(p, d)
+	if err != nil {
+		return err
+	}
+	// a snapshot holds no receipts, but the count is the one status makes
+	ev, err := evidence.Evaluate(p, d, true)
+	if err != nil {
+		return err
+	}
+	r.claims = claims.SplitOwed(d, func(id string) bool { return ev.State(id) == evidence.Proven })
 	if len(r.blocked) > 0 {
 		r.adoptLine = fmt.Sprintf("adopt: blocked: machinery gen refuses while %d finding(s) stand; nothing is owed", blockedCount(r.blocked))
 	} else {
 		r.adoptLine = fmt.Sprintf("adopt: wrote %d file(s), %d waiver(s), %d owed", len(r.files), added, r.owedTotal)
 	}
 	return r.plan(out, d)
+}
+
+// planLine counts the stories of the plan. The count is exact unless a
+// story's ids all carry a story already: --apply creates none of those whose
+// story is in the backlog, which a rehearsal never reads.
+func (r *rehearsal) planLine() string {
+	if r.mayExist > 0 {
+		return fmt.Sprintf("up to %d stories, %d edge(s); %d may exist already: a rehearsal never reads the backlog", r.planTotal, r.planEdges, r.mayExist)
+	}
+	return fmt.Sprintf("%d stories, %d edge(s)", r.planTotal, r.planEdges)
 }
 
 // blockedCount reads the count of the first line of adopt's blocked report.
@@ -364,17 +399,24 @@ func (r *rehearsal) plan(out string, d *design.Design) error {
 		return err
 	}
 	counts := map[[2]string]int{}
+	r.plannedIDs, r.mayExist = len(plan.Supplied), plan.MayExist(d)
 	for _, s := range plan.Stories {
 		kind := ""
 		if len(s.IDs) > 0 {
 			kind, _, _ = strings.Cut(s.IDs[0], ":")
 		}
+		if s.Wire() {
+			kind = wireKind
+		}
 		counts[[2]string{kind, s.Tier}]++
 	}
+	r.planWire = plan.WireLine("story", "stories")
+	r.wireStories, r.wireIDs = plan.WireCounts()
+	r.wireBy = plan.WireBy
 	for k, n := range counts {
 		r.planStories = append(r.planStories, planCount{k[0], k[1], n})
 	}
-	rank := map[string]int{}
+	rank := map[string]int{wireKind: len(owedKinds)}
 	for i, k := range owedKinds {
 		rank[k] = i
 	}

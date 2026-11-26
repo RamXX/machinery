@@ -17,10 +17,11 @@ exec mrun 1 trace
 stdout 'ERROR  unknown owed id: act:Order.bogus'
 stdout 'failed: 1 finding\(s\)'
 
-# problems of the owed file are errors here too
+# problems of the owed file are errors here as for every command, before any stage runs (section 11.1)
 cp owed_noreason.yaml design/owed.yaml
 exec mrun 1 trace
-stdout 'ERROR  design/owed.yaml: act:Order.cancel: reason is required'
+stderr '^ERROR  design/owed.yaml: act:Order.cancel: reason is required$'
+! stdout .
 
 -- order_no_cancel.go.in --
 // Package domain holds the order rules of the fixture project.

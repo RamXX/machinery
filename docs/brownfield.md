@@ -63,6 +63,13 @@ tables or an id listed twice, is listed under "Fix in the project first": no wai
 and `adopt --write` owes nothing until it is fixed. Fix those in the project, commit, and
 rehearse again until nothing you did not choose blocks.
 
+The rehearsal also tells apart what your tests already claim. Under "Owed" it counts the ids a
+test names (`claimed by a test, no receipt yet`), the ids no test names, and the ids your own
+sources mark as planned; the plan has the usual stories for the ids no test names, one `Wire evidence`
+story per test file for the claimed ones and none for an id you had planned, so a project with a thousand claimed ids is not asked
+for a thousand stories. A claim is not evidence: every one of them is still owed until its test
+emits a receipt.
+
 ## 3. Look before you write
 
 Point `adopt` at the area that hurts most. Without `--write` it changes nothing:
@@ -111,6 +118,16 @@ The second `adopt --write` finds the new design sources, adds them to `machinery
 `machinery gen` and puts every obligation into `design/owed.yaml` with the reason `unproven at
 adoption`. That list is your baseline of what was never proven. Nothing fails; nothing is
 claimed.
+
+Here no test names an id yet. In a project whose tests already point at the design, an id a
+test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as
+planned (`import.planned`: a sentence that opens an invariant's statement, a cell of a row of
+your failure catalog, each naming its story) is owed with `planned at adoption` and that story.
+`machinery status` then counts the owed ids by what stands behind each: claimed by a test with
+no receipt yet, named by no test, planned, and, once a run has proven some, proven and still
+listed. A story id your mark names is kept as it is: `plan --apply` creates nothing for an id
+whose story is not in this backlog and says so, and a mark that captures more than a story id
+stops `adopt` before it writes.
 
 **Mark the failures.** The code you model already fails somewhere: a status value such as
 `failed`, a worker that reports a crash, a lease that runs out. Tag the state that records it with
@@ -163,7 +180,10 @@ machinery waves
 
 `plan --apply` adds one story per group of owed ids to the same backlog, with dependency edges
 and a tier label. Your existing stories are untouched. To attach ids to a story you already have,
-use `machinery plan --link <story> <id>...`. `waves` shows what can run in parallel.
+use `machinery plan --link <story> <id>...`. `waves` shows what can run in parallel. Ids a test
+claimed at adoption get no story of their own: `plan` adds one `Wire evidence <test file>` story
+per file (per directory past `plan.wire_max_files` files) that lists the ids the file must emit
+receipts for.
 
 Decisions you already keep in a file move into the backlog record by record:
 `machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'` prints one decision
@@ -217,6 +237,8 @@ Each of those can happen later, one story at a time, and the owed list and the b
 exactly how far along you are.
 
 Nor did you have to convert a design you already keep. Machines in a JSON dialect of your own,
-failure modes in Markdown tables and your own trace markers in comments are read as they are,
+failure modes in Markdown tables and your own trace markers in comments are read as they are
+(a marker you also use for other text goes in `trace.markers.scenarios_exact`, which claims only
+when the text is a scenario name),
 through `import` and `trace.markers` in `machinery.yaml` (`docs/formats.md` sections 5.2.1, 5.4.1
 and 8.1); the fixture `e2e/testdata/fixtures/library` is a small example.

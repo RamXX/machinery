@@ -1,0 +1,101 @@
+# a scenarios_exact marker claims only when its text is a scenario name and is silent otherwise (section 8.1)
+fixture shop
+cp markers.yaml m.tmp
+exec sh -c 'sed "/^  tests: /r m.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+cp orders.sh.in e2e/orders.sh
+exec machinery trace
+! stdout 'unknown-id'
+stdout 'checked: 2 code files, 1 test files, 4 act ids, 16 obligations'
+stdout '^passed$'
+
+# the claim is real: without the line whose text is the scenario name, the scenario is unverified,
+# and a line that differs only in case claims nothing
+exec sh -c 'grep -v "Objective: Cancelled order refuses payment" e2e/orders.sh > o.tmp && mv o.tmp e2e/orders.sh'
+exec mrun 1 trace
+stdout 'ERROR  unverified: sc:cancelled-order-refuses-payment'
+! stdout 'unknown-id'
+stdout '^failed: 1 finding\(s\)$'
+
+# machinery affected follows an exact marker of a changed test file, and only its matching lines
+cp orders.sh.in e2e/orders.sh
+exec machinery gen
+gitinit
+exec git branch base
+cp extra.sh.in e2e/extra.sh
+exec machinery affected --base base
+cmp stdout want-affected.txt
+rm e2e/extra.sh
+
+# the same lines under a scenarios marker are unknown ids, as before
+cp strict.yaml m.tmp
+exec sh -c 'grep -v -e "^  markers:" -e "scenarios_exact" machinery.yaml | sed "/^  tests: /r m.tmp" > c.tmp && mv c.tmp machinery.yaml'
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/orders.sh:5: scenario "the buyer sees a receipt"'
+stdout 'ERROR  unknown-id: e2e/orders.sh:7: scenario "cancelled order refuses payment"'
+stdout '^failed: 2 finding\(s\)$'
+
+# when both lists match a line the longest marker wins, with its own mode
+cp longest.yaml m.tmp
+exec sh -c 'grep -v -e "^  markers:" -e "    scenarios: " machinery.yaml | sed "/^  tests: /r m.tmp" > c.tmp && mv c.tmp machinery.yaml'
+cp longest.sh.in e2e/orders.sh
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/orders.sh:5: scenario "not a scenario"'
+stdout '^failed: 1 finding\(s\)$'
+
+# a marker has one mode, and an exact marker is not empty
+cp both.yaml machinery.yaml
+exec mrun 2 trace
+stderr '^config: trace.markers.scenarios_exact: "Objective:" is also in trace.markers.scenarios; a marker has one mode$'
+cp empty.yaml machinery.yaml
+exec mrun 2 trace
+stderr '^config: trace.markers.scenarios_exact: a marker must not be empty$'
+
+-- markers.yaml --
+  markers:
+    scenarios_exact: ["Objective:"]
+-- strict.yaml --
+  markers:
+    scenarios: ["Objective:"]
+-- longest.yaml --
+  markers:
+    scenarios: ["Objective: model"]
+    scenarios_exact: ["Objective:"]
+-- orders.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-*
+# machinery:verifies inv:paid-before-shipped inv:terminal-is-final inv:customer-email-unique
+# Objective: Customer pays and the order ships
+# Objective: the buyer sees a receipt
+# Objective: Cancelled order refuses payment
+# Objective: cancelled order refuses payment
+echo "Objective: Cancelled order refuses payment"
+true
+-- longest.sh.in --
+#!/bin/sh
+# machinery:verifies tc:ORDE-*
+# machinery:verifies inv:paid-before-shipped inv:terminal-is-final inv:customer-email-unique
+# Objective: model Customer pays and the order ships
+# Objective: model not a scenario
+# Objective: Cancelled order refuses payment
+# Objective: anything else at all
+true
+-- extra.sh.in --
+#!/bin/sh
+# Objective: check the totals
+# Objective: Cancelled order refuses payment
+true
+-- want-affected.txt --
+sc:cancelled-order-refuses-payment
+-- both.yaml --
+version: 2
+trace:
+  tests: ["e2e/**"]
+  markers:
+    scenarios: ["Scenario:", "Objective:"]
+    scenarios_exact: ["Objective:"]
+-- empty.yaml --
+version: 2
+trace:
+  tests: ["e2e/**"]
+  markers:
+    scenarios_exact: [" "]

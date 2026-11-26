@@ -16,6 +16,7 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/internal/tags"
 )
 
 // Options are the arguments of machinery adopt.
@@ -75,6 +76,9 @@ func Run(o Options) (*Result, error) {
 	if existing {
 		if oldP, err = project.Load(root); err != nil {
 			return nil, err
+		}
+		if lines := design.OwedRefusal(oldP); len(lines) > 0 {
+			return nil, fmt.Errorf("%s", strings.Join(lines, "\n"))
 		}
 	} else {
 		cfgBytes = nil
@@ -150,10 +154,18 @@ func Run(o Options) (*Result, error) {
 		p = &project.Project{Root: root, Cfg: *cfg}
 	}
 
+	// a planned mark that names no story id is refused before anything is written
+	var planned map[string]string
+	if len(p.Cfg.ImportedPlanned()) > 0 {
+		var problems []string
+		if planned, problems = design.Load(p).PlannedMarks(); len(problems) > 0 {
+			return nil, fmt.Errorf("%s", strings.Join(problems, "\n"))
+		}
+	}
 	if err := describe(res, p, files); err != nil {
 		return nil, err
 	}
-	w := &worker{o: o, res: res, oldP: oldP, p: p, head: head, written: map[string]bool{}}
+	w := &worker{planned: planned, o: o, res: res, oldP: oldP, p: p, head: head, written: map[string]bool{}}
 	if newBytes != nil {
 		what := "new config"
 		if existing {
@@ -326,6 +338,7 @@ type worker struct {
 	oldP, p *project.Project
 	head    string
 	written map[string]bool
+	planned map[string]string // the project's planned marks: id to story
 }
 
 func (w *worker) record(rel, what string) {
@@ -440,17 +453,31 @@ func (w *worker) owed() error {
 
 func (w *worker) addOwed(d *design.Design) error {
 	have := d.OwedSet()
-	reason := "unproven at adoption (" + w.reasonSha() + ")"
+	at := " (" + w.reasonSha() + ")"
+	reason := design.ReasonUnproven + at
 	entries := append([]design.OwedEntry(nil), d.Owed...)
 	added := 0
-	served := servedIDs(w.p, d)
+	claims, err := tags.Read(w.p, d)
+	if err != nil {
+		return err
+	}
+	served := claims.Served
+	planned := w.planned
 	// Only what is new is owed: an id the committed obligation list already
 	// has was owed, or proven and pruned, before. Owing it again would undo
 	// the ratchet.
 	known := committedIDs(w.p)
 	for _, o := range d.Obligations {
 		if _, ok := have[o.ID]; !ok && !known[o.ID] {
-			entries = append(entries, design.OwedEntry{ID: o.ID, Reason: reason})
+			// what the project planned, what a test already claims, what no test names
+			e := design.OwedEntry{ID: o.ID, Reason: reason}
+			switch {
+			case planned[o.ID] != "":
+				e.Reason, e.Story = design.ReasonPlanned+at, planned[o.ID]
+			case len(claims.Tests[o.ID]) > 0:
+				e.Reason = design.ReasonClaimed + at
+			}
+			entries = append(entries, e)
 			added++
 		}
 	}

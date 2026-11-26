@@ -13,6 +13,7 @@ type Row struct {
 	Line     int    // 1-based
 	Failure  string
 	Behavior string
+	Cells    []string // every cell of the row, trimmed
 }
 
 // Columns names, for each column a failure-mode row needs, the header
@@ -80,7 +81,7 @@ func Catalog(rel string, data []byte, id *regexp.Regexp, cols Columns) (rows []R
 				continue
 			}
 			r := Row{Cell: cells[0], ID: strings.ToLower(cells[0]), Line: j + 1,
-				Failure: cellAt(cells, failure), Behavior: cellAt(cells, behavior)}
+				Failure: cellAt(cells, failure), Behavior: cellAt(cells, behavior), Cells: cells}
 			where := fmt.Sprintf("%s:%d: %s", rel, r.Line, r.Cell)
 			if !fmIDRe.MatchString(r.ID) {
 				problems = append(problems, fmt.Sprintf("%s: the id lower-cased, %s, must match ^[a-z][a-z0-9-]+$", where, r.ID))

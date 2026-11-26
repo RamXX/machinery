@@ -9,6 +9,7 @@ stdout '^obligations: 16 \(tc 10, sc 2, inv 3, fm 1\)$'
 ! stdout '^tiers:'
 stdout '^proven: 0  partial: 0  failed: 0  owed: 2  unproven and not owed: 14$'
 stdout '^owed without a story: 2$'
+! stdout '^owed, '
 stdout '^evidence: none at [0-9a-f]{7}$'
 exec sh -c 'test "$(machinery status | head -n 1)" = "project: $(basename "$(pwd -P)")" && echo name-ok'
 stdout name-ok
