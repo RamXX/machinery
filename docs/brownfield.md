@@ -125,7 +125,8 @@ claimed.
 Here no test names an id yet. In a project whose tests already point at the design, an id a
 test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as
 planned (`import.planned`: a sentence that opens an invariant's statement or a scenario's
-description, a cell of a row of your failure catalog, each naming its story) is owed with `planned at adoption` and that story.
+description, a cell of a row of your failure catalog, each naming its story) is owed with `planned
+at adoption` and that story.
 `machinery status` then counts the owed ids by what stands behind each: claimed by a test with
 no receipt yet, named by no test, planned, and, once a run has proven some, proven and still
 listed. A story id your mark names is kept as it is: `plan --apply` creates nothing for an id
@@ -186,10 +187,15 @@ still hinted: list it in `failure_events`, or dismiss the hint by name in `not_f
 the reason. An alias and `failure_events` go together when the action is itself the failing
 outcome (the model action `fail`, the events `send_failed` and `verify_failed`). A machine that
 writes the refusal of a command as an event of its own (`cancel` and `cancel_refused`) declares
-it in `refusal_events` (`cancel_refused: cancel`): it is no event from outside and no alias, and
-a declared refusal is neither hinted nor asked for a failure mode. A pattern that matches nothing in a machine it is applied to is an error, a pattern
+it in `refusal_events`, with the action and the reason
+(`cancel_refused: {action: cancel, reason: "a paid order is not cancelled"}`): it is no event
+from outside and no alias, and a declared refusal is neither hinted nor asked for a failure
+mode. That holds only for a refusal, where nothing failed: an event on which the machine
+enters a failure state is refused as one, and every declaration is printed with its reason. A
+pattern that matches nothing in a machine it is applied to is an error, a pattern
 of `*` only is refused, and an event that is an action of the model stays a finding whether you
-list it as external or give it an alias: the config cannot hide a command. Every alias and every refusal event in effect
+list it as external or give it an alias: the config cannot hide a command. Every alias and every
+refusal event in effect
 is a line of `xref-model-machine`, so the list of names you bridged stays in view.
 
 ## 6. Turn what is owed into stories, beside the ones you have

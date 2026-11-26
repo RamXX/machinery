@@ -43,8 +43,8 @@ enforces everything below, and an unknown key is an error, never silently skippe
   `_external_events`.
 - **Aliases.** `_aliases` maps events some state handles or ignores to action names, none of
   them also in `_external_events`.
-- **Refusal events.** `_refusal_events` maps events some state handles or ignores to action
-  names, none of them also in `_external_events`, `_failure_events` or `_aliases`.
+- **Refusal events.** `_refusal_events` maps events some state handles or ignores to an action
+  name and a reason, none of them also in `_external_events`, `_failure_events` or `_aliases`.
 - **Dismissed hints.** `_not_failures` maps events and state paths the machine has to reasons,
   none of them a declared failure.
 - **Callers.** `_requires` is a non-empty list of distinct, non-empty names.
@@ -209,18 +209,24 @@ for every alias in effect and counts them, and an aliased event whose name looks
 is still hinted. Prefer one name in the model and the machine; the alias is for a machine whose
 names cannot change.
 
-**`_refusal_events`** (root, optional). An object that maps an event name to the name of the
-model action it refuses: `"_refusal_events": {"cancel_refused": "cancel"}` for a machine that
+**`_refusal_events`** (root, optional). An object that maps an event name to the model action
+it refuses and the reason it is a refusal and no failure:
+`"_refusal_events": {"cancel_refused": {"action": "cancel", "reason": "a paid order is not cancelled"}}`
+for a machine that
 handles `cancel` and, in the states that do not accept it, writes the refusal as an event of its
 own. Such an event is no action (the caller sent `cancel`), no event from outside (the machine
 writes it) and no alias (`cancel` has its own event), so rule `event-action` accepts it only by
 this declaration (`docs/formats.md` section 6.4): the event is no action of the model, and the
 action is one of the machine's entity, or of an entity behind what an operational machine
-serves, with an `on` event of its own name in the same machine. Each value is a non-empty
-string, each event is one some state handles or ignores (a stale entry is an error), and none is
-also in `_external_events`, `_failure_events` or `_aliases`. The stage prints one line for every
-refusal event in effect and counts them. A refusal is declared, not a failure: its name is never
+serves, with an `on` event of its own name in the same machine. Each value is an object with a
+non-empty `action` and a non-empty `reason` and no other key, each event is one some state
+handles or ignores (a stale entry is an error), and none is also in `_external_events`,
+`_failure_events` or `_aliases`. A refusal is declared, not a failure: its name is never
 hinted, no failure mode is asked for it, and one may name it (`event:<machine id>.<event>`).
+That is sound only for a refusal (the command was refused, nothing failed), so an event on
+which the machine enters a state tagged `failure` is not accepted as one, and the stage prints
+one line for every refusal event in effect, with its reason, and counts them: the lines are
+what a reviewer reads to see that no failure was renamed a refusal.
 
 **`_not_failures`** (root, optional). An object that maps a name to the reason it only looks
 like a failure, which dismisses its name hint ("Failure idioms"):
@@ -450,7 +456,8 @@ it.
 **Name hints.** The lint warns about a state whose name contains `fail`, `error`, `abort`,
 `crash` or `timeout` (in any case) and is not tagged `failure`, and about an event with such a
 name that is neither in `_failure_events`, nor in `_refusal_events`, nor an action of the
-lifecycle entity; an event in `_external_events` or in `_aliases` is still hinted. When the name means something else, dismiss
+lifecycle entity; an event in `_external_events` or in `_aliases` is still hinted. When the name
+means something else, dismiss
 the hint with the reason in the root `_not_failures`, keyed by the event name or the dotted path
 of the state. A warning never fails the stage; tag the state, list the event, or dismiss the hint
 when the name means something else.
