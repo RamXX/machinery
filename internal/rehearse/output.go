@@ -89,15 +89,19 @@ func (r *rehearsal) markdown() string {
 	if r.planError != "" {
 		p("%s", r.planError)
 	} else {
-		p("%d stories, %d edge(s), as `machinery plan` would create them (`plan.md`; never applied).", r.planTotal, r.planEdges)
-		if r.planWire != "" || r.plannedStories > 0 {
+		if r.mayExist > 0 {
+			p("Up to %d stories, %d edge(s), as `machinery plan` would create them (`plan.md`; never applied); %d may exist already: every id of the group carries a story, and a rehearsal never reads the backlog.", r.planTotal, r.planEdges, r.mayExist)
+		} else {
+			p("%d stories, %d edge(s), as `machinery plan` would create them (`plan.md`; never applied).", r.planTotal, r.planEdges)
+		}
+		if r.planWire != "" || r.plannedIDs > 0 {
 			p("")
 		}
 		if r.planWire != "" {
 			p("- wire evidence: %s", r.planWire)
 		}
-		if r.plannedStories > 0 {
-			p("- already planned in the project: %d story(ies) are for ids planned at adoption; `plan --apply` creates nothing for them: each keeps the story the project gave it", r.plannedStories)
+		if r.plannedIDs > 0 {
+			p("- already planned in the project: %d id(s) planned at adoption keep the story the project gave them; no story is planned for them", r.plannedIDs)
 		}
 		if len(r.planStories) > 0 {
 			p("")
@@ -183,7 +187,7 @@ func (r *rehearsal) doc() map[string]any {
 	for _, s := range r.planStories {
 		stories = append(stories, map[string]any{"kind": s.Kind, "tier": s.Tier, "count": s.Count})
 	}
-	plan := map[string]any{"stories": stories, "total": r.planTotal, "edges": r.planEdges, "planned_stories": r.plannedStories,
+	plan := map[string]any{"stories": stories, "total": r.planTotal, "edges": r.planEdges, "planned_ids": r.plannedIDs, "may_exist": r.mayExist,
 		"wire": map[string]any{"stories": r.wireStories, "ids": r.wireIDs, "by": r.wireBy}}
 	if r.planError != "" {
 		plan["error"] = r.planError

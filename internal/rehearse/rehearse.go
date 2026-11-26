@@ -88,7 +88,8 @@ type rehearsal struct {
 	planWire             string     // how many stories wire evidence, or ""
 	wireStories, wireIDs int
 	wireBy               string
-	plannedStories       int // stories for ids planned at adoption
+	plannedIDs           int // ids planned at adoption: they keep the project's story and get none
+	mayExist             int // stories every id of which carries a story already
 	blocked              []string
 	checkLine            string
 	stageOutcomes        []count // Key: stage, outcome in waiverOf
@@ -171,7 +172,7 @@ func Run(o Options) error {
 	if r.planError != "" {
 		fmt.Fprintf(w, "plan: %s\n", r.planError)
 	} else {
-		fmt.Fprintf(w, "plan: %d stories, %d edge(s)\n", r.planTotal, r.planEdges)
+		fmt.Fprintf(w, "plan: %s\n", r.planLine())
 	}
 	if r.planWire != "" {
 		fmt.Fprintf(w, "wire evidence: %s\n", r.planWire)
@@ -270,6 +271,16 @@ func (r *rehearsal) rehearse(o Options, root, out, snap string) error {
 		r.adoptLine = fmt.Sprintf("adopt: wrote %d file(s), %d waiver(s), %d owed", len(r.files), added, r.owedTotal)
 	}
 	return r.plan(out, d)
+}
+
+// planLine counts the stories of the plan. The count is exact unless a
+// story's ids all carry a story already: --apply creates none of those whose
+// story is in the backlog, which a rehearsal never reads.
+func (r *rehearsal) planLine() string {
+	if r.mayExist > 0 {
+		return fmt.Sprintf("up to %d stories, %d edge(s); %d may exist already: a rehearsal never reads the backlog", r.planTotal, r.planEdges, r.mayExist)
+	}
+	return fmt.Sprintf("%d stories, %d edge(s)", r.planTotal, r.planEdges)
 }
 
 // blockedCount reads the count of the first line of adopt's blocked report.
@@ -388,17 +399,11 @@ func (r *rehearsal) plan(out string, d *design.Design) error {
 		return err
 	}
 	counts := map[[2]string]int{}
-	planned := map[string]bool{}
-	for _, o := range d.Owed {
-		planned[o.ID] = o.PlannedAtAdoption()
-	}
+	r.plannedIDs, r.mayExist = len(plan.Supplied), plan.MayExist(d)
 	for _, s := range plan.Stories {
 		kind := ""
 		if len(s.IDs) > 0 {
 			kind, _, _ = strings.Cut(s.IDs[0], ":")
-			if planned[s.IDs[0]] {
-				r.plannedStories++
-			}
 		}
 		if s.Wire() {
 			kind = wireKind

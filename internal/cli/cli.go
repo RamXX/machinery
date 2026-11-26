@@ -138,8 +138,10 @@ func (e *Env) Project() (*project.Project, bool) {
 	}
 	// an owed list that does not parse has no entries to trust: no command
 	// goes on as if it were empty (section 11.1)
-	if msg := design.OwedUnreadable(p); msg != "" {
-		fmt.Fprintf(e.Stderr, "ERROR  %s\n", msg)
+	if lines := design.OwedRefusal(p); len(lines) > 0 {
+		for _, l := range lines {
+			fmt.Fprintf(e.Stderr, "ERROR  %s\n", l)
+		}
 		e.exit = 1
 		return nil, false
 	}

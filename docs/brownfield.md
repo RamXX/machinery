@@ -65,8 +65,8 @@ rehearse again until nothing you did not choose blocks.
 
 The rehearsal also tells apart what your tests already claim. Under "Owed" it counts the ids a
 test names (`claimed by a test, no receipt yet`), the ids no test names, and the ids your own
-sources mark as planned; the plan has one story per id no test names and one `Wire evidence`
-story per test file for the claimed ones, so a project with a thousand claimed ids is not asked
+sources mark as planned; the plan has the usual stories for the ids no test names, one `Wire evidence`
+story per test file for the claimed ones and none for an id you had planned, so a project with a thousand claimed ids is not asked
 for a thousand stories. A claim is not evidence: every one of them is still owed until its test
 emits a receipt.
 

@@ -77,8 +77,8 @@ func Run(o Options) (*Result, error) {
 		if oldP, err = project.Load(root); err != nil {
 			return nil, err
 		}
-		if msg := design.OwedUnreadable(oldP); msg != "" {
-			return nil, fmt.Errorf("%s", msg)
+		if lines := design.OwedRefusal(oldP); len(lines) > 0 {
+			return nil, fmt.Errorf("%s", strings.Join(lines, "\n"))
 		}
 	} else {
 		cfgBytes = nil

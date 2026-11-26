@@ -10,29 +10,36 @@ grep '^RISK-3 \| planned: lib-7 \|' docs/risks.md
 cp planned.yaml p.tmp
 exec sh -c 'sed "/^import:/r p.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
 exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+# the project already owed one row, under a story of its own
+exec sh -c 'printf "    story: lib-3\n" >> design/owed.yaml'
 rm p.tmp
 gitinit
 
 # the rehearsal, before anything is written: owed by claim, and the plan in both groups
 exec machinery adopt --rehearse --out ../reh
 stdout '^adopt: wrote [0-9]+ file\(s\), 0 waiver\(s\), 19 owed$'
-stdout '^plan: 6 stories, 0 edge\(s\)$'
+# the three planned ids keep the project's story and get none; the row owed under lib-3 may have its story
+# in the backlog, which a rehearsal never reads, so the total is an upper bound
+stdout '^plan: up to 3 stories, 0 edge\(s\); 1 may exist already: a rehearsal never reads the backlog$'
 stdout '^wire evidence: 1 story for 14 claimed id\(s\), one per test file$'
 grep '^- total: 19$' ../reh/rehearsal.md
 grep '^- claimed by a test, no receipt yet: 14 \(tc 11, sc 1, fm 2\)$' ../reh/rehearsal.md
 grep '^- no test names it: 2 \(sc 1, fm 1\)$' ../reh/rehearsal.md
 grep '^- planned: 3 \(inv 2, fm 1\)$' ../reh/rehearsal.md
-grep '^6 stories, 0 edge\(s\), as `machinery plan` would create them' ../reh/rehearsal.md
+grep '^Up to 3 stories, 0 edge\(s\), as `machinery plan` would create them \(`plan.md`; never applied\); 1 may exist already: every id of the group carries a story, and a rehearsal never reads the backlog\.$' ../reh/rehearsal.md
 grep '^- wire evidence: 1 story for 14 claimed id\(s\), one per test file$' ../reh/rehearsal.md
-grep '^- already planned in the project: 3 story\(ies\) are for ids planned at adoption; `plan --apply` creates nothing for them: each keeps the story the project gave it$' ../reh/rehearsal.md
+grep '^- already planned in the project: 3 id\(s\) planned at adoption keep the story the project gave them; no story is planned for them$' ../reh/rehearsal.md
 grep '^\| wire \| routine \| 1 \|$' ../reh/rehearsal.md
 grep '^\| sc \| routine \| 1 \|$' ../reh/rehearsal.md
-grep '^\| inv \| routine \| 2 \|$' ../reh/rehearsal.md
-grep '^\| fm \| routine \| 2 \|$' ../reh/rehearsal.md
+! grep '^\| inv \|' ../reh/rehearsal.md
+grep '^\| fm \| routine \| 1 \|$' ../reh/rehearsal.md
+! grep '^## Prove fm:risk-3$' ../reh/plan.md
 ! grep '^\| tc \|' ../reh/rehearsal.md
 grep '^## Wire evidence e2e/loans.sh$' ../reh/plan.md
 grep '"wire": \{\n      "by": "file",\n      "ids": 14,\n      "stories": 1\n    \}' ../reh/rehearsal.json
-grep '"planned_stories": 3,' ../reh/rehearsal.json
+grep '"may_exist": 1,' ../reh/rehearsal.json
+grep '"total": 3,' ../reh/rehearsal.json
+grep '"planned_ids": 3,' ../reh/rehearsal.json
 grep '"claimed": \{\n      "by_kind": \{\n        "fm": 2,\n        "sc": 1,\n        "tc": 11\n      \},\n      "total": 14\n    \},' ../reh/rehearsal.json
 grep '"unnamed": \{\n      "by_kind": \{\n        "fm": 1,\n        "sc": 1\n      \},\n      "total": 2\n    \}' ../reh/rehearsal.json
 exec git status --porcelain
@@ -49,8 +56,8 @@ grep '  - id: inv:lent-before-returned\n    reason: "planned at adoption \([0-9a
 grep '  - id: sc:blocked-member-is-refused-a-loan\n    reason: "unproven at adoption \([0-9a-f]{7}\)"\n  - id' design/owed.yaml
 grep '  - id: inv:returned-is-final\n    reason: "planned at adoption \([0-9a-f]{7}\)"\n    story: lib-12\n' design/owed.yaml
 grep '  - id: fm:risk-3\n    reason: "planned at adoption \([0-9a-f]{7}\)"\n    story: lib-7\n' design/owed.yaml
-grep '  - id: fm:risk-4\n    reason: "the weekly recount has no test yet"\n' design/owed.yaml
-grep -count=3 '^    story: ' design/owed.yaml
+grep '  - id: fm:risk-4\n    reason: "the weekly recount has no test yet"\n    story: lib-3\n' design/owed.yaml
+grep -count=4 '^    story: ' design/owed.yaml
 exec machinery check
 stdout 'machinery check: 9 passed, 0 failed, 0 not demonstrated, 7 not applicable'
 gitcommit adopted
@@ -64,29 +71,33 @@ exec git status --porcelain
 # status counts the owed ids by claim; a planned id is planned even though a test claims it
 exec machinery status
 stdout '^ids: 0 proposed, 19 owed, 3 proven, 0 retired$'
-stdout '^owed without a story: 16$'
+stdout '^owed without a story: 15$'
 stdout '^owed, claimed by a test, no receipt yet: 14 \(tc 11, sc 1, fm 2\)$'
 stdout '^owed, no test names it: 2 \(sc 1, fm 1\)$'
 stdout '^owed, planned: 3 \(inv 2, fm 1\)$'
 exec sh -c 'machinery status | grep -A3 "^owed without a story" | tail -n 3 | cut -c1-12 | tr "\n" "|"'
 stdout '^owed, claime\|owed, no tes\|owed, planne\|$'
 
-# the plan: one story per id no test names and per planned id, one wire-evidence story for the claimed ones
+# the plan: the usual stories for the ids no test names, one wire-evidence story for the claimed ones, and
+# none for a planned id: --apply would create none, so neither the print nor --json shows one
 exec machinery plan
-stdout -count=6 '^## '
-stdout '^## Prove inv:lent-before-returned$'
-stdout '^## Prove fm:risk-3$'
+stdout -count=3 '^## '
+! stdout 'inv:lent-before-returned'
+! stdout 'fm:risk-3'
 stdout '^## Prove fm:risk-4$'
-stdout '^## Prove inv:returned-is-final$'
+! stdout 'inv:returned-is-final'
 stdout '^## Prove sc:blocked-member-is-refused-a-loan$'
 stdout '^## Wire evidence e2e/loans.sh$'
 ! stdout '^## Prove loan'
 ! stdout '^## Prove hold_queue'
 stdout '^The tests of e2e/loans.sh emit a receipt for each id they already claim\.$'
-stdout '^- inv:lent-before-returned: holds on the running system: A Loan reaches the returned status only from the lent status\.$'
 stdout '^- sc:member-borrows-and-returns-a-copy: claimed by e2e/loans.sh; runs end to end on the running system: Member borrows and returns a copy$'
 stdout '^- fm:risk-1: claimed by e2e/loans.sh; refused: '
 stdout '^- No new test: the tests that claim these ids exist; this story makes them emit receipts\.$'
+exec machinery plan --json
+! stdout 'returned-is-final'
+! stdout 'fm:risk-3'
+exec machinery plan
 stdout '^machinery:ids fm:risk-1 fm:risk-2 sc:member-borrows-and-returns-a-copy tc:'
 
 # a mark whose pattern captures more than a story id is refused, by source line, and nothing is written

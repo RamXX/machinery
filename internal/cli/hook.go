@@ -258,8 +258,8 @@ func branchStory(p *project.Project) string {
 func hookCheck(p *project.Project, base, story string) []string {
 	// an owed list that does not parse is a finding of its own: no stage is
 	// run as if the list were empty (section 11.1)
-	if msg := design.OwedUnreadable(p); msg != "" {
-		return []string{"owed: ERROR  " + msg}
+	if lines := design.OwedRefusal(p); len(lines) > 0 {
+		return []string{"owed: ERROR  " + strings.Join(lines, "; ")}
 	}
 	names := append([]string{}, stages.CheckStages...)
 	ctx := &stages.Context{P: p}

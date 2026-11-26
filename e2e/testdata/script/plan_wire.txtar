@@ -15,7 +15,7 @@ exec machinery gen
 
 # three test files claim: one story each; an id two files claim goes to the first, and its line names both
 exec machinery plan
-stdout -count=8 '^## '
+stdout -count=7 '^## '
 stdout '^## Model order-shipping \(tla\)$'
 stdout '^## Wire evidence e2e/more/pay.sh$'
 stdout '^## Wire evidence e2e/more/ship.sh$'
@@ -32,8 +32,8 @@ stdout '^## Prove fm:payment-provider-down$'
 stdout '^## Prove inv:terminal-is-final$'
 # and an id claimed at adoption whose claim is gone
 stdout '^## Prove sc:cancelled-order-refuses-payment$'
-# and a planned id, though a test claims it
-stdout '^## Prove sc:customer-pays-and-the-order-ships$'
+# a planned id, though a test claims it, is not wired, and gets no story at all: it has the project's
+! stdout 'sc:customer-pays-and-the-order-ships'
 ! stdout '^## Prove order'
 exec sh -c 'machinery plan | grep -A1 "^## Wire evidence e2e/orders.sh" >/dev/null && machinery plan > first.md && machinery plan | cmp - first.md'
 
@@ -48,11 +48,12 @@ stdout '^- none$'
 exec machinery plan --json
 stdout '"key": "wire-evidence-e2e-more-ship-sh",$'
 stdout '"title": "Wire evidence e2e/more/ship.sh",$'
+! stdout 'sc:customer-pays-and-the-order-ships'
 
 # past plan.wire_max_files the stories are one per directory
 exec sh -c 'printf "plan:\n  wire_max_files: 2\n" >> machinery.yaml'
 exec machinery plan
-stdout -count=7 '^## '
+stdout -count=6 '^## '
 stdout '^## Wire evidence e2e/$'
 stdout '^## Wire evidence e2e/more/$'
 ! stdout '^## Wire evidence e2e/orders.sh$'
@@ -90,10 +91,10 @@ exec mrun 2 plan --link shop-l1 sc:customer-pays-and-the-order-ships
 stderr '^usage: sc:customer-pays-and-the-order-ships carries the story shop-9 the project planned it under; plan never replaces it: edit design/owed.yaml to change it$'
 grep '    story: shop-9\n' design/owed.yaml
 
-# once the story is in the backlog the group is an existing one
+# once the story is in the backlog there is nothing to say about it
 exec bd create --id shop-9 --title 'Ship the happy path' --silent
 exec machinery plan --apply
-stdout '^plan: 0 created, 8 existing, 0 edge\(s\)$'
+stdout '^plan: 0 created, 7 existing, 0 edge\(s\)$'
 ! stdout 'external story'
 
 # the limit is a count

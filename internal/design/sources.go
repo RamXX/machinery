@@ -438,6 +438,21 @@ func MarshalOwed(entries []OwedEntry) []byte {
 	return b.Bytes()
 }
 
+// OwedRefusal returns why the owed file is not read, one line per problem,
+// or nil: it does not parse, or it parses and has a problem of its own (an
+// id listed twice, an entry without a reason, a wrong version). No command
+// goes on with such a list (section 11.1).
+func OwedRefusal(p *project.Project) []string {
+	if msg := OwedUnreadable(p); msg != "" {
+		return []string{msg}
+	}
+	_, problems := LoadOwed(p)
+	if len(problems) == 0 {
+		return nil
+	}
+	return append(problems, p.Cfg.Design.Owed+": fix the file; an owed list with a problem is not read")
+}
+
 // StoryID is the shape of a story id written by machinery from a project's
 // own text (section 2): letters, digits, dot, dash and underscore.
 var StoryID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
@@ -453,6 +468,8 @@ func OwedUnreadable(p *project.Project) string {
 	why := ""
 	if data, err := p.Read(rel); err != nil {
 		why = "cannot read: " + shortErr(err)
+	} else if strings.TrimSpace(string(data)) == "" {
+		why = "the file is empty; write \"version: 1\" and \"owed: []\" in it, or delete it (a missing file is an empty list)"
 	} else if err := strictYAML(data, &owedFile{}); err != nil {
 		why = err.Error()
 	}

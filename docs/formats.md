@@ -1405,14 +1405,23 @@ not owed (section 23.2): an entry that names a `pf` id is
 `ERROR  proof: <id> is in <owed file>; a proof obligation is not owed: it awaits a machine-checked proof, which this version cannot give; remove the entry`
 wherever the file is read. A missing file is an empty list.
 
-**A file that does not parse.** An owed file that cannot be read, is not YAML or has an unknown
+**A file with a problem.** An owed file that cannot be read, is not YAML or has an unknown
 key has no entries to trust, and it is never read as an empty list. Every command that works in
 the project then prints, on stderr and with nothing on stdout,
 `ERROR  <owed file>: <error>; an owed list that does not parse is not read as empty: fix the file`
-and exits 1: `status`, `verify`, `check`, `plan`, `landing` and the rest alike. `machinery adopt`
-refuses with the same text before it writes anything (`machinery: <owed file>: ...`, exit 1),
+and exits 1: `status`, `verify`, `check`, `plan`, `landing` and the rest alike. For an empty
+file `<error>` is
+`the file is empty; write "version: 1" and "owed: []" in it, or delete it (a missing file is an empty list)`.
+A file that parses and has a problem of its own (a version other than 1, an entry without an
+id or a reason, an id listed twice) is refused the same way, before any stage runs: one
+`ERROR  <owed file>: <problem>` line per problem, in file order (`duplicate id <id>`,
+`<id>: reason is required`), then
+`ERROR  <owed file>: fix the file; an owed list with a problem is not read`, and exit 1. An
+entry that names an id the design does not have is not such a problem: it is a finding of the
+stages that compare the list with the design, as before. `machinery adopt`
+refuses with the same lines before it writes anything (the first after `machinery: `, exit 1),
 `machinery assess` reports the problems of the snapshot's owed file as ERRORs of its `design`
-section, and the hooks hold it as their one finding (section 21.1). machinery itself writes
+section, and the hooks hold the lines, joined by `; `, as their one finding (section 21.1). machinery itself writes
 the file through a YAML encoder, every value included, so what it writes always parses back.
 
 `machinery adopt` writes three reasons (section 17.2, step 3), each followed by
@@ -1958,13 +1967,16 @@ created or not:
 (`1 wire-evidence story`).
 
 **A story the project supplied.** An entry planned at adoption carries the story of the
-project's own mark, and plan never replaces it. When that story is in the backlog its group is
-an existing one. When it is not, as when the project's ids come from another tracker,
-`--apply` creates nothing for the group and prints, after the lines above, one line per such id:
-`plan: <id>: external story <story>, not in the backlog; nothing created`. The entry keeps its
-story on every run. `plan --link <story> <id>` to another story is a usage error:
+project's own mark, and plan never replaces it. Such an id is in no group: the plan has no
+story for it, printed, with `--json` or applied, so no count of stories includes one that
+`--apply` would not create for this reason, and the other ids of what would have been its group
+keep their story. When its story is in the backlog nothing is said. When it is not, as when
+the project's ids come from another tracker, `--apply` prints, after the lines above, one line
+per such id: `plan: <id>: external story <story>, not in the backlog; nothing created`. The
+entry keeps its story on every run. `plan --link <story> <id>` to another story is a usage error:
 `<id> carries the story <story> the project planned it under; plan never replaces it: edit <owed file> to change it`.
-Printing the plan does not read the backlog: there such an id has its story like any other.
+Printing the plan does not read the backlog, so a printed plan still shows a group whose ids
+all carry a story that `--apply` may find in the backlog and skip.
 `machinery plan --link <story> <id>...` attaches ids to an existing story instead: it appends a
 `machinery:ids` note to the story, sets the `story` field of those owed entries and prints
 `plan: <n> id(s) linked to <story>`.
@@ -3418,7 +3430,7 @@ timestamp or an absolute path:
 | `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total; then the same ids as the `owed,` lines of `machinery status` count them (section 14), each after `- ` instead of `owed, `: `- claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `- no test names it: <n> (...)` and, when they count something, `- planned: <n> (...)`, `- proven by a receipt, still listed: <n> (...)` and `- actions: <n> served by code, <n> not served`. |
 | `blocked` | When adopt was blocked (section 17.2): the lines of its `blocked` report. |
 | `check` | The summary line of `machinery check` and the outcome line of each stage. |
-| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids, and `wire`, listed last, for a wire-evidence story) and tier, with counts, their total and the number of edges. Both groups show: when the plan has a wire-evidence story, `- wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>` (`1 story`), and when it has stories for ids planned at adoption, `- already planned in the project: <n> story(ies) are for ids planned at adoption; `plan --apply` creates nothing for them: each keeps the story the project gave it`. |
+| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids, and `wire`, listed last, for a wire-evidence story) and tier, with counts, their total and the number of edges. The total is exact unless every id of a story carries a story already: `--apply` skips such a group when that story is in the backlog, which a rehearsal never reads, so the line then starts `Up to <n> stories` and ends `; <m> may exist already: every id of the group carries a story, and a rehearsal never reads the backlog.` Both groups show: when the plan has a wire-evidence story, `- wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>` (`1 story`), and when ids were planned at adoption, `- already planned in the project: <n> id(s) planned at adoption keep the story the project gave them; no story is planned for them`. |
 | `blocks` | What blocks adoption: each stage of the check that failed or was not demonstrated, with its outcome line and its first 5 findings, and the number of the others. |
 | `fix_first` | Fix in the project first: every ERROR of stage `model`, `machines`, `failure-modes` or `risk`. No waiver covers one (section 6.7); a finding about the form of an imported failure catalog is one of them. |
 
@@ -3431,7 +3443,7 @@ otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty,
 claimed: {by_kind, total}, unnamed: {by_kind, total}, planned: {by_kind, total}, proven: {by_kind, total},
 actions: {served, unserved}},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
-count}], total, edges, planned_stories, wire: {stories, ids, by}}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
+count}], total, edges, planned_ids, may_exist, wire: {stories, ids, by}}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
 waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
 
 stdout:
@@ -3445,13 +3457,15 @@ adopt: wrote <n> file(s), <n> waiver(s), <n> owed
 adopt: blocked: machinery gen refuses while <n> finding(s) stand; nothing is owed
 check: machinery check: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
 plan: <n> stories, <n> edge(s)
+plan: up to <n> stories, <n> edge(s); <m> may exist already: a rehearsal never reads the backlog
 wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>
 blocks adoption: <n> stage(s): <stage>, <stage>
 fix in the project first: <n> finding(s)
 rehearse: rehearsal.md, rehearsal.json
 ```
 
-One of the two `adopt:` lines prints; the `wire evidence` line only when the plan has such a
+One of the two `adopt:` lines and one of the two `plan:` lines print (the second when a story's
+ids all carry a story already); the `wire evidence` line only when the plan has such a
 story (`1 story`); `blocks adoption: nothing` when every stage passed or was
 not applicable, and the `fix in the project first` line only when there is one. Exit 0 when the
 rehearsal ran, whatever it found; 1 when the snapshot could not be taken; 2 for a usage or config
@@ -3885,7 +3899,7 @@ would block. Any internal error (stdin that is not hook JSON, an invalid `machin
 or backlog command that fails, an unknown event) prints
 `{"systemMessage":"machinery hook <event> could not run: <why>"}` and changes nothing. A directory
 that is not in a machinery project prints nothing. An owed file that does not parse
-(section 11.1) is not an internal error: `pre-tool` and `stop` run no stage and hold
+(section 11.1) or has a problem of its own is not an internal error: `pre-tool` and `stop` run no stage and hold
 `owed: ERROR  <owed file>: <error>; ...` as their one finding, so a commit or push is refused in
 block mode, and `session-start` prints the `could not run` message with it. Other harnesses call the same command with
 JSON of the same shape.

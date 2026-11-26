@@ -48,6 +48,26 @@ type Plan struct {
 	Edges   []backlog.Edge
 	// WireBy is how the wire-evidence stories are cut: "file" or "directory".
 	WireBy string
+	// Supplied are the owed entries that carry a story the project supplied
+	// (planned at adoption): the plan has no story for them.
+	Supplied []design.OwedEntry
+}
+
+// MayExist counts the stories every id of which carries a story already:
+// --apply creates none of them whose story is in the backlog.
+func (plan *Plan) MayExist(d *design.Design) int {
+	owed := d.OwedSet()
+	n := 0
+	for _, s := range plan.Stories {
+		all := len(s.IDs) > 0
+		for _, id := range s.IDs {
+			all = all && owed[id].Story != ""
+		}
+		if all {
+			n++
+		}
+	}
+	return n
 }
 
 // WireCounts returns the number of wire-evidence stories and of their ids.
@@ -97,8 +117,14 @@ func BuildPlan(d *design.Design) (*Plan, error) {
 	// an id a test claimed at adoption, and still claims, gets no story of
 	// its own: its test file gets one that wires the evidence
 	wired := map[string][]string{}
+	var kept []design.OwedEntry
 	for _, o := range d.Owed {
 		if !d.Known(o.ID) {
+			continue
+		}
+		if supplied(o) {
+			// the project's own story stands: nothing is planned for the id
+			kept = append(kept, o)
 			continue
 		}
 		ids = append(ids, o.ID)
@@ -106,7 +132,9 @@ func BuildPlan(d *design.Design) (*Plan, error) {
 			wired[o.ID] = files
 		}
 	}
-	return buildPlan(d, ids, nil, wired), nil
+	plan := buildPlan(d, ids, nil, wired)
+	plan.Supplied = kept
+	return plan, nil
 }
 
 // BuildPlanFor groups the given ids into stories and derives the edges. For
@@ -629,6 +657,13 @@ func Apply(c *backlog.Client, d *design.Design, plan *Plan, parent string) (Appl
 	for _, is := range issues {
 		exists[is.ID] = true
 	}
+	// a story the project supplied is never replaced; one that is not in the
+	// backlog is reported
+	for _, e := range plan.Supplied {
+		if !exists[e.Story] {
+			res.External = append(res.External, e)
+		}
+	}
 	owed := d.OwedSet()
 	keep := map[string]bool{}
 	for _, s := range plan.Stories {
@@ -640,17 +675,6 @@ func Apply(c *backlog.Client, d *design.Design, plan *Plan, parent string) (Appl
 		}
 		if linked {
 			res.Existing++
-			continue
-		}
-		// a story the project supplied is never replaced: its group gets none
-		var external []design.OwedEntry
-		for _, id := range s.IDs {
-			if e := owed[id]; supplied(e) && !exists[e.Story] {
-				external = append(external, e)
-			}
-		}
-		if len(external) > 0 {
-			res.External = append(res.External, external...)
 			continue
 		}
 		keep[s.Key] = true
