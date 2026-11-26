@@ -1989,6 +1989,14 @@ is archived alone), into an extraction at `<out>/snapshot`: no worktree and no c
 writes the config there as `machinery.yaml`, runs `git init` and one commit inside the snapshot
 (hooks and signing off) so that stages that need a commit work, and runs every section there.
 
+The extraction writes through a root bound to `<out>/snapshot`, so nothing lands outside it. A
+symbolic link of `HEAD` whose target is absolute, or resolves outside the snapshot (by `..`, or
+through another link), is not created: what it points at is not assessed. stdout and the report
+say `outside links: <n> symbolic link(s) leave the project and are not in the snapshot: <paths>`,
+and the inventory has `warn   outside-link: <path>: leaves the project; not in the snapshot, not
+assessed` for each. Links that stay inside are kept. An archive entry whose name is absolute or
+holds a `..` segment stops the snapshot (exit 1).
+
 What assess reads of the project itself: `git` commands that write nothing (`archive`, `show`,
 `log`, `rev-parse`, `for-each-ref`, and `status` with optional locks off, so the index is
 not refreshed), the config file and the tracker export (section 18.8). When the work tree
@@ -2108,16 +2116,17 @@ than the current one (`git for-each-ref refs/heads`). A line that is not a JSON 
 ### 18.9 Output and exit codes
 
 `<out>/report.md` (for people) and `<out>/report.json` hold the same content: the project
-directory name, the short `HEAD` sha, where the config came from, the dirty counts, and per
-section its result, reason, `checked:` counts, number of blocking findings, rules, lines and,
-for a section made of several stages, each stage's result. `report.json` also gives the numbers
-of the lines as facts. Neither has a timestamp or an absolute path.
+directory name, the short `HEAD` sha, where the config came from, the dirty counts, the outside
+links, and per section its result, reason, `checked:` counts, number of blocking findings, rules,
+lines and, for a section made of several stages, each stage's result. `report.json` also gives
+the numbers of the lines as facts. Neither has a timestamp or an absolute path.
 
 ```json
 {
   "config": "machinery.yaml",
   "dirty": {"changed": 0, "untracked": 0},
   "head": "<short sha>",
+  "outside_links": [],
   "project": "<directory name>",
   "sections": [
     {"checked": [{"n": 9, "noun": "files"}], "facts": {"code_files": 1}, "findings": 0,
@@ -2149,13 +2158,14 @@ stdout:
 out: <absolute path of the out directory>
 project: <directory name> at <short sha>
 dirty: <n> changed, <n> untracked file(s) are not assessed
+outside links: <n> symbolic link(s) leave the project and are not in the snapshot: <paths>
 <section>: <outcome>; checked: <counts>
 assess: <n> sections, <p> passed, <f> failed, <d> not demonstrated, <a> not applicable
 ```
 
-The dirty line prints only when the tree is dirty. `<outcome>` is the last line of a stage block
-(section 3.2); a not applicable section has no `checked:` part. The out path is the only
-absolute path assess prints.
+The dirty line prints only when the tree is dirty, and the outside links line only when there
+is one. `<outcome>` is the last line of a stage block (section 3.2); a not applicable section has
+no `checked:` part. The out path is the only absolute path assess prints.
 
 | Code | Meaning |
 |---|---|

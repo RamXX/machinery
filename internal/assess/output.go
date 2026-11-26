@@ -63,6 +63,7 @@ type jsonReport struct {
 	Config   string        `json:"config"`
 	Dirty    jsonDirty     `json:"dirty"`
 	Head     string        `json:"head"`
+	Outside  []string      `json:"outside_links"`
 	Project  string        `json:"project"`
 	Sections []jsonSection `json:"sections"`
 	Summary  jsonSummary   `json:"summary"`
@@ -93,7 +94,7 @@ func stageResult(st *report.Stage) (string, string) {
 
 func (a *assessment) build() jsonReport {
 	r := jsonReport{Config: a.cfgLabel, Dirty: jsonDirty{a.changed, a.untrack}, Head: a.head,
-		Project: a.name, Sections: []jsonSection{}, Version: 1}
+		Outside: append([]string{}, a.outside...), Project: a.name, Sections: []jsonSection{}, Version: 1}
 	for _, s := range a.sections {
 		o, reason := s.outcome()
 		js := jsonSection{Checked: counts(s.checked()), Facts: s.facts, Findings: s.findings(), Lines: s.lines,
@@ -138,6 +139,11 @@ func (a *assessment) markdown(r jsonReport) string {
 		w("- %s", line)
 	} else {
 		w("- dirty: none; the work tree matches HEAD")
+	}
+	if line := a.outsideLine(); line != "" {
+		w("- %s", line)
+	} else {
+		w("- outside links: none")
 	}
 	w("- %s", a.totalLine())
 	w("")

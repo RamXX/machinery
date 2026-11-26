@@ -1,0 +1,47 @@
+# a symbolic link of the project that leaves it, by an absolute target or by .., is not created in
+# the snapshot and is named in the report; links that stay inside are kept, and nothing is written
+# outside --out (docs/formats.md section 18.2)
+fixture library proj
+mkdir outside
+exec sh -c 'echo kept apart > outside/secret.txt'
+cd proj
+symlink abs-link -> $WORK/outside/secret.txt
+symlink up-link -> ../outside/secret.txt
+symlink docs/updir -> ../../outside
+symlink internal/desk/same.go -> desk.go
+symlink e2e/through -> ../docs/updir/secret.txt
+gitinit
+cd $WORK
+exec sh -c 'find . -path ./out -prune -o -path ./.tmp -prune -o -path ./.home -prune -o -name "*.list" -prune -o -print | LC_ALL=C sort > before.list'
+exec sh -c 'find outside proj -type f | LC_ALL=C sort | xargs cksum >> before.list'
+
+exec machinery -C proj assess --out out
+stdout '^outside links: 3 symbolic link\(s\) leave the project and are not in the snapshot: abs-link, docs/updir, up-link$'
+stdout '^inventory: passed; checked: '
+stdout '^assess: 10 sections, '
+
+# the links that leave are not in the snapshot; the ones that stay are
+exec test ! -L out/snapshot/abs-link
+exec test ! -L out/snapshot/up-link
+exec test ! -L out/snapshot/docs/updir
+exec test -L out/snapshot/internal/desk/same.go
+exec test -L out/snapshot/e2e/through
+! exists out/snapshot/docs/updir/secret.txt
+
+# the report names them
+grep '^  warn   outside-link: abs-link: leaves the project; not in the snapshot, not assessed$' out/stages/inventory.txt
+grep '^  warn   outside-link: docs/updir: leaves the project; not in the snapshot, not assessed$' out/stages/inventory.txt
+grep '^  warn   outside-link: up-link: leaves the project; not in the snapshot, not assessed$' out/stages/inventory.txt
+grep '^- outside links: 3 symbolic link\(s\) leave the project and are not in the snapshot: abs-link, docs/updir, up-link$' out/report.md
+grep '^- 3 warn: inventory: outside-link$' out/report.md
+grep '^  "outside_links": \[$' out/report.json
+grep '^    "docs/updir",$' out/report.json
+! grep $WORK out/report.json
+! grep $WORK out/report.md
+
+# nothing outside --out changed: not the project, not what its links point at
+exec sh -c 'find . -path ./out -prune -o -path ./.tmp -prune -o -path ./.home -prune -o -name "*.list" -prune -o -print | LC_ALL=C sort > after.list'
+exec sh -c 'find outside proj -type f | LC_ALL=C sort | xargs cksum >> after.list'
+cmp before.list after.list
+exec git -C proj status --porcelain
+! stdout .

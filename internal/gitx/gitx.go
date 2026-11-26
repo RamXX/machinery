@@ -305,87 +305,182 @@ func Branches(root string) ([]string, error) {
 }
 
 // Archive extracts the tree of HEAD below root into dest: git archive piped
-// to an extraction, with no worktree and no checkout. It returns the number
-// of files and symbolic links written.
-func Archive(root, dest string) (int, error) {
+// to an extraction, with no worktree and no checkout. Every write goes
+// through an os.Root bound to dest, so nothing lands outside it. A symbolic
+// link whose target is absolute, or resolves outside dest, is not created:
+// outside lists those links, sorted, by path. An entry whose name is
+// absolute or holds a ".." segment stops the extraction. files counts the
+// files and links written.
+func Archive(root, dest string) (files int, outside []string, err error) {
 	cmd := exec.Command("git", "archive", "--format=tar", "HEAD")
 	cmd.Dir = root
 	var errb bytes.Buffer
 	cmd.Stderr = &errb
 	pipe, err := cmd.StdoutPipe()
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if err := cmd.Start(); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	n, xerr := extract(pipe, dest)
+	files, outside, xerr := extract(pipe, dest)
 	io.Copy(io.Discard, pipe)
-	werr := cmd.Wait()
-	if werr != nil {
+	if werr := cmd.Wait(); werr != nil {
 		msg := strings.TrimSpace(errb.String())
 		if msg == "" {
 			msg = werr.Error()
 		}
-		return n, errors.New("git archive: " + msg)
+		return files, outside, errors.New("git archive: " + msg)
 	}
-	return n, xerr
+	return files, outside, xerr
 }
 
-func extract(r io.Reader, dest string) (int, error) {
+// leaves reports whether a link at name with this target points outside the
+// tree by its text alone: an absolute target, or one that climbs above the
+// root with "..".
+func leaves(name, target string) bool {
+	if target == "" || path.IsAbs(target) || filepath.IsAbs(target) {
+		return true
+	}
+	j := path.Clean(path.Join(path.Dir(name), target))
+	return j == ".." || strings.HasPrefix(j, "../")
+}
+
+func extract(r io.Reader, dest string) (int, []string, error) {
+	rt, err := os.OpenRoot(dest)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rt.Close()
 	tr := tar.NewReader(r)
 	n := 0
+	var outside, links []string
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
-			return n, nil
+			break
 		}
 		if err != nil {
-			return n, err
+			return n, outside, err
 		}
-		name := path.Clean(h.Name)
-		if name == "." {
+		if h.Typeflag == tar.TypeXGlobalHeader {
 			continue
 		}
-		if path.IsAbs(name) || name == ".." || strings.HasPrefix(name, "../") {
-			return n, fmt.Errorf("archive entry %q leaves the snapshot", h.Name)
+		raw := strings.TrimSuffix(h.Name, "/")
+		if path.IsAbs(raw) || filepath.IsAbs(raw) || containsDotDot(raw) {
+			return n, outside, fmt.Errorf("archive entry %q is absolute or holds ..; nothing outside the snapshot is written", h.Name)
 		}
-		target := filepath.Join(dest, filepath.FromSlash(name))
+		name := path.Clean(raw)
+		if name == "." || name == "" {
+			continue
+		}
+		parent := path.Dir(name)
 		switch h.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return n, err
+			if err := rt.MkdirAll(name, 0o755); err != nil {
+				return n, outside, err
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return n, err
+			if err := rt.MkdirAll(parent, 0o755); err != nil {
+				return n, outside, err
 			}
 			mode := os.FileMode(0o644)
 			if h.Mode&0o111 != 0 {
 				mode = 0o755
 			}
-			f, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
+			f, err := rt.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
 			if err != nil {
-				return n, err
+				return n, outside, err
 			}
 			_, cerr := io.Copy(f, tr)
 			if err := f.Close(); cerr == nil {
 				cerr = err
 			}
 			if cerr != nil {
-				return n, cerr
+				return n, outside, cerr
 			}
 			n++
 		case tar.TypeSymlink:
-			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-				return n, err
+			if leaves(name, h.Linkname) {
+				outside = append(outside, name)
+				continue
 			}
-			if err := os.Symlink(h.Linkname, target); err != nil {
-				return n, err
+			if err := rt.MkdirAll(parent, 0o755); err != nil {
+				return n, outside, err
 			}
+			if err := rt.Symlink(h.Linkname, name); err != nil {
+				return n, outside, err
+			}
+			links = append(links, name)
 			n++
 		}
 	}
+	// a link that stays inside by its text may still leave through another
+	// link: resolve each for real, and remove the ones that leave
+	realDest := RealPath(dest)
+	for changed := true; changed; {
+		changed = false
+		for i, l := range links {
+			if l == "" || stays(dest, realDest, l) {
+				continue
+			}
+			if err := rt.Remove(l); err != nil {
+				return n, outside, err
+			}
+			outside = append(outside, l)
+			links[i] = ""
+			n--
+			changed = true
+		}
+	}
+	sort.Strings(outside)
+	return n, outside, nil
+}
+
+func containsDotDot(name string) bool {
+	for _, seg := range strings.Split(name, "/") {
+		if seg == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+// stays reports whether the link at rel below dest resolves inside dest.
+func stays(dest, realDest, rel string) bool {
+	p := filepath.Join(dest, filepath.FromSlash(rel))
+	target, err := os.Readlink(p)
+	if err != nil || filepath.IsAbs(target) {
+		return false
+	}
+	dir := RealPath(filepath.Dir(p))
+	return Within(dir, realDest) && Within(RealPath(filepath.Join(dir, target)), realDest)
+}
+
+// RealPath returns an absolute path with the symbolic links of its longest
+// existing prefix resolved.
+func RealPath(p string) string {
+	cur, rest := filepath.Clean(p), ""
+	for {
+		if r, err := filepath.EvalSymlinks(cur); err == nil {
+			return filepath.Join(r, rest)
+		}
+		parent := filepath.Dir(cur)
+		if parent == cur {
+			return filepath.Clean(p)
+		}
+		rest = filepath.Join(filepath.Base(cur), rest)
+		cur = parent
+	}
+}
+
+// Within reports whether path is dir or below it.
+func Within(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 // InitCommit makes dir a repository of its own and commits everything in it,

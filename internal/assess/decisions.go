@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/RamXX/machinery/internal/gitx"
 )
 
 // census counts the lines, the words and the lines a record expression
@@ -92,7 +94,7 @@ func instructions(root string) []instruction {
 		}
 		path := filepath.Join(root, name)
 		real, err := filepath.EvalSymlinks(path)
-		if err != nil || !within(real, resolve(root)) {
+		if err != nil || !gitx.Within(real, gitx.RealPath(root)) {
 			continue
 		}
 		data, err := os.ReadFile(real)

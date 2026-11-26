@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/report"
 )
 
@@ -98,7 +99,7 @@ func (a *assessment) save(s *section) {
 func (a *assessment) scrub(s *section) {
 	var pairs []string
 	for _, d := range []struct{ path, name string }{{a.snap, "snapshot"}, {a.out, "out"}, {a.root, a.name}} {
-		for _, p := range uniqStrings([]string{d.path, resolve(d.path)}) {
+		for _, p := range uniqStrings([]string{d.path, gitx.RealPath(d.path)}) {
 			if p != "" {
 				pairs = append(pairs, p+string(filepath.Separator), "", p, d.name)
 			}

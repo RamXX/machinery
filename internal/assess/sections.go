@@ -13,8 +13,12 @@ import (
 	"github.com/RamXX/machinery/internal/stages"
 )
 
-// inventory: the facts of the adopt report for the snapshot.
+// inventory: the facts of the adopt report for the snapshot, and the links
+// left out of it.
 func (a *assessment) inventory(s *section) {
+	for _, l := range a.outside {
+		s.own.Warnf("outside-link: %s: leaves the project; not in the snapshot, not assessed", l)
+	}
 	files, err := a.p.Files()
 	if err != nil {
 		s.own.Errorf("cannot list files: %v", err)

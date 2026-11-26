@@ -55,6 +55,7 @@ type assessment struct {
 	since    []sinceRef
 	changed  int
 	untrack  int
+	outside  []string         // symbolic links of HEAD that leave the project, not in the snapshot
 	p        *project.Project // the snapshot
 	ctx      *stages.Context
 	sections []*section
@@ -79,6 +80,9 @@ func Run(o Options) error {
 	if line := a.dirtyLine(); line != "" {
 		fmt.Fprintln(w, line)
 	}
+	if line := a.outsideLine(); line != "" {
+		fmt.Fprintln(w, line)
+	}
 	for _, def := range sectionDefs {
 		s := a.run(def)
 		a.sections = append(a.sections, s)
@@ -96,6 +100,14 @@ func (a *assessment) dirtyLine() string {
 		return ""
 	}
 	return fmt.Sprintf("dirty: %d changed, %d untracked file(s) are not assessed", a.changed, a.untrack)
+}
+
+// outsideLine names the symbolic links left out of the snapshot (section 18.2).
+func (a *assessment) outsideLine() string {
+	if len(a.outside) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("outside links: %d symbolic link(s) leave the project and are not in the snapshot: %s", len(a.outside), strings.Join(a.outside, ", "))
 }
 
 // inputs resolves the project, the config, the --since refs and the out
@@ -123,7 +135,7 @@ func (a *assessment) inputs() error {
 	if info, serr := os.Stat(abs); serr != nil || !info.IsDir() {
 		return usagef("%s is not a directory", root)
 	}
-	a.root = resolve(abs)
+	a.root = gitx.RealPath(abs)
 	a.name = filepath.Base(a.root)
 
 	if o.Config != "" {
@@ -163,15 +175,15 @@ func (a *assessment) inputs() error {
 func (a *assessment) outDir() error {
 	containers := []string{a.root}
 	if top, err := gitx.TopLevel(a.root); err == nil && top != "" {
-		containers = append(containers, resolve(top))
+		containers = append(containers, gitx.RealPath(top))
 	}
 	if gd, err := gitx.CommonDir(a.root); err == nil {
-		containers = append(containers, resolve(gd))
+		containers = append(containers, gitx.RealPath(gd))
 	}
 	inside := func(p string) string {
-		rp := resolve(p)
+		rp := gitx.RealPath(p)
 		for _, c := range containers {
-			if within(rp, c) {
+			if gitx.Within(rp, c) {
 				return c
 			}
 		}
@@ -216,9 +228,11 @@ func (a *assessment) snapshot() error {
 	if err := os.MkdirAll(a.snap, 0o755); err != nil {
 		return err
 	}
-	if _, err := gitx.Archive(a.root, a.snap); err != nil {
+	_, outside, err := gitx.Archive(a.root, a.snap)
+	if err != nil {
 		return err
 	}
+	a.outside = outside
 	cfg := filepath.Join(a.snap, project.ConfigName)
 	if err := os.RemoveAll(cfg); err != nil {
 		return err
@@ -240,32 +254,6 @@ func (a *assessment) snapshot() error {
 	a.ctx = &stages.Context{P: p}
 	a.changed, a.untrack, err = gitx.StatusCounts(a.root)
 	return err
-}
-
-// resolve returns an absolute path with the symbolic links of its longest
-// existing prefix resolved.
-func resolve(p string) string {
-	cur, rest := filepath.Clean(p), ""
-	for {
-		if r, err := filepath.EvalSymlinks(cur); err == nil {
-			return filepath.Join(r, rest)
-		}
-		parent := filepath.Dir(cur)
-		if parent == cur {
-			return filepath.Clean(p)
-		}
-		rest = filepath.Join(filepath.Base(cur), rest)
-		cur = parent
-	}
-}
-
-// within reports whether path is dir or below it.
-func within(path, dir string) bool {
-	rel, err := filepath.Rel(dir, path)
-	if err != nil {
-		return false
-	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }
 
 func shortErr(err error) string {
