@@ -66,6 +66,13 @@ import:                         # optional: design sources kept in the project's
       root: {notes: _comment, startable: _entries}
       state: {skip: _ignores}
       transition: {allowed: _requires, denied: _refusal}
+  failure_modes:                # optional: a failure-mode catalog kept as Markdown tables (section 5.4.1)
+    file: docs/risks.md         # required
+    id: "^RISK-[0-9]+$"         # required: the first cell of a failure-mode row matches it in full
+    columns:                    # required: header names, case-insensitive, first match wins
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml   # optional: the subject and required value of each row
 contracts:                      # optional
   - kind: openapi               # openapi | proto
     path: contracts/openapi.yaml
@@ -124,6 +131,11 @@ Rules:
   (`import.machines: design.machines is also set; read the machines from one of them`), and so
   are an empty `import.machines.files` (`import.machines.files is required`), a `states` value
   other than `capitalize` or `keep`, and an empty key or name in `rename`.
+  `import.failure_modes` needs `file` (`import.failure_modes.file is required`), an `id` that is
+  a regular expression (`import.failure_modes.id is required`,
+  `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
+  `columns.failure` and `columns.behavior` (`import.failure_modes.columns.failure is required`).
+  It may be set beside `design.failure_modes`.
 - Globs use doublestar syntax: `**` matches any number of directories, `*` matches inside one path
   segment, `{a,b}` alternates.
 - `scope` bounds the static stages that read code (`arch`, `tests`, `trace`): a file outside every
@@ -427,6 +439,57 @@ Subject forms: `invoke:<machine id>.<src>`, `dependency:<name>`, `act:<Entity>.<
 and `event:<machine id>.<event>` (a failure event). `required: refuse` is only valid with
 `kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject.
 
+#### 5.4.1 Failure modes kept as Markdown tables
+
+A project that already keeps its failure modes as tables in a Markdown document names it in
+`import.failure_modes` (section 2). machinery reads the tables and never writes the document.
+
+- **Tables.** A table is a header row, a delimiter row (cells of `-`, with an optional `:` at
+  either end) and the rows after it, up to the first line that is not a table row. Leading and
+  trailing pipes are optional, and `\|` is a pipe inside a cell. A table inside a fenced code
+  block is not read.
+- **Rows.** A row whose first cell, trimmed, matches `id` in full is a failure mode. A row whose
+  first cell does not match is ignored, and so is a table with no such row.
+- **Columns.** The header row of a row's own table decides its columns, by name and never by
+  position: for each of `failure` and `behavior`, the first name of the list that is a header
+  cell (compared trimmed and case-insensitively) is the column. A failure-mode row in a table
+  whose header has no failure column is
+  `ERROR  <file>:<line>: <cell>: the table header has no failure column (<names>)`, and the same
+  for behavior. An empty failure or behavior cell is
+  `ERROR  <file>:<line>: <cell>: the failure cell is empty`: section 5.4 requires both.
+- **Ids.** The machinery id is the cell lower-cased (`RISK-12` is `risk-12`, obligation
+  `fm:risk-12`). It must match the pattern of section 5.4:
+  `ERROR  <file>:<line>: <cell>: the id lower-cased, <id>, must match ^[a-z][a-z0-9-]+$`. A
+  duplicate is `ERROR  <file>:<line>: <cell>: duplicate id, first on line <n>`, and the later row
+  is not read. An id that `design.failure_modes` also declares is
+  `ERROR  <file>:<line>: <cell>: fm:<id> is also declared in <native file>`, and the row is not
+  read.
+- **Text.** The failure cell is the failure mode's `failure`, and so the obligation title; the
+  behavior cell is its `behavior`. Both are kept as written, trimmed.
+
+An imported row has no subject and no required value until it is linked. The links file gives
+them:
+
+```yaml
+version: 1
+links:
+  - {id: RISK-3, subject: "invoke:loan_desk.reserveCopy", required: retry-bounded}
+  - {id: RISK-7, kind: abuse, subject: "act:Loan.renew", required: refuse}
+```
+
+`id` is the catalog id, compared case-insensitively. `subject` and `required` are required and
+`kind` is optional (default `fault`), with the value rules of section 5.4 and its messages,
+prefixed `<links file>: <id>`. An id that is not an imported row is
+`ERROR  <links file>: <id>: no failure-mode row of <file> has this id`, one listed twice is
+`ERROR  <links file>: <id>: listed twice`, and an unknown key is an ERROR.
+
+- A **linked** row is a failure mode like a native one, and takes part in every rule of stage
+  `xref-failure`.
+- An **unlinked** row is an obligation all the same: `fm:<id>` is owed, claimed and traced like
+  any failure mode. It names nothing, so it takes part in no subject rule of `xref-failure`: it
+  neither resolves nor covers an invoke, a dependency, an action, a failure state or a failure
+  event.
+
 ### 5.5 Risk file
 
 `risk.yaml` assigns risk tiers to areas of the design. See section 22.
@@ -473,9 +536,12 @@ nor `import.machines` is configured. With `import.machines` the translation find
 
 ### 6.3 `failure-modes`
 
-Parses the file against section 5.4. Unique ids, valid `kind` and `required` values, well-formed
-`subject`. `checked:` counts failure modes and, of those, abuse cases. Not applicable when
-`design.failure_modes` is absent.
+Parses the file against section 5.4, and the catalog and its links file against section 5.4.1.
+Unique ids, valid `kind` and `required` values, well-formed `subject`. `checked:` counts failure
+modes, native and imported, and, of those, abuse cases. When `import.failure_modes` is configured
+it also counts the imported rows and, of those, the unlinked ones:
+`checked: 9 failure modes, 1 abuse cases, 7 imported, 4 unlinked`. Not applicable when neither
+`design.failure_modes` nor `import.failure_modes` is configured.
 
 ### 6.4 `xref-model-machine`
 
@@ -515,8 +581,13 @@ Operations without a binding are counted and are not an error (reads and queries
 | `failure-state-mode` | Every state tagged `failure` of every machine is the subject (`state:<machine id>.<State>`) of at least one failure mode. |
 | `failure-event-mode` | Every `_failure_events` entry of every machine is the subject (`event:<machine id>.<event>`) of at least one failure mode. |
 
-The stage applies when `design.failure_modes` is configured, or when any machine declares a
-failure state or a failure event (section 5.2). `checked:` counts failure modes, invokes,
+The stage applies when `design.failure_modes` or `import.failure_modes` is configured, or when
+any machine declares a failure state or a failure event (section 5.2). An imported row that is
+not linked (section 5.4.1) is counted among the failure modes and takes part in no rule. A
+finding that asks for a failure mode says where to declare it: in the file of
+`design.failure_modes` when there is one, else in the links file of `import.failure_modes`
+(`a links file (import.failure_modes.links)` when none is configured). `checked:` counts
+failure modes, invokes,
 dependencies, tiered actions, failure states and failure events. With no failure-mode file
 configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
 event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
@@ -606,8 +677,9 @@ gen directory is `not applicable: no design sources configured`.
 - `title` is the invariant statement, the scenario name, the case title (section 7.2), the
   failure-mode `failure` text, `Formal model of <area>: <why>` for `fv`, and
   `Replay <violated property> (<spec> run <run>)` for `cx`.
-- `source` is the file the id comes from: the model, the machine, the failure-mode file, the
-  risk file for `fv`, the trace file for `cx`, the evidence file for `ck`.
+- `source` is the file the id comes from: the model, the machine (for an imported machine its
+  source file), the failure-mode file or the imported catalog, the risk file for `fv`, the trace
+  file for `cx`, the evidence file for `ck`.
 - `effects` is present only for `tc` and may be empty.
 - `served` holds every `act` id, sorted by id.
 
@@ -959,7 +1031,7 @@ that was established at the base may quietly stop being established:
 |---|---|
 | `proven-to-owed` | An id that was an obligation at the base and was not owed there is owed now: `ERROR  ratchet: <id> was proven at <ref> and is owed now`. New obligations may be owed. |
 | `scope-narrowed` | A scope glob of the base is missing now: `ERROR  ratchet: scope narrowed: <glob>`. |
-| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`: moving from one to the other keeps it on. |
+| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`, and stage `failure-modes` with `design.failure_modes` or `import.failure_modes`: moving from one to the other keeps it on. |
 | `obligation-removed` | An obligation of the base does not exist now: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
 | `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 22), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
@@ -1241,7 +1313,8 @@ stories: [{id, tier, title, route, scope}]}], stage}`. The exit code follows sec
 
 Parallel work is safe only against one contract. The **contract hash** is the sha256 over the
 sorted list of `<path> <sha256 of the file>` lines of the design sources: the model files, every
-`*.machine.json`, the failure-mode file, the risk file, the facts file and the contract files.
+`*.machine.json` or imported machine source, the failure-mode file, the imported failure-mode
+catalog and its links file, the risk file, the facts file and the contract files.
 Generated files, the owed list and formal models are not part of it.
 
 `machinery waves --freeze` requires a clean `gen-drift` stage and writes
@@ -2007,7 +2080,8 @@ checker reads; a checker never reads the project's sources. Every list is sorted
 }
 ```
 
-An invariant's `entity` is empty for a top-level invariant. A machine's `role` is `lifecycle` or
+An invariant's `entity` is empty for a top-level invariant. An imported failure mode that is not
+linked (section 5.4.1) has an empty `subject` and `required`. A machine's `role` is `lifecycle` or
 `operational`. A machine lists, after its `ignores`, its `refusals` and its guard `clauses` (section 7.2),
 each with its `tc` id. Lists that have nothing are empty lists, never absent. The projection does not
 contain `ck` obligations: it is the input of the checkers, not their output.

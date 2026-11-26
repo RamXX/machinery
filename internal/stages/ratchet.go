@@ -124,7 +124,7 @@ func stageKeys(c *project.Config) []stageKey {
 	return []stageKey{
 		{"model", "design.models", len(c.Design.Models) > 0},
 		{"machines", machinesKey(c), c.HasMachines()},
-		{"failure-modes", "design.failure_modes", c.Design.FailureModes != ""},
+		{"failure-modes", failureModesKey(c), c.HasFailureModes()},
 		{"risk", "design.risk", c.Design.Risk != ""},
 		{"xref-contract", "contracts", len(c.Contracts) > 0},
 		{"xstate", "tools.xstate", c.Tools.XState},
@@ -141,6 +141,14 @@ func machinesKey(c *project.Config) string {
 		return "import.machines"
 	}
 	return "design.machines"
+}
+
+// failureModesKey names the key that makes stage failure-modes apply.
+func failureModesKey(c *project.Config) string {
+	if c.Design.FailureModes == "" && c.ImportedFailureModes() != nil {
+		return "import.failure_modes"
+	}
+	return "design.failure_modes"
 }
 
 func stageOn(c *project.Config, stage string) bool {

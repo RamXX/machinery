@@ -1,0 +1,189 @@
+# what import.failure_modes refuses, and with which message
+fixture empty
+mkdir docs design
+cp risks.md docs/risks.md
+
+# config errors
+cp nofile.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.failure_modes.file is required'
+cp noid.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.failure_modes.id is required'
+cp badid.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.failure_modes.id is not a regular expression: '
+cp nofailure.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.failure_modes.columns.failure is required'
+cp nobehavior.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.failure_modes.columns.behavior is required'
+cp outside.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.failure_modes.links: "../links.yaml" must stay inside the project root'
+
+# a catalog that cannot be read
+cp good.yaml machinery.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  docs/missing.md: cannot read: '
+
+# rows: a table without the columns, an empty cell, a duplicate, an id that is not a machinery id
+cp good-catalog.yaml machinery.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  docs/risks.md:8: RISK-2: the table header has no behavior column \(Required behavior, Expected\)'
+stdout 'ERROR  docs/risks.md:9: RISK-3: the table header has no behavior column'
+stdout 'ERROR  docs/risks.md:9: RISK-3: the failure cell is empty'
+stdout 'ERROR  docs/risks.md:10: RISK-1: duplicate id, first on line 3'
+! stdout 'docs/risks.md:10: RISK-1: the table header'
+stdout 'ERROR  docs/risks.md:14: RISK-4: the table header has no failure column \(Failure\)'
+stdout 'ERROR  docs/risks.md:18: RISK-x_1: the id lower-cased, risk-x_1, must match \^\[a-z\]\[a-z0-9-\]\+\$'
+! stdout 'RISK-0'
+stdout 'checked: 6 failure modes, 0 abuse cases, 6 imported, 6 unlinked'
+
+# links: an id with no row, an id listed twice, the value rules of a failure mode, unknown keys
+cp good-links.yaml machinery.yaml
+cp clean.md docs/risks.md
+cp bad-links.yaml design/links.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/links.yaml: RISK-9: no failure-mode row of docs/risks.md has this id'
+stdout 'ERROR  design/links.yaml: risk-1: listed twice'
+stdout 'ERROR  design/links.yaml: RISK-2: required must be fail-closed, retry-bounded, surface or refuse, got "maybe"'
+stdout 'ERROR  design/links.yaml: RISK-3: required: refuse is only valid with kind: abuse'
+stdout 'ERROR  design/links.yaml: RISK-4: subject "nowhere" is not invoke:'
+cp unknown-key-links.yaml design/links.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/links.yaml: .*field owner not found'
+cp version-links.yaml design/links.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  design/links.yaml: version must be 1'
+
+# an id the native file also declares
+cp both.yaml machinery.yaml
+cp native.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout 'ERROR  docs/risks.md:3: RISK-1: fm:risk-1 is also declared in design/failure-modes.yaml'
+stdout 'checked: 4 failure modes, 0 abuse cases, 3 imported, 3 unlinked'
+
+-- nofile.yaml --
+version: 2
+import:
+  failure_modes:
+    id: "^RISK-[0-9]+$"
+    columns: {failure: ["Failure"], behavior: ["Expected"]}
+-- noid.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    columns: {failure: ["Failure"], behavior: ["Expected"]}
+-- badid.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9+$"
+    columns: {failure: ["Failure"], behavior: ["Expected"]}
+-- nofailure.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns: {behavior: ["Expected"]}
+-- nobehavior.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns: {failure: ["Failure"], behavior: []}
+-- outside.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns: {failure: ["Failure"], behavior: ["Expected"]}
+    links: ../links.yaml
+-- good.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/missing.md
+    id: "^RISK-[0-9]+$"
+    columns: {failure: ["Failure"], behavior: ["Required behavior", "Expected"]}
+-- good-catalog.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9a-z_]+$"
+    columns: {failure: ["Failure"], behavior: ["Required behavior", "Expected"]}
+-- good-links.yaml --
+version: 2
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns: {failure: ["Failure"], behavior: ["Required behavior", "Expected"]}
+    links: design/links.yaml
+-- both.yaml --
+version: 2
+design:
+  failure_modes: design/failure-modes.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns: {failure: ["Failure"], behavior: ["Required behavior", "Expected"]}
+-- risks.md --
+| Risk | Failure | Expected |
+|---|---|---|
+| RISK-1 | The lamp fails. | The desk uses daylight. |
+| RISK-0 | The heating fails. | The desk closes early. |
+
+| Risk | Failure | Severity |
+|---|---|---|
+| RISK-2 | The till jams. | high |
+| RISK-3 |  | low |
+| RISK-1 | The lamp fails again. | low |
+
+| Risk | Expected |
+|---|---|
+| RISK-4 | The door stays shut. |
+
+| Risk | Failure | Expected |
+|---|---|---|
+| RISK-x_1 | An id with an underscore. | Rejected. |
+-- clean.md --
+| Risk | Failure | Expected |
+|---|---|---|
+| RISK-1 | The lamp fails. | The desk uses daylight. |
+| RISK-2 | The till jams. | The desk takes cards only. |
+| RISK-3 | The door sticks. | The side door opens. |
+| RISK-4 | The phone is down. | The desk posts a notice. |
+-- bad-links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "dependency:power", required: surface}
+  - {id: risk-1, subject: "dependency:power", required: surface}
+  - {id: RISK-2, subject: "dependency:till", required: maybe}
+  - {id: RISK-3, subject: "dependency:door", required: refuse}
+  - {id: RISK-4, subject: "nowhere", required: surface}
+  - {id: RISK-9, subject: "dependency:phone", required: surface}
+-- unknown-key-links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "dependency:power", required: surface, owner: desk}
+-- version-links.yaml --
+version: 2
+links: []
+-- native.yaml --
+version: 1
+failure_modes:
+  - id: risk-1
+    subject: dependency:power
+    failure: "The lamp fails."
+    required: surface
+    behavior: "The desk uses daylight."

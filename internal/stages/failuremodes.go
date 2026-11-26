@@ -8,16 +8,25 @@ func init() { Bind("failure-modes", FailureModes) }
 func FailureModes(ctx *Context) *report.Stage {
 	s := report.New("failure-modes")
 	d := ctx.Design()
-	if !d.HasFM {
+	if !d.HasFailureModes() {
 		return s.NotApplicable("no design.failure_modes configured")
 	}
-	abuse := 0
+	abuse, imported, unlinked := 0, 0, 0
 	for _, fm := range d.FailureModes {
 		if fm.Kind == "abuse" {
 			abuse++
 		}
+		if fm.Imported {
+			imported++
+		}
+		if fm.Unlinked() {
+			unlinked++
+		}
 	}
 	s.Count(len(d.FailureModes), "failure modes").Count(abuse, "abuse cases")
+	if d.ImportsFM {
+		s.Count(imported, "imported").Count(unlinked, "unlinked")
+	}
 	for _, p := range d.FMProblems {
 		s.Errorf("%s", p)
 	}

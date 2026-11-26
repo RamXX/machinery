@@ -27,7 +27,7 @@ func XrefFailure(ctx *Context) *report.Stage {
 	p := ctx.P
 	d := ctx.Design()
 	fstates, fevents := failureSubjects(d)
-	if !d.HasFM {
+	if !d.HasFailureModes() {
 		if len(fstates) == 0 && len(fevents) == 0 {
 			return s.NotApplicable("no design.failure_modes configured")
 		}
@@ -56,6 +56,9 @@ func XrefFailure(ctx *Context) *report.Stage {
 	}
 	named, abused := map[string]bool{}, map[string]bool{}
 	for _, fm := range d.FailureModes {
+		if fm.Unlinked() {
+			continue // names nothing (section 5.4.1)
+		}
 		named[fm.Subject] = true
 		if fm.Kind == "abuse" {
 			abused[fm.Subject] = true
@@ -66,12 +69,12 @@ func XrefFailure(ctx *Context) *report.Stage {
 	}
 	for _, id := range sortedSet(invokes) {
 		if !named[id] {
-			w.find(s, "invoke-failure-mode", id, "no failure mode names this invoke; declare what happens when it fails in %s", p.Cfg.Design.FailureModes)
+			w.find(s, "invoke-failure-mode", id, "no failure mode names this invoke; declare what happens when it fails in %s", d.FailureModeTarget())
 		}
 	}
 	for _, id := range sortedSet(deps) {
 		if !named[id] {
-			w.find(s, "dependency-failure-mode", id, "no failure mode names this dependency; declare what happens when it fails in %s", p.Cfg.Design.FailureModes)
+			w.find(s, "dependency-failure-mode", id, "no failure mode names this dependency; declare what happens when it fails in %s", d.FailureModeTarget())
 		}
 	}
 	tiered := 0
@@ -91,7 +94,7 @@ func XrefFailure(ctx *Context) *report.Stage {
 		}
 	}
 	failureGaps(s, w, fstates, fevents, named, func(when string) string {
-		return "declare what the system must do when it " + when + " in " + p.Cfg.Design.FailureModes
+		return "declare what the system must do when it " + when + " in " + d.FailureModeTarget()
 	})
 	w.stale(s)
 	s.Count(len(d.FailureModes), "failure modes").Count(len(invokes), "invokes").Count(len(deps), "dependencies").Count(tiered, "tiered actions").
@@ -145,7 +148,9 @@ func UnmodeledFailures(ctx *Context) []project.Waiver {
 	states, events := failureSubjects(d)
 	named := map[string]bool{}
 	for _, fm := range d.FailureModes {
-		named[fm.Subject] = true
+		if !fm.Unlinked() {
+			named[fm.Subject] = true
+		}
 	}
 	waived := map[string]bool{}
 	for _, wv := range ctx.P.Cfg.Waivers {

@@ -50,7 +50,41 @@ type Design struct {
 
 // Import names design sources kept in the project's own formats (section 2).
 type Import struct {
-	Machines *ImportMachines `yaml:"machines,omitempty"`
+	Machines     *ImportMachines     `yaml:"machines,omitempty"`
+	FailureModes *ImportFailureModes `yaml:"failure_modes,omitempty"`
+}
+
+// ImportFailureModes reads a failure-mode catalog kept as Markdown tables
+// (section 5.4.1).
+type ImportFailureModes struct {
+	File    string    `yaml:"file"`
+	ID      string    `yaml:"id"`
+	Columns FMColumns `yaml:"columns"`
+	Links   string    `yaml:"links,omitempty"`
+}
+
+// FMColumns lists the header names of each column a failure-mode row needs.
+type FMColumns struct {
+	Failure  []string `yaml:"failure"`
+	Behavior []string `yaml:"behavior"`
+}
+
+// IDPattern compiles the id expression so that it matches a cell in full.
+func (f *ImportFailureModes) IDPattern() (*regexp.Regexp, error) {
+	return regexp.Compile("^(?:" + f.ID + ")$")
+}
+
+// ImportedFailureModes returns the import.failure_modes block, or nil.
+func (c *Config) ImportedFailureModes() *ImportFailureModes {
+	if c.Import == nil {
+		return nil
+	}
+	return c.Import.FailureModes
+}
+
+// HasFailureModes reports whether the project has failure modes, native or imported.
+func (c *Config) HasFailureModes() bool {
+	return c.Design.FailureModes != "" || c.ImportedFailureModes() != nil
 }
 
 // ImportMachines reads machines written in a JSON dialect (section 5.2.1).
@@ -376,6 +410,9 @@ func (c *Config) validate() error {
 
 // validateImport holds the import block to section 2.
 func (c *Config) validateImport() error {
+	if err := c.validateImportedFailureModes(); err != nil {
+		return err
+	}
 	im := c.ImportedMachines()
 	if im == nil {
 		return nil
@@ -408,6 +445,39 @@ func (c *Config) validateImport() error {
 		}
 	}
 	return nil
+}
+
+func (c *Config) validateImportedFailureModes() error {
+	f := c.ImportedFailureModes()
+	if f == nil {
+		return nil
+	}
+	if f.File == "" {
+		return Errf("import.failure_modes.file is required")
+	}
+	if strings.TrimSpace(f.ID) == "" {
+		return Errf("import.failure_modes.id is required")
+	}
+	if _, err := regexp.Compile(f.ID); err != nil {
+		return Errf("import.failure_modes.id is not a regular expression: %v", err)
+	}
+	for _, col := range []struct {
+		name  string
+		names []string
+	}{{"failure", f.Columns.Failure}, {"behavior", f.Columns.Behavior}} {
+		if len(col.names) == 0 {
+			return Errf("import.failure_modes.columns.%s is required", col.name)
+		}
+		for _, n := range col.names {
+			if strings.TrimSpace(n) == "" {
+				return Errf("import.failure_modes.columns.%s: a header name must not be empty", col.name)
+			}
+		}
+	}
+	if err := CheckPath("import.failure_modes.file", f.File); err != nil {
+		return err
+	}
+	return CheckPath("import.failure_modes.links", f.Links)
 }
 
 // Default routing texts (section 2).

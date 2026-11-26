@@ -172,7 +172,12 @@ func idRead(d *design.Design, specs []*formal.Spec, ids []string) []string {
 				set[src] = true
 			}
 		case "fm":
-			set[d.P.Cfg.Design.FailureModes] = true
+			if o := d.Obligation(id); o != nil {
+				set[o.Source] = true
+			}
+			if im := d.P.Cfg.ImportedFailureModes(); im != nil && im.Links != "" {
+				set[im.Links] = true
+			}
 		case "fv", "cx":
 			for _, s := range specs {
 				set[s.Path] = true

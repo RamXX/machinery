@@ -1,0 +1,122 @@
+# a failure-mode catalog kept as Markdown tables is read by header; linked rows count like native ones
+fixture shop
+exec sh -c 'sed "/failure_modes: design\/failure-modes.yaml/d" machinery.yaml > c.tmp && cat c.tmp import.yaml > machinery.yaml'
+mkdir docs
+cp risks.md docs/risks.md
+cp links.yaml design/risk-links.yaml
+cp owed.yaml design/owed.yaml
+cp docs/risks.md risks.orig
+exec machinery lint --stage failure-modes --stage xref-failure
+stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 1 abuse cases, 4 imported, 2 unlinked\npassed\n'
+stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 1 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events\npassed\n'
+! stdout 'RISK-99'
+! stdout 'risk-99'
+cmp docs/risks.md risks.orig
+
+# the ids are lower-cased obligations; the failure cell is the title, an escaped pipe is a pipe
+exec machinery gen
+grep '"id": "fm:risk-1"' design/gen/obligations.json
+grep '"id": "fm:risk-4"' design/gen/obligations.json
+! grep 'fm:risk-99' design/gen/obligations.json
+! grep 'fm:p1' design/gen/obligations.json
+grep '"source": "docs/risks.md"' design/gen/obligations.json
+grep '"title": "The payment provider times out."' design/gen/obligations.json
+grep '"title": "A shipment notice is sent twice \| or not at all."' design/gen/obligations.json
+
+# an unlinked row is owed and traced like any failure mode
+exec mrun 1 trace
+stdout 'ERROR  unverified: fm:risk-1'
+stdout 'ERROR  unverified: fm:risk-3'
+exec sh -c 'echo "# machinery:verifies fm:risk-1 fm:risk-2 fm:risk-3 fm:risk-4" >> e2e/orders.sh'
+exec machinery trace
+stdout 'checked: 2 code files, 1 test files, 4 act ids, 19 obligations'
+stdout '^passed$'
+
+# an unlinked row covers nothing: the invoke it would name has no failure mode
+cp links-no-invoke.yaml design/risk-links.yaml
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout 'checked: 4 failure modes, 1 abuse cases, 4 imported, 3 unlinked'
+stdout 'ERROR  invoke-failure-mode: invoke:order.chargePayment: no failure mode names this invoke; declare what happens when it fails in design/risk-links.yaml'
+
+# a linked row takes part in every rule: its subject must resolve
+cp links-bad-subject.yaml design/risk-links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  subject-resolves: invoke:order.refundPayment: failure mode risk-1: machine order has no invoke with that src'
+
+# without a links file every row is unlinked, and the finding says where links go
+exec sh -c 'grep -v "links: design/risk-links.yaml" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout 'checked: 4 failure modes, 0 abuse cases, 4 imported, 4 unlinked'
+stdout 'ERROR  invoke-failure-mode: invoke:order.chargePayment: no failure mode names this invoke; declare what happens when it fails in a links file \(import.failure_modes.links\)'
+
+# the native file and the catalog together: both count, and a native failure mode covers the invoke
+fixture shop
+cp import.yaml imp.tmp
+exec sh -c 'cat imp.tmp >> machinery.yaml'
+cp links.yaml design/risk-links.yaml
+exec machinery lint --stage failure-modes --stage xref-failure
+stdout 'checked: 5 failure modes, 1 abuse cases, 4 imported, 2 unlinked'
+stdout 'checked: 5 failure modes, 1 invokes'
+exec machinery gen
+grep '"id": "fm:payment-provider-down"' design/gen/obligations.json
+grep '"source": "design/failure-modes.yaml"' design/gen/obligations.json
+grep '"id": "fm:risk-2"' design/gen/obligations.json
+
+-- import.yaml --
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+-- risks.md --
+# Risks of the shop
+
+## Principles
+
+| Id | Principle |
+|----|-----------|
+| P1 | A charge is never lost. |
+
+## Payments
+
+| Risk | Failure | Current behavior | Required behavior | Owner |
+|:-----|---------|------------------|-------------------|------:|
+| RISK-1 | The payment provider times out. | The order hangs. | The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE. | payments |
+| RISK-2 | A caller who is not a Clerk ships an order. | Nothing stops it. | The request is refused with FORBIDDEN. | api |
+
+## Operations
+
+Ref | Severity | what goes wrong | EXPECTED
+--- | --- | --- | ---
+RISK-3 | high | A shipment notice is sent twice \| or not at all. | The customer gets exactly one notice.
+RISK-4 | low | The order list is slow. | The list answers within two seconds.
+
+## How a row is written
+
+```
+| Risk | Failure | Required behavior |
+|------|---------|-------------------|
+| RISK-99 | An example, not a failure mode. | Nothing. |
+```
+-- owed.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "invoke:order.chargePayment", required: retry-bounded}
+  - {id: risk-2, kind: abuse, subject: "act:Order.ship", required: refuse}
+-- links-no-invoke.yaml --
+version: 1
+links:
+  - {id: RISK-2, kind: abuse, subject: "act:Order.ship", required: refuse}
+-- links-bad-subject.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "invoke:order.refundPayment", required: retry-bounded}
+  - {id: RISK-2, kind: abuse, subject: "act:Order.ship", required: refuse}

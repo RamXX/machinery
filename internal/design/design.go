@@ -49,9 +49,10 @@ type Design struct {
 	Machines        []*machine.Machine
 	MachineProblems []string
 
-	FailureModes []FailureMode
+	FailureModes []FailureMode // native first, then the imported rows
 	FMProblems   []string
-	HasFM        bool
+	HasFM        bool // design.failure_modes is configured
+	ImportsFM    bool // import.failure_modes is configured
 
 	Areas        []Area
 	RiskProblems []string
@@ -82,6 +83,10 @@ func Load(p *project.Project) *Design {
 	}
 	d.Machines, d.MachineProblems = ms, probs
 	d.FailureModes, d.FMProblems, d.HasFM = LoadFailureModes(p)
+	imported, probs, on := LoadImportedFailureModes(p, d.FailureModes)
+	d.FailureModes = append(d.FailureModes, imported...)
+	d.FMProblems = append(d.FMProblems, probs...)
+	d.ImportsFM = on
 	d.Areas, d.RiskProblems, d.HasRisk = LoadRisk(p)
 	d.Owed, d.OwedProblems = LoadOwed(p)
 	d.Traces = loadTraces(p)
@@ -154,7 +159,7 @@ func (d *Design) inventory() {
 		}
 	}
 	for _, fm := range d.FailureModes {
-		add(Obligation{ID: "fm:" + fm.ID, Kind: "fm", Source: d.P.Cfg.Design.FailureModes, Title: fm.Failure})
+		add(Obligation{ID: "fm:" + fm.ID, Kind: "fm", Source: fm.Source, Title: fm.Failure})
 	}
 	for _, a := range d.Areas {
 		if a.Tier == Critical {
@@ -184,6 +189,22 @@ func (d *Design) inventory() {
 	for i := range d.Obligations {
 		d.byID[d.Obligations[i].ID] = &d.Obligations[i]
 	}
+}
+
+// HasFailureModes reports whether failure modes are configured, native or
+// imported.
+func (d *Design) HasFailureModes() bool { return d.HasFM || d.ImportsFM }
+
+// FailureModeTarget names where a missing failure mode is declared: the
+// native file, else the links file of the import (section 6.6).
+func (d *Design) FailureModeTarget() string {
+	if f := d.P.Cfg.Design.FailureModes; f != "" {
+		return f
+	}
+	if im := d.P.Cfg.ImportedFailureModes(); im != nil && im.Links != "" {
+		return im.Links
+	}
+	return "a links file (import.failure_modes.links)"
 }
 
 // Plain strips the backticks Modelith text uses around entity names.
@@ -328,7 +349,11 @@ func (d *Design) ContractFiles() []string {
 	for _, m := range d.Machines {
 		set[m.Path] = true
 	}
-	for _, f := range []string{c.Design.FailureModes, c.Design.Risk, c.Design.Facts} {
+	files := []string{c.Design.FailureModes, c.Design.Risk, c.Design.Facts}
+	if im := c.ImportedFailureModes(); im != nil {
+		files = append(files, im.File, im.Links)
+	}
+	for _, f := range files {
 		if f != "" && d.P.Exists(f) {
 			set[f] = true
 		}

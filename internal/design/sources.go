@@ -20,7 +20,19 @@ type FailureMode struct {
 	Failure  string `yaml:"failure"`
 	Required string `yaml:"required"`
 	Behavior string `yaml:"behavior"`
+
+	// Source is the file the failure mode comes from: the failure-mode file
+	// or the imported catalog (section 5.4.1).
+	Source string `yaml:"-"`
+	// Imported is true for a row of the catalog; Linked when the links file
+	// gives it a subject and a required value.
+	Imported bool `yaml:"-"`
+	Linked   bool `yaml:"-"`
 }
+
+// Unlinked reports an imported row without a link: it names nothing, so it
+// takes part in no subject rule (section 5.4.1).
+func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
 
 type failureFile struct {
 	Version      int           `yaml:"version"`
@@ -68,9 +80,7 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 		if fm.ID != "" {
 			where = fmt.Sprintf("%s: %s", rel, fm.ID)
 		}
-		if fm.Kind == "" {
-			fm.Kind = "fault"
-		}
+		fm.Source = rel
 		switch {
 		case !kebabRe.MatchString(fm.ID):
 			problems = append(problems, where+": id must match ^[a-z][a-z0-9-]+$")
@@ -78,24 +88,7 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 			problems = append(problems, where+": duplicate id")
 		}
 		seen[fm.ID] = true
-		if fm.Kind != "fault" && fm.Kind != "abuse" {
-			problems = append(problems, fmt.Sprintf("%s: kind must be fault or abuse, got %q", where, fm.Kind))
-		}
-		if !subjectRe.MatchString(fm.Subject) {
-			problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>", where, fm.Subject))
-		}
-		switch fm.Required {
-		case "fail-closed", "retry-bounded", "surface":
-		case "refuse":
-			if fm.Kind != "abuse" {
-				problems = append(problems, where+": required: refuse is only valid with kind: abuse")
-			}
-		default:
-			problems = append(problems, fmt.Sprintf("%s: required must be fail-closed, retry-bounded, surface or refuse, got %q", where, fm.Required))
-		}
-		if fm.Kind == "abuse" && !strings.HasPrefix(fm.Subject, "act:") && !strings.HasPrefix(fm.Subject, "entity:") {
-			problems = append(problems, where+": kind: abuse needs an act or entity subject")
-		}
+		problems = append(problems, checkValues(where, fm)...)
 		if strings.TrimSpace(fm.Failure) == "" {
 			problems = append(problems, where+": failure is required")
 		}
@@ -104,6 +97,33 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 		}
 	}
 	return f.FailureModes, problems, true
+}
+
+// checkValues holds kind, subject and required to section 5.4, defaulting
+// kind to fault. where prefixes every problem.
+func checkValues(where string, fm *FailureMode) (problems []string) {
+	if fm.Kind == "" {
+		fm.Kind = "fault"
+	}
+	if fm.Kind != "fault" && fm.Kind != "abuse" {
+		problems = append(problems, fmt.Sprintf("%s: kind must be fault or abuse, got %q", where, fm.Kind))
+	}
+	if !subjectRe.MatchString(fm.Subject) {
+		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>", where, fm.Subject))
+	}
+	switch fm.Required {
+	case "fail-closed", "retry-bounded", "surface":
+	case "refuse":
+		if fm.Kind != "abuse" {
+			problems = append(problems, where+": required: refuse is only valid with kind: abuse")
+		}
+	default:
+		problems = append(problems, fmt.Sprintf("%s: required must be fail-closed, retry-bounded, surface or refuse, got %q", where, fm.Required))
+	}
+	if fm.Kind == "abuse" && !strings.HasPrefix(fm.Subject, "act:") && !strings.HasPrefix(fm.Subject, "entity:") {
+		problems = append(problems, where+": kind: abuse needs an act or entity subject")
+	}
+	return problems
 }
 
 // Tier names in rising order.
