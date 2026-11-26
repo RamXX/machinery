@@ -1297,7 +1297,8 @@ machinery run [--stack "<description>"] -- <command> [args...]
    `.jsonl` files directly in the receipts directory, and nothing else in it) and the property
    records `<gen>/vital/*.json`, whose statuses render the owed file (section 23.4));
 2. deletes receipt files in the receipts directory that are not valid for the current commit
-   (section 10.1), and their entries in the run ledger (section 10.2);
+   (section 10.1), and their entries in the run ledger, together with the entries of this
+   receipts directory whose file is no longer there (section 10.2);
 3. creates `<receipts dir>/<UTC timestamp>-<short sha>.jsonl` (timestamp
    `20060102T150405.000Z`), writes the header line and enters the file in the run ledger;
 4. runs the command with extra environment variables: `MACHINERY_RECEIPTS` (absolute path of
@@ -1365,32 +1366,41 @@ working tree, one entry per receipts file, at
 `<git common dir>/machinery/runs/<name of the receipts file>`. An entry is one JSON line:
 
 ```json
-{"v":1,"file":"<sha256 of the finished file>"}
+{"v":1,"commit":"<40 hex>","dir":"<receipts directory, absolute>","file":"<sha256 of the finished file>"}
 ```
 
-The entry is written as `{"v":1}` when the run starts; `file`, the digest of the whole file with
-its header and its end line, is added when the command has exited. Every command that reads
-evidence compares each receipts file that is valid for the current commit (section 10.1) with the
-entry of its name:
+The entry is written without `file` when the run starts: the commit of the run and the receipts
+directory the file is in. `file`, the digest of the whole file with its header and its end
+line, is added when the command has exited. Every command that reads evidence asks the ledger
+before it believes a header, for every `.jsonl` file of the receipts directory and for every
+entry that names this receipts directory:
 
 | Finding | When |
 |---|---|
-| `ERROR  receipts: <file>: not produced by machinery run; delete the file and run the tests through machinery run` | The ledger has no entry of that name. |
-| `ERROR  receipts: <file>: changed after the run; delete the file and run the tests again through machinery run` | The file does not have the digest of the entry; or the file has an end line and the entry has no digest (the run never ended and an end line was added). |
+| `ERROR  receipts: <file>: not produced by machinery run; delete the file and run the tests through machinery run` | The file has a run header whose commit is valid for the current commit (section 10.1) and the ledger has no entry of its name. |
+| `ERROR  receipts: <file>: changed after the run; delete the file and run the tests again through machinery run` | The entry has a digest and the file does not have it, whatever its header says now, or whether it still has one. Or the entry has no digest (the run never ended), its commit is valid for the current commit, and the file has an end line, no header, or a header of another commit. |
+| `ERROR  receipts: <file>: recorded by machinery run and no longer present; run the tests again through machinery run` | An entry names this receipts directory, its commit is valid for the current commit, and no file of that name is in the directory. |
 
-Nothing in such a file counts: it is not a run, none of its receipts is read, a failure in it
-included, and nothing else about it is reported. So that the failure cannot vanish with the
-file, the refusal itself is carried everywhere a result is given: the ERROR by `verify`,
-`verify --story` and the tier gates (section 15.6), a `refused` line by `machinery status`
-(section 14), and the result line of `machinery proof` (section 13). A
-file with no end line whose entry has no digest is the incomplete run of section 12. An entry
-that is not such a line is no entry.
+Nothing in a refused file counts: it is not a run, none of its receipts is read, a failure in it
+included, and nothing else about it is reported. An untouched run of another commit matches its
+entry and is passed over without a finding, as before. A file with no end line whose entry has
+no digest, and whose header still carries the commit of the entry, is the incomplete run of
+section 12. An entry that is not such a line is no entry.
+
+A failing run does not vanish when its file is edited, cut or deleted: the three findings above
+and the incomplete run are carried everywhere a result is given. `verify`, `verify --story` and
+the tier gates print the ERROR (section 15.6), `machinery status` prints a `refused` line
+(section 14), `machinery proof` gives the number of refused files in place of counts (section
+13), and `machinery owed sync` prunes nothing (section 11.2). What clears them is a new
+`machinery run`, after deleting the refused file.
 
 - The entry goes by the name of the file, so a copy of a real run under another name has no
-  entry. `machinery run` deletes the entry with the file (step 2 of section 10).
+  entry. `machinery run` deletes the entry with the file, and the entries of its receipts
+  directory whose file is gone (step 2 of section 10).
 - The ledger is shared by the worktrees of a repository and is in none of them: it is never
-  dirty, never committed and never cloned. Evidence is produced in the repository where it is
-  judged.
+  dirty, never committed and never cloned. An entry of another worktree or project names another
+  receipts directory and is never reported as gone here. Evidence is produced in the repository
+  where it is judged.
 - Everything that appends receipts finishes before the command exits. A process that outlives
   the command and appends later changes the file after the run.
 
@@ -1475,9 +1485,10 @@ owed list is the baseline of what was never proven.
 
 ### 11.2 `machinery owed sync`
 
-Reads the evidence exactly as `verify` does (section 12), then rewrites `owed.yaml`. A receipts
-file or a receipt that section 10.2 refuses proves nothing here either, so nothing is pruned on
-it:
+Reads the evidence exactly as `verify` does (section 12). While a receipts file is refused
+(section 10.2) or a run is incomplete, it writes nothing, whatever the other runs prove: it
+prints the finding `verify` has for each such file as `ERROR  <finding>` and exits 1. A receipt
+whose test claims nothing proves nothing here either. Otherwise it rewrites `owed.yaml`:
 
 - removes every entry whose id is proven;
 - unless `--prune-only`, adds every obligation that is neither proven nor listed, with the reason
@@ -1567,8 +1578,10 @@ Per obligation:
 
 Findings:
 
-- `ERROR  receipts: <file>: not produced by machinery run; ...` and
-  `ERROR  receipts: <file>: changed after the run; ...` (section 10.2, with the full text).
+- `ERROR  receipts: <file>: not produced by machinery run; ...`,
+  `ERROR  receipts: <file>: changed after the run; ...` and
+  `ERROR  receipts: <file>: recorded by machinery run and no longer present; ...` (section 10.2,
+  with the full text).
   Nothing in the file is used.
 - `ERROR  receipt: <id>: <test> does not claim it; <what to do>` (section 10.2). A `pass` is not
   used; a `fail` still fails its obligation.
@@ -1609,9 +1622,9 @@ tests observe the target state and no effects: the case is `partial`, therefore 
 makes the effect real and the test observes it, the case becomes `proven` and leaves the list.
 
 `--story <id>` judges only the ids of that backlog story (section 15.1); every other obligation is
-ignored except for `failed` ones, which always print. The findings about evidence that is not
-used always print too, whatever id they name: a refused receipts file, an incomplete run, and
-`receipt: <id>: <test> does not claim it` (section 10.2).
+ignored except for `failed` ones, which always print. A refused receipts file, an incomplete
+run and `receipt: <id>: <test> does not claim it` (section 10.2) always print too, whatever id
+they name.
 
 ### 12.1 Targeted runs: `machinery affected`
 
@@ -1729,8 +1742,8 @@ observations:
 `usage: --ids: <id> is a proof obligation: it awaits a machine-checked proof and has no evidence to show`. Without evidence the block
 has no `command:` line and `result:   no evidence at <short sha>`. The `, against <stack>` part is
 left out when no run names a stack. An owed id prints under `not proven` as
-`<id> (<state>, owed)`. When a receipts file is not used and may hide a failure (one that
-section 10.2 refuses, or an incomplete run), no count stands: the line is
+`<id> (<state>, owed)`. When a receipts file is refused (section 10.2) or a run is incomplete
+(section 12), no count stands: the line is
 `result:   <n> receipts file(s) refused: delete them and run the tests through machinery run`
 and the exit code is 1, whatever the other runs prove. `--post` posts that block as it is.
 
@@ -1770,7 +1783,7 @@ proofs awaiting: <n>
 vital: <id> proven (by test and model; proof awaited)
 assumed, unproven: <area> <name>: <statement>
 owed without a story: <n>
-refused: <receipts file>: <not produced by machinery run|changed after the run|incomplete run>
+refused: <receipts file>: <why: the text of section 10.2 before the semicolon, or incomplete run>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
 
@@ -1783,9 +1796,9 @@ The `tiers` line counts obligations by the tier of their area and is omitted whe
 risk file; its `vital` part, and the three lines after the `proven` line, print only when the
 risk file has a vital area (section 23.2): the number of proof obligations, one `vital` line per
 id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
-whose evidence is owed, each group sorted. One `refused` line prints per receipts file that is
-not used and may hide a failure: a file section 10.2 refuses, or an incomplete run (section 12);
-sorted by file. When there is no evidence the line is `evidence: none at <short sha>`. When
+whose evidence is owed, each group sorted. One `refused` line prints per receipts file that
+section 10.2 refuses and per incomplete run (section 12). When there is no evidence the line is
+`evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
 `intake <id>: <n> of 7 steps done; next: <step>`; then the latest review of each kind (section 15.10):
@@ -2144,11 +2157,11 @@ A missing session is never an error: harnesses that give none exist.
 
 Findings name what is missing, for example `ERROR  no prediction for <short sha>: a verifier runs
 machinery predict before reading the proof`, `ERROR  verifier is the builder: <actor>`,
-`ERROR  unproven: <id>`. A receipts file that is not used fails the gate of every story with the
-finding `verify` has for it (`ERROR  receipts: <file>: ...`, `ERROR  incomplete run: <file>`;
-sections 10.2 and 12): the failure of the story may be in it. `checked:` counts ids, proofs,
-predictions and verdicts. A story without
-a `machinery:ids` line is `not demonstrated: story names no design ids`.
+`ERROR  unproven: <id>`. A refused receipts file or an incomplete run fails the gate of every
+story with the finding `verify` has for it (`ERROR  receipts: <file>: ...`,
+`ERROR  incomplete run: <file>`; sections 10.2 and 12): the failure of the story may be in it.
+`checked:` counts ids, proofs, predictions and verdicts. A story without a `machinery:ids` line
+is `not demonstrated: story names no design ids`.
 
 **The design story.** A story that carries `machinery:intake-design` lands the design change of its
 intake (section 15.7) and names no ids. `machinery story` judges it at the current commit by the
