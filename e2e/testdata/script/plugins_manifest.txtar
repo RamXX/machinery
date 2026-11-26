@@ -8,11 +8,23 @@ exists $REPO/skills/machinery/SKILL.md
 exists $REPO/agents/machinery-pm.md
 exists $REPO/agents/machinery-verifier.md
 exists $REPO/agents/machinery-modeler.md
+exists $REPO/agents/machinery-builder.md
+exists $REPO/agents/machinery-checker.md
+exists $REPO/agents/machinery-delegate.md
+exists $REPO/docs/roles.md
 exists $REPO/hooks/hooks.json
 
 # size limits of section 21
 exec sh -c 'test $(wc -l < $REPO/skills/machinery/SKILL.md) -le 120'
 exec sh -c 'for f in $REPO/agents/*.md; do test $(wc -l < $f) -le 60 || exit 1; done'
+exec sh -c 'test $(wc -l < $REPO/docs/roles.md) -le 120'
+
+# one prompt per role, and no vendor model in a prompt's frontmatter
+exec sh -c 'test $(ls $REPO/agents | wc -l) -eq 6'
+exec sh -c '! grep -l "^model:" $REPO/agents/*.md'
+
+# the delegate is marked experimental
+grep 'Experimental' $REPO/agents/machinery-delegate.md
 
 # the installed version matches the manifests
 exec machinery version
@@ -23,6 +35,17 @@ exec machinery
 cp stdout help.txt
 exec node commands.cjs $REPO help.txt
 stdout 'commands ok'
+
+# and takes every flag they show with it
+exec node flags.cjs $REPO help.txt
+stdout 'flags ok'
+
+# a flag the tool does not have is caught
+mkdir bad/skills/machinery bad/agents
+cp bad.md bad/agents/bad.md
+cp $REPO/skills/machinery/SKILL.md bad/skills/machinery/SKILL.md
+! exec node flags.cjs bad help.txt
+stderr 'agents/bad.md: machinery waves has no flag --dispatch'
 
 -- check.cjs --
 const fs = require("fs");
@@ -54,6 +77,51 @@ for (const [event, [arg, matcher]] of Object.entries(want)) {
   if (c.type !== "command" || c.command !== "machinery" || JSON.stringify(c.args) !== JSON.stringify(["hook", arg])) throw new Error(event + ": runs " + JSON.stringify(c));
 }
 console.log("hooks ok");
+-- bad.md --
+Then `machinery waves --dispatch`.
+-- flags.cjs --
+const fs = require("fs");
+const path = require("path");
+const {spawnSync} = require("child_process");
+const repo = process.argv[2];
+const help = fs.readFileSync(process.argv[3], "utf8");
+const known = new Set();
+for (const line of help.split("\n")) {
+  const m = line.match(/^  ([a-z]+(?: [a-z]+)?) {2,}/);
+  if (m) known.add(m[1]);
+}
+const flagsOf = {};
+function flags(cmd) {
+  if (!flagsOf[cmd]) {
+    const r = spawnSync("machinery", [...cmd.split(" "), "--help"], {encoding: "utf8"});
+    flagsOf[cmd] = new Set([...(r.stdout + r.stderr).matchAll(/^  -([a-z-]+)/gm)].map((m) => m[1]));
+  }
+  return flagsOf[cmd];
+}
+const files = ["skills/machinery/SKILL.md", ...fs.readdirSync(path.join(repo, "agents")).map((f) => "agents/" + f)];
+let checked = 0;
+for (const f of files) {
+  // a line of a code block that ends in a backslash goes on in the next one
+  const text = fs.readFileSync(path.join(repo, f), "utf8").replace(/\\\n\s*/g, " ");
+  // a command is an inline code span, or a line of a code block, that starts with machinery
+  const spans = [...text.matchAll(/`(machinery [^`]*)`/g)].map((m) => m[1].replace(/\s+/g, " "));
+  for (const line of text.split("\n")) if (line.startsWith("machinery ")) spans.push(line);
+  for (const s of spans) {
+    const w = s.split(" ");
+    const cmd = known.has(w[1] + " " + w[2]) ? w[1] + " " + w[2] : w[1];
+    if (!known.has(cmd)) continue; // commands.cjs reports an unknown command
+    const own = s.split(" -- ")[0]; // what follows -- belongs to the command machinery runs
+    for (const m of own.matchAll(/(?:^| |\|)--([a-z-]+)/g)) {
+      checked++;
+      if (!flags(cmd).has(m[1])) {
+        console.error(f + ": machinery " + cmd + " has no flag --" + m[1]);
+        process.exit(1);
+      }
+    }
+  }
+}
+if (checked < 30) throw new Error("too few flags found: " + checked);
+console.log("flags ok");
 -- commands.cjs --
 const fs = require("fs");
 const path = require("path");
