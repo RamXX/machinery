@@ -50,11 +50,14 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - `import.machines.annotate`: for a dialect that has no key for them, the config says which
   events arrive from outside, which report a failure, which states record one (names and `*`
   patterns) and which event is a model action under another name. A pattern that matches nothing
-  is an error. The native annotation `_aliases` carries the last one, and rules `event-action`
-  and `action-event` read an aliased event as its action.
+  is an error, and a pattern of `*` only is refused. The native annotation `_aliases` carries
+  the last one, and rules `event-action` and `action-event` read an aliased event as its action.
 - Rule `event-action` reports an event listed in `_external_events` or `_failure_events` that is
-  an action of the model: an action is a caller's command. The name hint no longer warns about
-  an event that is listed as external or has an alias.
+  an action of the model: an action is a caller's command. For an operational machine every
+  action of the entities behind what it serves counts.
+- The name hint about a failure-looking name is dismissed by name, with a reason, in the root
+  `_not_failures` (`not_failures` in `import.machines.annotate`); it no longer warns about an
+  event that has an alias. Listing an event as external does not stop it.
 
 ### Carried forward from v1
 
