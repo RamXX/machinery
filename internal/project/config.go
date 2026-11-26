@@ -115,6 +115,7 @@ type ImportMachines struct {
 // the entity of a lifecycle machine, or the ids an operational machine serves.
 type Bind struct {
 	LifecycleOf string   `yaml:"lifecycle_of,omitempty"`
+	Aspect      string   `yaml:"aspect,omitempty"`
 	Serves      []string `yaml:"serves,omitempty"`
 }
 
@@ -542,6 +543,8 @@ func (c *Config) validateImport() error {
 			return Errf("import.machines.bind.%s: set lifecycle_of or serves, not both", k)
 		case !lifecycle && len(b.Serves) == 0:
 			return Errf("import.machines.bind.%s: set lifecycle_of or serves", k)
+		case b.Aspect != "" && !lifecycle:
+			return Errf("import.machines.bind.%s: aspect needs lifecycle_of; an aspect is part of an entity's lifecycle", k)
 		}
 		for _, id := range b.Serves {
 			if strings.TrimSpace(id) == "" {

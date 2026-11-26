@@ -31,6 +31,23 @@ func (m *Machine) Serves() (ids []string, present bool) {
 	return ids, true
 }
 
+// reAspect is the form of a root _aspect: a short name.
+var reAspect = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]*$`)
+
+// lintAspect holds the shape of the root _aspect, the part of its entity's
+// lifecycle a lifecycle machine holds (docs/formats.md section 5.2). Which
+// machines may declare it is stage xref-model-machine's.
+func lintAspect(base string, ro *ir.Object) []string {
+	v, ok := ro.Get("_aspect")
+	if !ok {
+		return nil
+	}
+	if v == nil || v.Kind != ir.KindString || !reAspect.MatchString(v.AsString()) {
+		return []string{fmt.Sprintf("%s: _aspect %s must be a short name matching [A-Za-z][A-Za-z0-9_-]* (the part of its entity's lifecycle the machine holds)", base, ir.Repr(v))}
+	}
+	return nil
+}
+
 // lintServes holds the shape of the root _serves: a non-empty list of
 // distinct entity:<Name> and act:<Entity>.<action> ids. Whether they are in
 // the model is stage xref-model-machine's.

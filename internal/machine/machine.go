@@ -28,6 +28,7 @@ type Machine struct {
 	Tag         string
 	LifecycleOf string // from _lifecycle_of ("" when absent)
 	Role        string // from _role ("" when absent)
+	Aspect      string // from _aspect ("" when absent): the part of its entity's lifecycle
 	Root        *ir.Value
 	Bytes       []byte // the machine as stage xstate loads it
 	Resolver    *ir.Resolver
@@ -216,6 +217,7 @@ func parse(rel, base string, data, source []byte) (*Machine, error) {
 	}
 	m.LifecycleOf = ro.GetString("_lifecycle_of")
 	m.Role = ro.GetString("_role")
+	m.Aspect = ro.GetString("_aspect")
 	m.Resolver = ir.NewResolver(root)
 	m.Table = buildTable(m)
 	return m, nil

@@ -1,0 +1,246 @@
+# several lifecycle machines of one entity are aspects of its lifecycle: each declares _aspect,
+# a name unique for the entity, holds the states of an enum of its own, and the actions of the
+# entity are events of at least one of them (docs/formats.md sections 5.2 and 6.4)
+exec machinery lint --stage xref-model-machine
+stdout '^checked: 2 machines, 2 lifecycle machines, 0 operational machines, 5 domain states, 2 events, 2 actions, 1 entities with actions$'
+stdout '^passed$'
+
+# an action no aspect has as an event names every lifecycle machine of the entity
+cp model-reroute.yaml design/model/parcels.modelith.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  action-event: act:Parcel.reroute: no on event reroute in any lifecycle machine of Parcel: customs \(design/machines/Customs.machine.json\), parcel \(design/machines/Parcel.machine.json\)$'
+stdout '^failed: 1 finding\(s\)$'
+cp model.yaml design/model/parcels.modelith.yaml
+
+# without _aspect on each, the second machine is a binding finding that names the first
+cp parcel-plain.json design/machines/Parcel.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: parcel: a second lifecycle machine of Parcel, beside customs; several lifecycle machines of one entity are aspects of its lifecycle: set _aspect on each, a short name unique for Parcel$'
+stdout '^failed: 1 finding\(s\)$'
+
+# two aspects of one entity need different names
+cp parcel-same.json design/machines/Parcel.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: parcel: _aspect customs is also the aspect of customs; the aspects of Parcel need different names$'
+cp parcel.json design/machines/Parcel.machine.json
+
+# an enum is the state enum of one aspect only
+cp customs-same-states.json design/machines/Customs.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  state-enum: parcel: enum ParcelStatus is already the state enum of customs; each aspect of Parcel needs an enum attribute of its own$'
+! stdout 'state-enum: customs'
+cp customs.json design/machines/Customs.machine.json
+
+# an entity with no action: the events of all its aspects are one finding for the entity
+cp model-no-actions.yaml design/model/parcels.modelith.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: entity:Parcel: declares no actions, so none of the 2 event\(s\) of customs, parcel is one of its actions \(inspect, seal\); add the actions to the model, or list the events in _external_events \(or in _failure_events when one reports a failure\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an entity with no enum-typed attribute: one finding for the entity, naming each aspect
+cp model-no-enum.yaml design/model/parcels.modelith.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  state-enum: entity:Parcel: has no state enum \(no attribute of Parcel has an enum type\); the domain states of customs \(Cleared, Held, Pending\) and of parcel \(Open, Sealed\) need one each$'
+stdout '^failed: 1 finding\(s\)$'
+cp model.yaml design/model/parcels.modelith.yaml
+
+# an aspect belongs to a lifecycle: on an operational machine it is a binding finding
+cp ops.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: ops: _aspect is set on an operational machine; an aspect is part of an entity''s lifecycle: remove _aspect, or bind the machine with _lifecycle_of$'
+rm design/machines/Ops.machine.json
+
+# stage machines holds the shape of _aspect
+cp customs-bad-aspect.json design/machines/Customs.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Customs.machine.json: _aspect ''the customs'' must be a short name matching \[A-Za-z\]\[A-Za-z0-9_-\]\* \(the part of its entity''s lifecycle the machine holds\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/parcels.modelith.yaml
+  machines: design/machines
+-- design/model/parcels.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Parcels
+enums:
+  ParcelStatus:
+    values:
+      - {name: Open, definition: "Being packed."}
+      - {name: Sealed, definition: "Packed and closed."}
+  CustomsStatus:
+    values:
+      - {name: Pending, definition: "Not inspected yet."}
+      - {name: Cleared, definition: "Inspected and let through."}
+      - {name: Held, definition: "Inspected and kept back."}
+entities:
+  Parcel:
+    definition: "A parcel on its way."
+    attributes:
+      - {name: status, type: ParcelStatus}
+      - {name: customs, type: CustomsStatus}
+    actions:
+      - {name: seal, actor: Packer}
+      - {name: inspect, actor: Officer}
+-- model.yaml --
+kind: DomainModel
+version: v1
+title: Parcels
+enums:
+  ParcelStatus:
+    values:
+      - {name: Open, definition: "Being packed."}
+      - {name: Sealed, definition: "Packed and closed."}
+  CustomsStatus:
+    values:
+      - {name: Pending, definition: "Not inspected yet."}
+      - {name: Cleared, definition: "Inspected and let through."}
+      - {name: Held, definition: "Inspected and kept back."}
+entities:
+  Parcel:
+    definition: "A parcel on its way."
+    attributes:
+      - {name: status, type: ParcelStatus}
+      - {name: customs, type: CustomsStatus}
+    actions:
+      - {name: seal, actor: Packer}
+      - {name: inspect, actor: Officer}
+-- model-reroute.yaml --
+kind: DomainModel
+version: v1
+title: Parcels
+enums:
+  ParcelStatus:
+    values:
+      - {name: Open, definition: "Being packed."}
+      - {name: Sealed, definition: "Packed and closed."}
+  CustomsStatus:
+    values:
+      - {name: Pending, definition: "Not inspected yet."}
+      - {name: Cleared, definition: "Inspected and let through."}
+      - {name: Held, definition: "Inspected and kept back."}
+entities:
+  Parcel:
+    definition: "A parcel on its way."
+    attributes:
+      - {name: status, type: ParcelStatus}
+      - {name: customs, type: CustomsStatus}
+    actions:
+      - {name: seal, actor: Packer}
+      - {name: inspect, actor: Officer}
+      - {name: reroute, actor: Packer}
+-- model-no-actions.yaml --
+kind: DomainModel
+version: v1
+title: Parcels
+enums:
+  ParcelStatus:
+    values:
+      - {name: Open, definition: "Being packed."}
+      - {name: Sealed, definition: "Packed and closed."}
+  CustomsStatus:
+    values:
+      - {name: Pending, definition: "Not inspected yet."}
+      - {name: Cleared, definition: "Inspected and let through."}
+      - {name: Held, definition: "Inspected and kept back."}
+entities:
+  Parcel:
+    definition: "A parcel on its way."
+    attributes:
+      - {name: status, type: ParcelStatus}
+      - {name: customs, type: CustomsStatus}
+-- model-no-enum.yaml --
+kind: DomainModel
+version: v1
+title: Parcels
+entities:
+  Parcel:
+    definition: "A parcel on its way."
+    attributes:
+      - {name: status, type: string}
+    actions:
+      - {name: seal, actor: Packer}
+      - {name: inspect, actor: Officer}
+-- design/machines/Parcel.machine.json --
+{
+  "id": "parcel", "_aspect": "box",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"seal": {"target": "Sealed"}}},
+    "Sealed": {"type": "final"}
+  }
+}
+-- parcel.json --
+{
+  "id": "parcel", "_aspect": "box",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"seal": {"target": "Sealed"}}},
+    "Sealed": {"type": "final"}
+  }
+}
+-- parcel-plain.json --
+{
+  "id": "parcel",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"seal": {"target": "Sealed"}}},
+    "Sealed": {"type": "final"}
+  }
+}
+-- parcel-same.json --
+{
+  "id": "parcel", "_aspect": "customs",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"seal": {"target": "Sealed"}}},
+    "Sealed": {"type": "final"}
+  }
+}
+-- design/machines/Customs.machine.json --
+{
+  "id": "customs", "_lifecycle_of": "Parcel", "_aspect": "customs",
+  "initial": "Pending",
+  "states": {
+    "Pending": {"on": {"inspect": [{"target": "Cleared", "guard": "isCleared"}, {"target": "Held"}]}},
+    "Cleared": {"type": "final"},
+    "Held": {"type": "final"}
+  }
+}
+-- customs.json --
+{
+  "id": "customs", "_lifecycle_of": "Parcel", "_aspect": "customs",
+  "initial": "Pending",
+  "states": {
+    "Pending": {"on": {"inspect": [{"target": "Cleared", "guard": "isCleared"}, {"target": "Held"}]}},
+    "Cleared": {"type": "final"},
+    "Held": {"type": "final"}
+  }
+}
+-- customs-same-states.json --
+{
+  "id": "customs", "_lifecycle_of": "Parcel", "_aspect": "customs",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"inspect": {"target": "Sealed"}}},
+    "Sealed": {"type": "final"}
+  }
+}
+-- customs-bad-aspect.json --
+{
+  "id": "customs", "_lifecycle_of": "Parcel", "_aspect": "the customs",
+  "initial": "Pending",
+  "states": {
+    "Pending": {"on": {"inspect": [{"target": "Cleared", "guard": "isCleared"}, {"target": "Held"}]}},
+    "Cleared": {"type": "final"},
+    "Held": {"type": "final"}
+  }
+}
+-- ops.json --
+{
+  "id": "ops", "_role": "operational", "_serves": ["entity:Parcel"], "_aspect": "queue",
+  "initial": "Idle",
+  "states": {"Idle": {"on": {"seal": {"target": "Idle"}}}}
+}

@@ -194,7 +194,14 @@ func (t *translator) bind(out *ir.Object) {
 	}
 	b := t.im.Bind[keys[0]]
 	if strings.TrimSpace(b.LifecycleOf) != "" {
+		if b.Aspect != "" && out.Has("_aspect") {
+			t.fail("_aspect is set in the source and by import.machines.bind %s; keep one", keys[0])
+			return
+		}
 		out.Set("_lifecycle_of", ir.StringValue(b.LifecycleOf))
+		if b.Aspect != "" {
+			out.Set("_aspect", ir.StringValue(b.Aspect))
+		}
 		return
 	}
 	ids := make([]*ir.Value, len(b.Serves))

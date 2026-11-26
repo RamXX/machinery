@@ -49,10 +49,12 @@ exec mrun 1 lint --stage xref-model-machine
 stdout '^  ERROR  machine-binding: ops: _lifecycle_of and _role: operational are both set; a machine is one or the other$'
 
 # a lifecycle machine serves its entity: _serves on it is an error
+mv design/machines/Order.machine.json order.keep
 cp lifecycle-serves.json design/machines/Ops.machine.json
 exec mrun 1 lint --stage xref-model-machine
 stdout '^  ERROR  machine-binding: ops: _serves is set on the lifecycle machine of Order; a lifecycle machine serves its entity: remove _serves, or set _role: operational$'
 stdout '^failed: 1 finding\(s\)$'
+mv order.keep design/machines/Order.machine.json
 
 # a binding finding is waivable by machine id, and the waived machine is still unbound
 cp ops-bare.json design/machines/Ops.machine.json
@@ -70,10 +72,20 @@ cp base.yaml machinery.yaml
 
 # _lifecycle_of binds a machine whose file name is not the entity name
 rm design/machines/Ops.machine.json
+mv design/machines/Order.machine.json order.keep
 cp alt.json design/machines/Alt.machine.json
 exec machinery lint --stage xref-model-machine
-stdout '^checked: 2 machines, 2 lifecycle machines, 0 operational machines, 6 domain states, 4 events, 2 actions, 1 entities with actions$'
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
 stdout '^passed$'
+
+# a second lifecycle machine of the entity is never accepted silently: without _aspect on each,
+# every machine after the first is a finding that names the first
+mv order.keep design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: order: a second lifecycle machine of Order, beside alt; several lifecycle machines of one entity are aspects of its lifecycle: set _aspect on each, a short name unique for Order$'
+! stdout 'machine-binding: alt'
+stdout '^  ERROR  state-enum: order: enum Status is already the state enum of alt; each aspect of Order needs an enum attribute of its own$'
+stdout '^failed: 2 finding\(s\)$'
 
 -- machinery.yaml --
 version: 2

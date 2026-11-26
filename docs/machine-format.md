@@ -44,6 +44,7 @@ enforces everything below, and an unknown key is an error, never silently skippe
 - **Callers.** `_requires` is a non-empty list of distinct, non-empty names.
 - **Serves.** `_serves` is a non-empty list of distinct `entity:<Name>` and
   `act:<Entity>.<action>` ids.
+- **Aspects.** `_aspect` is a short name matching `^[A-Za-z][A-Za-z0-9_-]*$`.
 - **Collisions.** Two machines may not share a case-id tag or a machine id.
 
 Name hints print as `warn   <file>: <message>` and never fail the stage (see "Failure idioms").
@@ -55,8 +56,8 @@ machine file. A file that cannot be parsed is an ERROR.
 ## The subset
 
 - **Root keys:** `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, and the
-  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_serves`, `_oracle_tag`, `_guards`,
-  `_external_events`, `_failure_events`, `_entries`.
+  annotations `_comment`, `_delays`, `_lifecycle_of`, `_aspect`, `_role`, `_serves`, `_oracle_tag`,
+  `_guards`, `_external_events`, `_failure_events`, `_entries`.
 - **State keys:** `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`, `id`,
   `meta`, `description`, `tags`, `onDone`, `output`, and the annotations `_comment`, `_exhaustive`,
   `_ignores`, `_refusal`, `_terminal`.
@@ -141,6 +142,12 @@ Every machine binds to the model, as one of two kinds (`docs/formats.md` section
 - an **operational machine**: `_role: "operational"`, for example a command-execution envelope,
   with `_serves` naming what it exists for.
 
+An entity whose state lives in more than one attribute (an order's payment and its delivery, a
+parcel and its customs check) may have one lifecycle machine per attribute: each is an
+**aspect** of the lifecycle and declares `_aspect`, a short name unique for the entity. Each
+aspect's domain states are the values of an enum of its own, and every action of the entity is
+an event of at least one aspect. A second lifecycle machine without `_aspect` is an error.
+
 `machinery lint` reports a machine that binds to nothing (rule `machine-binding`), and an entity
 that declares actions and has no lifecycle machine (rule `entity-machine`; an entity with no
 state of its own is waived, with the reason).
@@ -181,6 +188,12 @@ machine exists for, each `entity:<Name>` or `act:<Entity>.<action>`, none twice:
 `"_serves": ["act:Order.pay", "act:Order.ship"]` for an envelope that runs those commands. Stage
 `machines` holds the shape; stage `xref-model-machine` holds that each id is in the model. It is
 an error on a lifecycle machine, which serves its entity.
+
+**`_aspect`** (root, optional). A short name, `^[A-Za-z][A-Za-z0-9_-]*$`, on a lifecycle machine
+that holds one aspect of its entity's lifecycle: `"_aspect": "scan"`. Two lifecycle machines of
+one entity both declare it, with different names. Stage `machines` holds the shape; stage
+`xref-model-machine` holds the rest (`docs/formats.md` section 6.4). It is an error on an
+operational machine.
 
 **`_failure_events`** (root, optional). An array of event names that report a failure arriving
 from outside: a dependency failed, a crash was detected, a lease was lost. The shape and the

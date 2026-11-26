@@ -15,6 +15,12 @@ grep '"_lifecycle_of": "Loan",' design/gen/imported/machines/loan_desk.machine.j
 grep '"_lifecycle_of": "Loan"' design/gen/imported/machines/annex.machine.json
 ! grep '_role' design/gen/imported/machines/annex.machine.json
 
+# an entry with aspect adds _aspect after _lifecycle_of: the desk and the annex are two aspects
+# of the lifecycle of Loan, each with its own state enum
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/loan_desk.machine.json > desk.flat'
+grep '"_lifecycle_of":"Loan","_aspect":"desk","_oracle_tag":' desk.flat
+grep '"_aspect": "annex"' design/gen/imported/machines/annex.machine.json
+
 # a machine with no binding, from its source or from bind, is reported like any other
 cp stray.json machines/stray.json
 exec mrun 1 lint --stage xref-model-machine
@@ -49,7 +55,17 @@ exec mrun 1 lint --stage machines
 stdout '^  ERROR  import.machines.bind ghost_desk: matches no machine file and no machine id$'
 stdout '^failed: 1 finding\(s\)$'
 
+# an aspect from the source and from an entry is one too many
+cp config.yaml machinery.yaml
+cp desk-facet.json machines/loans/desk-main.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loans/desk-main\.json: _aspect is set in the source and by import.machines.bind machines/loans/desk-\*\.json; keep one$'
+stdout '^failed: 1 finding\(s\)$'
+
 # a malformed entry is a config error
+cp config-aspect.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.bind.hold_queue: aspect needs lifecycle_of; an aspect is part of an entity''s lifecycle$'
 cp config-both.yaml machinery.yaml
 exec mrun 2 lint
 stderr '^config: import.machines.bind.hold_queue: set lifecycle_of or serves, not both$'
@@ -76,10 +92,10 @@ import:
     files: ["machines/**/*.json"]
     states: capitalize
     rename:
-      root: {entity: _lifecycle_of}
+      root: {entity: _lifecycle_of, facet: _aspect}
       state: {skip: _ignores}
     bind:
-      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      "machines/loans/desk-*.json": {lifecycle_of: Loan, aspect: desk}
       hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
 -- config-self.yaml --
 version: 2
@@ -91,10 +107,10 @@ import:
     files: ["machines/**/*.json"]
     states: capitalize
     rename:
-      root: {entity: _lifecycle_of}
+      root: {entity: _lifecycle_of, facet: _aspect}
       state: {skip: _ignores}
     bind:
-      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      "machines/loans/desk-*.json": {lifecycle_of: Loan, aspect: desk}
       "machines/loans/annex.json": {lifecycle_of: Loan}
       hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
 -- config-two.yaml --
@@ -107,10 +123,10 @@ import:
     files: ["machines/**/*.json"]
     states: capitalize
     rename:
-      root: {entity: _lifecycle_of}
+      root: {entity: _lifecycle_of, facet: _aspect}
       state: {skip: _ignores}
     bind:
-      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      "machines/loans/desk-*.json": {lifecycle_of: Loan, aspect: desk}
       "machines/h*.json": {serves: ["entity:Loan"]}
       hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
 -- config-ghost.yaml --
@@ -123,10 +139,10 @@ import:
     files: ["machines/**/*.json"]
     states: capitalize
     rename:
-      root: {entity: _lifecycle_of}
+      root: {entity: _lifecycle_of, facet: _aspect}
       state: {skip: _ignores}
     bind:
-      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      "machines/loans/desk-*.json": {lifecycle_of: Loan, aspect: desk}
       hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
       ghost_desk: {lifecycle_of: Loan}
 -- config-both.yaml --
@@ -173,11 +189,16 @@ enums:
     values:
       - {name: Shelved, definition: "On the shelf."}
       - {name: Lent, definition: "With a member."}
+  AnnexStatus:
+    values:
+      - {name: Open, definition: "The annex copy is in."}
+      - {name: Closed, definition: "The annex copy is out."}
 entities:
   Loan:
     definition: "One copy lent to one member."
     attributes:
       - {name: status, type: LoanStatus}
+      - {name: annex, type: AnnexStatus}
     actions:
       - {name: lend, actor: Librarian}
       - {name: giveBack, actor: Member}
@@ -200,6 +221,23 @@ entities:
 {
   "id": "annex",
   "entity": "Loan",
+  "facet": "annex",
+  "initial": "open",
+  "states": {
+    "open": {
+      "on": {"lend": {"target": "closed"}},
+      "skip": {"giveBack": "nothing is lent from the annex; the desk refuses with NOT_LENT"}
+    },
+    "closed": {
+      "on": {"giveBack": {"target": "open"}},
+      "skip": {"lend": "the annex lends one copy at a time; the desk refuses with ANNEX_BUSY"}
+    }
+  }
+}
+-- desk-facet.json --
+{
+  "id": "loan-desk",
+  "facet": "front",
   "initial": "shelved",
   "states": {
     "shelved": {
@@ -212,6 +250,13 @@ entities:
     }
   }
 }
+-- config-aspect.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    bind:
+      hold_queue: {aspect: queue, serves: ["entity:Loan"]}
 -- machines/hold-queue.json --
 {
   "id": "hold-queue",

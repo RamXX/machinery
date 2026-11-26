@@ -68,6 +68,7 @@ import:                         # optional: design sources kept in the project's
       transition: {allowed: _requires, denied: _refusal}
     bind:                       # optional: what a machine binds to in the model (section 5.2.1)
       "machines/loan*.json": {lifecycle_of: Loan}       # a glob of source files, or
+      "machines/loan-fines.json": {lifecycle_of: Loan, aspect: fines}   # one aspect of a lifecycle
       hold_queue: {serves: ["act:Loan.lend"]}            # a machine id
   failure_modes:                # optional: a failure-mode catalog kept as Markdown tables (section 5.4.1)
     file: docs/risks.md         # required
@@ -143,7 +144,9 @@ Rules:
   are an empty `import.machines.files` (`import.machines.files is required`), a `states` value
   other than `capitalize` or `keep`, and an empty key or name in `rename`.
   `import.machines.bind` maps a glob of source files or a machine id to exactly one of
-  `lifecycle_of` (an entity name) and `serves` (a non-empty list of model ids): an empty key or
+  `lifecycle_of` (an entity name, with an optional `aspect`, section 5.2) and `serves` (a
+  non-empty list of model ids): an `aspect` without `lifecycle_of`
+  (`import.machines.bind.<key>: aspect needs lifecycle_of; an aspect is part of an entity's lifecycle`), an empty key or
   one that is not a valid glob (`import.machines.bind: "<key>" is not a valid glob`), an entry
   with both or neither (`import.machines.bind.<key>: set lifecycle_of or serves, not both`,
   `import.machines.bind.<key>: set lifecycle_of or serves`) and an empty id in `serves`
@@ -355,6 +358,12 @@ Every machine binds to the model, as one of:
 A machine that binds to nothing is a finding of stage `xref-model-machine` (section 6.4): no
 cross-check is skipped because nothing says what a machine is for.
 
+An entity has one lifecycle machine, or several that are **aspects** of one lifecycle: each
+declares the root `_aspect: "<name>"`, a short name unique among the lifecycle machines of that
+entity, and holds the states of a state attribute of its own (an order's payment and its
+delivery, a parcel and its customs check). A second lifecycle machine without `_aspect` is a
+finding, never accepted silently.
+
 In a lifecycle machine, top-level states whose name starts with an uppercase letter are **domain
 states**. States whose name starts with a lowercase letter are transient overlay states.
 
@@ -420,11 +429,14 @@ is generated, never a source, and is not read):
 5. **Binding.** The translation never invents a binding. A result that has `_lifecycle_of`,
    `_role` or `_serves` binds itself and is kept as it is. Any other is bound by the entry of
    `import.machines.bind` whose key is its machine id or a glob that matches its source file:
-   `lifecycle_of: <Entity>` adds `_lifecycle_of`, and `serves: [<ids>]` adds
-   `_role: "operational"` and `_serves`. A machine with no binding, from its source or from
-   `bind`, is reported by `machine-binding` like any other (section 6.4). Then:
+   `lifecycle_of: <Entity>` adds `_lifecycle_of` (and `aspect: <name>` adds `_aspect` after it),
+   and `serves: [<ids>]` adds `_role: "operational"` and `_serves`. A machine with no binding,
+   from its source or from `bind`, is reported by `machine-binding` like any other (section 6.4).
+   Then:
    - A machine that binds itself and is matched by an entry is
      `ERROR  <file>: bound in the source and by import.machines.bind <key>; keep one`.
+   - An entry with `aspect` for a machine whose source has `_aspect` is
+     `ERROR  <file>: _aspect is set in the source and by import.machines.bind <key>; keep one`.
    - A machine matched by two entries is
      `ERROR  <file>: import.machines.bind <a> and <b> both match; keep one` (the first two
      keys, in sorted order), and none is applied.
@@ -564,8 +576,10 @@ delays, reachability from the initial state and from every entry state (`_entrie
 absorbing states unless declared `_terminal`, every invoke has `onError` and a timeout, event
 completeness on resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`),
 fail-closed tags, no state tagged both `failure` and `accepting`, and the shape of `_requires`,
-`_entries`, `_terminal`, `_external_events`, `_failure_events` and `_serves` (a non-empty list of
-distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is section 6.4). Two machines whose id tags
+`_entries`, `_terminal`, `_external_events`, `_failure_events`, `_serves` (a non-empty list of
+distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is section 6.4) and
+`_aspect` (a short name matching `^[A-Za-z][A-Za-z0-9_-]*$`; which machines may declare it is
+section 6.4). Two machines whose id tags
 collide (section 7.2), or that share a machine `id`, are an ERROR.
 
 Name hints are warnings and never fail the stage. A state whose name contains, case-insensitively,
@@ -594,10 +608,10 @@ For every machine, and every entity of the models:
 
 | Rule | Check |
 |---|---|
-| `machine-binding` | The machine binds to the model (section 5.2): it is the lifecycle machine of an existing entity, or an operational machine whose `_serves` names only entities and actions of the model. |
-| `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). When no candidate has a value in D, the finding says that E has no state enum for the machine and names no enum. An entity with no enum-typed attribute at all is one finding for the entity, whatever the number of its lifecycle machines. |
+| `machine-binding` | The machine binds to the model (section 5.2): it is the lifecycle machine of an existing entity, or an operational machine whose `_serves` names only entities and actions of the model. An entity has one lifecycle machine, or several that each declare a different `_aspect`. |
+| `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). When no candidate has a value in D, the finding says that E has no state enum for the machine and names no enum. An entity with no enum-typed attribute at all is one finding for the entity, whatever the number of its lifecycle machines. With aspects, each aspect machine is matched against an enum of its own: an enum that exactly matches one machine is that machine's, and no enum is the state enum of two machines (a machine that matches only an enum another one holds is a finding, and the enums other aspects hold are left out of its candidates). |
 | `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. |
-| `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine. |
+| `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine, or, with aspects, in at least one of them. |
 | `entity-machine` | Every entity that declares at least one action has a lifecycle machine. An entity that has no state of its own is waived, with the reason. |
 
 The findings of `machine-binding`:
@@ -610,6 +624,11 @@ The findings of `machine-binding`:
 - `machine-binding: <id>: _serves names <x>, which is not an entity or an action of the model`, once
   per such entry.
 - `machine-binding: <id>: _serves is set on the lifecycle machine of <E>; a lifecycle machine serves its entity: remove _serves, or set _role: operational`
+- `machine-binding: <id>: a second lifecycle machine of <E>, beside <first>; several lifecycle machines of one entity are aspects of its lifecycle: set _aspect on each, a short name unique for <E>`:
+  an entity has more than one lifecycle machine and not every one declares `_aspect`. Every
+  machine after the first, in machine order, is reported, naming the first.
+- `machine-binding: <id>: _aspect <name> is also the aspect of <other>; the aspects of <E> need different names`
+- `machine-binding: <id>: _aspect is set on an operational machine; an aspect is part of an entity's lifecycle: remove _aspect, or bind the machine with _lifecycle_of`
 
 and of `entity-machine`:
 `entity-machine: entity:<E>: declares <n> action(s) and no machine is its lifecycle; write its lifecycle machine (_lifecycle_of: <E>), or waive the rule with the reason it has no state`.
@@ -618,6 +637,8 @@ The findings of `state-enum` and `event-action` that stand for a whole entity or
 
 - `state-enum: entity:<E>: has no state enum (no attribute of <E> has an enum type); the domain states of <id> (<states>) need one`;
 - `state-enum: <id>: entity <E> has no state enum for this machine: no enum of its attributes (<enums>) has a value among the domain states (<states>); add an enum attribute with these values`;
+- `state-enum: <id>: enum <X> is already the state enum of <other>; each aspect of <E> needs an enum attribute of its own`, and
+  `state-enum: <id>: entity <E> has no state enum for this machine: every enum of its attributes is the state enum of another aspect; add an enum attribute with the domain states (<states>)`;
 - `event-action: entity:<E>: declares no actions, so none of the <n> event(s) of <id> is one of its actions (<events>); add the actions to the model, or list the events in _external_events (or in _failure_events when one reports a failure)`.
 
 `<states>` and `<events>` are sorted and comma-separated.

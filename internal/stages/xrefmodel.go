@@ -74,6 +74,48 @@ func bindingOf(d *design.Design, m *machine.Machine) binding {
 	return b
 }
 
+// bindingsOf returns the binding of every machine, in machine order, with
+// the findings that need the other machines: an entity has one lifecycle
+// machine, or several that each name a different _aspect (section 5.2).
+func bindingsOf(d *design.Design) []binding {
+	bs := make([]binding, len(d.Machines))
+	count := map[string]int{}
+	for i, m := range d.Machines {
+		bs[i] = bindingOf(d, m)
+		if bs[i].operational && m.Aspect != "" {
+			bs[i].problems = append(bs[i].problems, "_aspect is set on an operational machine; an aspect is part of an entity's lifecycle: remove _aspect, or bind the machine with _lifecycle_of")
+		}
+		if e := bs[i].entity; e != nil {
+			count[e.Name]++
+		}
+	}
+	first := map[string]*machine.Machine{}
+	aspects := map[string]map[string]*machine.Machine{}
+	for i, m := range d.Machines {
+		e := bs[i].entity
+		if e == nil || count[e.Name] < 2 {
+			continue
+		}
+		f := first[e.Name]
+		if f == nil {
+			first[e.Name] = m
+			aspects[e.Name] = map[string]*machine.Machine{}
+		}
+		if m.Aspect == "" || (f != nil && f.Aspect == "") {
+			if f != nil {
+				bs[i].problems = append(bs[i].problems, fmt.Sprintf("a second lifecycle machine of %s, beside %s; several lifecycle machines of one entity are aspects of its lifecycle: set _aspect on each, a short name unique for %s", e.Name, f.ID, e.Name))
+			}
+			continue
+		}
+		if other := aspects[e.Name][m.Aspect]; other != nil {
+			bs[i].problems = append(bs[i].problems, fmt.Sprintf("_aspect %s is also the aspect of %s; the aspects of %s need different names", m.Aspect, other.ID, e.Name))
+			continue
+		}
+		aspects[e.Name][m.Aspect] = m
+	}
+	return bs
+}
+
 // servesResolves reports whether a _serves id names an entity or an action
 // of the model.
 func servesResolves(d *design.Design, id string) bool {
@@ -113,8 +155,9 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 	c.machines = len(d.Machines)
 	var groups []*lifecycleGroup
 	byEntity := map[string]*lifecycleGroup{}
-	for _, m := range d.Machines {
-		b := bindingOf(d, m)
+	bs := bindingsOf(d)
+	for i, m := range d.Machines {
+		b := bs[i]
 		for _, p := range b.problems {
 			fs.add(ruleMachineBinding, m.ID, "%s", p)
 		}
@@ -262,9 +305,8 @@ func XrefModelMachine(ctx *Context) *report.Stage {
 // not (section 6.4); a waiver does not bind a machine. Every machine is
 // unbound when there is no model.
 func BindingCounts(ctx *Context) (bound, unbound int) {
-	d := ctx.Design()
-	for _, m := range d.Machines {
-		if bindingOf(d, m).bound() {
+	for _, b := range bindingsOf(ctx.Design()) {
+		if b.bound() {
 			bound++
 		} else {
 			unbound++
@@ -397,7 +439,9 @@ func enumCands(model *design.Model, e *design.Entity, domain []string) []enumCan
 
 // checkStateEnum applies the state-enum rule to the lifecycle machines of
 // one entity. An entity with no enum-typed attribute is one finding, not one
-// per machine.
+// per machine. Aspect machines each have an enum of their own: an enum whose
+// values are the domain states of one machine is claimed by it, and no enum
+// is claimed twice.
 func checkStateEnum(fs *xfindings, d *design.Design, g *lifecycleGroup) {
 	e := g.entity
 	_, model := design.FindEntity(d.Models, e.Name)
@@ -413,33 +457,77 @@ func checkStateEnum(fs *xfindings, d *design.Design, g *lifecycleGroup) {
 		fs.add("state-enum", "entity:"+e.Name, "has no state enum (no attribute of %s has an enum type); the domain states of %s %s", e.Name, strings.Join(parts, " and of "), need)
 		return
 	}
-	for _, m := range g.machines {
-		domain := domainStates(m)
-		cands := enumCands(model, e, domain)
-		var exact []string
-		for _, c := range cands {
+	cands := make([][]enumCand, len(g.machines))
+	exact := make([][]string, len(g.machines))
+	for i, m := range g.machines {
+		cands[i] = enumCands(model, e, domainStates(m))
+		for _, c := range cands[i] {
 			if c.exact {
-				exact = append(exact, c.name)
+				exact[i] = append(exact[i], c.name)
 			}
 		}
-		switch {
-		case len(exact) == 1:
-			continue
-		case len(exact) > 1:
-			sort.Strings(exact)
-			fs.add("state-enum", m.ID, "more than one enum of %s has the domain states of the machine: %s", e.Name, strings.Join(exact, ", "))
+		sort.Strings(exact[i])
+	}
+	claimed := map[string]*machine.Machine{}
+	done := make([]bool, len(g.machines))
+	// a machine with exactly one exact enum claims it first
+	for i, m := range g.machines {
+		if len(exact[i]) != 1 {
 			continue
 		}
-		sort.SliceStable(cands, func(i, j int) bool {
-			if cands[i].overlap != cands[j].overlap {
-				return cands[i].overlap > cands[j].overlap
+		done[i] = true
+		en := exact[i][0]
+		if other := claimed[en]; other != nil {
+			fs.add("state-enum", m.ID, "enum %s is already the state enum of %s; each aspect of %s needs an enum attribute of its own", en, other.ID, e.Name)
+			continue
+		}
+		claimed[en] = m
+	}
+	for i, m := range g.machines {
+		if done[i] || len(exact[i]) == 0 {
+			continue
+		}
+		done[i] = true
+		var free []string
+		for _, en := range exact[i] {
+			if claimed[en] == nil {
+				free = append(free, en)
 			}
-			return cands[i].name < cands[j].name
+		}
+		switch len(free) {
+		case 1:
+			claimed[free[0]] = m
+		case 0:
+			fs.add("state-enum", m.ID, "enum %s is already the state enum of %s; each aspect of %s needs an enum attribute of its own", exact[i][0], claimed[exact[i][0]].ID, e.Name)
+		default:
+			fs.add("state-enum", m.ID, "more than one enum of %s has the domain states of the machine: %s", e.Name, strings.Join(free, ", "))
+		}
+	}
+	for i, m := range g.machines {
+		if done[i] {
+			continue
+		}
+		domain := domainStates(m)
+		var open []enumCand
+		for _, c := range cands[i] {
+			if claimed[c.name] == nil {
+				open = append(open, c)
+			}
+		}
+		if len(open) == 0 {
+			fs.add("state-enum", m.ID, "entity %s has no state enum for this machine: every enum of its attributes is the state enum of another aspect; add an enum attribute with the domain states (%s)", e.Name, strings.Join(domain, ", "))
+			continue
+		}
+		sort.SliceStable(open, func(i, j int) bool {
+			if open[i].overlap != open[j].overlap {
+				return open[i].overlap > open[j].overlap
+			}
+			return open[i].name < open[j].name
 		})
-		c := cands[0]
+		c := open[0]
 		if c.overlap == 0 {
 			var names []string
-			for _, cd := range cands {
+			for _, cd := range open {
 				names = append(names, cd.name)
 			}
 			sort.Strings(names)
