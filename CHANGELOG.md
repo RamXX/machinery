@@ -47,6 +47,19 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - `adopt --rehearse`: adoption on a snapshot outside the project, with what it writes and owes,
   the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
   generation.
+- `import.machines.annotate`: for a dialect that has no key for them, the config says which
+  events arrive from outside, which report a failure, which states record one (names and `*`
+  patterns) and which event is a model action under another name. A pattern that matches nothing
+  is an error, and a pattern of `*` only is refused. The native annotation `_aliases` carries
+  the last one, and rules `event-action` and `action-event` read an aliased event as its action.
+  An alias hides nothing: an event that is an action takes none, an action with an event of its
+  own name is the action of none, and stage `xref-model-machine` prints and counts every alias.
+- Rule `event-action` reports an event listed in `_external_events` or `_failure_events` that is
+  an action of the model: an action is a caller's command. For an operational machine every
+  action of the entities behind what it serves counts, for a listed and for an aliased event.
+- The name hint about a failure-looking name is dismissed by name, with a reason, in the root
+  `_not_failures` (`not_failures` in `import.machines.annotate`). Listing an event as external
+  or giving it an alias does not stop it, and a dismissal that dismisses no hint is an error.
 
 ### Carried forward from v1
 

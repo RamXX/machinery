@@ -142,6 +142,8 @@ func servesResolves(d *design.Design, id string) bool {
 // xrefCounts is what the stage reports as checked.
 type xrefCounts struct {
 	machines, lifecycle, operational, states, events, actions, withActions int
+	// aliases holds one line per alias in effect (section 6.4)
+	aliases []string
 }
 
 // lifecycleGroup is an entity with its lifecycle machines, in machine order.
@@ -164,7 +166,7 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 		if b.operational {
 			c.operational++
 			if len(b.problems) == 0 {
-				c.events += checkOperationalEvents(&fs, d, m)
+				c.events += checkOperationalEvents(&fs, &c.aliases, d, m)
 			}
 			continue
 		}
@@ -186,7 +188,7 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 			c.states += len(domainStates(m))
 		}
 		checkStateEnum(&fs, d, g)
-		c.events += checkLifecycleEvents(&fs, g)
+		c.events += checkLifecycleEvents(&fs, &c.aliases, g)
 		c.actions += len(g.entity.Actions)
 	}
 	for _, md := range d.Models {
@@ -205,20 +207,100 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 
 // externalEvents returns the events a machine declares as arriving from
 // outside: _external_events and _failure_events (a failure event arrives
-// from outside). A list of the wrong shape is a finding of event-action.
-func externalEvents(fs *xfindings, m *machine.Machine) map[string]bool {
-	external, ok := eventSet(m, "_external_events")
-	if !ok {
-		fs.add("event-action", m.ID, "_external_events must be a list of event names")
-	}
-	failure, ok := eventSet(m, "_failure_events")
-	if !ok {
-		fs.add("event-action", m.ID, "_failure_events must be a list of event names")
-	}
-	for ev := range failure {
-		external[ev] = true
+// from outside). A list of the wrong shape is a finding of event-action,
+// and so is a listed event that is an action (entityOf names the entity of
+// every action the machine could be asked for): an action is a caller's
+// command, and no list hides one. The finding says where the event is
+// listed: the entry of import.machines.annotate that added it, or the file.
+func externalEvents(fs *xfindings, m *machine.Machine, entityOf map[string]string) map[string]bool {
+	external := map[string]bool{}
+	for _, key := range []string{"_external_events", "_failure_events"} {
+		set, ok := eventSet(m, key)
+		if !ok {
+			fs.add("event-action", m.ID, "%s must be a list of event names", key)
+		}
+		for _, ev := range sortedNames(set) {
+			if external[ev] {
+				continue // in both lists: stage machines reports it
+			}
+			external[ev] = true
+			if ent, isAction := entityOf[ev]; isAction {
+				where := fmt.Sprintf("remove it from %s in %s", key, m.Path)
+				if by := m.Listed[key+" "+ev]; by != "" {
+					where = by + "; narrow the pattern or remove it"
+				}
+				fs.add("event-action", m.ID+"."+ev, "listed in %s and an action of %s; an action is a caller's command, not an event from outside: %s", key, ent, where)
+			}
+		}
 	}
 	return external
+}
+
+// eventSetOf returns the events a machine handles under on.
+func eventSetOf(m *machine.Machine) map[string]bool {
+	set := map[string]bool{}
+	for _, ev := range m.Table.Events() {
+		set[ev] = true
+	}
+	return set
+}
+
+func sortedNames(set map[string]bool) []string {
+	res := make([]string, 0, len(set))
+	for n := range set {
+		res = append(res, n)
+	}
+	sort.Strings(res)
+	return res
+}
+
+// aliasRules is what the aliases of a machine are held to (section 6.4).
+type aliasRules struct {
+	entityOf map[string]string // every action behind the machine, with its entity: none takes an alias
+	isAction map[string]bool   // the actions an alias may name
+	of       string            // what those are the actions of
+	missing  string            // what to do about an action that is not one
+	ownIn    map[string]string // an action that has an on event of its own name, with the machine that has it
+	handled  map[string]bool   // the events the machine handles under on
+}
+
+// aliasedEvents returns the events of a machine that are an action under
+// another name (_aliases), each with its action, for the ones that hold: the
+// event is no action of any entity behind the machine, the action is one an
+// alias may name, and that action has no event of its own name. The others
+// are findings of event-action. Every alias that holds is a line of lines:
+// none is silent.
+func aliasedEvents(fs *xfindings, lines *[]string, m *machine.Machine, r aliasRules) (valid map[string]string, all map[string]bool) {
+	valid, all = map[string]string{}, map[string]bool{}
+	aliases := m.Aliases()
+	evs := make([]string, 0, len(aliases))
+	for ev := range aliases {
+		evs = append(evs, ev)
+	}
+	sort.Strings(evs)
+	for _, ev := range evs {
+		act := aliases[ev]
+		all[ev] = true
+		where := "remove it from _aliases in " + m.Path
+		if by := m.Listed["_aliases "+ev]; by != "" {
+			where = by
+		}
+		ent, evIsAction := r.entityOf[ev]
+		switch {
+		case evIsAction:
+			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and %s is itself an action of %s; an action is not hidden behind another: %s", act, ev, ent, where)
+		case !r.isAction[act]:
+			fs.add("event-action", m.ID+"."+ev, "_aliases names action %s, which is not an action of %s; %s, or %s", act, r.of, r.missing, where)
+		case !r.handled[ev]:
+			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and no state handles %s under on; an event that is only ignored stands for no action: %s", act, ev, where)
+		case r.ownIn[act] != "":
+			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and %s has an event of its own name in %s; an action has its own event or stands behind aliases, not both: %s", act, act, r.ownIn[act], where)
+		default:
+			valid[ev] = act
+			*lines = append(*lines, fmt.Sprintf("alias: %s: %s stands for %s", m.ID, ev, act))
+		}
+	}
+	return valid, all
 }
 
 // checkOperationalEvents applies event-action to an operational machine
@@ -226,13 +308,24 @@ func externalEvents(fs *xfindings, m *machine.Machine) map[string]bool {
 // an action of an entity it serves, the action of an act id it serves, or
 // declared external. A machine that serves only entities with no action
 // compared nothing, and that is one finding, not one per event.
-func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine) int {
+func checkOperationalEvents(fs *xfindings, aliasLines *[]string, d *design.Design, m *machine.Machine) int {
 	serves, _ := m.Serves()
 	allowed := map[string]bool{}
+	// entityOf holds every action of every entity behind what the machine
+	// serves, the entity of an act id too: none of them is external
+	entityOf := map[string]string{}
 	anyAction := false
 	var bare []string
 	for _, id := range serves {
 		kind, name, _ := strings.Cut(id, ":")
+		entName, _, _ := strings.Cut(name, ".")
+		if e, _ := design.FindEntity(d.Models, entName); e != nil {
+			for _, a := range e.Actions {
+				if _, have := entityOf[a.Name]; !have {
+					entityOf[a.Name] = e.Name
+				}
+			}
+		}
 		switch kind {
 		case "entity":
 			e, _ := design.FindEntity(d.Models, name)
@@ -252,11 +345,17 @@ func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine)
 			anyAction = true
 		}
 	}
-	external := externalEvents(fs, m)
+	of := fmt.Sprintf("what the machine serves (%s)", strings.Join(serves, ", "))
+	external := externalEvents(fs, m, entityOf)
 	evs := m.Table.Events()
+	ownIn := map[string]string{}
+	for _, ev := range evs {
+		ownIn[ev] = m.ID
+	}
+	_, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: allowed, of: of, missing: "serve the action (act:<Entity>.<action>)", ownIn: ownIn, handled: eventSetOf(m)})
 	var unmatched []string
 	for _, ev := range evs {
-		if !allowed[ev] && !external[ev] {
+		if !allowed[ev] && !external[ev] && !aliased[ev] {
 			unmatched = append(unmatched, ev)
 		}
 	}
@@ -278,23 +377,41 @@ func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine)
 // lifecycle machines of one entity and returns how many events they have.
 // An entity that declares no action is one finding, not one per event: the
 // one missing declaration is the cause of all of them.
-func checkLifecycleEvents(fs *xfindings, g *lifecycleGroup) (events int) {
+func checkLifecycleEvents(fs *xfindings, aliasLines *[]string, g *lifecycleGroup) (events int) {
 	e := g.entity
 	acts := map[string]bool{}
 	for _, a := range e.Actions {
 		acts[a.Name] = true
 	}
+	entityOf := map[string]string{}
+	for _, a := range e.Actions {
+		entityOf[a.Name] = e.Name
+	}
 	evSet := map[string]bool{}
 	var unmatched, ids []string
 	seen := map[string]bool{}
+	// an action with an on event of its own name, in any lifecycle machine
+	// of the entity, with the first machine that has it
+	ownIn := map[string]string{}
 	for _, m := range g.machines {
-		external := externalEvents(fs, m)
+		for _, ev := range m.Table.Events() {
+			if ownIn[ev] == "" {
+				ownIn[ev] = m.ID
+			}
+		}
+	}
+	for _, m := range g.machines {
+		external := externalEvents(fs, m, entityOf)
+		alias, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: acts, of: e.Name, missing: "name an action of " + e.Name, ownIn: ownIn, handled: eventSetOf(m)})
 		evs := m.Table.Events()
 		events += len(evs)
 		ids = append(ids, m.ID)
 		for _, ev := range evs {
 			evSet[ev] = true
-			if acts[ev] || external[ev] {
+			if act, ok := alias[ev]; ok {
+				evSet[act] = true // the event is that action under another name
+			}
+			if acts[ev] || external[ev] || aliased[ev] {
 				continue
 			}
 			if len(e.Actions) > 0 {
@@ -345,8 +462,14 @@ func XrefModelMachine(ctx *Context) *report.Stage {
 		w.find(s, f.rule, f.subject, "%s", f.msg)
 	}
 	w.stale(s)
+	for _, line := range c.aliases {
+		s.Warnf("%s", line)
+	}
 	s.Count(c.machines, "machines").Count(c.lifecycle, "lifecycle machines").Count(c.operational, "operational machines").
 		Count(c.states, "domain states").Count(c.events, "events").Count(c.actions, "actions").Count(c.withActions, "entities with actions")
+	if len(c.aliases) > 0 {
+		s.Count(len(c.aliases), "aliases")
+	}
 	if len(d.Machines) == 0 && len(d.MachineProblems) == 0 {
 		s.NotDemonstrated("nothing to check")
 	}

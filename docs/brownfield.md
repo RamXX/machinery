@@ -139,6 +139,20 @@ rest. `states: pascal` turns `on_hold` into the domain state `OnHold`;
 the states it is never left in; and a register that lists the transitions your code makes
 (`import.machines.register`) is checked both ways against the machines.
 
+**Say which events are not caller actions.** A dialect of your own rarely has a key for it, and
+you do not have to add one to every file. `import.machines.annotate` says it per glob of files
+or per machine id: `external_events` for what arrives from outside the caller (a timer, a
+callback, another machine), `failure_events` and `failure_states` for what reports and records
+a failure, each a list of names and `*` patterns (`"*_refused"`, `"*_failed"`), and `aliases`
+for an event that is a model action under another name (`handed_back: giveBack`). The
+"not an action" findings stop for the names you declare, and the "looks like a failure" warnings
+for the failures you declare. An external or aliased event whose name looks like a failure is
+still hinted: list it in `failure_events`, or dismiss the hint by name in `not_failures`, with
+the reason. A pattern that matches nothing in a machine it is applied to is an error, a pattern
+of `*` only is refused, and an event that is an action of the model stays a finding whether you
+list it as external or give it an alias: the config cannot hide a command. Every alias in effect
+is a line of `xref-model-machine`, so the list of names you bridged stays in view.
+
 ## 6. Turn what is owed into stories, beside the ones you have
 
 ```sh

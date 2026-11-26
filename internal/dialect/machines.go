@@ -18,10 +18,13 @@ import (
 
 // Machine is one translated machine file.
 type Machine struct {
-	Source      string // project-relative path of the source file
-	ID          string // the machine id
-	Original    string // the original id: the root id, or the file name
-	Bytes       []byte // the translated machine
+	Source   string // project-relative path of the source file
+	ID       string // the machine id
+	Original string // the original id: the root id, or the file name
+	Bytes    []byte // the translated machine
+	// Listed says, for an event import.machines.annotate added to a root
+	// list ("<list key> <event>"), which entry and pattern did.
+	Listed      map[string]string
 	SourceBytes []byte
 }
 
@@ -42,7 +45,8 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 	}
 	gen := strings.TrimSuffix(p.Cfg.Design.Gen, "/") + "/"
 	byID := map[string]string{}
-	used := map[string]bool{} // the bind keys that match a machine
+	used := map[string]bool{}      // the bind keys that match a machine
+	annotated := map[string]bool{} // the annotate keys that match a machine
 	for _, f := range files {
 		if strings.HasPrefix(f, gen) || f == im.RegisterFile() {
 			continue // generated, or the register: never a machine
@@ -50,6 +54,11 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 		for _, k := range im.BindKeys() {
 			if project.Match([]string{k}, f) {
 				used[k] = true
+			}
+		}
+		for _, k := range im.AnnotateKeys() {
+			if project.Match([]string{k}, f) {
+				annotated[k] = true
 			}
 		}
 		data, err := p.Read(f)
@@ -66,7 +75,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 			problems = append(problems, f+": machine must be a JSON object")
 			continue
 		}
-		t := &translator{src: f, rename: im.Rename, mode: im.States, im: im, used: used}
+		t := &translator{src: f, rename: im.Rename, mode: im.States, im: im, used: used, annotated: annotated}
 		out := t.machine(root.AsObject())
 		problems = append(problems, t.problems...)
 		if first, dup := byID[t.id]; dup {
@@ -79,11 +88,16 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 			problems = append(problems, fmt.Sprintf("%s: %v", f, err))
 			continue
 		}
-		ms = append(ms, Machine{Source: f, ID: t.id, Original: t.origID, Bytes: b, SourceBytes: data})
+		ms = append(ms, Machine{Source: f, ID: t.id, Original: t.origID, Bytes: b, SourceBytes: data, Listed: t.listed})
 	}
 	for _, k := range im.BindKeys() {
 		if !used[k] {
 			problems = append(problems, fmt.Sprintf("import.machines.bind %s: matches no machine file and no machine id", k))
+		}
+	}
+	for _, k := range im.AnnotateKeys() {
+		if !annotated[k] {
+			problems = append(problems, fmt.Sprintf("import.machines.annotate %s: matches no machine file and no machine id; correct the key or remove the entry", k))
 		}
 	}
 	return ms, problems
@@ -91,11 +105,18 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 
 // translator turns one source machine into a native one.
 type translator struct {
-	src      string
-	rename   project.Rename
-	mode     string // the states setting: how state names are written
-	im       *project.ImportMachines
-	used     map[string]bool // bind keys that matched a machine, shared by all files
+	src    string
+	rename project.Rename
+	mode   string // the states setting: how state names are written
+	im     *project.ImportMachines
+	used   map[string]bool // bind keys that matched a machine, shared by all files
+	// annotate keys that matched a machine, shared by all files
+	annotated map[string]bool
+	// sourceOf maps the dotted path of a translated state to its path in
+	// source names
+	sourceOf map[string]string
+	// listed is Machine.Listed
+	listed   map[string]string
 	origID   string
 	id       string
 	problems []string
@@ -198,10 +219,12 @@ func (t *translator) translate(root *ir.Object, names map[string]string) *ir.Obj
 		}
 		out.Set("_entries", ir.ArrayValue(names))
 	}
+	t.sourceOf = map[string]string{}
 	if sv := out.Get2("states"); sv != nil {
-		out.Set("states", t.states(sv, ""))
+		out.Set("states", t.states(sv, "", ""))
 	}
 	t.bind(out)
+	t.annotate(out)
 	if !out.Has("_oracle_tag") {
 		out.Set("_oracle_tag", ir.StringValue(OracleTag(t.id, t.origID)))
 	}
@@ -378,7 +401,7 @@ func (t *translator) target(s string) string {
 }
 
 // states translates a states object: names, then each state.
-func (t *translator) states(sv *ir.Value, parent string) *ir.Value {
+func (t *translator) states(sv *ir.Value, parent, translated string) *ir.Value {
 	o := sv.AsObject()
 	if o == nil {
 		return sv // malformed: the lint reports it
@@ -392,11 +415,12 @@ func (t *translator) states(sv *ir.Value, parent string) *ir.Value {
 			continue
 		}
 		from[nn] = name
-		p := name
+		p, tp := name, nn
 		if parent != "" {
-			p = parent + "." + name
+			p, tp = parent+"."+name, translated+"."+nn
 		}
-		out.Set(nn, t.state(o.Get2(name), p))
+		t.sourceOf[tp] = p
+		out.Set(nn, t.state(o.Get2(name), p, tp))
 	}
 	return ir.ObjectValue(out)
 }
@@ -407,7 +431,7 @@ type disposition struct {
 }
 
 // state translates one state node; p is its dotted path in source names.
-func (t *translator) state(v *ir.Value, p string) *ir.Value {
+func (t *translator) state(v *ir.Value, p, translated string) *ir.Value {
 	o := v.AsObject()
 	if o == nil {
 		return v
@@ -440,7 +464,7 @@ func (t *translator) state(v *ir.Value, p string) *ir.Value {
 	}
 	t.capitalizeValue(out, "initial")
 	if sv := out.Get2("states"); sv != nil {
-		out.Set("states", t.states(sv, p))
+		out.Set("states", t.states(sv, p, translated))
 	}
 	t.refusals(out, node, hoisted)
 	return ir.ObjectValue(out)

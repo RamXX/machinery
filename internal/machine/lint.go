@@ -14,7 +14,7 @@ import (
 var (
 	rootKeys = setOf("id", "initial", "context", "states", "description", "meta", "version",
 		"_comment", "_delays", "_lifecycle_of", "_role", "_serves", "_oracle_tag", "_guards",
-		"_external_events", "_failure_events", "_entries", "_aspect")
+		"_external_events", "_failure_events", "_entries", "_aspect", "_aliases", "_not_failures")
 	stateKeys = setOf("on", "after", "always", "invoke", "entry", "exit", "states", "initial",
 		"type", "id", "meta", "description", "tags", "onDone", "output", "_comment",
 		"_exhaustive", "_ignores", "_refusal", "_terminal")
@@ -77,6 +77,8 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 		}
 	}
 	errs = append(errs, lintExternalEvents(base, ro, states)...)
+	errs = append(errs, lintAliases(base, ro, states)...)
+	errs = append(errs, lintNotFailures(base, ro, states)...)
 	errs = append(errs, lintEntries(base, ro)...)
 	errs = append(errs, lintServes(base, ro)...)
 	errs = append(errs, lintAspect(base, ro)...)
