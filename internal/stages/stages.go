@@ -38,7 +38,7 @@ var Defs = []Def{
 	{"model", "The vocabulary every other artifact uses: entities, actions, invariants, scenarios."},
 	{"machines", "Every state answers every event: a transition, a refusal or a reasoned ignore."},
 	{"failure-modes", "Each declared failure and abuse case is well formed and has a required behavior."},
-	{"risk", "Each risk area names real design ids, so tier gates attach to real behavior."},
+	{"risk", "Each risk area and status entry names real design ids, so tier gates and statuses attach to real behavior."},
 	{"xref-model-machine", "The lifecycle a machine implements is the lifecycle the model promises."},
 	{"xref-contract", "Every action is reachable through a published operation."},
 	{"xref-failure", "Every side effect, dependency, failure state, failure event and tiered action has a declared failure behavior."},

@@ -1,6 +1,9 @@
 package stages
 
 import (
+	"strings"
+
+	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/tags"
 )
@@ -42,15 +45,15 @@ func Trace(ctx *Context) *report.Stage {
 		s.Errorf("%s", msg)
 	}
 	owed := d.OwedSet()
-	for id := range owed {
-		if !d.Known(id) {
-			s.Errorf("unknown owed id: %s", id)
-		}
+	for _, msg := range d.OwedIssues() {
+		s.Errorf("%s", msg)
 	}
 
-	ids := d.AllIDs()
+	// a proposed or retired id is an id of the design, which nothing may claim
+	ids := d.DeclaredIDs()
 	scenarios := d.ScenarioIDs()
 	served, verified := map[string]bool{}, map[string]bool{}
+	claimedHeld := map[string]bool{}
 	for _, t := range found {
 		for _, tok := range t.IDs {
 			hits := tags.Resolve(t, tok, ids, scenarios)
@@ -63,6 +66,18 @@ func Trace(ctx *Context) *report.Stage {
 				continue
 			}
 			for _, id := range hits {
+				if st := d.Status(id); st != "" {
+					// a pattern claims only the ids that yield an obligation
+					if key := id + " " + t.File; !strings.HasSuffix(tok, "*") && !claimedHeld[key] {
+						claimedHeld[key] = true
+						if st == design.Proposed {
+							s.Errorf("proposed: %s is claimed by %s; commit it first", id, t.File)
+						} else {
+							s.Errorf("retired: %s is claimed by %s; remove the claim, or un-retire it", id, t.File)
+						}
+					}
+					continue
+				}
 				if t.Kind == tags.Serves {
 					served[id] = true
 				} else {

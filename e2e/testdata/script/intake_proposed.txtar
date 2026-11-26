@@ -1,0 +1,120 @@
+# intake: a proposed id is never a new id; intake status lists it apart and intake plan plans none of it (sections 4.1, 15.7)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec machinery intake new 'Order totals' --intent 'A Customer sees that every order has a positive total' --refuses 'an order with a zero total'
+cp stdout iid.txt
+
+# the design adds two invariants; one of them is only proposed
+cp model.yaml design/model/shop.modelith.yaml
+cp status.yaml design/status.yaml
+exec machinery gen
+gitcommit 'design: order totals'
+exec sh -c 'mrun 1 intake status $(cat iid.txt)'
+stdout '^  new ids         done     1 new id\(s\) since [0-9a-f]{7}$'
+stdout '^    inv:total-is-positive  routine$'
+stdout '^    proposed, not planned: inv:refund-window$'
+! stdout '^    inv:refund-window'
+exec sh -c 'mrun 1 intake status $(cat iid.txt) --json'
+stdout '"proposed": \[\n    "inv:refund-window"\n  \]'
+
+# the plan holds the committed id and the capstone, never the proposed one
+exec sh -c 'machinery intake plan $(cat iid.txt)'
+stdout '^## Prove inv:total-is-positive$'
+stdout '^## Demonstrate: Order totals$'
+! stdout 'refund-window'
+exec sh -c 'machinery intake plan $(cat iid.txt) --apply'
+stdout '^plan: 2 created, 0 existing, 1 edge\(s\)$'
+stdout '^owed: 1 added$'
+! grep 'refund-window' design/owed.yaml
+exec sh -c 'machinery intake status $(cat iid.txt)'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+$'
+
+# a proposed id that stays proposed is not new again at a later intake
+gitcommit 'owe the new id'
+exec machinery intake new 'Refunds' --intent 'A Clerk refunds within thirty days'
+cp stdout iid2.txt
+exec sh -c 'mrun 1 intake status $(cat iid2.txt)'
+stdout '^  new ids         done     none since [0-9a-f]{7}: only the capstone is planned$'
+! stdout 'proposed, not planned'
+
+# committed later, it is a new id of that intake
+rm design/status.yaml
+exec machinery gen
+gitcommit 'commit the refund window'
+exec sh -c 'mrun 1 intake status $(cat iid2.txt)'
+stdout '^  new ids         done     1 new id\(s\) since [0-9a-f]{7}$'
+stdout '^    inv:refund-window  routine$'
+
+-- status.yaml --
+version: 1
+proposed:
+  - {id: "inv:refund-window", note: "candidate; no delivery commitment"}
+-- model.yaml --
+kind: DomainModel
+version: v1
+title: Shop
+description: >
+  A minimal order desk used as the shared test fixture. A Customer places an
+  Order, pays for it, and a Clerk ships it. An Order can be cancelled until it
+  ships.
+
+glossary:
+  Clerk: "A staff member who ships a paid `Order`."
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Placed, not yet paid."}
+      - {name: Paid, definition: "Payment captured."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Cancelled, definition: "Abandoned before shipping; terminal."}
+
+entities:
+  Customer:
+    definition: >
+      A person who places and pays for an `Order`.
+    attributes:
+      - {name: email, type: string}
+    relationships:
+      - {entity: Order, cardinality: "1:n", ownership: owned}
+    invariants:
+      - {id: customer-email-unique, statement: "No two `Customer` records share an email."}
+  Order:
+    definition: >
+      A request by one `Customer` to buy goods. Its status follows the order
+      lifecycle from pending to shipped or cancelled.
+    attributes:
+      - {name: status, type: OrderStatus}
+      - {name: totalCents, type: integer}
+    relationships:
+      - {entity: Customer, cardinality: "n:1", ownership: referenced}
+    actions:
+      - {name: place, actor: Customer, description: "Create the `Order` in the pending status."}
+      - {name: pay, actor: Customer, preserves: [paid-before-shipped]}
+      - {name: ship, actor: Clerk, preserves: [paid-before-shipped]}
+      - {name: cancel, actor: Customer, preserves: [terminal-is-final]}
+    invariants:
+      - {id: paid-before-shipped, statement: "An `Order` reaches the shipped status only from the paid status."}
+
+invariants:
+  - {id: terminal-is-final, statement: "A shipped or cancelled `Order` never changes status again."}
+  - {id: total-is-positive, statement: "Every `Order` has a total above zero."}
+  - {id: refund-window, statement: "A paid `Order` is refunded only within thirty days."}
+
+scenarios:
+  - name: Customer pays and the order ships
+    actors: [Customer, Clerk]
+    steps:
+      - "Customer places an `Order`; it is pending."
+      - "Customer pays; the `Order` becomes paid."
+      - "Clerk ships; the `Order` becomes shipped."
+    invariants_touched: [paid-before-shipped]
+  - name: Cancelled order refuses payment
+    actors: [Customer]
+    steps:
+      - "Customer places an `Order` and cancels it."
+      - "Customer tries to pay; the request is refused and the `Order` stays cancelled."
+    invariants_touched: [terminal-is-final]

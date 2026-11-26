@@ -61,6 +61,7 @@ type Design struct {
 	Formal       string   `yaml:"formal,omitempty"`
 	Facts        string   `yaml:"facts,omitempty"`
 	Owed         string   `yaml:"owed,omitempty"`
+	Status       string   `yaml:"status,omitempty"`
 	Gen          string   `yaml:"gen,omitempty"`
 }
 
@@ -403,7 +404,7 @@ func (c *Config) validate() error {
 	steps := []error{
 		check("scope", c.Scope...),
 		check("design.models", d.Models...),
-		check("design", d.Machines, d.FailureModes, d.Risk, d.Formal, d.Facts, d.Owed, d.Gen),
+		check("design", d.Machines, d.FailureModes, d.Risk, d.Formal, d.Facts, d.Owed, d.Status, d.Gen),
 		check("receipts.dir", c.Receipts.Dir),
 	}
 	for _, ct := range c.Contracts {
@@ -654,6 +655,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Design.Owed == "" {
 		c.Design.Owed = "design/owed.yaml"
+	}
+	if c.Design.Status == "" {
+		c.Design.Status = "design/status.yaml"
 	}
 	if c.Design.Gen == "" {
 		c.Design.Gen = "design/gen"

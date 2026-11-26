@@ -151,6 +151,12 @@ func judgeCapstone(s *report.Stage, t backlog.Tags, siblings []backlog.Issue, id
 func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed map[string]design.OwedEntry, id string) {
 	_, isOwed := owed[id]
 	switch {
+	case d.Status(id) == design.Proposed:
+		s.Errorf("proposed: %s yields no obligation; commit it first", id)
+		return
+	case d.Status(id) == design.Retired:
+		s.Errorf("retired: %s yields no obligation; take it out of the story", id)
+		return
 	case !d.Known(id):
 		s.Errorf("unknown id: %s", id)
 		return

@@ -204,6 +204,7 @@ type IntakeStatus struct {
 	Steps            []Step
 	NewIDs           []NewID
 	RoutineByDefault []string
+	Proposed         []string        // new ids that are only proposed (section 4.1): never planned
 	Stories          []backlog.Issue // the stories of the intake, the capstone included
 	Capstone         *backlog.Issue
 	without          []string // new ids that no story of the intake lists
@@ -218,7 +219,7 @@ func (ds *DesignState) Assess(in *Intake, issues []backlog.Issue) *IntakeStatus 
 	if in.Tags.Base == nil {
 		newReason = "the item has no machinery:intake-base line; record requirements with machinery intake new"
 	} else {
-		st.NewIDs, newReason = ds.newIDs(in.Tags.Base.Commit)
+		st.NewIDs, st.Proposed, newReason = ds.newIDs(in.Tags.Base.Commit)
 		st.newKnown = newReason == ""
 	}
 	st.Steps = []Step{
@@ -306,6 +307,9 @@ func (st *IntakeStatus) newIDsStep(reason string) Step {
 			line += " (" + strings.Join(n.Areas, ", ") + ")"
 		}
 		s.details = append(s.details, line)
+	}
+	if len(st.Proposed) > 0 {
+		s.details = append(s.details, "proposed, not planned: "+strings.Join(st.Proposed, " "))
 	}
 	return s
 }
@@ -400,18 +404,31 @@ func (st *IntakeStatus) planned(issues []backlog.Issue) Step {
 }
 
 // newIDs lists the ids now that the generated obligation list at the base
-// commit does not hold. reason is set when the base cannot be read.
-func (ds *DesignState) newIDs(commit string) ([]NewID, string) {
+// commit does not hold, and apart from them the proposed ids that are new the
+// same way and were not proposed at the base either. reason is set when the
+// base cannot be read.
+func (ds *DesignState) newIDs(commit string) ([]NewID, []string, string) {
 	d := ds.D
 	root := d.P.Root
 	if !gitx.Exists(root, commit) {
-		return nil, fmt.Sprintf("base commit %s is not in this repository", gitx.Short(commit))
+		return nil, nil, fmt.Sprintf("base commit %s is not in this repository", gitx.Short(commit))
 	}
 	had := map[string]bool{}
-	genDir := d.P.Cfg.Design.Gen
+	genDir, statusFile := d.P.Cfg.Design.Gen, d.P.Cfg.Design.Status
 	if raw, ok := gitx.Show(root, commit, project.ConfigName); ok {
 		if bcfg, err := project.Parse(raw); err == nil {
-			genDir = bcfg.Design.Gen
+			genDir, statusFile = bcfg.Design.Gen, bcfg.Design.Status
+		}
+	}
+	wasProposed := map[string]bool{}
+	if data, ok := gitx.Show(root, commit, statusFile); ok {
+		l, _ := design.ParseStatus(statusFile, data)
+		for _, e := range l.Proposed {
+			for _, id := range d.DeclaredIDs() {
+				if design.MatchID(strings.TrimSpace(e.ID), id) {
+					wasProposed[id] = true
+				}
+			}
 		}
 	}
 	if data, ok := gitx.Show(root, commit, strings.TrimSuffix(genDir, "/")+"/obligations.json"); ok {
@@ -424,7 +441,7 @@ func (ds *DesignState) newIDs(commit string) ([]NewID, string) {
 			} `json:"served"`
 		}
 		if err := json.Unmarshal(data, &inv); err != nil {
-			return nil, fmt.Sprintf("obligations.json at %s cannot be read: %v", gitx.Short(commit), err)
+			return nil, nil, fmt.Sprintf("obligations.json at %s cannot be read: %v", gitx.Short(commit), err)
 		}
 		for _, o := range inv.Obligations {
 			had[o.ID] = true
@@ -446,7 +463,13 @@ func (ds *DesignState) newIDs(commit string) ([]NewID, string) {
 		sort.Strings(areas)
 		res = append(res, NewID{ID: id, Tier: tier, Areas: areas})
 	}
-	return res, ""
+	var proposed []string
+	for _, id := range d.WithStatus(design.Proposed) {
+		if !had[id] && !wasProposed[id] {
+			proposed = append(proposed, id)
+		}
+	}
+	return res, proposed, ""
 }
 
 func short12(h string) string {
@@ -531,12 +554,14 @@ func (st *IntakeStatus) JSON(w io.Writer) int {
 		Contract         string   `json:"contract"`
 		Steps            []Step   `json:"steps"`
 		NewIDs           []NewID  `json:"new_ids"`
+		Proposed         []string `json:"proposed"`
 		RoutineByDefault []string `json:"routine_by_default"`
 		Done             int      `json:"done"`
 		Next             string   `json:"next"`
 	}{Intake: st.In.ID, Title: st.In.Title, Contract: st.contract, Steps: st.Steps,
-		NewIDs: append([]NewID{}, st.NewIDs...), RoutineByDefault: append([]string{}, st.RoutineByDefault...),
-		Done: st.Done(), Next: st.Next()}
+		NewIDs: append([]NewID{}, st.NewIDs...), Proposed: append([]string{}, st.Proposed...),
+		RoutineByDefault: append([]string{}, st.RoutineByDefault...),
+		Done:             st.Done(), Next: st.Next()}
 	if b := st.In.Tags.Base; b != nil {
 		doc.Base = &base{b.Commit, b.Contract}
 	}

@@ -61,15 +61,21 @@ type Design struct {
 	Owed         []OwedEntry
 	OwedProblems []string
 
+	HasStatus      bool // the status file exists (section 4.1)
+	StatusList     StatusList
+	StatusProblems []string
+
 	Traces []TraceRef
 
 	Obligations []Obligation // sorted by id
 	Served      []Served     // sorted by id
 	Duplicates  []string     // ids declared more than once
 
-	byID  map[string]*Obligation
-	acts  map[string]bool
-	specs map[string][]string
+	byID     map[string]*Obligation
+	acts     map[string]bool // every declared action, whatever its status
+	declared []string        // every declared id, sorted
+	statuses map[string]StatusMark
+	specs    map[string][]string
 }
 
 // Load reads every design source. It never fails: problems are kept per
@@ -89,6 +95,7 @@ func Load(p *project.Project) *Design {
 	d.ImportsFM = on
 	d.Areas, d.RiskProblems, d.HasRisk = LoadRisk(p)
 	d.Owed, d.OwedProblems = LoadOwed(p)
+	d.StatusList, d.StatusProblems, d.HasStatus = LoadStatus(p)
 	d.Traces = loadTraces(p)
 	d.inventory()
 	return d
@@ -185,10 +192,43 @@ func (d *Design) inventory() {
 	sort.Slice(d.Obligations, func(i, j int) bool { return d.Obligations[i].ID < d.Obligations[j].ID })
 	sort.Slice(d.Served, func(i, j int) bool { return d.Served[i].ID < d.Served[j].ID })
 	sort.Strings(d.Duplicates)
+	d.withholdStatuses()
 	d.byID = map[string]*Obligation{}
 	for i := range d.Obligations {
 		d.byID[d.Obligations[i].ID] = &d.Obligations[i]
 	}
+}
+
+// withholdStatuses reads the status of every declared id and keeps only the
+// ids that yield an obligation in Obligations and Served (section 4.1).
+func (d *Design) withholdStatuses() {
+	d.declared = nil
+	for _, s := range d.Served {
+		d.declared = append(d.declared, s.ID)
+	}
+	for _, o := range d.Obligations {
+		d.declared = append(d.declared, o.ID)
+	}
+	sort.Strings(d.declared)
+	var problems []string
+	d.statuses, problems = resolveStatus(d.P.Cfg.Design.Status, d.StatusList, d.declared)
+	d.StatusProblems = append(d.StatusProblems, problems...)
+	if len(d.statuses) == 0 {
+		return
+	}
+	obls := d.Obligations[:0:0]
+	for _, o := range d.Obligations {
+		if d.statuses[o.ID].Status == "" {
+			obls = append(obls, o)
+		}
+	}
+	served := d.Served[:0:0]
+	for _, s := range d.Served {
+		if d.statuses[s.ID].Status == "" {
+			served = append(served, s)
+		}
+	}
+	d.Obligations, d.Served = obls, served
 }
 
 // ScenarioIDs maps the name of every model scenario to its sc id.
@@ -224,13 +264,16 @@ func Plain(s string) string { return strings.ReplaceAll(s, "`", "") }
 // Obligation returns the obligation with the id, or nil.
 func (d *Design) Obligation(id string) *Obligation { return d.byID[id] }
 
-// IsAct reports whether id is a model action.
+// IsAct reports whether id is a model action, whatever its status.
 func (d *Design) IsAct(id string) bool { return d.acts[id] }
 
-// Known reports whether id is an obligation or an action.
-func (d *Design) Known(id string) bool { return d.byID[id] != nil || d.acts[id] }
+// Known reports whether id is an obligation or an action that yields an
+// obligation: a proposed or retired id is not known here (section 4.1).
+func (d *Design) Known(id string) bool {
+	return d.byID[id] != nil || (d.acts[id] && d.Status(id) == "")
+}
 
-// AllIDs lists every act and obligation id, sorted.
+// AllIDs lists every act and obligation id that yields an obligation, sorted.
 func (d *Design) AllIDs() []string {
 	var ids []string
 	for _, s := range d.Served {
@@ -360,7 +403,7 @@ func (d *Design) ContractFiles() []string {
 	for _, m := range d.Machines {
 		set[m.Path] = true
 	}
-	files := []string{c.Design.FailureModes, c.Design.Risk, c.Design.Facts, c.ImportedMachines().RegisterFile()}
+	files := []string{c.Design.FailureModes, c.Design.Risk, c.Design.Status, c.Design.Facts, c.ImportedMachines().RegisterFile()}
 	if im := c.ImportedFailureModes(); im != nil {
 		files = append(files, im.File, im.Links)
 	}

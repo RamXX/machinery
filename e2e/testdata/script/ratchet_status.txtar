@@ -1,0 +1,75 @@
+# the ratchet holds the statuses: what was owed or proven at the base is never demoted to proposed,
+# and retiring what was proven is reported, never silent (sections 4.1, 11.3)
+fixture shop
+exec machinery gen
+gitinit
+exec git branch base
+
+# demoted: an invariant proven at the base and a failure mode owed there
+cp demote.yaml design/status.yaml
+cp owed-tc-only.yaml design/owed.yaml
+exec machinery gen
+exec mrun 1 check --base base --stage ratchet
+stdout '^  ERROR  ratchet: demoted to proposed: fm:payment-provider-down; proposed is for candidates, not a way out of an obligation$'
+stdout '^  ERROR  ratchet: demoted to proposed: inv:terminal-is-final; proposed is for candidates, not a way out of an obligation$'
+stdout '^failed: 2 finding\(s\)$'
+! stdout 'obligation removed'
+
+# retired: an action served at the base is reported with its reason; a case owed there is not
+cp retire.yaml design/status.yaml
+cp owed-fm-only.yaml design/owed.yaml
+exec machinery gen
+exec machinery check --base base --stage ratchet
+stdout '^  warn   ratchet: retired: act:Order.cancel \(cancelling moved to the carrier\)$'
+stdout '^  warn   ratchet: retired: inv:terminal-is-final \(no longer promised\)$'
+! stdout 'retired: tc:ORDE-8bd6e7'
+! stdout 'obligation removed'
+stdout '^passed$'
+
+# un-retiring is allowed: the ids are obligations again, nothing is reported
+gitcommit 'retire'
+exec git branch retired
+rm design/status.yaml
+cp owed-fm-only.yaml design/owed.yaml
+exec sh -c 'printf "  - id: tc:ORDE-8bd6e7\n    reason: \"owed again\"\n" >> design/owed.yaml'
+exec machinery gen
+exec machinery check --base retired --stage ratchet
+! stdout 'ERROR'
+! stdout 'warn'
+stdout '^passed$'
+
+# a proposed id at the base may be committed, or stay proposed
+cp propose-new.yaml design/status.yaml
+exec machinery gen
+gitcommit 'propose'
+exec git branch proposed
+rm design/status.yaml
+exec machinery gen
+exec machinery check --base proposed --stage ratchet
+stdout '^passed$'
+
+-- demote.yaml --
+version: 1
+proposed:
+  - {id: "inv:terminal-is-final"}
+  - {id: "fm:payment-provider-down"}
+-- retire.yaml --
+version: 1
+retired:
+  - {id: "act:Order.cancel", reason: "cancelling moved to the carrier"}
+  - {id: "inv:terminal-is-final", reason: "no longer promised", since: "v2"}
+  - {id: "tc:ORDE-8bd6e7", reason: "the charge record is gone"}
+-- propose-new.yaml --
+version: 1
+proposed:
+  - {id: "sc:cancelled-order-refuses-payment"}
+-- owed-tc-only.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- owed-fm-only.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"

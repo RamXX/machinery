@@ -12,7 +12,7 @@ stdout '^owed without a story: 2$'
 stdout '^evidence: none at [0-9a-f]{7}$'
 exec sh -c 'test "$(machinery status | head -n 1)" = "project: $(basename "$(pwd -P)")" && echo name-ok'
 stdout name-ok
-exec sh -c 'machinery status | head -n 4 | tail -n 3'
+exec sh -c 'machinery status | head -n 5 | tail -n 4'
 cmp stdout want-none-shape.txt
 
 # with evidence
@@ -47,6 +47,7 @@ stderr '^config: '
 
 -- want-none-shape.txt --
 obligations: 16 (tc 10, sc 2, inv 3, fm 1)
+ids: 0 proposed, 2 owed, 18 proven, 0 retired
 proven: 0  partial: 0  failed: 0  owed: 2  unproven and not owed: 14
 owed without a story: 2
 -- owed-story.yaml --

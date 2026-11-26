@@ -53,6 +53,8 @@ func runStatus(e *Env, args []string) int {
 		fmt.Fprintf(w, "tiers: routine %d, consequential %d, critical %d\n",
 			tiers[design.Routine], tiers[design.Consequential], tiers[design.Critical])
 	}
+	proposed, owed, proven, retired := d.StatusCounts()
+	fmt.Fprintf(w, "ids: %d proposed, %d owed, %d proven, %d retired\n", proposed, owed, proven, retired)
 	ev, err := evidence.Evaluate(p, d, true)
 	if err != nil {
 		return e.Fail(err)

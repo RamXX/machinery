@@ -120,10 +120,8 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	}
 	owed := d.OwedSet()
 	ev.NOwed = len(d.Owed)
-	for _, o := range d.Owed {
-		if o.ID != "" && !d.Known(o.ID) {
-			add(report.Error, "unknown owed id: %s", o.ID)
-		}
+	for _, msg := range d.OwedIssues() {
+		add(report.Error, "%s", msg)
 	}
 	ev.HasEvidence = len(ev.Runs) > 0
 	ev.NReceipts = len(recs)

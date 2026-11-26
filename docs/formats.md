@@ -1521,9 +1521,9 @@ evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 
 The `red` line prints only while the integration branch is red (section 12.2). The first count
 line lists only kinds that occur, in the order `tc, sc, inv, fm, fv, cx, ck`. The `ids` line
-counts every `act` and obligation id by its status (section 4.1): `owed` the entries of the owed
-list, `proven` the ids that yield an obligation and are not owed, which is what `verify` holds
-them to; the next line says what the evidence shows.
+counts every `act` and obligation id by its status (section 4.1): `owed` the ids the owed list
+holds, `proven` the other ids that yield an obligation, which is what `verify` holds them to; the
+next line says what the evidence shows.
 The `tiers` line counts obligations by the tier of their area and is omitted when there is no
 risk file. When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by

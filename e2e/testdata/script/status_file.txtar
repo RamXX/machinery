@@ -1,0 +1,153 @@
+# design/status.yaml: a proposed or retired id yields no obligation; stage risk checks the file (sections 4.1, 23)
+fixture shop
+exec machinery gen
+gitinit
+
+# without the file stage risk is not applicable, as before
+exec machinery lint --stage risk
+stdout '^not applicable: no design.risk configured$'
+exec machinery status
+stdout '^ids: 0 proposed, 2 owed, 18 proven, 0 retired$'
+
+# a proposed invariant and a retired action: stage risk checks the file
+cp status.yaml design/status.yaml
+exec machinery lint --stage risk
+stdout '^checked: 1 proposed ids, 1 retired ids$'
+stdout '^passed$'
+exec machinery checks
+stdout 'protects: Each risk area and status entry names real design ids, so tier gates and statuses attach to real behavior.'
+
+# the file is a design source: obligations.json no longer holds the two ids
+exec mrun 1 gen --check
+stdout 'design/gen/obligations.json'
+exec machinery gen
+! grep 'inv:customer-email-unique' design/gen/obligations.json
+! grep 'act:Order.cancel' design/gen/obligations.json
+grep 'act:Order.ship' design/gen/obligations.json
+
+# nothing may claim them: the test claims the invariant, the code serves the action
+exec mrun 1 trace
+stdout '^  ERROR  proposed: inv:customer-email-unique is claimed by e2e/orders.sh; commit it first$'
+stdout '^  ERROR  retired: act:Order.cancel is claimed by internal/domain/order.go; remove the claim, or un-retire it$'
+stdout '^checked: [0-9]+ code files, [0-9]+ test files, 3 act ids, 15 obligations$'
+stdout '^failed: 2 finding\(s\)$'
+! stdout 'unknown-id'
+! stdout 'unserved'
+! stdout 'unverified'
+
+# the claims gone, trace passes; a wildcard that also matches a proposed case claims none of it
+exec sh -c 'sed -i.bak "s/ inv:customer-email-unique//" e2e/orders.sh && sed -i.bak "s/ act:Order.cancel//" internal/domain/order.go && rm e2e/orders.sh.bak internal/domain/order.go.bak'
+cp status-tc.yaml design/status.yaml
+exec machinery gen
+exec machinery trace
+stdout '^checked: [0-9]+ code files, [0-9]+ test files, 3 act ids, 14 obligations$'
+stdout '^passed$'
+
+# status prints the four counts
+exec machinery status
+stdout '^obligations: 14 \(tc 9, sc 2, inv 2, fm 1\)$'
+stdout '^ids: 2 proposed, 2 owed, 15 proven, 1 retired$'
+
+# a proposed or retired id may not be owed
+cp status.yaml design/status.yaml
+exec sh -c 'printf "  - id: inv:customer-email-unique\n    reason: \"later\"\n  - id: act:Order.cancel\n    reason: \"later\"\n" >> design/owed.yaml'
+exec machinery gen
+exec mrun 1 trace
+stdout '^  ERROR  proposed: inv:customer-email-unique is in design/owed.yaml; a proposed id is not owed: remove it, or commit it first$'
+stdout '^  ERROR  retired: act:Order.cancel is in design/owed.yaml; a retired id is not owed: remove it, or un-retire it$'
+! stdout 'unknown owed id'
+exec mrun 1 owed list
+stderr '^ERROR  proposed: inv:customer-email-unique is in design/owed.yaml'
+exec mrun 1 verify --allow-dirty
+stdout '^  ERROR  retired: act:Order.cancel is in design/owed.yaml; a retired id is not owed: remove it, or un-retire it$'
+
+# malformed entries and unknown ids are ERRORs of stage risk
+cp bad.yaml design/status.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/status.yaml: proposed entry 2: id is required$'
+stdout '^  ERROR  design/status.yaml: proposed: inv:no-such-thing matches no design id$'
+stdout '^  ERROR  design/status.yaml: proposed: tc:ZZZZ-\* matches no design id$'
+stdout '^  ERROR  design/status.yaml: proposed: fv:order-payment: only act, inv, sc, tc and fm ids take a status$'
+stdout '^  ERROR  design/status.yaml: proposed: sc:cancelled-order-refuses-payment is listed twice$'
+stdout '^  ERROR  design/status.yaml: retired: act:Order.ship: reason is required$'
+stdout '^  ERROR  design/status.yaml: inv:terminal-is-final is both proposed and retired$'
+stdout '^failed: 7 finding\(s\)$'
+cp bad-version.yaml design/status.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/status.yaml: version must be 1$'
+cp bad-key.yaml design/status.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/status.yaml: .*field retire not found'
+
+# an empty file has nothing to check
+cp empty.yaml design/status.yaml
+exec mrun 1 lint --stage risk
+stdout '^not demonstrated: nothing to check$'
+
+# design.status names another path; with a risk file both are counted
+cp status.yaml design/statuses.yaml
+rm design/status.yaml
+cp machinery-status.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery lint --stage risk
+stdout '^checked: 1 areas, 2 consequential ids, 0 critical ids, 1 proposed ids, 1 retired ids$'
+exec machinery config
+stdout '^  status: design/statuses.yaml$'
+
+-- machinery-status.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+  status: design/statuses.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- status.yaml --
+version: 1
+proposed:
+  - {id: "inv:customer-email-unique", note: "candidate; no delivery commitment"}
+retired:
+  - {id: "act:Order.cancel", reason: "cancelling moved to the carrier", since: "v2.0"}
+-- status-tc.yaml --
+version: 1
+proposed:
+  - {id: "inv:customer-email-unique"}
+  - {id: "tc:ORDE-507e4f", note: "a refund on cancel, not committed"}
+retired:
+  - {id: "act:Order.cancel", reason: "cancelling moved to the carrier"}
+-- bad.yaml --
+version: 1
+proposed:
+  - {id: "inv:no-such-thing"}
+  - {note: "no id"}
+  - {id: "fv:order-payment"}
+  - {id: "tc:ZZZZ-*"}
+  - {id: "sc:cancelled-order-refuses-payment"}
+  - {id: "sc:cancelled-order-refuses-payment"}
+  - {id: "inv:terminal-is-final"}
+retired:
+  - {id: "act:Order.ship"}
+  - {id: "inv:*", reason: "every invariant"}
+-- bad-version.yaml --
+version: 2
+-- bad-key.yaml --
+version: 1
+retire: []
+-- empty.yaml --
+version: 1
+-- risk.yaml --
+version: 1
+areas:
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]

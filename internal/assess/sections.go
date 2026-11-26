@@ -45,13 +45,17 @@ func (a *assessment) inventory(s *section) {
 	}
 }
 
-// design: every lint stage, and how many machines bind to the model.
+// design: every lint stage, the ids by status, and how many machines bind
+// to the model.
 func (a *assessment) design(s *section) {
 	s.stages = stages.Run(a.ctx, stages.LintStages)
+	proposed, owed, proven, retired := a.ctx.Design().StatusCounts()
+	s.lines = append(s.lines, fmt.Sprintf("ids: %d proposed, %d owed, %d proven, %d retired", proposed, owed, proven, retired))
+	s.facts = map[string]any{"statuses": map[string]any{"proposed": proposed, "owed": owed, "proven": proven, "retired": retired}}
 	if len(a.ctx.Design().Machines) > 0 {
 		bound, unbound := stages.BindingCounts(a.ctx)
 		s.own.Count(bound, "bound machines").Count(unbound, "unbound machines")
-		s.facts = map[string]any{"bound_machines": bound, "unbound_machines": unbound}
+		s.facts["bound_machines"], s.facts["unbound_machines"] = bound, unbound
 	}
 }
 

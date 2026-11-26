@@ -23,13 +23,16 @@ func kindOf(id string) string {
 func Risk(ctx *Context) *report.Stage {
 	s := report.New("risk")
 	d := ctx.Design()
-	if !d.HasRisk {
+	if !d.HasRisk && !d.HasStatus {
 		return s.NotApplicable("no design.risk configured")
 	}
 	for _, p := range d.RiskProblems {
 		s.Errorf("%s", p)
 	}
-	ids := d.AllIDs()
+	for _, p := range d.StatusProblems {
+		s.Errorf("%s", p)
+	}
+	ids := d.DeclaredIDs()
 	cons, crit := 0, 0
 	for _, id := range ids {
 		if !tierable[kindOf(id)] {
@@ -57,8 +60,13 @@ func Risk(ctx *Context) *report.Stage {
 			}
 		}
 	}
-	s.Count(len(d.Areas), "areas").Count(cons, "consequential ids").Count(crit, "critical ids")
-	if len(d.Areas) == 0 && len(d.RiskProblems) == 0 {
+	if d.HasRisk {
+		s.Count(len(d.Areas), "areas").Count(cons, "consequential ids").Count(crit, "critical ids")
+	}
+	if d.HasStatus {
+		s.Count(len(d.WithStatus(design.Proposed)), "proposed ids").Count(len(d.WithStatus(design.Retired)), "retired ids")
+	}
+	if len(d.Areas) == 0 && d.StatusList.Entries() == 0 && s.Blocking() == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
 	return s

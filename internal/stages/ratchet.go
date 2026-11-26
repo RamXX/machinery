@@ -63,9 +63,15 @@ func Ratchet(ctx *Context) *report.Stage {
 		}
 	}
 
-	// proven-to-owed, obligation-removed
+	// proven-to-owed, obligation-removed, demoted, retired
 	nowOwed := d.OwedSet()
+	for _, a := range inv.Served {
+		ratchetStatus(s, d, a.ID, baseOwed[a.ID])
+	}
 	for _, o := range inv.Obligations {
+		if ratchetStatus(s, d, o.ID, baseOwed[o.ID]) {
+			continue
+		}
 		if !d.Known(o.ID) {
 			s.Warnf("ratchet: obligation removed since %s: %s", ref, o.ID)
 			continue
@@ -111,6 +117,23 @@ func Ratchet(ctx *Context) *report.Stage {
 	s.Count(len(inv.Obligations), "obligations").Count(len(bcfg.Scope), "scope globs").
 		Count(tiered, "tiered ids").Count(entries, "baseline entries")
 	return s
+}
+
+// ratchetStatus reports an id of the base that has a status now (section
+// 4.1): demoted to proposed is an error, retiring what was proven is
+// reported. It returns true when the id has a status.
+func ratchetStatus(s *report.Stage, d *design.Design, id string, wasOwed bool) bool {
+	switch d.Status(id) {
+	case design.Proposed:
+		s.Errorf("ratchet: demoted to proposed: %s; proposed is for candidates, not a way out of an obligation", id)
+	case design.Retired:
+		if !wasOwed {
+			s.Warnf("ratchet: retired: %s (%s)", id, strings.TrimSpace(d.StatusEntryOf(id).Reason))
+		}
+	default:
+		return false
+	}
+	return true
 }
 
 type stageKey struct {

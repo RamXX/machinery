@@ -41,12 +41,7 @@ func runOwedList(e *Env, args []string) int {
 		noun = "entry"
 	}
 	fmt.Fprintf(e.Stdout, "owed: %d %s\n", len(entries), noun)
-	problems := append([]string(nil), d.OwedProblems...)
-	for _, o := range entries {
-		if o.ID != "" && !d.Known(o.ID) {
-			problems = append(problems, "unknown owed id: "+o.ID)
-		}
-	}
+	problems := append(append([]string(nil), d.OwedProblems...), d.OwedIssues()...)
 	for _, pr := range problems {
 		fmt.Fprintf(e.Stderr, "ERROR  %s\n", pr)
 	}
