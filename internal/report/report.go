@@ -132,7 +132,21 @@ func (s *Stage) OK() bool {
 	return o == Passed || o == NotApplicable
 }
 
-func label(sev Severity) string {
+// Sorted returns the findings in the order a stage block prints them: ERROR,
+// then DRIFT, then warn, each group sorted by message.
+func (s *Stage) Sorted() []Finding {
+	fs := append([]Finding(nil), s.Findings...)
+	sort.SliceStable(fs, func(i, j int) bool {
+		if fs[i].Sev != fs[j].Sev {
+			return fs[i].Sev < fs[j].Sev
+		}
+		return fs[i].Msg < fs[j].Msg
+	})
+	return fs
+}
+
+// Label is the word a finding of the severity prints with.
+func Label(sev Severity) string {
 	switch sev {
 	case Error:
 		return "ERROR"
@@ -160,15 +174,8 @@ func Print(w io.Writer, s *Stage) {
 		}
 		fmt.Fprintln(w)
 	}
-	fs := append([]Finding(nil), s.Findings...)
-	sort.SliceStable(fs, func(i, j int) bool {
-		if fs[i].Sev != fs[j].Sev {
-			return fs[i].Sev < fs[j].Sev
-		}
-		return fs[i].Msg < fs[j].Msg
-	})
-	for _, f := range fs {
-		fmt.Fprintf(w, "  %s  %s\n", label(f.Sev), f.Msg)
+	for _, f := range s.Sorted() {
+		fmt.Fprintf(w, "  %s  %s\n", Label(f.Sev), f.Msg)
 	}
 	switch out {
 	case Passed:

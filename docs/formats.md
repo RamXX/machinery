@@ -128,6 +128,10 @@ commands:
 backlog:                        # optional: the backlog bridge (section 15)
   tool: bd                      # only bd
   base: main                    # optional: the branch work is cut from; default main
+hooks:                          # optional: what machinery hook does (section 21.1); block | warn | off
+  commit: block                 # optional, this is the default
+  push: block                   # optional, this is the default
+  stop: warn                    # optional, this is the default
 delegate:                       # optional, experimental: answers on the owner's behalf (section 15.9)
   policy: ../owner/delegate.yaml   # required: the owner's policy file; may lie outside the project
 routing:                        # optional: model routing guidance printed in briefs (section 15.5)
@@ -263,6 +267,7 @@ Rules:
 | `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). |
 | `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). |
 | `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
+| `machinery hook <event>` | Reads a harness's hook JSON on stdin and answers with hook JSON on stdout: `session-start`, `pre-tool`, `stop` (section 21.1). Always exits 0. |
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
 | `machinery version` | Prints `machinery <version>`. |
 
@@ -270,7 +275,7 @@ Rules:
 order, and the exit code depends on them alone. An unknown stage name is a usage error (exit 2).
 
 `machinery` with no arguments prints help and exits 0. `version`, `init`, `adopt`,
-`formal tools` and help work without a `machinery.yaml`, and `assess` with `--config`; every
+`formal tools`, `hook` and help work without a `machinery.yaml`, and `assess` with `--config`; every
 other command needs one.
 
 ### 3.2 Stage output
@@ -3347,9 +3352,115 @@ which command to run and reads its findings, and is never asked to remember a ru
 | Skill | `skills/machinery/SKILL.md` | When to use machinery and the command for each step. Under 120 lines; details are in `docs/` and are opened only when needed. |
 | Agent prompts | `agents/machinery-pm.md`, `agents/machinery-verifier.md`, `agents/machinery-modeler.md` | One role each, under 60 lines, built on `machinery brief`. |
 | Plugin manifests | `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` | Name, version, and the paths above. |
+| Hooks | `hooks/hooks.json` (the Claude Code plugin) | Three hook events, each running `machinery hook <event>` (section 21.1). |
 
-There is no hook. Nothing in machinery blocks an agent session, keeps session state or takes
-custody of files. The gates fail closed where they run: `make check`, `machinery landing` and CI.
+The hooks put the checks in front of an agent at the points where it acts: the status when a
+session starts, the static check before `git commit` and `git push`, and after a turn that changed
+files. They are a convenience in front of the gates, not the gates: the gates fail closed where
+they run, `make check`, `machinery landing` and CI. A hook keeps one small file per session and
+never takes custody of the project's files.
+
+### 21.1 Hooks: `machinery hook <event>`
+
+```
+machinery hook session-start | pre-tool | stop
+```
+
+One command a harness calls from its hooks. It reads the harness's hook input, one JSON object,
+on stdin and writes the harness's hook output, one JSON object or nothing, on stdout. The logic
+is in the tool; a plugin only wires it. The fields are those of the Claude Code hooks reference:
+
+| Field | Read or written | Use |
+|---|---|---|
+| `session_id` | read, every event | the session (section 15.1) |
+| `cwd` | read, every event | where the project is looked for, walking up; the process directory when absent; `-C` wins |
+| `tool_name`, `tool_input.command` | read, `pre-tool` | the Bash command about to run |
+| `stop_hook_active` | read, `stop` | the loop guard: true while the turn continues because of a stop hook |
+| `CLAUDE_ENV_FILE` (environment) | appended to, `session-start` | `export MACHINERY_SESSION=<session_id>` for the session's later commands |
+| `hookSpecificOutput.hookEventName`, `.additionalContext` | written | context for the model (`SessionStart`; `PreToolUse` in warn mode) |
+| `hookSpecificOutput.permissionDecision` (`deny`), `.permissionDecisionReason` | written, `pre-tool` | refuses the command; the reason is shown to the model |
+| `decision` (`block`), `reason` | written, `stop` | the turn goes on; the reason is shown to the model |
+| `systemMessage` | written | a message shown to the user that changes nothing (`stop` in warn mode, an internal error) |
+
+`machinery hook` always exits 0: a hook must never fail the harness, and for a harness exit 2
+would block. Any internal error (stdin that is not hook JSON, an invalid `machinery.yaml`, a git
+or backlog command that fails, an unknown event) prints
+`{"systemMessage":"machinery hook <event> could not run: <why>"}` and changes nothing. A directory
+that is not in a machinery project prints nothing. Other harnesses call the same command with
+JSON of the same shape.
+
+Config in `machinery.yaml` (section 2), each `block`, `warn` or `off`:
+
+```yaml
+hooks:
+  commit: block     # default block: git commit
+  push: block       # default block: git push
+  stop: warn        # default warn: the end of a turn
+```
+
+`block` refuses (`pre-tool`) or continues the turn (`stop`); `warn` hands the same text over
+without stopping anything (`additionalContext` for `pre-tool`, `systemMessage` for `stop`, since
+context on a stop continues the turn); `off` prints nothing. A value outside the three is a config
+error (`hooks.commit must be block, warn or off, got "<value>"`).
+
+**session-start.** Never blocks. In a project it prints
+`{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"<text>"}}`, the text
+being the line `machinery: <root directory name> is a machinery project; machinery status prints the full summary.`
+and then, in their order there, the lines of `machinery status` (section 14) that start with `red:`,
+`ids:`, `proofs awaiting:`, `intake ` and `questions:`. At most 30 lines: beyond that the first 29
+and `<k> more line(s): run machinery status`. When `session_id` is one word of
+`^[A-Za-z0-9][A-Za-z0-9._-]*$`, it also records the session's start in
+`<git common dir>/machinery/sessions/<session_id>.json`,
+`{"version": 1, "session": "<session_id>", "head": "<full sha of HEAD, empty before the first commit>"}`,
+unless that file exists already (a resumed or compacted session keeps its first start), and, when
+`CLAUDE_ENV_FILE` is set, appends `export MACHINERY_SESSION=<session_id>` to that file. The
+session files stay; they are a few bytes each.
+
+**pre-tool.** Without loading the project, it reads `tool_input.command` when `tool_name` is
+`Bash` and finds the git commands in it: the command is split into simple commands at `;`, `&`,
+`|`, newlines, parentheses and backquotes outside quotes; leading `NAME=value` words and one
+`env`, `command`, `exec`, `nohup`, `time` or `sudo` are skipped; a simple command is a git
+command when its first word is `git` (or ends in `/git`), and its subcommand is the first word
+after git's own options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--namespace` and
+`--super-prefix` take the next word). Anything other than `commit` or `push` prints nothing; a
+command line that holds both is a push. Then, by `hooks.commit` or `hooks.push`, it runs the
+stages of `machinery check` and stage `ratchet` against the base: `backlog.base`, or `main`
+without a backlog. Before the repository's first commit the ratchet is left out; when HEAD
+exists and the base names no commit the ratchet is `not demonstrated: base <ref> is not a commit;
+set backlog.base to the integration branch`. For a push, a red integration branch (section 12.2)
+is a finding too:
+`red: the integration branch is red since <short sha> (<stages>); marker <path>; repair: fix forward and run machinery landing --base <ref> --repair, or revert and run machinery landing --clear-red --reason "<what was reverted>"`,
+`<path>` relative to the project root. The findings are, in the order the stages ran (the red line
+first), each ERROR and DRIFT line of a stage that failed, `<stage>: <ERROR|DRIFT>  <message>`, and
+each stage that was not demonstrated, `<stage>: not demonstrated: <reason>`: a stage that is not
+demonstrated blocks like one that failed. Without findings it prints nothing. With findings the
+text is
+
+```
+machinery: git <commit|push> refused: machinery check --base <ref> found <n> finding(s)
+<the first 40 findings>
+<k> more finding(s): run machinery check --base <ref>
+```
+
+(the last line only past 40), returned as `permissionDecision` `deny` with the text as
+`permissionDecisionReason`; in warn mode the first line reads
+`machinery: git <commit|push> goes ahead (hooks.<commit|push>: warn): machinery check --base <ref> found <n> finding(s)`
+and the text is `additionalContext`.
+
+**stop.** By `hooks.stop`, when files changed since the session started (`git status` of the
+project is not empty, or HEAD is not the head of the session's file; without a session file only
+`git status` counts), it runs the stages of `machinery check` and collects the findings as
+`pre-tool` does. Without a change or without findings it prints nothing. With findings the text is
+
+```
+machinery: machinery check found <n> finding(s) in the files changed this session
+<the first 40 findings>
+<k> more finding(s): run machinery check
+```
+
+In block mode it prints `{"decision":"block","reason":"<text>"}`, so the turn goes on with the
+findings in front of the model, except while `stop_hook_active` is true: then, as in warn mode, it
+prints `{"systemMessage":"<text>"}`, so a stop chain is blocked at most once.
 
 Routing. A brief names the model class for the tier (`routing` in `machinery.yaml`): the smallest
 model that fits routine stories, a stronger one where a wrong result costs more, and the strongest

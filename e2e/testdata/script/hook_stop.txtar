@@ -1,0 +1,87 @@
+# machinery hook stop: the static check after a session that changed files; warn by default, a
+# block at most once per stop chain, and nothing when nothing changed (docs/formats.md section 21.1)
+fixture shop proj
+cd proj
+exec machinery gen
+gitinit
+cd ..
+exec sh -c 'for f in *.tpl; do sed "s|@WORK@|$WORK|g" $f > ${f%.tpl}.json; done'
+
+# the session starts at HEAD
+stdin start.json
+exec machinery hook session-start
+stdout 'SessionStart'
+
+# nothing changed: nothing
+stdin stop.json
+exec machinery hook stop
+! stdout .
+
+# a change without a finding: nothing
+exec sh -c 'printf "// note\n" >> proj/internal/api/handlers.go'
+stdin stop.json
+exec machinery hook stop
+! stdout .
+
+# a change with a finding: by default a message for the user, and the turn ends
+cp unit_test.go proj/internal/domain/order_test.go
+stdin stop.json
+exec machinery hook stop
+stdout '^\{"systemMessage":"machinery: machinery check found 1 finding\(s\) in the files changed this session\\ntests: ERROR  unit-test: internal/domain/order_test.go"\}$'
+
+# block: the turn goes on with the findings, but only once per stop chain
+exec sh -c 'printf "hooks:\n  stop: block\n" >> proj/machinery.yaml'
+stdin stop.json
+exec machinery hook stop
+stdout '^\{"decision":"block","reason":"machinery: machinery check found 1 finding\(s\) in the files changed this session\\ntests: ERROR  unit-test: internal/domain/order_test.go"\}$'
+stdin stop-active.json
+exec machinery hook stop
+stdout '^\{"systemMessage":"machinery: machinery check found 1 finding\(s\) in the files changed this session\\ntests: ERROR  unit-test: internal/domain/order_test.go"\}$'
+! stdout 'decision'
+
+# a clean tree whose HEAD moved since the start still counts
+exec sh -c 'cd proj && git add -A && git commit -q -m "a unit test"'
+exec sh -c 'cd proj && git status --porcelain | wc -l | tr -d " "'
+stdout '^0$'
+stdin stop.json
+exec machinery hook stop
+stdout '"decision":"block"'
+
+# without a session file only git status counts: the tree is clean
+stdin stop-other.json
+exec machinery hook stop
+! stdout .
+
+# off: nothing
+exec sh -c 'cd proj && sed "s/stop: block/stop: off/" machinery.yaml > m.tmp && mv m.tmp machinery.yaml'
+stdin stop.json
+exec machinery hook stop
+! stdout .
+
+# outside a project, and stdin that is not hook JSON
+stdin stop-outside.json
+exec machinery hook stop
+! stdout .
+stdin broken.json
+exec machinery hook stop
+stdout '^\{"systemMessage":"machinery hook stop could not run: stdin is not hook JSON: invalid character .*"\}$'
+
+-- broken.json --
+{"session_id": sess-1}
+-- outside/.keep --
+-- unit_test.go --
+package domain
+
+import "testing"
+
+func TestUnit(t *testing.T) {}
+-- start.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}
+-- stop.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"The change is done.","background_tasks":[],"session_crons":[]}
+-- stop-active.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"Stop","stop_hook_active":true,"last_assistant_message":"The change is done.","background_tasks":[],"session_crons":[]}
+-- stop-other.tpl --
+{"session_id":"sess-2","transcript_path":"/home/dev/.claude/projects/proj/sess-2.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"The change is done.","background_tasks":[],"session_crons":[]}
+-- stop-outside.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/outside","permission_mode":"default","hook_event_name":"Stop","stop_hook_active":false,"last_assistant_message":"The change is done.","background_tasks":[],"session_crons":[]}

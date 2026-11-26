@@ -33,6 +33,7 @@ type Config struct {
 	Receipts     Receipts          `yaml:"receipts"`
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
+	Hooks        *Hooks            `yaml:"hooks,omitempty"`
 	Delegate     *Delegate         `yaml:"delegate,omitempty"`
 	Routing      map[string]string `yaml:"routing,omitempty"`
 	Vital        *Vital            `yaml:"vital,omitempty"`
@@ -269,6 +270,38 @@ type Commands struct {
 type Backlog struct {
 	Tool string `yaml:"tool"`
 	Base string `yaml:"base,omitempty"`
+}
+
+// Hooks sets what machinery hook does at each point (section 21.1): block,
+// warn or off.
+type Hooks struct {
+	Commit string `yaml:"commit,omitempty"`
+	Push   string `yaml:"push,omitempty"`
+	Stop   string `yaml:"stop,omitempty"`
+}
+
+// The hook modes and their defaults (section 21.1).
+const (
+	HookBlock = "block"
+	HookWarn  = "warn"
+	HookOff   = "off"
+)
+
+var hookDefaults = Hooks{Commit: HookBlock, Push: HookBlock, Stop: HookWarn}
+
+// HookMode returns the mode of a hook point: "commit", "push" or "stop".
+func (c *Config) HookMode(point string) string {
+	h := hookDefaults
+	if c.Hooks != nil {
+		h = *c.Hooks
+	}
+	switch point {
+	case "commit":
+		return h.Commit
+	case "push":
+		return h.Push
+	}
+	return h.Stop
 }
 
 // Delegate names the owner's policy for answers on the owner's behalf
@@ -522,6 +555,15 @@ func (c *Config) validate() error {
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
 	}
+	if h := c.Hooks; h != nil {
+		for _, pt := range []struct{ key, v string }{{"commit", h.Commit}, {"push", h.Push}, {"stop", h.Stop}} {
+			switch pt.v {
+			case "", HookBlock, HookWarn, HookOff:
+			default:
+				return Errf("hooks.%s must be block, warn or off, got %q", pt.key, pt.v)
+			}
+		}
+	}
 	if c.Delegate != nil && strings.TrimSpace(c.Delegate.Policy) == "" {
 		return Errf("delegate.policy is required")
 	}
@@ -735,6 +777,16 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Backlog != nil && c.Backlog.Base == "" {
 		c.Backlog.Base = "main"
+	}
+	if h := c.Hooks; h != nil {
+		for _, f := range []struct {
+			v   *string
+			def string
+		}{{&h.Commit, hookDefaults.Commit}, {&h.Push, hookDefaults.Push}, {&h.Stop, hookDefaults.Stop}} {
+			if *f.v == "" {
+				*f.v = f.def
+			}
+		}
 	}
 	if c.Routing == nil {
 		c.Routing = map[string]string{}

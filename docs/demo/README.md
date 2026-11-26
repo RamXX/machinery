@@ -19,7 +19,7 @@ that hold it. Run one script with `make e2e-one S=<name>`; the scripts are in
 | Adoption in an existing project | `machinery adopt` | `adopt_*`, `bfix_builds`, `brownfield_walkthrough` |
 | A checker of your own, from design to proven obligation | `machinery checkers run` | `checkers_*` |
 | Guides whose commands are executed | `docs/getting-started.md`, `docs/brownfield.md` | `docs_getting_started`, `brownfield_walkthrough` |
-| Agent surfaces without hooks | `skills/`, `agents/` | `plugins_manifest` |
+| Agent surfaces, and hooks that only call the tool | `skills/`, `agents/`, `hooks/`, `machinery hook` | `plugins_manifest`, `hook_*` |
 | machinery checking itself | `make check` | `self_check` |
 | The whole loop on a real service and a real Postgres | `make crm` | `examples/crm/DEMO.md` |
 

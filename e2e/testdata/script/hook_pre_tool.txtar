@@ -1,0 +1,145 @@
+# machinery hook pre-tool: the static check with the ratchet before git commit and git push, a
+# refused push while the branch is red, warn and off modes, and no opinion on anything else
+# (docs/formats.md section 21.1)
+fixture shop proj
+cd proj
+exec machinery gen
+gitinit
+cd ..
+exec sh -c 'for f in *.tpl; do sed "s|@WORK@|$WORK|g" $f > ${f%.tpl}.json; done'
+
+# not a git commit or push: nothing, without loading the project
+cp bad-config.yaml proj/machinery.yaml
+stdin ls.json
+exec machinery hook pre-tool
+! stdout .
+stdin read.json
+exec machinery hook pre-tool
+! stdout .
+stdin echo.json
+exec machinery hook pre-tool
+! stdout .
+stdin log.json
+exec machinery hook pre-tool
+! stdout .
+
+# a commit in a project whose config is broken: the hook says it could not run, and lets it be
+stdin commit.json
+exec machinery hook pre-tool
+stdout '^\{"systemMessage":"machinery hook pre-tool could not run: config: machinery.yaml: version must be 2"\}$'
+exec sh -c 'cd proj && git checkout -q -- machinery.yaml'
+
+# a commit with nothing to find: no opinion
+stdin commit.json
+exec machinery hook pre-tool
+! stdout .
+
+# a finding refuses the commit; the reason is the findings
+cp unit_test.go proj/internal/domain/order_test.go
+stdin commit.json
+exec machinery hook pre-tool
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"machinery: git commit refused: machinery check --base main found 1 finding\(s\)\\ntests: ERROR  unit-test: internal/domain/order_test.go"\}\}$'
+stdin commit-wrapped.json
+exec machinery hook pre-tool
+stdout 'git commit refused'
+stdin commit-and-push.json
+exec machinery hook pre-tool
+stdout 'git push refused'
+
+# the ratchet runs against the base
+cp proj/design/owed.yaml owed-saved.yaml
+exec sh -c 'printf "  - id: tc:ORDE-e6d28f\n    reason: \"later\"\n" >> proj/design/owed.yaml'
+stdin commit.json
+exec machinery hook pre-tool
+stdout '\\nratchet: ERROR  ratchet: tc:ORDE-e6d28f was proven at main and is owed now'
+cp owed-saved.yaml proj/design/owed.yaml
+
+# the first 40 findings and a count of the rest
+exec sh -c 'for i in $(seq 10 54); do cp unit_test.go proj/internal/domain/x${i}_test.go; done'
+stdin commit.json
+exec machinery hook pre-tool
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"machinery: git commit refused: machinery check --base main found 46 finding\(s\)'
+stdout '\\n6 more finding\(s\): run machinery check --base main"\}\}$'
+exec sh -c 'rm proj/internal/domain/x*_test.go'
+
+# warn mode: the same findings as context, nothing refused
+exec sh -c 'printf "hooks:\n  commit: warn\n" >> proj/machinery.yaml'
+stdin commit.json
+exec machinery hook pre-tool
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"PreToolUse","additionalContext":"machinery: git commit goes ahead \(hooks.commit: warn\): machinery check --base main found 1 finding\(s\)\\ntests: ERROR  unit-test: internal/domain/order_test.go"\}\}$'
+! stdout 'permissionDecision'
+
+# off: nothing
+exec sh -c 'cd proj && git checkout -q -- machinery.yaml && printf "hooks:\n  commit: off\n" >> machinery.yaml'
+stdin commit.json
+exec machinery hook pre-tool
+! stdout .
+exec sh -c 'cd proj && git checkout -q -- machinery.yaml'
+
+# a stage that is not demonstrated refuses like a failed one
+exec sh -c 'cd proj && printf "tools:\n  modelith: no-such-modelith\n" >> machinery.yaml'
+stdin commit.json
+exec machinery hook pre-tool
+stdout '"permissionDecision":"deny"'
+stdout '\\nmodel: not demonstrated: '
+exec sh -c 'cd proj && git checkout -q -- machinery.yaml'
+exec sh -c 'rm proj/internal/domain/order_test.go'
+
+# a push while the integration branch is red is refused, with the marker and the repair path
+stdin push.json
+exec machinery hook pre-tool
+! stdout .
+mkdir proj/.git/machinery
+cp red.json proj/.git/machinery/red.json
+stdin push.json
+exec machinery hook pre-tool
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"machinery: git push refused: machinery check --base main found 1 finding\(s\)\\nred: the integration branch is red since 0123456 \(run\); marker .git/machinery/red.json; repair: fix forward and run machinery landing --base main --repair, or revert and run machinery landing --clear-red --reason \\"<what was reverted>\\""\}\}$'
+stdin commit.json
+exec machinery hook pre-tool
+! stdout .
+exec sh -c 'printf "hooks:\n  push: warn\n" >> proj/machinery.yaml'
+stdin push.json
+exec machinery hook pre-tool
+stdout '"additionalContext":"machinery: git push goes ahead \(hooks.push: warn\)'
+
+# stdin that is not hook JSON
+stdin broken.json
+exec machinery hook pre-tool
+stdout '^\{"systemMessage":"machinery hook pre-tool could not run: stdin is not hook JSON: unexpected end of JSON input"\}$'
+
+# outside a project: nothing
+stdin commit-outside.json
+exec machinery hook pre-tool
+! stdout .
+
+-- red.json --
+{"version": 1, "commit": "0123456789abcdef0123456789abcdef01234567", "base": "main", "stages": ["run"]}
+-- bad-config.yaml --
+version: 1
+-- broken.json --
+{"tool_name": "Bash", "tool_input":
+-- outside/.keep --
+-- unit_test.go --
+package domain
+
+import "testing"
+
+func TestUnit(t *testing.T) {}
+-- ls.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls -la internal","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- read.tpl --
+{"session_id":"sess-1","cwd":"@WORK@/proj","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"@WORK@/proj/machinery.yaml"},"tool_use_id":"toolu_01ABD"}
+-- echo.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo \"git commit -m done\" && grep -rn 'git push' docs","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- log.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git log --oneline --grep commit -5 | head","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- commit.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git add -A && git commit -m 'add refunds'","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- commit-wrapped.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"cd proj; GIT_AUTHOR_NAME=x env git -C . -c user.name=x commit -q -m wip","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- commit-and-push.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -am wip && git push origin HEAD","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- push.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git push origin HEAD","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}
+-- commit-outside.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/outside","permission_mode":"default","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x","description":"Run it","timeout":120000,"run_in_background":false},"tool_use_id":"toolu_01ABC"}

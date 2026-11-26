@@ -11,7 +11,7 @@
     {
       "name": "machinery",
       "source": "./",
-      "description": "One small skill and three agent prompts (planner, verifier, modeler) built on the machinery command-line tool. No hooks."
+      "description": "One small skill, three agent prompts (planner, verifier, modeler) and three hooks (session start, before git commit and push, at the end of a turn), all built on the machinery command-line tool."
     }
   ]
 }

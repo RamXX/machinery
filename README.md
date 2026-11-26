@@ -59,9 +59,11 @@ is in [examples/crm](examples/crm).
 
 ## For coding agents
 
-The plugin ships one small skill (`skills/machinery/SKILL.md`) and three prompts: planner,
-verifier and modeler (`agents/`). Checks are commands, not prose, and there is no hook: nothing
-blocks a session. Workers are briefed by pointer with `machinery brief <story>`.
+The plugin ships one small skill (`skills/machinery/SKILL.md`), three prompts: planner,
+verifier and modeler (`agents/`), and three hooks (`hooks/hooks.json`, see
+[docs/hooks.md](docs/hooks.md)): the status when a session starts, the static check before
+`git commit` and `git push`, and after a turn that changed files. Checks are commands, not prose;
+the hooks only call them. Workers are briefed by pointer with `machinery brief <story>`.
 
 ## Requirements
 

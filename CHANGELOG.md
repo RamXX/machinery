@@ -44,7 +44,7 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - The threat ledger as a separate artifact: an abuse case is now a failure mode.
 - The built-in rules engine and its baselines.
 - READS, WRITES, USES and similar matrix declarations; matrix and oracle markdown files.
-- Hooks and the custody, integrity and isolation layers.
+- The custody, integrity and isolation layers, and v1's hooks.
 - Locked-test amendment rules, execution packets, slice maps, hard TDD phases.
 - Mandatory C4 architecture documents and the four-phase handoff with its agents.
 - Unit tests, in this repository and as something machinery asks of a project.

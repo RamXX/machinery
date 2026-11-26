@@ -1,0 +1,87 @@
+# machinery hook session-start: the status summary for the model, the session's start recorded
+# and exported; never blocks; nothing outside a project (docs/formats.md section 21.1)
+fixture shop proj
+fixture shop-formal proj
+fixture shop-vital proj
+cd proj
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+cd ..
+exec sh -c 'for f in *.tpl; do sed "s|@WORK@|$WORK|g" $f > ${f%.tpl}.json; done'
+env CLAUDE_ENV_FILE=$WORK/claude-env.sh
+
+# the cwd of the input names the project; the summary is the lines of status that matter at a start
+stdin start.json
+exec machinery hook session-start
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"SessionStart","additionalContext":"machinery: proj is a machinery project; machinery status prints the full summary\.\\nids: 0 proposed, [0-9]+ owed, [0-9]+ proven, 0 retired\\nproofs awaiting: 2"\}\}$'
+exists proj/.git/machinery/sessions/sess-1.json
+grep '^\{"version": 1, "session": "sess-1", "head": "[0-9a-f]{40}"\}$' proj/.git/machinery/sessions/sess-1.json
+grep '^export MACHINERY_SESSION=sess-1$' claude-env.sh
+
+# a red branch and an open question show; a resumed session keeps its first start
+mkdir proj/.git/machinery
+cp red.json proj/.git/machinery/red.json
+cd proj
+exec machinery ask 'Name the new state' --option Settled --option Closed --recommend 2 --default Closed
+exec sh -c 'printf "// x\n" >> internal/api/handlers.go'
+gitcommit 'a later commit'
+cd ..
+cp proj/.git/machinery/sessions/sess-1.json first.json
+stdin start.json
+exec machinery hook session-start
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"SessionStart","additionalContext":"machinery: proj is a machinery project; machinery status prints the full summary\.\\nred: since 0123456 \(run\): repair or revert first\\nids: .*\\nproofs awaiting: 2\\nquestions: 1 open, 0 held"\}\}$'
+cmp proj/.git/machinery/sessions/sess-1.json first.json
+
+# a session id that is not one safe word is neither recorded nor exported
+stdin start-odd.json
+exec machinery hook session-start
+stdout '^\{"hookSpecificOutput":\{"hookEventName":"SessionStart","additionalContext":"machinery: proj is a machinery project; machinery status prints the full summary\.'
+! exists proj/.git/machinery/sessions/../odd.json
+! grep 'odd' claude-env.sh
+
+# outside a project: nothing at all
+stdin start-outside.json
+exec machinery hook session-start
+! stdout .
+! exists outside/.git
+! grep 'sess-out' claude-env.sh
+
+# at most 30 lines
+cd proj
+exec sh -c 'for i in $(seq 1 28); do bd create --title "Need $i" --description "machinery:intake" --silent >/dev/null || exit 1; done'
+cd ..
+stdin start.json
+exec machinery hook session-start
+stdout '\\nintake shop-[a-z0-9]+: [0-9] of 7 steps done; next: [a-z ]+\\n'
+stdout '\\n4 more line\(s\): run machinery status"\}\}$'
+exec sh -c 'machinery hook session-start < start.json | grep -o "\\\\n" | wc -l | tr -d " "'
+stdout '^29$'
+
+# an internal error becomes a message for the user; the hook never fails the harness
+stdin broken.json
+exec machinery hook session-start
+stdout '^\{"systemMessage":"machinery hook session-start could not run: stdin is not hook JSON: unexpected end of JSON input"\}$'
+cp bad-config.yaml proj/machinery.yaml
+stdin start.json
+exec machinery hook session-start
+stdout '^\{"systemMessage":"machinery hook session-start could not run: config: machinery.yaml: version must be 2"\}$'
+exec machinery hook bogus
+stdout '^\{"systemMessage":"machinery hook bogus could not run: unknown event; the events are session-start, pre-tool and stop"\}$'
+exec machinery hook
+stdout '^\{"systemMessage":"machinery hook could not run: name the event: session-start, pre-tool or stop"\}$'
+
+-- red.json --
+{"version": 1, "commit": "0123456789abcdef0123456789abcdef01234567", "base": "main", "stages": ["run"]}
+-- bad-config.yaml --
+version: 1
+-- broken.json --
+{"session_id": "sess-1", "cwd":
+-- outside/.keep --
+-- start.tpl --
+{"session_id":"sess-1","transcript_path":"/home/dev/.claude/projects/proj/sess-1.jsonl","cwd":"@WORK@/proj","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}
+-- start-odd.tpl --
+{"session_id":"../odd","transcript_path":"/home/dev/.claude/projects/proj/../odd.jsonl","cwd":"@WORK@/proj","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}
+-- start-outside.tpl --
+{"session_id":"sess-out","transcript_path":"/home/dev/.claude/projects/proj/sess-out.jsonl","cwd":"@WORK@/outside","hook_event_name":"SessionStart","source":"startup","model":"claude-opus-5"}

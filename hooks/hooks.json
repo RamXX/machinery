@@ -1,0 +1,51 @@
+{
+  "description": "machinery: the status when a session starts, the static check before git commit and git push, and after a turn that changed files. Each hook runs machinery hook <event>, so the machinery executable must be on PATH (docs/hooks.md).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "machinery",
+            "args": [
+              "hook",
+              "session-start"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "machinery",
+            "args": [
+              "hook",
+              "pre-tool"
+            ],
+            "if": "Bash(git *)",
+            "statusMessage": "machinery: checking before git"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "machinery",
+            "args": [
+              "hook",
+              "stop"
+            ],
+            "statusMessage": "machinery: checking the changed files"
+          }
+        ]
+      }
+    ]
+  }
+}

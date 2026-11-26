@@ -1,12 +1,14 @@
 # The plugin manifests are valid JSON and every path they name exists; the
-# agent surfaces stay small (docs/formats.md section 21).
+# agent surfaces stay small; the hooks only call machinery hook (docs/formats.md section 21).
 exec node check.cjs $REPO
 stdout 'manifests ok'
+exec node hooks.cjs $REPO
+stdout 'hooks ok'
 exists $REPO/skills/machinery/SKILL.md
 exists $REPO/agents/machinery-pm.md
 exists $REPO/agents/machinery-verifier.md
 exists $REPO/agents/machinery-modeler.md
-! exists $REPO/hooks
+exists $REPO/hooks/hooks.json
 
 # size limits of section 21
 exec sh -c 'test $(wc -l < $REPO/skills/machinery/SKILL.md) -le 120'
@@ -33,9 +35,25 @@ for (const f of [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json"
   for (const k of ["skills", "agents"]) {
     if (m[k] && !fs.existsSync(path.join(repo, m[k]))) throw new Error(f + ": missing " + m[k]);
   }
-  if (m.hooks) throw new Error(f + ": v2 ships no hook");
+  if (m.hooks) throw new Error(f + ": the plugin's hooks live in hooks/hooks.json, loaded without a manifest key");
 }
 console.log("manifests ok");
+-- hooks.cjs --
+const fs = require("fs");
+const path = require("path");
+const repo = process.argv[2];
+const h = JSON.parse(fs.readFileSync(path.join(repo, "hooks/hooks.json"), "utf8")).hooks;
+const want = {SessionStart: ["session-start", undefined], PreToolUse: ["pre-tool", "Bash"], Stop: ["stop", undefined]};
+if (Object.keys(h).sort().join() !== Object.keys(want).sort().join()) throw new Error("events: " + Object.keys(h).join());
+for (const [event, [arg, matcher]] of Object.entries(want)) {
+  if (h[event].length !== 1) throw new Error(event + ": one matcher group");
+  const g = h[event][0];
+  if (g.matcher !== matcher) throw new Error(event + ": matcher " + g.matcher);
+  if (g.hooks.length !== 1) throw new Error(event + ": one handler");
+  const c = g.hooks[0];
+  if (c.type !== "command" || c.command !== "machinery" || JSON.stringify(c.args) !== JSON.stringify(["hook", arg])) throw new Error(event + ": runs " + JSON.stringify(c));
+}
+console.log("hooks ok");
 -- commands.cjs --
 const fs = require("fs");
 const path = require("path");
