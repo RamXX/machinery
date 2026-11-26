@@ -1792,7 +1792,9 @@ commit, read with `git show <base>:<gen>/obligations.json` (the gen directory of
 `machinery.yaml`); a base without that file has no ids, so every id is new. They print sorted, each
 with its tier and the areas that give it. Under `tiers`, the new `act` ids that are in no area
 print as `routine by default`, so the planner sees what was left routine; the line is left out
-when there is none.
+when there is none. An item without a `machinery:intake-base` line (one not made by `intake new`)
+has neither `design changed` nor `new ids` done, and while the new ids are not known `planned`
+is missing too.
 
 The last line is the summary: `intake <id>: <n> of 7 steps done`, followed by
 `; next: <first missing step>` when a step is missing. Exit 0 when every step is done, 1
