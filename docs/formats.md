@@ -2035,7 +2035,7 @@ Each says what to do:
 | `--adapter go-test-json: -json=false is refused: the adapter reads the event stream; leave it out` | `-json` switched off. |
 | `--streams needs --adapter go-test-json: add it before --streams` | `--streams` alone. |
 | `--adapter go-test-json: trace.tests is not set: the adapter joins the run to the claims of the test files; list them in machinery.yaml` | No `trace.tests`. |
-| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>) matches <import path>, the package of <directory>: entries are read only with --streams; remove the entry, or run the suite through --streams` | Without `--streams`, an entry whose `package` matches the import path of a directory that holds files under `trace.tests` ("Whose verdict", below). The first such entry, and the first such directory in sorted order. |
+| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>) matches <import path>, the package of <directory>: entries are read only with --streams; remove the entry, or run the suite through --streams` | Without `--streams`, an entry whose `package` matches the import path of a directory that holds files under `trace.tests` ("Whose verdict", below). The first such entry, and for it the first such import path in sorted order. |
 | `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>): files <globs> match no file under trace.tests: correct the globs, or list the files in trace.tests` | With `--streams`, an entry that maps onto nothing; `<globs>` as written, separated by `, `. |
 
 **Cached results never count, and fails are never lost.** Without `-count=1`, `go test` may

@@ -89,6 +89,15 @@ stdout '^  ERROR  failed: fm:payment-provider-down \(e2e/suite/outage_test\.go\)
 exec machinery status
 stdout '  failed: 1  '
 
+# a fail in a stream that says the package was answered from the cache is read all the same: go
+# test never caches a failing run, but no fail is dropped for a cache
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh cachedmark.sh
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; '
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/email_test\.go::TestEmailUnique"'
+
 # one function with two verdicts in one stream (the wrapper ran it twice): they differ, it failed
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh again.sh
@@ -206,6 +215,18 @@ first=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/a.json")
 second=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/b.json")
 echo "cachedfail: $first cached in a, $second in b"
 exit 0
+-- cachedmark.sh --
+#!/bin/sh
+# a stream typed by hand: the cache mark of go test, a pass and a fail
+set -eu
+p=example.test/shop/e2e/suite
+{
+  printf '{"Action":"start","Package":"%s"}\n' "$p"
+  printf '{"Action":"pass","Package":"%s","Test":"TestShipNeedsPayment"}\n' "$p"
+  printf '{"Action":"fail","Package":"%s","Test":"TestEmailUnique"}\n' "$p"
+  printf '{"Action":"output","Package":"%s","Output":"ok  \\t%s\\t(cached)\\n"}\n' "$p" "$p"
+  printf '{"Action":"pass","Package":"%s"}\n' "$p"
+} > "$MACHINERY_GO_TEST_JSON/cached.json"
 -- again.sh --
 #!/bin/sh
 set -eu
