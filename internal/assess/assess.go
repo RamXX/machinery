@@ -155,7 +155,11 @@ func (a *assessment) inputs() error {
 	if a.head, err = HeadOf(a.root, "assess"); err != nil {
 		return err
 	}
-	if err := a.overlay.Check(a.root, cfg); err != nil {
+	var external *project.Config
+	if o.Config != "" {
+		external = cfg
+	}
+	if err := a.overlay.Check(a.root, external, a.cfgLabel, cfg, a.cfgLabel); err != nil {
 		return err
 	}
 	for _, ref := range o.Since {

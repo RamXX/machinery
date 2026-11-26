@@ -677,9 +677,9 @@ is `ERROR  <file>: <id>: subject "<subject>" is not invoke:<machine id>.<src>, d
 
 A `system:` subject is for a failure mode about nothing the model, the machines or the
 dependencies hold: a release built without a signature, clocks that disagree. Its name must be
-declared (rule `subject-resolves`, section 6.6) and that is the only cross-reference rule it
-takes part in: it is compared with no entity, action, state or event, and no rule asks for a
-failure mode per declared system. `required`, `failure` and `behavior` are as mandatory as for
+declared: an unknown one is the ERROR `unknown-system` of section 6.6, which no waiver covers.
+That is the only check it takes part in: it is compared with no entity, action, state or event,
+and no rule asks for a failure mode per declared system. `required`, `failure` and `behavior` are as mandatory as for
 any failure mode.
 
 A failure mode that names no subject at all says so, with the reason, in place of `subject`:
@@ -917,7 +917,7 @@ Operations without a binding are counted and are not an error (reads and queries
 
 | Rule | Check |
 |---|---|
-| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a configured system (`systems`, section 2: `<name> is not a configured system; declare it under systems in machinery.yaml`), a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
+| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
 | `invoke-failure-mode` | Every `invoke` `src` of every machine is the subject of at least one failure mode. |
 | `dependency-failure-mode` | Every configured dependency is the subject of at least one failure mode. |
 | `tiered-action-abuse` | Every action that belongs to a consequential, critical or vital area (section 23) is the subject of at least one failure mode of kind `abuse`. |
@@ -927,29 +927,38 @@ Operations without a binding are counted and are not an error (reads and queries
 The stage applies when `design.failure_modes` or `import.failure_modes` is configured, or when
 any machine declares a failure state or a failure event (section 5.2). An imported row that is
 not linked (section 5.4.1) and a failure mode declared subject-less (`no_subject`, section 5.4)
-are counted among the failure modes and take part in no rule. A `system:` subject takes part in
-`subject-resolves` alone. A
+are counted among the failure modes and take part in no rule. A `system:` subject takes part in none of the rules of the table. Its name must be one of
+`systems` (section 2):
+`ERROR  unknown-system: system:<name>: failure mode <id>: <name> is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)`.
+`unknown-system` is not a rule a waiver may name (section 6.7), and a waiver of
+`subject-resolves` for a `system:` subject matches no finding and is stale. A
 finding that asks for a failure mode says where to declare it: in the file of
 `design.failure_modes` when there is one, else in the links file of `import.failure_modes`
 (`a links file (import.failure_modes.links)` when none is configured). `checked:` counts
 failure modes, invokes,
 dependencies, tiered actions, failure states and failure events. When `import.failure_modes` is
-configured it counts, right after the failure modes, those that name a subject (`linked`, native
-ones included) and the unlinked rows; when at least one failure mode is declared subject-less it
-counts those next:
-`checked: 964 failure modes, 640 linked, 12 unlinked, 312 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
+configured, or a failure mode is unaccounted for (below), it counts, right after the failure
+modes, those that name a subject (`linked`, native ones included) and those unaccounted for
+(`unlinked`); when at least one failure mode is declared subject-less it counts those next:
+`checked: 48 failure modes, 30 linked, 4 unlinked, 14 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
 With no failure-mode file
 configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
 event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
 states and failure events only. Not applicable when there is neither a failure-mode file nor a
 failure state or failure event.
 
-While any imported row is unlinked (it names no subject and no entry declares it subject-less,
-section 5.4.1), the stage did not compare every failure mode with the design: one linked row among
-many is no pass. Its result is
+A failure mode is unaccounted for when it names no subject and is not declared subject-less with
+a reason: an imported row no links entry names (section 5.4.1), and a failure mode, native or
+imported, whose `no_subject` has a blank reason or stands beside a `subject`. Stage
+`failure-modes` has the ERROR of the latter; this stage counts it as `unlinked` all the same, so
+that it does not pass when run alone. While one failure mode is unaccounted for, the stage did
+not compare every failure mode with the design: one linked row among many is no pass. Its result
+is
 `not demonstrated: <n> of <m> failure modes name no subject; link each in <links file> or declare it there with no_subject and a reason`,
-where `<n>` counts the unlinked rows, `<m>` every failure mode, and `<links file>` is
-`a links file (import.failure_modes.links)` when none is configured. When no row is unlinked and
+where `<n>` counts those unaccounted for, `<m>` every failure mode, and `<links file>` is
+`a links file (import.failure_modes.links)` when none is configured; when none of them is an
+imported row the middle part is `give each a subject in <failure-mode file>`. When none is
+unaccounted for and
 still no failure mode names a subject (every one is declared subject-less), it compared none:
 `not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing at
 all to compare). Neither is ever passed, waivers or not; with findings the stage is failed
@@ -3352,9 +3361,8 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--overlay <dir>] [--
   exists; without either the snapshot has none and adoption starts from scratch, as `adopt` does.
   `--write` is a usage error (`usage: --rehearse writes only in its out directory; it takes no --write`).
 - `--overlay <dir>` is the overlay of `assess` (section 18.2), with its refusals: the files of
-  `<dir>` are laid over the snapshot before adopt runs there. It needs a config, since
-  `trace.code` and `trace.tests` say what an overlay may not replace:
-  `usage: --overlay <dir> needs a config (--config, the machinery.yaml of the project or one in the overlay): trace.code and trace.tests say what an overlay may not replace`.
+  `<dir>` are laid over the snapshot before adopt runs there. A project with no
+  `machinery.yaml` at `HEAD` needs `--config` for it, since that config judges the overlay.
   Without `--rehearse` it is a usage error (`usage: --overlay goes with --rehearse`).
 - In the snapshot it runs `machinery adopt --write` with the `--paths` and `--e2e` given,
   commits the result (hooks and signing off), runs the stages of `machinery check`, and builds
@@ -3457,7 +3465,12 @@ Each refusal exits 2 before anything is written:
 | A symbolic link in the overlay, to a file or to a directory | `usage: --overlay <dir>: <path> is a symbolic link; an overlay holds regular files only` |
 | Anything else that is not a regular file | `usage: --overlay <dir>: <path> is not a regular file; an overlay holds regular files only` |
 | A path under `.git` | `usage: --overlay <dir>: <path>: an overlay never writes under .git` |
-| A file stage `trace` reads for tags | `usage: --overlay <dir>: <path> is under trace.tests; an overlay is for design-side files (links, status, risk, config), never for code or tests` (or `trace.code`) |
+| No config to judge the overlay by | `usage: --overlay <dir> needs a config to be judged by (the machinery.yaml of HEAD, or --config): it says which files are design sources, and a config in the overlay never does` |
+| The `machinery.yaml` of `HEAD` is invalid | `config: machinery.yaml at HEAD, which judges the overlay: <message>` |
+| A path that is not ASCII | `usage: --overlay <dir>: <path> is not written in ASCII; an overlay path holds ASCII characters only` |
+| A path, or a directory of it, that differs from one of `HEAD` only by case | `usage: --overlay <dir>: <path> differs from <path of HEAD> of HEAD only by case; an overlay path is written as HEAD has it` |
+| A file that is not a design source | `usage: --overlay <dir>: <path> is not a design source of <judge>: an overlay holds only the config and the design sources it names (design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links)` |
+| A design source that a code or test glob matches | `usage: --overlay <dir>: <path> is under <key> of <config>; an overlay never replaces what is read as code or tests` |
 | A path at or below a symbolic link of `HEAD` | `usage: --overlay <dir>: <path>: <link> is a symbolic link at HEAD; an overlay never writes through or over a link` |
 
 ### 18.2 The snapshot
@@ -3475,7 +3488,7 @@ and the inventory has `warn   outside-link: <path>: leaves the project; not in t
 assessed` for each. Links that stay inside are kept. An archive entry whose name is absolute or
 holds a `..` segment stops the snapshot (exit 1).
 
-**The overlay.** A design-side file that is not committed yet (a links file, a status or risk
+**The overlay.** A design source that is not committed yet (a links file, a status or risk
 file, the config) can be tried without committing it into the project: `--overlay <dir>` lays
 every file of `<dir>` over the snapshot at the same relative path, replacing the file of `HEAD`
 or adding one, after the extraction and before the config is written and the snapshot is
@@ -3483,15 +3496,37 @@ committed. A `machinery.yaml` at the top of the overlay is the config of the run
 would give it. The files are read once, before anything is written, and what was read is what is
 laid and hashed.
 
-An overlay is for the design side, never for the evidence. Under the config of the run, a file
-that stage `trace` would read for tags is refused, whether `HEAD` has it or not: one that
-`trace.tests` matches, or that `trace.code` matches inside `scope` (with the defaults of
-section 2: a `trace` block without `code` takes `scope`, and no `trace` block refuses nothing).
-The `machinery.yaml` of the overlay is the config and is not held to this. A symbolic link in
-the overlay, a file that is not regular, a path under `.git`, and a path at or below a symbolic
-link of `HEAD` are refused as well (section 18.1): nothing is written through or over a link,
-and the overlay is written through the root bound to the snapshot, like the extraction. Should a
-path of the overlay still meet a symbolic link in the snapshot, the snapshot stops (exit 1).
+An overlay is for the design side, never for the evidence, and the design side is defined
+positively. An overlay may hold two things and nothing else:
+
+- **The config**: `machinery.yaml` at its top, with the waivers it carries.
+- **Design sources the judge names**: `design.models`, a file below `design.machines`, `design.failure_modes`, `design.risk`, `design.facts`, `design.owed`, `design.status` (the last two with their defaults) and `import.failure_modes.links`. The path is the one the judge gives, character for
+  character.
+
+The **judge** is the `machinery.yaml` of `HEAD` when `HEAD` has one, else the `--config` file;
+`<judge>` in a message is `machinery.yaml at HEAD` or `--config <file name>`. A config in the
+overlay never judges: an overlay that holds anything beside the config needs a judge, and a file
+that only an overlaid config names as a design source is refused. Generated files
+(`design.gen`), formal models (`design.formal`), sources read through `import` other than the
+links file, tests, code and every other file are not design sources in this sense.
+
+A design source is still refused when a glob under which files are read as code or as tests
+matches it, in the judge or in the config of the run: `trace.code`, `trace.tests`, `tests.e2e`,
+`tests.files`, the `paths` of `constraints.layers` and `constraints.size.paths`, with the
+defaults of section 2 (a `trace` block without `code` takes `scope`) and whatever `scope` says;
+`<key>` in the message is the first of these that matches, a layer as `constraints.layers`.
+Paths are compared as written and again with case folded, the globs included.
+
+A file system may fold case or normalise names, so that two spellings are one file there. An
+overlay path therefore holds ASCII characters only, and a path that differs from a path of
+`HEAD`, or one of its directories from a directory of `HEAD`, only by case is refused: folded,
+a path is compared character by character after each character is replaced by the smallest of
+its case orbit (and the three characters whose canonical form is one ASCII character by that
+character). A symbolic link in the overlay, a file that is not regular, a path under `.git`, and
+a path at or below a symbolic link of `HEAD` are refused as well (section 18.1): nothing is
+written through or over a link, and the overlay is written through the root bound to the
+snapshot, like the extraction. Should a path of the overlay still meet a symbolic link in the
+snapshot, the snapshot stops (exit 1).
 
 The result of such a run is not the result of `HEAD`, and every output says so: stdout has
 `overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>`, and the

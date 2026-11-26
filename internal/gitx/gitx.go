@@ -337,6 +337,22 @@ func Branches(root string) ([]string, error) {
 	return res, nil
 }
 
+// HeadPaths lists every path of HEAD below root, relative to root. It
+// writes nothing.
+func HeadPaths(root string) ([]string, error) {
+	out, err := run(root, "ls-tree", "-r", "-z", "--name-only", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, name := range strings.Split(out, "\x00") {
+		if name != "" {
+			res = append(res, name)
+		}
+	}
+	return res, nil
+}
+
 // HeadLinks lists the symbolic links of HEAD below root, by path relative to
 // root, sorted. It writes nothing.
 func HeadLinks(root string) ([]string, error) {

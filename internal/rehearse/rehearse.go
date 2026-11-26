@@ -142,7 +142,11 @@ func Run(o Options) error {
 	if r.head, err = assess.HeadOf(root, verb); err != nil {
 		return err
 	}
-	if err := r.overlay.Check(root, parsed); err != nil {
+	var external *project.Config
+	if o.Config != "" {
+		external = parsed
+	}
+	if err := r.overlay.Check(root, external, r.cfgLabel, parsed, r.cfgLabel); err != nil {
 		return err
 	}
 	out, err := assess.PrepareOut(root, o.Out, verb)

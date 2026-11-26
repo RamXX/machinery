@@ -27,6 +27,17 @@ stdout '^checked: 2 failure modes, 0 abuse cases, 2 imported, 0 unlinked$'
 stdout '^checked: 2 failure modes, 1 linked, 0 unlinked, 1 subject-less, 0 invokes, '
 stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
 
+# a declaration without a reason, or beside a subject, declares nothing: the row counts as
+# unlinked and the stage does not pass, run alone or not
+cp links-blank.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 1 linked, 1 unlinked, 0 invokes, '
+stdout '^not demonstrated: 1 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+cp links-both.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 1 linked, 1 unlinked, 0 invokes, '
+stdout '^not demonstrated: 1 of 2 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+
 # every row declared subject-less: nothing was compared with the design
 cp links-all-declared.yaml design/links.yaml
 exec mrun 1 lint --stage xref-failure
@@ -118,6 +129,16 @@ links:
 version: 1
 links:
   - {id: RISK-1, no_subject: "the card reader is hardware the desk does not own or model"}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- links-blank.yaml --
+version: 1
+links:
+  - {id: RISK-1, no_subject: " "}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- links-both.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend", no_subject: "the card reader is hardware", required: surface}
   - {id: RISK-2, subject: "act:Loan.lend", required: surface}
 -- links-all-declared.yaml --
 version: 1

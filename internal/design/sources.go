@@ -36,12 +36,17 @@ type FailureMode struct {
 // takes part in no subject rule (section 5.4.1).
 func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
 
-// SubjectLess reports a failure mode declared to name no subject, with the
-// reason (no_subject). Like an unlinked row it takes part in no subject rule.
-func (fm FailureMode) SubjectLess() bool { return fm.NoSubject != nil }
+// SubjectLess reports a failure mode declared to name no subject: no_subject
+// with a reason, and no subject beside it. Like an unlinked row it takes part
+// in no subject rule.
+func (fm FailureMode) SubjectLess() bool {
+	return fm.NoSubject != nil && strings.TrimSpace(*fm.NoSubject) != "" && fm.Subject == ""
+}
 
-// Named reports a failure mode that names a subject.
-func (fm FailureMode) Named() bool { return !fm.Unlinked() && !fm.SubjectLess() }
+// Named reports a failure mode that names a subject. One that is neither
+// named nor subject-less is unaccounted for: an unlinked row, or a
+// no_subject without a reason or beside a subject.
+func (fm FailureMode) Named() bool { return !fm.Unlinked() && fm.NoSubject == nil }
 
 type failureFile struct {
 	Version      int           `yaml:"version"`
@@ -120,9 +125,9 @@ func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
 		problems = append(problems, fmt.Sprintf("%s: kind must be fault or abuse, got %q", where, fm.Kind))
 	}
 	switch {
-	case fm.SubjectLess() && fm.Subject != "":
+	case fm.NoSubject != nil && fm.Subject != "":
 		problems = append(problems, where+": subject and no_subject are both set; name the subject or say why there is none")
-	case fm.SubjectLess():
+	case fm.NoSubject != nil:
 		if strings.TrimSpace(*fm.NoSubject) == "" {
 			problems = append(problems, where+": no_subject needs a reason")
 		}
@@ -131,7 +136,7 @@ func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
 	}
 	switch fm.Required {
 	case "":
-		if !link || !fm.SubjectLess() {
+		if !link || fm.NoSubject == nil {
 			problems = append(problems, fmt.Sprintf("%s: required must be fail-closed, retry-bounded, surface or refuse, got %q", where, fm.Required))
 		}
 	case "fail-closed", "retry-bounded", "surface":

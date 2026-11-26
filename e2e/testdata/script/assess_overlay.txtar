@@ -16,10 +16,28 @@ exec mrun 2 -C proj assess --overlay hollow --out out
 stderr '^usage: --overlay hollow holds no file$'
 exec mrun 2 -C proj assess --overlay ov --config other.yaml --out out
 stderr '^usage: --overlay ov holds machinery.yaml and --config is given; keep one$'
+# only the config and the design sources the config of HEAD names: a test, code, a file of
+# another spelling, any other file
 exec mrun 2 -C proj assess --overlay ov-test --out out
-stderr '^usage: --overlay ov-test: e2e/loans.sh is under trace.tests; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+stderr '^usage: --overlay ov-test: e2e/loans.sh is not a design source of machinery.yaml at HEAD: an overlay holds only the config and the design sources it names \(design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links\)$'
 exec mrun 2 -C proj assess --overlay ov-code --out out
-stderr '^usage: --overlay ov-code: internal/desk/extra.go is under trace.code; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+stderr '^usage: --overlay ov-code: internal/desk/extra.go is not a design source of machinery.yaml at HEAD: '
+exec mrun 2 -C proj assess --overlay ov-extra --out out
+stderr '^usage: --overlay ov-extra: design/notes/why.md is not a design source of machinery.yaml at HEAD: '
+exec mrun 2 -C proj assess --overlay ov-upper --out out
+stderr '^usage: --overlay ov-upper: E2E/loans.sh differs from e2e of HEAD only by case; an overlay path is written as HEAD has it$'
+exec mrun 2 -C proj assess --overlay ov-case --out out
+stderr '^usage: --overlay ov-case: design/Risk-Links.yaml differs from design/risk-links.yaml of HEAD only by case; an overlay path is written as HEAD has it$'
+exec mrun 2 -C proj assess --overlay ov-newcase --out out
+stderr '^usage: --overlay ov-newcase: DESIGN/status.yaml differs from design of HEAD only by case; an overlay path is written as HEAD has it$'
+mkdir ov-uni/design
+exec sh -c 'f=$(printf "ov-uni/design/st\303\244tus.yaml"); printf "version: 1\n" > "$f"'
+exec mrun 2 -C proj assess --overlay ov-uni --out out
+stderr '^usage: --overlay ov-uni: design/st.*tus.yaml is not written in ASCII; an overlay path holds ASCII characters only$'
+# the config of HEAD judges, never the one in the overlay: an overlaid config that names a
+# test as a design source and drops the trace block admits nothing
+exec mrun 2 -C proj assess --overlay ov-cfg --out out
+stderr '^usage: --overlay ov-cfg: e2e/loans.sh is not a design source of machinery.yaml at HEAD: '
 exec mrun 2 -C proj assess --overlay ov-git --out out
 stderr '^usage: --overlay ov-git: .git/config: an overlay never writes under .git$'
 exec mrun 2 -C proj assess --overlay ov-through --out out
@@ -38,12 +56,12 @@ exec mrun 2 -C proj assess --overlay ov-badcfg --out out
 stderr '^config: machinery.yaml: version must be 2$'
 ! exists out
 
-# the overlay: a links file that leaves one row unlinked, a new file, and the config
+# the overlay: a links file that leaves one row unlinked, a status file HEAD does not have, and the config
 exec machinery -C proj assess --overlay ov --out out
 stdout '^project: proj at [0-9a-f]{7}$'
-stdout '^overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD: design/notes/why.md, design/risk-links.yaml, machinery.yaml$'
+stdout '^overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD: design/risk-links.yaml, design/status.yaml, machinery.yaml$'
 cmp out/snapshot/design/risk-links.yaml ov/design/risk-links.yaml
-cmp out/snapshot/design/notes/why.md ov/design/notes/why.md
+cmp out/snapshot/design/status.yaml ov/design/status.yaml
 grep '^systems:$' out/snapshot/machinery.yaml
 
 # the run is the run of the overlaid design: the fourth row is unlinked there, not at HEAD
@@ -54,7 +72,7 @@ grep '^not demonstrated: 1 of 4 failure modes name no subject; ' out/stages/xref
 grep '^- config: --overlay machinery.yaml$' out/report.md
 grep '^- overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/report.md
 exec sh -c 'grep -x "  - \`design/risk-links.yaml\` sha256 $(shasum -a 256 ov/design/risk-links.yaml | cut -c1-64)" out/report.md'
-exec sh -c 'grep -x "  - \`design/notes/why.md\` sha256 $(shasum -a 256 ov/design/notes/why.md | cut -c1-64)" out/report.md'
+exec sh -c 'grep -x "  - \`design/status.yaml\` sha256 $(shasum -a 256 ov/design/status.yaml | cut -c1-64)" out/report.md'
 exec sh -c 'grep -x "  - \`machinery.yaml\` sha256 $(shasum -a 256 ov/machinery.yaml | cut -c1-64)" out/report.md'
 grep '^  "config": "--overlay machinery.yaml",$' out/report.json
 grep '^  "overlay": \[$' out/report.json
@@ -84,8 +102,23 @@ links:
   - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
   - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
   - {id: RISK-3, subject: "state:loan.Lost", required: surface}
--- ov/design/notes/why.md --
+-- ov/design/status.yaml --
+version: 1
+-- ov-extra/design/notes/why.md --
 Why the fourth row is not linked yet.
+-- ov-upper/E2E/loans.sh --
+echo replaced
+-- ov-case/design/Risk-Links.yaml --
+version: 1
+links: []
+-- ov-newcase/DESIGN/status.yaml --
+version: 1
+-- ov-cfg/machinery.yaml --
+version: 2
+design:
+  risk: e2e/loans.sh
+-- ov-cfg/e2e/loans.sh --
+echo replaced
 -- ov/machinery.yaml --
 version: 2
 scope: ["internal/**"]

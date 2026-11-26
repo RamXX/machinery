@@ -52,11 +52,12 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   failure mode says it has none with `no_subject: "<reason>"`, in the failure-mode file or the
   links file.
 - Failure-mode subject `system:<name>` for the system as a whole or a named part of it, with the
-  names declared under `systems` in `machinery.yaml`.
+  names declared under `systems` in `machinery.yaml`; no waiver covers an unknown name.
 - Links entries that cover many rows: `ids` takes ids and inclusive ranges
   (`FM-01..FM-23`); two entries that name the same row are a finding that names both.
 - `assess --overlay <dir>` and `adopt --rehearse --overlay <dir>`: design-side files laid over
-  the snapshot, listed in the report with their sha256; code and tests are refused.
+  the snapshot, listed in the report with their sha256. An overlay holds only the config and
+  the design sources the config of `HEAD` (or `--config`) names.
 
 ### Carried forward from v1
 

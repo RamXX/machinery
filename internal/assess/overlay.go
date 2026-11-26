@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/project"
@@ -111,32 +112,65 @@ func (o *Overlay) Config() []byte {
 	return nil
 }
 
-// Check refuses what an overlay may not hold, before anything is written: a
-// file stage trace would read for tags under cfg (trace.tests, or trace.code
-// inside scope), and a path at or below a symbolic link of HEAD. cfg is the
-// config of the run, nil when it has none.
-func (o *Overlay) Check(root string, cfg *project.Config) error {
+// others lists the files of the overlay but the config, which is the config
+// of the run and is not laid over the snapshot.
+func (o *Overlay) others() []OverlayFile {
+	var res []OverlayFile
+	for _, f := range o.Files {
+		if f.Path != project.ConfigName {
+			res = append(res, f)
+		}
+	}
+	return res
+}
+
+// Check refuses what an overlay may not hold, before anything is written
+// (section 18.2). The judge is the machinery.yaml of HEAD when HEAD has one,
+// else external (the --config file, labelled externalLabel, nil for none):
+// never a config of the overlay. A file of the overlay must be a design
+// source the judge names, spelled as HEAD spells it, in ASCII, not at or
+// below a symbolic link of HEAD, and matched by no code or test glob of the
+// judge or of run, the config of the run (labelled runLabel, nil for none).
+func (o *Overlay) Check(root string, external *project.Config, externalLabel string, run *project.Config, runLabel string) error {
 	if o == nil {
 		return nil
 	}
-	if cfg == nil {
-		return usagef("--overlay %s needs a config (--config, the machinery.yaml of the project or one in the overlay): trace.code and trace.tests say what an overlay may not replace", o.Dir)
+	others := o.others()
+	if len(others) == 0 {
+		return nil
+	}
+	judge, label := external, externalLabel
+	if data, ok := gitx.Show(root, "HEAD", project.ConfigName); ok {
+		cfg, err := project.Parse(data)
+		if err != nil {
+			return project.Errf("%s at HEAD, which judges the overlay: %v", project.ConfigName, err)
+		}
+		judge, label = cfg, project.ConfigName+" at HEAD"
+	}
+	if judge == nil {
+		return usagef("--overlay %s needs a config to be judged by (the %s of HEAD, or --config): it says which files are design sources, and a config in the overlay never does", o.Dir, project.ConfigName)
+	}
+	paths, err := gitx.HeadPaths(root)
+	if err != nil {
+		return err
 	}
 	links, err := gitx.HeadLinks(root)
 	if err != nil {
 		return err
 	}
-	const why = "an overlay is for design-side files (links, status, risk, config), never for code or tests"
-	for _, f := range o.Files {
-		if f.Path == project.ConfigName {
-			continue // the config of the run, not a file laid over the snapshot
+	head := map[string]string{} // folded path or directory of HEAD -> as HEAD spells it
+	for _, p := range paths {
+		for _, pre := range prefixes(p) {
+			head[foldPath(pre)] = pre
 		}
-		if t := cfg.Trace; t != nil {
-			switch {
-			case project.Match(t.Tests, f.Path):
-				return o.refuse("%s is under trace.tests; %s", f.Path, why)
-			case project.Match(t.Code, f.Path) && project.Match(cfg.Scope, f.Path):
-				return o.refuse("%s is under trace.code; %s", f.Path, why)
+	}
+	for _, f := range others {
+		if !isASCII(f.Path) {
+			return o.refuse("%s is not written in ASCII; an overlay path holds ASCII characters only", f.Path)
+		}
+		for _, pre := range prefixes(f.Path) {
+			if spelled, ok := head[foldPath(pre)]; ok && spelled != pre {
+				return o.refuse("%s differs from %s of HEAD only by case; an overlay path is written as HEAD has it", f.Path, spelled)
 			}
 		}
 		for _, l := range links {
@@ -144,8 +178,116 @@ func (o *Overlay) Check(root string, cfg *project.Config) error {
 				return o.refuse("%s: %s is a symbolic link at HEAD; an overlay never writes through or over a link", f.Path, l)
 			}
 		}
+		if !designSource(judge, f.Path) {
+			return o.refuse("%s is not a design source of %s: an overlay holds only the config and the design sources it names (design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links)", f.Path, label)
+		}
+		for _, c := range []struct {
+			cfg   *project.Config
+			label string
+		}{{judge, label}, {run, runLabel}} {
+			if key := evidenceKey(c.cfg, f.Path); key != "" {
+				return o.refuse("%s is under %s of %s; an overlay never replaces what is read as code or tests", f.Path, key, c.label)
+			}
+		}
 	}
 	return nil
+}
+
+// designSource reports whether cfg names rel as a design source: one of
+// design.models, a file below design.machines, design.failure_modes,
+// design.risk, design.facts, design.owed, design.status, or
+// import.failure_modes.links. The spelling must be the config's.
+func designSource(cfg *project.Config, rel string) bool {
+	d := cfg.Design
+	named := append([]string{d.FailureModes, d.Risk, d.Facts, d.Owed, d.Status}, d.Models...)
+	if im := cfg.ImportedFailureModes(); im != nil {
+		named = append(named, im.Links)
+	}
+	for _, n := range named {
+		if n != "" && path.Clean(n) == rel {
+			return true
+		}
+	}
+	return d.Machines != "" && strings.HasPrefix(rel, path.Clean(d.Machines)+"/")
+}
+
+// evidenceKey names the first key of cfg whose globs match rel, compared as
+// written and with case folded, whatever the scope: the globs under which
+// files are read as code or as tests. "" when none does, or cfg is nil.
+func evidenceKey(cfg *project.Config, rel string) string {
+	if cfg == nil {
+		return ""
+	}
+	type set struct {
+		key   string
+		globs []string
+	}
+	var sets []set
+	if t := cfg.Trace; t != nil {
+		sets = append(sets, set{"trace.code", t.Code}, set{"trace.tests", t.Tests})
+	}
+	if t := cfg.Tests; t != nil {
+		sets = append(sets, set{"tests.e2e", t.E2E}, set{"tests.files", t.Files})
+	}
+	if c := cfg.Constraints; c != nil {
+		for _, l := range c.Layers {
+			sets = append(sets, set{"constraints.layers", l.Paths})
+		}
+		if c.Size != nil {
+			sets = append(sets, set{"constraints.size.paths", c.Size.Paths})
+		}
+	}
+	for _, s := range sets {
+		folded := make([]string, len(s.globs))
+		for i, g := range s.globs {
+			folded[i] = foldPath(g)
+		}
+		if project.Match(s.globs, rel) || project.Match(folded, foldPath(rel)) {
+			return s.key
+		}
+	}
+	return ""
+}
+
+// prefixes lists a path and every directory above it, shortest first.
+func prefixes(rel string) []string {
+	segs := strings.Split(rel, "/")
+	res := make([]string, 0, len(segs))
+	for i := range segs {
+		res = append(res, strings.Join(segs[:i+1], "/"))
+	}
+	return res
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
+// asciiTwins are the characters whose canonical form is one ASCII character:
+// a file system that normalises names takes each for its twin.
+var asciiTwins = map[rune]rune{'\u212a': 'K', '\u037e': ';', '\u1fef': '`'}
+
+// foldPath is the key two paths share when a file system that folds case and
+// normalises names would take them for one, given that one of them is ASCII:
+// every character becomes the smallest of its case orbit.
+func foldPath(p string) string {
+	return strings.Map(func(r rune) rune {
+		if t, ok := asciiTwins[r]; ok {
+			r = t
+		}
+		least := r
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			if f < least {
+				least = f
+			}
+		}
+		return least
+	}, p)
 }
 
 // Paths lists the overlaid files.

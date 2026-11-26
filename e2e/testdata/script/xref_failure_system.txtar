@@ -22,13 +22,22 @@ stdout '^passed$'
 # an unknown name is an error
 cp unknown.yaml design/failure-modes.yaml
 exec mrun 1 lint --stage xref-failure
-stdout '^  ERROR  subject-resolves: system:warehouse: failure mode shelf-collapses: warehouse is not a configured system; declare it under systems in machinery.yaml$'
+stdout '^  ERROR  unknown-system: system:warehouse: failure mode shelf-collapses: warehouse is not a configured system; declare it under systems in machinery.yaml \(no waiver covers an unknown system\)$'
 stdout '^failed: 1 finding\(s\)$'
 
-# the finding is waived like any subject-resolves finding
+# no waiver covers it: one on subject-resolves matches nothing and is stale, and the rule
+# itself cannot be waived
+cp machinery.yaml config.orig
 exec sh -c 'printf "  - {rule: subject-resolves, id: \"system:warehouse\", reason: \"the warehouse is declared next\"}\n" >> machinery.yaml'
-exec machinery lint --stage xref-failure
-stdout '^  warn   waived: subject-resolves: system:warehouse: '
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  unknown-system: system:warehouse: '
+stdout '^  ERROR  stale waiver: subject-resolves system:warehouse$'
+! stdout 'waived'
+cp config.orig machinery.yaml
+exec sh -c 'printf "  - {rule: unknown-system, id: \"system:warehouse\", reason: \"the warehouse is declared next\"}\n" >> machinery.yaml'
+exec mrun 2 lint --stage xref-failure
+stderr '^config: waivers: "unknown-system" is not a rule that can be waived$'
+cp config.orig machinery.yaml
 
 # the value rules stay: required is mandatory, a name is needed, and an abuse case needs an
 # act or entity subject

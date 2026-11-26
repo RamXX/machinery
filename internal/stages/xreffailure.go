@@ -59,22 +59,35 @@ func XrefFailure(ctx *Context) *report.Stage {
 		systems["system:"+sy.Name] = true
 	}
 	named, abused := map[string]bool{}, map[string]bool{}
-	linked, unlinked, subjectLess := 0, 0, 0
+	linked, unlinked, subjectLess, unlinkedRows := 0, 0, 0, 0
 	for _, fm := range d.FailureModes {
 		switch {
-		case fm.Unlinked():
-			unlinked++
-			continue // names nothing (section 5.4.1)
 		case fm.SubjectLess():
 			subjectLess++
 			continue // names nothing, and says why (section 5.4)
+		case !fm.Named():
+			// names nothing and does not say why: an unlinked row (section
+			// 5.4.1), or a no_subject without a reason or beside a subject
+			unlinked++
+			if fm.Imported {
+				unlinkedRows++
+			}
+			continue
 		}
 		linked++
 		named[fm.Subject] = true
 		if fm.Kind == "abuse" {
 			abused[fm.Subject] = true
 		}
-		if why := unresolved(d, fm.Subject, invokes, deps, systems, fstates, fevents); why != "" {
+		if strings.HasPrefix(fm.Subject, "system:") {
+			if !systems[fm.Subject] {
+				// not a subject-resolves finding: no waiver covers an unknown system
+				s.Errorf("unknown-system: %s: failure mode %s: %s is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)",
+					fm.Subject, fm.ID, strings.TrimPrefix(fm.Subject, "system:"))
+			}
+			continue
+		}
+		if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
 			w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
 		}
 	}
@@ -109,7 +122,7 @@ func XrefFailure(ctx *Context) *report.Stage {
 	})
 	w.stale(s)
 	s.Count(len(d.FailureModes), "failure modes")
-	if d.ImportsFM {
+	if d.ImportsFM || unlinked > 0 {
 		s.Count(linked, "linked").Count(unlinked, "unlinked")
 	}
 	if subjectLess > 0 {
@@ -124,8 +137,12 @@ func XrefFailure(ctx *Context) *report.Stage {
 	case unlinked > 0:
 		// a row that names nothing and does not say why was not compared
 		// with the design: one linked row among many is no pass
-		s.NotDemonstrated(fmt.Sprintf("%d of %d failure modes name no subject; link each in %s or declare it there with no_subject and a reason",
-			unlinked, len(d.FailureModes), linksTarget(p)))
+		todo := "give each a subject in " + d.FailureModeTarget()
+		if unlinkedRows > 0 {
+			todo = "link each in " + linksTarget(p)
+		}
+		s.NotDemonstrated(fmt.Sprintf("%d of %d failure modes name no subject; %s or declare it there with no_subject and a reason",
+			unlinked, len(d.FailureModes), todo))
 	case len(d.FailureModes) > 0 && linked == 0:
 		// every failure mode is declared subject-less: none was compared
 		s.NotDemonstrated("no failure mode names a subject")
@@ -208,7 +225,7 @@ func UnmodeledFailures(ctx *Context) []project.Waiver {
 
 // unresolved says why a well-formed subject names nothing, or "".
 // Malformed subjects are the failure-modes stage's finding.
-func unresolved(d *design.Design, subject string, invokes, deps, systems, fstates, fevents map[string]bool) string {
+func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevents map[string]bool) string {
 	kind, name, ok := strings.Cut(subject, ":")
 	if !ok {
 		return ""
@@ -226,10 +243,6 @@ func unresolved(d *design.Design, subject string, invokes, deps, systems, fstate
 	case "dependency":
 		if !deps[subject] {
 			return fmt.Sprintf("%s is not a configured dependency", name)
-		}
-	case "system":
-		if !systems[subject] {
-			return fmt.Sprintf("%s is not a configured system; declare it under systems in machinery.yaml", name)
 		}
 	case "act":
 		if !d.IsAct(subject) {

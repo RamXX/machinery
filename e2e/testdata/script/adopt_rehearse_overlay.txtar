@@ -10,11 +10,23 @@ cd ..
 exec mrun 2 -C proj adopt --overlay ov
 stderr '^usage: --overlay goes with --rehearse$'
 exec mrun 2 -C proj adopt --rehearse --overlay ov --out out
-stderr '^usage: --overlay ov needs a config \(--config, the machinery.yaml of the project or one in the overlay\): trace.code and trace.tests say what an overlay may not replace$'
+stderr '^usage: --overlay ov needs a config to be judged by \(the machinery.yaml of HEAD, or --config\): it says which files are design sources, and a config in the overlay never does$'
+exec mrun 2 -C proj adopt --rehearse --overlay ov-cfg --out out
+stderr '^usage: --overlay ov-cfg needs a config to be judged by \(the machinery.yaml of HEAD, or --config\): it says which files are design sources, and a config in the overlay never does$'
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-test --out out
-stderr '^usage: --overlay ov-test: e2e/orders.sh is under trace.tests; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+stderr '^usage: --overlay ov-test: e2e/orders.sh is not a design source of --config shop.yaml: an overlay holds only the config and the design sources it names \(design.models, design.machines, design.failure_modes, design.risk, design.facts, design.owed, design.status, import.failure_modes.links\)$'
 exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-code --out out
-stderr '^usage: --overlay ov-code: internal/domain/order.go is under trace.code; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+stderr '^usage: --overlay ov-code: internal/domain/order.go is not a design source of --config shop.yaml: '
+# a config that names a test or code as a design source admits neither: what the globs of
+# trace, tests and constraints match is never replaced, in any letter case, inside scope or not
+exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-risk --out out
+stderr '^usage: --overlay ov-risk: e2e/risk.yaml is under trace.tests of --config tricky.yaml; an overlay never replaces what is read as code or tests$'
+exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-status --out out
+stderr '^usage: --overlay ov-status: lib/domain/status.yaml is under constraints.layers of --config tricky.yaml; '
+exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-facts --out out
+stderr '^usage: --overlay ov-facts: cmd/facts.yaml is under trace.code of --config tricky.yaml; '
+exec mrun 2 -C proj adopt --rehearse --config tricky.yaml --overlay ov-owed --out out
+stderr '^usage: --overlay ov-owed: Smoke/owed.yaml is under tests.e2e of --config tricky.yaml; '
 ! exists out
 
 # the overlay adds a failure mode: one more obligation is owed than at HEAD
@@ -75,6 +87,35 @@ failure_modes:
     failure: "The warehouse floods."
     required: surface
     behavior: "Orders are held until the stock is counted again."
+-- tricky.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  risk: e2e/risk.yaml
+  status: lib/domain/status.yaml
+  facts: cmd/facts.yaml
+  owed: Smoke/owed.yaml
+trace:
+  code: ["cmd/**"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["smoke/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["lib/domain/**"]}
+-- ov-risk/e2e/risk.yaml --
+version: 1
+-- ov-status/lib/domain/status.yaml --
+version: 1
+-- ov-facts/cmd/facts.yaml --
+version: 1
+-- ov-owed/Smoke/owed.yaml --
+version: 1
+-- ov-cfg/machinery.yaml --
+version: 2
+-- ov-cfg/design/owed.yaml --
+version: 1
+owed: []
 -- ov-test/e2e/orders.sh --
 echo replaced
 -- ov-code/internal/domain/order.go --
