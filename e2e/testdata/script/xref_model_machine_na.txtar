@@ -9,9 +9,14 @@ cp no-models.yaml machinery.yaml
 exec machinery lint --stage xref-model-machine
 stdout 'not applicable: no design.models configured'
 
-# a machines directory without machine files has nothing to check
+# a machines directory without machine files: the entity with actions has no lifecycle machine,
+# and with that waived there is nothing to check; never a pass
 mkdir design/empty
 cp empty-dir.yaml machinery.yaml
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  entity-machine: entity:Order: declares 4 action\(s\) and no machine is its lifecycle; '
+stdout '^failed: 1 finding\(s\)$'
+exec sh -c 'cat empty-dir.yaml waiver.yaml > machinery.yaml'
 exec mrun 1 lint --stage xref-model-machine
 stdout 'not demonstrated: nothing to check'
 
@@ -30,3 +35,6 @@ design:
   models:
     - design/model/shop.modelith.yaml
   machines: design/empty
+-- waiver.yaml --
+waivers:
+  - {rule: entity-machine, id: "entity:Order", reason: "the order lifecycle is written next"}
