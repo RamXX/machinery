@@ -570,7 +570,9 @@ A project that already keeps its failure modes as tables in a Markdown document 
   block is not read. A row line outside every table whose first cell matches `id` (a blank line
   ended its table, or it never had a header) is
   `ERROR  <file>:<line>: <cell>: the row is in no table (a table needs a header row and a delimiter row above its rows, and a blank line ends it)`,
-  and it is not read.
+  and it is not read. Consecutive row lines outside every table have one missing header between
+  them, so they are one finding, at the first matching row, when more than one of them matches:
+  `ERROR  <file>:<line>: <cell>: the row and the <n> after it, to <last cell> on line <m>, are in no table (a table needs a header row and a delimiter row above its rows, and a blank line ends it)`.
 - **Rows.** A row whose first cell, trimmed, matches `id` in full is a failure mode. A row whose
   first cell does not match is ignored, and so is a table with no such row.
 - **Columns.** The header row of a row's own table decides its columns, by name and never by

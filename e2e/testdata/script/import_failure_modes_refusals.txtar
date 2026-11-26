@@ -38,8 +38,9 @@ stdout 'ERROR  docs/risks.md:10: RISK-1: duplicate id, first on line 3'
 ! stdout 'docs/risks.md:10: RISK-1: the table header'
 stdout 'ERROR  docs/risks.md:14: RISK-4: the table header has no failure column \(Failure\)'
 stdout 'ERROR  docs/risks.md:18: RISK-x_1: the id lower-cased, risk-x_1, must match \^\[a-z\]\[a-z0-9-\]\+\$'
-stdout 'ERROR  docs/risks.md:20: RISK-5: the row is in no table \(a table needs a header row and a delimiter row above its rows, and a blank line ends it\)'
-stdout 'ERROR  docs/risks.md:22: RISK-6: the row is in no table'
+stdout 'ERROR  docs/risks.md:20: RISK-5: the row and the 1 after it, to RISK-6 on line 22, are in no table \(a table needs a header row and a delimiter row above its rows, and a blank line ends it\)'
+! stdout 'docs/risks.md:22: RISK-6'
+stdout 'ERROR  docs/risks.md:25: RISK-8: the row is in no table \(a table needs a header row and a delimiter row above its rows, and a blank line ends it\)'
 ! stdout 'RISK-0'
 ! stdout 'RISK-7'
 stdout 'checked: 6 failure modes, 0 abuse cases, 6 imported, 6 unlinked'
@@ -164,6 +165,8 @@ import:
 | P2 | A row of no failure mode, also outside a table. | - |
 RISK-6 | A row without a header. | Rejected.
 Prose that names RISK-7 | in passing is not a row of a failure mode.
+
+| RISK-8 | A row alone after a blank line. | Rejected. |
 -- clean.md --
 | Risk | Failure | Expected |
 |---|---|---|

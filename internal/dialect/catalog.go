@@ -50,11 +50,25 @@ func Catalog(rel string, data []byte, id *regexp.Regexp, cols Columns) (rows []R
 			continue
 		}
 		if i+1 >= len(lines) || !isDelimiter(lines[i+1]) {
-			// a row outside every table: a blank line ended its table, or
-			// it never had a header
-			if cells := splitRow(lines[i]); len(cells) > 0 && id.MatchString(cells[0]) {
-				problems = append(problems, fmt.Sprintf("%s:%d: %s: the row is in no table (a table needs a header row and a delimiter row above its rows, and a blank line ends it)", rel, i+1, cells[0]))
+			// rows outside every table: a blank line ended their table, or
+			// it never had a header. One missing header is one finding for
+			// the whole run of lines, not one per row.
+			var orphans []Row
+			j := i
+			for ; j < len(lines) && isRow(lines[j]) && (j+1 >= len(lines) || !isDelimiter(lines[j+1])); j++ {
+				if cells := splitRow(lines[j]); len(cells) > 0 && id.MatchString(cells[0]) {
+					orphans = append(orphans, Row{Cell: cells[0], Line: j + 1})
+				}
 			}
+			const why = "(a table needs a header row and a delimiter row above its rows, and a blank line ends it)"
+			switch n := len(orphans); {
+			case n == 1:
+				problems = append(problems, fmt.Sprintf("%s:%d: %s: the row is in no table %s", rel, orphans[0].Line, orphans[0].Cell, why))
+			case n > 1:
+				last := orphans[n-1]
+				problems = append(problems, fmt.Sprintf("%s:%d: %s: the row and the %d after it, to %s on line %d, are in no table %s", rel, orphans[0].Line, orphans[0].Cell, n-1, last.Cell, last.Line, why))
+			}
+			i = j - 1
 			continue
 		}
 		header := splitRow(lines[i])
