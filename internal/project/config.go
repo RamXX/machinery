@@ -135,8 +135,16 @@ type Dependency struct {
 }
 
 type Trace struct {
-	Code  []string `yaml:"code,omitempty"`
-	Tests []string `yaml:"tests,omitempty"`
+	Code    []string `yaml:"code,omitempty"`
+	Tests   []string `yaml:"tests,omitempty"`
+	Markers *Markers `yaml:"markers,omitempty"`
+}
+
+// Markers are a project's own trace markers, literal prefixes (section 8.1).
+type Markers struct {
+	Serves    []string `yaml:"serves,omitempty"`
+	Verifies  []string `yaml:"verifies,omitempty"`
+	Scenarios []string `yaml:"scenarios,omitempty"`
 }
 
 type Tests struct {
@@ -362,6 +370,18 @@ func (c *Config) validate() error {
 	}
 	if c.Trace != nil {
 		steps = append(steps, check("trace.code", c.Trace.Code...), check("trace.tests", c.Trace.Tests...))
+		if m := c.Trace.Markers; m != nil {
+			for _, kind := range []struct {
+				name    string
+				markers []string
+			}{{"serves", m.Serves}, {"verifies", m.Verifies}, {"scenarios", m.Scenarios}} {
+				for _, mk := range kind.markers {
+					if strings.TrimSpace(mk) == "" {
+						return Errf("trace.markers.%s: a marker must not be empty", kind.name)
+					}
+				}
+			}
+		}
 	}
 	if c.Tests != nil {
 		steps = append(steps, check("tests.e2e", c.Tests.E2E...), check("tests.baseline", c.Tests.Baseline))

@@ -84,6 +84,27 @@ modes, a TLA+ spec of the order payment (`order-payment`) and an Alloy spec of o
 counterexample. The helper `shopformal` (`e2e/testdata/bin`) generates, commits, stamps
 `sources.read_at` and writes the skeletons.
 
+## `library`
+
+A project that keeps its design in its own formats, read through `import` and `trace.markers`
+without converting anything. Generated files are not part of the fixture.
+
+- `machines/loan.json`: the lifecycle of entity `Loan` in a JSON dialect (`entity`, `notes`,
+  `startable`, `skip`, `allowed`, `denied`) with lower-case state names. Translated with
+  `states: capitalize`, it is machine `loan`: 4 states (`Lost` is tagged `failure`), 3
+  transitions, 3 ignores, 1 refusal, entry state `Lent`.
+- `machines/hold-queue.json`: machine `hold_queue`, operational, 2 states, 4 transitions, one
+  invoke (`sendNotice`).
+- `design/model/library.modelith.yaml`: entity `Loan` (statuses Reserved, Lent, Returned, Lost),
+  3 actions, 2 invariants, 2 scenarios.
+- `docs/risks.md`: 4 failure modes `RISK-1` to `RISK-4` in two table layouts, beside a table that
+  holds none; `design/risk-links.yaml` links 3 of them (one abuse case). `fm:risk-4` is owed.
+- `internal/desk/desk.go` and `e2e/loans.sh` claim every id through the markers `Implements:`,
+  `Checks:`, `Proves:` and `Scenario:`.
+
+Counts the scripts rely on: 19 obligations (11 cases, 2 invariants, 2 scenarios, 4 failure
+modes), 3 act ids; `machinery check` passes.
+
 ## `brownfield`
 
 A small existing Go project, module `example.test/depot`, standard library only, with no

@@ -1,0 +1,28 @@
+{
+  "id": "loan",
+  "entity": "Loan",
+  "notes": "one copy lent to one member",
+  "startable": ["lent"],
+  "initial": "reserved",
+  "states": {
+    "reserved": {
+      "on": {
+        "lend": {"target": "lent", "guard": "memberInGoodStanding", "allowed": ["Librarian"],
+                 "denied": "a member with unpaid fines is refused with MEMBER_BLOCKED; the loan stays reserved"}
+      },
+      "skip": {
+        "giveBack": "nothing is lent yet; the desk refuses with NOT_LENT",
+        "reportLost": "nothing is lent yet; the desk refuses with NOT_LENT"
+      }
+    },
+    "lent": {
+      "on": {
+        "giveBack": {"target": "returned", "allowed": ["Member", "Librarian"]},
+        "reportLost": {"target": "lost", "allowed": ["Librarian"]}
+      },
+      "skip": {"lend": "already lent; the desk refuses with ALREADY_LENT"}
+    },
+    "returned": {"type": "final"},
+    "lost": {"type": "final", "tags": "failure"}
+  }
+}

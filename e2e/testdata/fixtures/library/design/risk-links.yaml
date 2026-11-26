@@ -1,0 +1,5 @@
+version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
+  - {id: RISK-3, subject: "state:loan.Lost", required: surface}

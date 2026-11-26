@@ -1,0 +1,153 @@
+# a project's own markers claim ids like machinery:serves and machinery:verifies
+fixture shop
+cp markers.yaml m.tmp
+exec sh -c 'sed "/^  tests: /r m.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+grep '^    verifies: \["Checks:", "Proves:"\]' machinery.yaml
+cp order.go.in internal/domain/order.go
+cp orders.sh.in e2e/orders.sh
+exec machinery trace
+stdout 'checked: 2 code files, 1 test files, 4 act ids, 16 obligations'
+stdout '^passed$'
+
+# a list stops at a line that does not end with a comma: act:Order.cancel needs its own marker
+cp order-nocancel.go.in internal/domain/order.go
+exec mrun 1 trace
+stdout 'ERROR  unserved: act:Order.cancel'
+cp order.go.in internal/domain/order.go
+
+# a bare token tries inv:, act:, fm: (lower-cased) and sc: in that order
+cp fm-shadow.yaml design/failure-modes.yaml
+exec mrun 1 trace
+stdout 'ERROR  unverified: fm:terminal-is-final'
+! stdout 'unverified: inv:terminal-is-final'
+
+# what resolves to nothing is an unknown id, named by file and line
+cp fixture-fm.yaml design/failure-modes.yaml
+cp orders-unknown.sh.in e2e/orders.sh
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/orders.sh:3: nosuch'
+stdout 'ERROR  unknown-id: e2e/orders.sh:4: inv:nosuch-either'
+stdout 'ERROR  unknown-id: e2e/orders.sh:5: scenario "customer pays and the order ships"'
+stdout 'ERROR  unknown-id: e2e/orders.sh:6: tc:NOPE-\*'
+! stdout 'nosuch-from-a-string'
+! stdout 'Order.nope'
+! stdout 'nosuch-in-prose'
+
+# serves markers are read in trace.code, verifies markers in trace.tests
+cp orders-wrongplace.sh.in e2e/orders.sh
+exec mrun 1 trace
+! stdout 'Bogus'
+stdout 'ERROR  unverified: inv:customer-email-unique'
+
+# machinery affected follows the markers of a changed test file
+cp orders.sh.in e2e/orders.sh
+exec machinery gen
+gitinit
+exec git branch base
+cp extra.sh.in e2e/extra.sh
+exec machinery affected --base base
+cmp stdout want-affected.txt
+
+# an empty marker is a config error
+cp empty-marker.yaml machinery.yaml
+exec mrun 2 trace
+stderr 'config: trace.markers.verifies: a marker must not be empty'
+
+-- markers.yaml --
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- order.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+import "fmt"
+
+// Apply is a placeholder for the order behavior.
+//
+// Implements: act:Order.place, Order.pay,
+//   Order.ship
+// Order.cancel is served below, not by the line above
+func Apply(event string) string {
+	fmt.Println("Implements: Order.nope")
+	return event
+}
+
+// Cancel cancels. A verifies marker in code claims nothing:
+// Checks: inv:Bogus.fromcode
+/* Implements: Order.cancel. */
+func Cancel() {}
+-- order-nocancel.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+// Apply is a placeholder for the order behavior.
+//
+// Implements: act:Order.place, Order.pay,
+//   Order.ship
+//   Order.cancel
+func Apply(event string) string {
+	return event
+}
+-- orders.sh.in --
+#!/bin/sh
+# Fixture evidence emitter, claimed through the project's own markers.
+#
+# Checks: tc:ORDE-*,
+#   paid-before-shipped terminal-is-final,
+#   customer-email-unique.
+# Scenario: Customer pays and the order ships
+# Proves: PAYMENT-PROVIDER-DOWN
+# machinery:verifies sc:cancelled-order-refuses-payment
+echo "Checks: nosuch-from-a-string"
+true
+-- orders-unknown.sh.in --
+#!/bin/sh
+# Checks: tc:ORDE-* sc:cancelled-order-refuses-payment sc:customer-pays-and-the-order-ships
+# Proves: nosuch
+# Checks: paid-before-shipped, terminal-is-final, customer-email-unique, inv:nosuch-either
+# Scenario: customer pays and the order ships
+#  * Proves: tc:NOPE-*
+# Proves: PAYMENT-PROVIDER-DOWN (nosuch-in-prose)
+echo "Checks: nosuch-from-a-string"
+-- orders-wrongplace.sh.in --
+#!/bin/sh
+# Checks: tc:ORDE-* sc:cancelled-order-refuses-payment sc:customer-pays-and-the-order-ships
+# Checks: paid-before-shipped, terminal-is-final
+# Implements: act:Bogus.fromtest
+-- extra.sh.in --
+#!/bin/sh
+# Proves: customer-email-unique
+# Scenario: Cancelled order refuses payment
+true
+-- want-affected.txt --
+inv:customer-email-unique
+sc:cancelled-order-refuses-payment
+-- fm-shadow.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: terminal-is-final
+    subject: entity:Order
+    failure: "A final order is changed."
+    required: fail-closed
+    behavior: "The change is refused."
+-- fixture-fm.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+-- empty-marker.yaml --
+version: 2
+trace:
+  tests: ["e2e/**"]
+  markers:
+    verifies: ["Checks:", " "]

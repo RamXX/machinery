@@ -85,6 +85,10 @@ dependencies:                   # optional: external dependencies of the system
 trace:                          # optional
   code: ["internal/**/*.go"]    # files that may carry machinery:serves tags; default: scope
   tests: ["e2e/**"]             # files that may carry machinery:verifies tags
+  markers:                      # optional: the project's own markers, literal prefixes (section 8.1)
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
 tests:                          # optional: the end-to-end-only policy (section 9.4)
   e2e: ["e2e/**"]               # where tests live; default: trace.tests
   files: []                     # optional: replaces the default test-file patterns
@@ -136,6 +140,8 @@ Rules:
   `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
   `columns.failure` and `columns.behavior` (`import.failure_modes.columns.failure is required`).
   It may be set beside `design.failure_modes`.
+- An empty marker in `trace.markers` is a config error
+  (`trace.markers.verifies: a marker must not be empty`).
 - Globs use doublestar syntax: `**` matches any number of directories, `*` matches inside one path
   segment, `{a,b}` alternates.
 - `scope` bounds the static stages that read code (`arch`, `tests`, `trace`): a file outside every
@@ -839,6 +845,37 @@ is absent.
 Trace is static and cheap. It proves that a test claims an id, not that the test passed. Only
 `verify` proves that.
 
+### 8.1 A project's own markers
+
+A project that already points its code and tests at its design in its own words names those
+markers in `trace.markers`, as literal prefixes. `machinery:serves` and `machinery:verifies` keep
+working beside them, unchanged. A marker claims what the tag of the same kind claims, wherever
+tags are read: stage `trace`, `machinery affected` (section 12.1) and the served ids of
+`machinery adopt` (section 17.2).
+
+- **Where.** A `serves` marker is read in the files of `trace.code` inside `scope`, a `verifies`
+  or `scenarios` marker in the files of `trace.tests`. A marker counts only where it follows
+  nothing but whitespace and comment characters (`/`, `#`, `*`, `-`, `;`, `%`, `!`, `<`) at the
+  start of its line: `// Checks: RISK-3` and ` * Checks: RISK-3` count, `log("Checks: RISK-3")`
+  does not. When several markers match one line, the longest wins.
+- **Ids.** After a `serves` or `verifies` marker come ids, separated by commas, spaces or both.
+  Reading stops at the first token that is not an id token (section 8), and a period that ends
+  the list is ignored (`/* Implements: Order.cancel. */` serves `act:Order.cancel`). When
+  every token of a line is an id and the line ends with a comma, the list goes on with the next
+  line, read after its leading whitespace and comment characters, and so on while each line ends
+  with a comma; a line that carries a marker of its own starts its own list instead.
+- **Resolution.** A token with a kind prefix (`inv:`, `act:`, `sc:`, `tc:`, `fm:`, `fv:`, `cx:`,
+  `ck:`) is taken as written, a `*` prefix included. A bare token is tried, in order, as
+  `inv:<token>`, `act:<token>`, `fm:<token lower-cased>` and `sc:<token>`, and the first that
+  names an id of the design is taken (a bare token ending in `*` is tried the same way, as a
+  prefix). A token that resolves to nothing is `ERROR  unknown-id: <file>:<line>: <token>`, with
+  the line the token is on.
+- **Scenarios.** After a `scenarios` marker the rest of the line, trimmed, is the name of a model
+  scenario, and the marker claims (verifies) the `sc` id of the scenario with exactly that name.
+  No scenario of that name is `ERROR  unknown-id: <file>:<line>: scenario "<name>"`.
+
+The rules and the `checked:` line of stage `trace` do not change.
+
 ## 9. Architecture constraints
 
 Stage `arch` enforces the `constraints:` block.
@@ -1103,8 +1140,10 @@ Testing shifts right: per change, run what the change can break; run everything 
 the difference between `<ref>` and the working tree:
 
 1. ids whose entry in `obligations.json` is new or differs from the base (title, effects);
-2. ids named by a `machinery:verifies` tag in a changed test file;
-3. for each `act` id named by a `machinery:serves` tag in a changed code file: every `tc` id of
+2. ids named by a `machinery:verifies` tag, or claimed by a verifies or scenarios marker
+   (section 8.1), in a changed test file;
+3. for each `act` id named by a `machinery:serves` tag or a serves marker in a changed code file:
+   every `tc` id of
    the entity's lifecycle machine whose trigger is that action's event, and every `inv` id the
    action `preserves`;
 4. every `tc` id of a machine whose file changed.

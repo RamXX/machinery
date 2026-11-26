@@ -125,3 +125,8 @@ baseline, and from then on the area is held to the same rules.
 Rewrite code. Stop the stories in flight. Migrate the backlog. Model everything. Delete tests.
 Each of those can happen later, one story at a time, and the owed list and the baselines show
 exactly how far along you are.
+
+Nor did you have to convert a design you already keep. Machines in a JSON dialect of your own,
+failure modes in Markdown tables and your own trace markers in comments are read as they are,
+through `import` and `trace.markers` in `machinery.yaml` (`docs/formats.md` sections 5.2.1, 5.4.1
+and 8.1); the fixture `e2e/testdata/fixtures/library` is a small example.

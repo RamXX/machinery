@@ -1,0 +1,29 @@
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+tools:
+  xstate: true

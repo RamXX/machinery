@@ -65,23 +65,15 @@ func Compute(p *project.Project, d *design.Design, ref string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	var obligationIDs, actIDs []string
-	for _, o := range d.Obligations {
-		obligationIDs = append(obligationIDs, o.ID)
-	}
-	for _, a := range d.Served {
-		actIDs = append(actIDs, a.ID)
-	}
+	ids, scenarios := d.AllIDs(), d.ScenarioIDs()
 	for _, t := range tg {
 		for _, tok := range t.IDs {
-			switch t.Kind {
-			case tags.Verifies:
-				for _, id := range tags.Expand(tok, obligationIDs) {
-					add(id)
-				}
-			case tags.Serves:
-				for _, act := range tags.Expand(tok, actIDs) {
-					servedBy(d, act, add)
+			for _, id := range tags.Resolve(t, tok, ids, scenarios) {
+				switch {
+				case t.Kind == tags.Verifies:
+					add(id) // add keeps obligations only
+				case d.IsAct(id):
+					servedBy(d, id, add)
 				}
 			}
 		}

@@ -1,0 +1,15 @@
+{
+  "id": "hold-queue",
+  "notes": "tells members that a reserved copy is waiting",
+  "initial": "idle",
+  "_delays": {"noticeTimeout": "30000 ms - upper bound on the notice service"},
+  "states": {
+    "idle": {
+      "on": {"notify": {"target": "notifying", "allowed": ["system/scheduler"]}}
+    },
+    "notifying": {
+      "invoke": {"src": "sendNotice", "onDone": {"target": "idle"}, "onError": {"target": "idle"}},
+      "after": {"noticeTimeout": {"target": "idle"}}
+    }
+  }
+}

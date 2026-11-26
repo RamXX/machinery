@@ -191,6 +191,17 @@ func (d *Design) inventory() {
 	}
 }
 
+// ScenarioIDs maps the name of every model scenario to its sc id.
+func (d *Design) ScenarioIDs() map[string]string {
+	res := map[string]string{}
+	for _, m := range d.Models {
+		for _, s := range m.Scenarios {
+			res[s.Name] = "sc:" + Slug(s.Name)
+		}
+	}
+	return res
+}
+
 // HasFailureModes reports whether failure modes are configured, native or
 // imported.
 func (d *Design) HasFailureModes() bool { return d.HasFM || d.ImportsFM }

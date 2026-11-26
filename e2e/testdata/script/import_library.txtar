@@ -1,0 +1,56 @@
+# a project that keeps its design in its own formats (machines in a JSON dialect, failure modes in
+# Markdown tables, its own trace markers): lint, gen, gen --check and trace read it as written
+fixture library
+cp machines/loan.json loan.orig
+cp docs/risks.md risks.orig
+cp e2e/loans.sh loans.orig
+exec machinery gen
+stdout 'gen: wrote 8 file\(s\)'
+stdout 'design/gen/imported/machines/loan.machine.json'
+stdout 'design/gen/imported/machines/hold_queue.machine.json'
+
+exec machinery lint
+stdout '(?s)== model ==\nchecked: 1 models, 1 entities, 3 actions, 2 invariants, 2 scenarios\npassed\n'
+stdout '(?s)== machines ==\nchecked: 2 machines, 6 states, 7 transitions\npassed\n'
+stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 1 abuse cases, 4 imported, 1 unlinked\npassed\n'
+stdout '(?s)== xref-model-machine ==\nchecked: 2 machines, 4 domain states, 3 events, 3 actions\npassed\n'
+stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 1 invokes, 0 dependencies, 0 tiered actions, 1 failure states, 0 failure events\npassed\n'
+stdout '(?s)== xstate ==\nchecked: 2 machines, 4 cases\npassed\n'
+stdout 'machinery lint: 6 passed, 0 failed, 0 not demonstrated, 2 not applicable'
+
+exec machinery gen --check
+stdout 'checked: 7 generated files'
+stdout '^passed$'
+
+exec machinery trace
+stdout 'checked: 1 code files, 1 test files, 3 act ids, 19 obligations'
+stdout '^passed$'
+
+exec machinery check
+stdout 'machinery check: 9 passed, 0 failed, 0 not demonstrated, 6 not applicable'
+
+# the sources are read and never written
+cmp machines/loan.json loan.orig
+cmp docs/risks.md risks.orig
+cmp e2e/loans.sh loans.orig
+
+# the lifecycle machine binds to its entity through a renamed key, with capitalized domain states
+grep '"_lifecycle_of": "Loan"' design/gen/imported/machines/loan.machine.json
+grep '"initial": "Reserved"' design/gen/imported/machines/loan.machine.json
+grep '"lend": "a member with unpaid fines is refused with MEMBER_BLOCKED; the loan stays reserved"' design/gen/imported/machines/loan.machine.json
+grep '"_comment": "notes: tells members that a reserved copy is waiting"' design/gen/imported/machines/hold_queue.machine.json
+grep '"_role": "operational"' design/gen/imported/machines/hold_queue.machine.json
+grep '"source": "machines/loan.json"' design/gen/tables/loan.table.json
+grep '"requires": \[' design/gen/tables/loan.table.json
+grep '"id": "fm:risk-3"' design/gen/obligations.json
+grep '"title": "A lent copy is lost."' design/gen/obligations.json
+
+# a changed source is drift where the team looks; a marker naming nothing is an error with its line
+exec sh -c 'sed "s/ALREADY_LENT/LENT_ALREADY/" machines/loan.json > m.tmp && mv m.tmp machines/loan.json'
+exec mrun 1 gen --check
+stdout 'DRIFT  design/gen/imported/machines/loan.machine.json: stale'
+stdout 'DRIFT  design/gen/tables/loan.table.json: stale'
+cp loan.orig machines/loan.json
+exec sh -c 'echo "# Proves: RISK-5" >> e2e/loans.sh'
+exec mrun 1 trace
+stdout 'ERROR  unknown-id: e2e/loans.sh:10: RISK-5'

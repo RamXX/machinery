@@ -1,0 +1,19 @@
+# adopt reads the project's own markers: an action a serves marker names is not owed
+fixture library
+gitinit
+
+# without the marker for reportLost, that action would be owed beside every obligation
+exec sh -c 'sed "s/Loan.reportLost./Loan.nothing/" internal/desk/desk.go > d.tmp && mv d.tmp internal/desk/desk.go'
+exec machinery adopt
+stdout '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$'
+stdout '^  design/owed.yaml  new owed entries: 19$'
+
+# with it, every action is served and only the 18 obligations that are not owed yet are added
+exec git checkout -q internal/desk/desk.go
+exec machinery adopt --write
+grep -count=19 '^  - id: ' design/owed.yaml
+! grep 'id: act:' design/owed.yaml
+grep 'id: fm:risk-1' design/owed.yaml
+grep 'reason: "the weekly recount has no test yet"' design/owed.yaml
+exec machinery check
+stdout 'machinery check: 9 passed, 0 failed, 0 not demonstrated, 6 not applicable'

@@ -1,0 +1,51 @@
+kind: DomainModel
+version: v1
+title: Library
+description: >
+  The circulation desk of a small library. A Librarian lends a copy to a
+  Member, the Member gives it back, and a copy that never comes back is
+  reported lost.
+
+glossary:
+  Librarian: "A desk worker who lends copies and records what happens to a `Loan`."
+  Member: "A reader who borrows a copy and gives it back."
+
+enums:
+  LoanStatus:
+    values:
+      - {name: Reserved, definition: "A copy is set aside for the member."}
+      - {name: Lent, definition: "The member has the copy."}
+      - {name: Returned, definition: "The copy is back on the shelf; terminal."}
+      - {name: Lost, definition: "The copy will not come back; terminal."}
+
+entities:
+  Loan:
+    definition: >
+      One copy lent to one member. Its status follows the loan lifecycle from
+      reserved to returned or lost.
+    attributes:
+      - {name: id, type: string}
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian, preserves: [lent-before-returned]}
+      - {name: giveBack, actor: Member, preserves: [returned-is-final]}
+      - {name: reportLost, actor: Librarian, preserves: [returned-is-final]}
+    invariants:
+      - {id: lent-before-returned, statement: "A `Loan` reaches the returned status only from the lent status."}
+
+invariants:
+  - {id: returned-is-final, statement: "A returned or lost `Loan` never changes status again."}
+
+scenarios:
+  - name: Member borrows and returns a copy
+    actors: [Librarian, Member]
+    steps:
+      - "Librarian lends a reserved copy; the `Loan` is lent."
+      - "Member gives it back; the `Loan` is returned."
+    invariants_touched: [lent-before-returned]
+  - name: Blocked member is refused a loan
+    actors: [Librarian]
+    steps:
+      - "Librarian tries to lend a copy to a member with unpaid fines; the request is refused."
+      - "The `Loan` stays reserved."
+    invariants_touched: [returned-is-final]

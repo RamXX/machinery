@@ -49,12 +49,17 @@ func Trace(ctx *Context) *report.Stage {
 	}
 
 	ids := d.AllIDs()
+	scenarios := d.ScenarioIDs()
 	served, verified := map[string]bool{}, map[string]bool{}
 	for _, t := range found {
 		for _, tok := range t.IDs {
-			hits := tags.Expand(tok, ids)
+			hits := tags.Resolve(t, tok, ids, scenarios)
 			if len(hits) == 0 {
-				s.Errorf("unknown-id: %s:%d: %s", t.File, t.Line, tok)
+				if t.Scenario {
+					s.Errorf("unknown-id: %s:%d: scenario %q", t.File, t.Line, tok)
+				} else {
+					s.Errorf("unknown-id: %s:%d: %s", t.File, t.Line, tok)
+				}
 				continue
 			}
 			for _, id := range hits {

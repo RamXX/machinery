@@ -57,12 +57,13 @@ func servedIDs(p *project.Project, d *design.Design) map[string]bool {
 		return res
 	}
 	ids := d.AllIDs()
+	scenarios := d.ScenarioIDs()
 	for _, t := range found {
 		if t.Kind != tags.Serves {
 			continue
 		}
 		for _, tok := range t.IDs {
-			for _, id := range tags.Expand(tok, ids) {
+			for _, id := range tags.Resolve(t, tok, ids, scenarios) {
 				res[id] = true
 			}
 		}
