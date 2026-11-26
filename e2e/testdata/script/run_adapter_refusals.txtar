@@ -1,0 +1,72 @@
+# what the adapter refuses before it runs anything, and a package answered from the test cache
+# (section 10.3)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+exec mrun 2 run --adapter junit -- go test ./e2e/suite
+stderr '^usage: --adapter: unknown adapter "junit"; the only adapter is go-test-json$'
+exec mrun 2 run --adapter go-test-json -- sh e2e/orders.sh
+stderr '^usage: --adapter go-test-json: the command must be go test, got sh e2e/orders.sh$'
+exec mrun 2 run --adapter go-test-json -- go vet ./...
+stderr '^usage: --adapter go-test-json: the command must be go test, got go vet$'
+exec mrun 2 run --adapter go-test-json -- go test -count=2 ./e2e/suite
+stderr '^usage: --adapter go-test-json: -count=2 is refused: write -count=1$'
+exec mrun 2 run --adapter go-test-json -- go test -count 3 ./e2e/suite
+stderr '^usage: --adapter go-test-json: -count=3 is refused: write -count=1$'
+exec mrun 2 run --adapter go-test-json -- go test -json=false -count=1 ./e2e/suite
+stderr '^usage: --adapter go-test-json: -json=false is refused: the adapter reads the event stream$'
+# nothing ran and nothing was recorded
+! exists .machinery/receipts
+! exists .git/machinery/runs
+
+# -json written by the caller is not added again, and a leading -C stays first
+exec machinery run --adapter go-test-json -- go test -count=1 -json ./e2e/suite
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"command":\["go","test","-count=1","-json","./e2e/suite"\],'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -C e2e/suite -count=1 .
+stderr 'adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"command":\["go","test","-C","e2e/suite","-json","-count=1","."\],'
+# a -count after -args belongs to the test binary and is not read
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite -args -- -count=2
+stderr 'adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
+# without -count=1 go test may answer from its cache: such a package counts nothing
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stdout '^ok  \texample\.test/shop/e2e/suite\t\(cached\)$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; nothing in it counts: run with -count=1$'
+exec sh -c '! grep -q "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+
+# without trace.tests there is no claim to join the run to
+cp notrace.yaml machinery.yaml
+gitcommit 'no trace'
+exec mrun 2 run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^usage: --adapter go-test-json: trace\.tests is not set: the adapter joins the run to the claims of the test files; list them in machinery\.yaml$'
+
+-- notrace.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

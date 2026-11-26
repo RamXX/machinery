@@ -1,0 +1,94 @@
+# what the adapter writes for a function that failed, was skipped or did not run, and for a
+# package that did not end ok (section 10.3)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+# a failed function: a fail receipt for the id above it. The package did not end with pass, so
+# no pass is written from it, and the passes of its other functions count for nothing
+env SHOP_EMAIL=fail
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr 'with a verdict: 5 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
+exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+cmp stdout want-fail.jsonl
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+exec machinery status
+stdout '^proven: 0  partial: 0  failed: 1  owed: 2  unproven and not owed: 13$'
+
+# a skipped function: a skip receipt, which never counts
+rm .machinery/receipts
+env SHOP_EMAIL=skip
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr 'with a verdict: 5 passed, 0 failed, 1 skipped$'
+stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 1 skip$'
+exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
+stdout '"outcome":"skip","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique skipped","source":"adapter","granularity":"function"'
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 4 proven, 2 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 2 owed, 5 receipts$'
+stdout '^  ERROR  unproven: inv:customer-email-unique$'
+env SHOP_EMAIL=
+
+# at file granularity one failed function fails every id of the file, and one skipped function
+# skips them
+rm .machinery/receipts
+env SHOP_SCENARIO=fail
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+cmp stdout want-file-fail.jsonl
+rm .machinery/receipts
+env SHOP_SCENARIO=skip
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 3 pass, 0 fail, 2 skip$'
+exec sh -c 'grep -h sc:customer-pays .machinery/receipts/*.jsonl'
+stdout '"outcome":"skip","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay skipped","source":"adapter","granularity":"file"'
+env SHOP_SCENARIO=
+
+# a failed subtest fails its parent, and the parent's verdict is the one that is read
+rm .machinery/receipts
+env SHOP_FAIL_SUBTEST=cancelled
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr 'with a verdict: 5 passed, 1 failed, 0 skipped$'
+exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout -count=1 receipt
+stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal failed"'
+env SHOP_FAIL_SUBTEST=
+
+# a function that claims nothing fails: no receipt at all, the package did not end ok
+rm .machinery/receipts
+env SHOP_ROUTING=fail
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
+stderr 'package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
+exec sh -c '! grep -q "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
+stdout '^  warn   run exited 1: '
+env SHOP_ROUTING=
+
+# a function that did not run writes nothing: the id stays without evidence and is counted
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 -run TestShipNeedsPayment ./e2e/suite
+stderr 'adapter go-test-json: 1 package\(s\), 1 test function\(s\) with a verdict: 1 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 5 id\(s\)$'
+# at file granularity every function of the file must have run
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 -run TestPayThenShip ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 6 id\(s\)$'
+exec mrun 1 verify
+stdout '^  ERROR  unproven: sc:customer-pays-and-the-order-ships$'
+
+-- want-fail.jsonl --
+{"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique failed","source":"adapter","granularity":"function","tags":[]}
+-- want-file-fail.jsonl --
+{"v":1,"type":"receipt","id":"sc:cancelled-order-refuses-payment","outcome":"fail","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay failed","source":"adapter","granularity":"file","tags":[]}
+{"v":1,"type":"receipt","id":"sc:customer-pays-and-the-order-ships","outcome":"fail","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay failed","source":"adapter","granularity":"file","tags":[]}
