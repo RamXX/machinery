@@ -132,6 +132,9 @@ hooks:                          # optional: what machinery hook does (section 21
   commit: block                 # optional, this is the default
   push: block                   # optional, this is the default
   stop: warn                    # optional, this is the default
+review:                         # optional: the checker's reviews that gate dispatch (section 15.10); required | off
+  backlog: required             # default required when backlog.tool is set: waves --freeze waits for an approved review
+  design: required              # default required when backlog.tool is set: intake plan --apply waits for one
 delegate:                       # optional, experimental: answers on the owner's behalf (section 15.9)
   policy: ../owner/delegate.yaml   # required: the owner's policy file; may lie outside the project
 routing:                        # optional: model routing by tier, printed in briefs and waves (section 21); these are the defaults
@@ -187,6 +190,10 @@ Rules:
   `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
   `columns.failure` and `columns.behavior` (`import.failure_modes.columns.failure is required`).
   It may be set beside `design.failure_modes`.
+- `review.backlog` and `review.design` are `required` or `off`
+  (`review.backlog must be required or off, got "<value>"`). Each defaults to `required` when
+  `backlog.tool` is set and to `off` otherwise. A project being adopted may set them `off`; the
+  ratchet reports a review switched off against a base that required it (section 11.3).
 - `delegate.policy` is the one path that may leave the project root: it is absolute, or relative to
   the root, and names a file the owner keeps (section 15.9). An empty one is a config error
   (`delegate.policy is required`).
@@ -229,7 +236,7 @@ Rules:
 | `machinery arch` | Stage `arch` (section 9). `--write-baseline` rewrites the baseline file. |
 | `machinery tests` | Stage `tests` (section 9.4). `--write-baseline` rewrites the baseline file. |
 | `machinery trace` | Stage `trace` (section 8). |
-| `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3). |
+| `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3), and with `--story <id>` as well stage `scope` (section 15.11). |
 | `machinery checks` | Prints the declaration of applicable checks (section 3.4). A report, never a gate. |
 | `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). |
 | `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`. |
@@ -257,6 +264,8 @@ Rules:
 | `machinery intake plan <id>` | Prints the stories the design change owes; `--apply` creates them in one backlog call (section 15.7). |
 | `machinery decide "<title>" --why "<text>"` | Records a decision in the backlog (section 15.8). `--ids`, `--supersedes`, `--vetoable`. |
 | `machinery decisions` | Lists the current decisions (section 15.8). `--ids`, `--open-vetoes`. |
+| `machinery decisions import --file <path> --record "<regex>"` | Prints one backlog decision per record of an existing decision file; `--apply` creates them (section 15.8). |
+| `machinery review <backlog\|design <id>\|intake <id>>` | Records the checker's review, approved or rejected, that `waves --freeze` and `intake plan --apply` wait for (section 15.10). |
 | `machinery ask "<question>"` | Records a question for the owner, with its options, a recommendation and the default (section 15.9). Experimental. |
 | `machinery answer <id>` | Records the owner's answer; with `--delegate`, an answer on the owner's behalf under the delegate policy (section 15.9). Experimental. |
 | `machinery questions` | Lists the open questions and what each waits for (section 15.9). `--held`. |
@@ -265,7 +274,7 @@ Rules:
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
-| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). |
+| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3). |
 | `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). |
 | `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
 | `machinery hook <event>` | Reads a harness's hook JSON on stdin and answers with hook JSON on stdout: `session-start`, `pre-tool`, `stop` (section 21.1). Always exits 0. |
@@ -354,6 +363,7 @@ configuration file is the versioned declaration; this command renders it.
 | `contract` | Stories running in parallel build against the same design. |
 | `intake` | A requirement reaches the backlog only through the design it changed, and is closed once delivered. |
 | `ratchet` | What was proven, covered or modeled stays so. |
+| `scope` | A story writes only inside its declared scope, and leaves the design to an intake. |
 | `verify` | Each obligation is observed on the running system at this commit. |
 | `probe` | The tests would notice a wrong transition or a missing effect. |
 | `story` | A story is accepted with the formality its risk tier requires. |
@@ -1396,6 +1406,7 @@ that was established at the base may quietly stop being established:
 | `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 23), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
+| `review-off` | A review gate (section 15.10) that was required at the base is off now: `warn   ratchet: review switched off: review.<kind> was required at <ref> and is off now`. A project being adopted switches a gate off on purpose; the ratchet makes the change seen. |
 | `vital-weakened` | A vital area of the base (section 23.1) states less now: `ERROR  ratchet: vital weakened: <area>: <what>; record it under lowered: in the risk file with a reason`, unless the risk file records that area and that `<what>` under `lowered:` (section 23), which prints as `warn   ratchet: vital weakened: <area>: <what> (<reason>)`. Adding or strengthening raises nothing. |
 
 The `<what>` of `vital-weakened`, one finding per change, in the order the base's area lists its
@@ -1658,7 +1669,11 @@ id a property is over that the evidence proves, and one `assumed, unproven` line
 whose evidence is owed, each group sorted. When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
-`intake <id>: <n> of 7 steps done; next: <step>`, and then, when a question is open (section 15.9),
+`intake <id>: <n> of 7 steps done; next: <step>`; then the latest review of each kind (section 15.10):
+`review backlog: <verdict> at <12 hex> by <actor>[, <n> issue(s)]` for the latest backlog review, and
+`review <design|intake> <intake id>: <verdict> at <12 hex> by <actor>[, <n> issue(s)]` for the latest
+review of that kind on each open intake item, by intake id, the 12 hex being the contract hash
+the review was for; and then, when a question is open (section 15.9),
 `questions: <n> open, <k> held`. Exit 0 unless the config is invalid.
 
 ## 15. Backlog and scheduling
@@ -1686,8 +1701,9 @@ machinery:prediction commit=<full sha> actor=<actor> [session=<session>] [agent=
 machinery:verdict <accept|reject> commit=<full sha> actor=<actor> [session=<session>] [agent=<agent>] observed="<text>"
 machinery:intake
 machinery:intake <intake id>
-machinery:intake-base <full sha> <contract hash>
-machinery:intake-planned <full sha> <contract hash>
+machinery:intake-base <full sha> <contract hash> [actor=<actor>] [session=<session>] [agent=<agent>]
+machinery:intake-planned <full sha> <contract hash> [actor=<actor>] [session=<session>] [agent=<agent>]
+machinery:intake-design
 machinery:no-design-change <reason>
 machinery:capstone
 machinery:demo <command>
@@ -1696,18 +1712,20 @@ machinery:observation <kind> <text>
 machinery:observation-filed <item id> <kind> <text>
 machinery:repair <short sha>
 machinery:decision <actor>
+machinery:decision-source <path>#<12 hex>
 machinery:supersedes <decision id>
 machinery:vetoable
 machinery:confirmed <actor>
 machinery:overruled <actor>
-machinery:question <actor>
+machinery:question <actor> [session=<session>] [agent=<agent>]
 machinery:option <n> <text>
 machinery:recommend <n>
 machinery:default <text>
 machinery:about <topic> <topic>
 machinery:amount <number> <unit>
 machinery:story <id>
-machinery:answer <n|refuse|hold> actor=<actor> [clause=<clause id>] reason="<text>"
+machinery:answer <n|refuse|hold> actor=<actor> [clause=<clause id>] [session=<session>] [agent=<agent>] reason="<text>"
+machinery:review <backlog|design|intake> <approved|rejected> commit=<full sha> contract=<contract hash> actor=<actor> [session=<session>] [agent=<agent>] [stories=<id>,<id>] [issue1="<text>"]...
 ```
 
 - `machinery:ids` lists the design ids the story delivers. Several lines add up.
@@ -1717,22 +1735,26 @@ machinery:answer <n|refuse|hold> actor=<actor> [clause=<clause id>] reason="<tex
 - The actor is `--actor`, else the environment variable `BEADS_ACTOR`, else `git config user.name`.
 - The session is the environment variable `MACHINERY_SESSION`, white space at either end removed.
   When it is set and not empty, `proof --post`, `predict` and `accept` write `session=<value>` on
-  their line, and no session part otherwise. A value that is not one word (it holds white space
+  their line, and no session part otherwise; so do `intake new` and `intake plan --apply` on the
+  intake lines, `review`, `ask` and `answer --delegate`. A value that is not one word (it holds white space
   or a `"`) is a usage error, before anything is written:
   `usage: MACHINERY_SESSION must be one word, got "<value>"`. In Claude Code the `session-start`
   hook exports the harness's session id as `MACHINERY_SESSION` (section 21.1); another harness sets
   it or leaves it unset. The last words of a proof line are its session and its agent when they
-  start with `session=` and `agent=`; the words between the sha and them are the actor.
+  start with `session=` and `agent=`; the words between the sha and them are the actor. The
+  question line is read the same way: the words after `machinery:question` are the actor.
 - The agent is the environment variable `MACHINERY_AGENT`, read like the session: white space at
   either end removed, one word or else `usage: MACHINERY_AGENT must be one word, got "<value>"`
   before anything is written, and `agent=<value>` on the same three lines (after the session)
-  only when it is set and not empty. It names the worker context within a session. A harness
+  only when it is set and not empty, and on the other lines that write the session. It names the
+  worker context within a session. A harness
   gives the subagents of a session the session's id, so the session alone cannot tell a builder
   from a verifier run as a subagent: whoever spawns a worker sets `MACHINERY_AGENT` for it to a
   value no other worker of the session has. `machinery brief` prints that value for a builder
   and a verifier (section 15.5): `<story id>-<role>`.
 - `machinery:intake` with nothing after it marks an intake item; `machinery:intake <id>` marks a
-  story of that intake. The other intake lines are described in section 15.7.
+  story of that intake. The other intake lines are described in section 15.7, the review line in
+  section 15.10.
 - `machinery:repair` records that a story was closed while the integration branch was red, as
   its repair (section 12.2). The learning, observation and decision lines are described in
   section 15.8, the question and answer lines in section 15.9.
@@ -1863,7 +1885,7 @@ Findings:
 - `warn   no scope declared: <story>`;
 - `ERROR  no design ids: <story>: a story proves ids; a requirement starts with machinery intake new`
   for an open story labelled `machinery`, or belonging to an intake (section 15.7), that has no
-  `machinery:ids` line and is not a capstone. Work in the design's name names the ids it proves;
+  `machinery:ids` line and is neither a capstone nor a design story (`machinery:intake-design`). Work in the design's name names the ids it proves;
   a new requirement goes through `machinery intake` instead;
 - `warn   <n> open stories outside machinery (no design ids)`: the other open stories without a
   `machinery:ids` line, counted on one line when there is at least one, never listed one by one.
@@ -1901,6 +1923,15 @@ frozen (section 15.7): stories against a changed contract must not join a runnin
 `wave: none frozen`). `--freeze` prints `wave: frozen <12 hex> at <short sha>, <n> stories` and
 refuses when stage `gen-drift` or the waves stage itself does not pass. A design source that was
 added or removed since the freeze counts as changed.
+
+With `review.backlog` required (section 2), the waves stage of `--freeze` also holds the
+checker's review (section 15.10). The latest backlog review for the current contract hash and the
+current set of wave-1 story ids must be approved, else
+`ERROR  no approved review of this backlog at <12 hex>: the checker runs machinery review backlog`.
+It must come from another context than the one that freezes, compared as in section 15.10, else
+`ERROR  the review of this backlog at <12 hex> is the planner's: <reason>; the checker reviews in a fresh context`;
+the warnings of that comparison print as `warn` lines. `checked:` then also counts the reviews
+read. Without `--freeze` the review is not looked at.
 `checked:` counts design files.
 
 ### 15.5 `machinery brief`
@@ -1937,8 +1968,8 @@ done when: <one line>
 - `decisions` lists, sorted by id, the current decisions (section 15.8) that govern an id of the
   story: an id or pattern of the decision's `machinery:ids` and an id of the story overlap. It is
   a pointer: the decision is read in the backlog.
-- `run` for a builder: `machinery check --base <base>`, `machinery run --affected --base <base> --
-  <commands.e2e>`, `machinery verify --story <id>`, `machinery proof --story <id> --post`.
+- `run` for a builder: `machinery check --base <base> --story <id>`, `machinery run --affected --base
+  <base> -- <commands.e2e>`, `machinery verify --story <id>`, `machinery proof --story <id> --post`.
 - For a verifier, `read` never contains the proof, and `run` starts with
   `machinery predict <id> --observation "..." --expect "..."`, then
   `machinery proof --story <id>`, then `machinery accept <id> --verdict accept|reject --observed
@@ -1996,6 +2027,15 @@ Findings name what is missing, for example `ERROR  no prediction for <short sha>
 machinery predict before reading the proof`, `ERROR  verifier is the builder: <actor>`,
 `ERROR  unproven: <id>`. `checked:` counts ids, proofs, predictions and verdicts. A story without
 a `machinery:ids` line is `not demonstrated: story names no design ids`.
+
+**The design story.** A story that carries `machinery:intake-design` lands the design change of its
+intake (section 15.7) and names no ids. `machinery story` judges it at the current commit by the
+design, not by evidence: every lint stage and stage `gen-drift` pass or are not applicable
+(`ERROR  design: <stage>: <outcome line>`), the working tree is clean, and with `review.design`
+required the latest design review of its intake for the current contract hash is approved
+(`ERROR  no approved design review of <intake> at <12 hex>: the checker runs machinery review design <intake>`).
+`checked:` counts the stages and the design reviews read. It asks for no verifier: the checker's
+review is the independent reading of a design change.
 
 An intake item (section 15.7) is not a unit of build work. The gate refuses it:
 `ERROR  <id> is an intake item: an intake item is planned, not built; run machinery intake status <id>`.
@@ -2061,12 +2101,13 @@ Refuses:
 - <refusal>
 
 machinery:intake
-machinery:intake-base <full sha of HEAD> <contract hash>
+machinery:intake-base <full sha of HEAD> <contract hash> actor=<actor>[ session=<session>][ agent=<agent>]
 ```
 
 There is one `- ` line per `--refuses`, in the order given, and `- none` without one; a newline
 inside a value becomes a space. The base is the commit the requirement arrived at and the
-contract hash (section 15.4) there. An empty title or intent is a usage error. `intake new`
+contract hash (section 15.4) there, and the planner who recorded it: the actor of section 15.1,
+with the session and the agent when they are set. An empty title or intent is a usage error. `intake new`
 refuses (exit 1) without a commit, and while a design source has uncommitted changes:
 `machinery: uncommitted design change: <path>, ...; a requirement starts from a committed design`.
 
@@ -2104,7 +2145,7 @@ intake <id>: 6 of 7 steps done; next: planned
 | `new ids` | The base commit exists (`<n> new id(s) since <short sha>`, or `none since <short sha>: only the capstone is planned`). | `base commit <short sha> is not in this repository` |
 | `tiers` | Stage `risk` passes or is not applicable (`stage risk passed`, or `no design.risk configured: every new id is routine`). | `stage risk: <outcome line>; run machinery lint --stage risk` |
 | `formal` | Every critical or vital area that holds a new id has its `fv` obligation proven, or for each of its questions a spec of the matching tool that lists the area (section 16.1) (`no critical area holds a new id`, or `modeled: <area>, ...`). | `fv:<area>: no <tool> spec answers <question>; ...; scaffold it with machinery formal new` |
-| `planned` | Every new id is in the `machinery:ids` of a story of the intake, and the intake has its capstone (`every new id has a story; capstone <id>`). | `<n> new id(s) without a story; run machinery intake plan <id> --apply`, or `no capstone; run machinery intake plan <id> --apply` |
+| `planned` | Every new id is in the `machinery:ids` of a story of the intake, the intake has its capstone and, when its contract hash is not the base hash, its design story (`every new id has a story; capstone <id>`, then `; design story <id>` when there is one). | `<n> new id(s) without a story; run machinery intake plan <id> --apply`, `no capstone; run machinery intake plan <id> --apply`, or `no design story; run machinery intake plan <id> --apply` |
 
 `machinery:no-design-change <reason>` is written by the planner on the item's notes
 (`bd update <id> --append-notes "machinery:no-design-change <reason>"`). The **new ids** are the
@@ -2138,6 +2179,16 @@ refuses unless the steps `design changed`, `design sound`, `generated`, `new ids
 `formal` are done, with one line per missing step:
 `machinery: cannot plan intake <id>: <step> is missing: <reason>`.
 
+With `--apply`, when `review.design` is required (section 2) and the contract hash is not the base
+hash, it also refuses (exit 1) unless the latest design review of the intake for the current
+contract hash is approved (section 15.10):
+`machinery: cannot plan intake <id>: no approved design review of <id> at <12 hex>: the checker runs machinery review design <id>`,
+and unless that review comes from another context than the one applying the plan, compared as in
+section 15.10:
+`machinery: cannot plan intake <id>: the design review of <id> at <12 hex> is the planner's: <reason>; the checker reviews in a fresh context`.
+The warnings of the comparison print on stdout as `warn: <text>`. Without `--apply` the review is
+not looked at.
+
 Then it does what `machinery plan` does (section 15.2) for the new ids that no story of the
 intake lists yet, instead of for the owed list: the same groups, titles, tiers, priorities, edges
 and story text. Every story is a child of the intake and carries `machinery:intake <id>` and the
@@ -2159,6 +2210,31 @@ intake's intent. One more story, the **capstone**, is added when the intake has 
 
 When the capstone exists already, the stories created now are added to its blockers.
 
+One more story, the **design story**, is added when the contract hash is not the base hash and no
+story of the intake carries `machinery:intake-design`. It is the one story that lands the design
+change, alone and before the stories that build on it, so stage `scope` (section 15.11) lets it
+change design sources:
+
+- title `Land the design: <intake title>`, type `task`, labels `machinery` and `tier:<tier>`, where
+  the tier is the highest tier of the new ids (`routine` without one), priority from that tier;
+- it blocks every other story created now: each lists it under `Needs` with the output
+  `the design it builds on`, and the capstone, blocked by every other story of its intake, with
+  `the behavior shown`;
+- the story text with the intent line `Land the design change of the requirement alone, before
+  the stories that build on it.`; the acceptance lines `- The design sources are committed, sound
+  and generated: machinery lint and machinery gen --check pass.` and `- The checker approved the
+  design change: machinery review design <id>.`; in `Ids`, `machinery:intake-design`, then
+  `machinery:scope` with the design sources of the contract hash (section 15.4) and `<gen>/**`,
+  sorted, then `machinery:intake <id>`, without a `machinery:ids` line; the exclusion
+  `- No code and no test: the stories of the intake build on this design.`; and `- none` under
+  `Needs`;
+- acceptance criteria: the same two lines, and `machinery story` passes for it (section 15.6).
+
+The design was committed before the plan (step `design changed`): the story records the change
+and is landed by its branch, `machinery check --base <ref> --story <id>` holding it to its scope.
+A planner who wants another story to land the design appends `machinery:intake-design` to it
+before planning; then none is created.
+
 Without `--apply` it prints the stories as the Markdown of section 15.2, the capstone last. With
 `--apply`:
 
@@ -2168,8 +2244,8 @@ Without `--apply` it prints the stories as the Markdown of section 15.2, the cap
    when it is not owed yet, with the reason `owed by intake <id>`, and the `story` field of each of
    those ids names its story. When the call fails nothing is written, so the owed list and the
    backlog are as they were;
-3. it appends `machinery:intake-planned <full sha> <contract hash>` to the intake's notes, unless a
-   line with the current contract hash is there already.
+3. it appends `machinery:intake-planned <full sha> <contract hash> actor=<actor>[ session=<session>][ agent=<agent>]`
+   to the intake's notes, unless a line with the current contract hash is there already.
 
 It prints `plan: <n> created, <n> existing, <n> edge(s)` (existing: the stories the intake had
 before), `owed: <n> added`, and `intake <id>: planned at <short sha>, contract <12 hex>` when step 3
@@ -2262,6 +2338,70 @@ prefix of a pattern, or two patterns of which one prefix contains the other). A 
 ids governs none. `--open-vetoes` keeps the vetoable decisions that are not confirmed, and the last
 line is then `decisions: <n> open to veto`. `machinery brief` lists the same decisions for the ids
 of a story (section 15.5). Exit 0.
+
+**Importing decisions.** A project that already keeps its decisions in a file moves them into the
+backlog record by record:
+
+```
+machinery decisions import --file <path> --record "<regex of a record's heading line>" [--apply] [--actor <name>]
+```
+
+`--file` is a path relative to the project root, inside it. A **record** starts at a line the
+`--record` expression matches and runs to the line before the next such line, or to the end of the
+file; lines before the first record belong to none. Per record, in file order:
+
+- the **title** is the heading line with its leading `#` characters and white space removed (the
+  heading as written when that leaves nothing);
+- the **body** is the record's other lines, blank lines at either end dropped; a `machinery:` in it
+  is written `machinery :` so that no line of the body starts a tag;
+- the **ids** are every design id the text (heading and body) names that exists in the design
+  (section 4.1 statuses included): each token of `[A-Za-z0-9_.:-]` characters, trailing `.` and
+  `:` dropped, is resolved as a token of a project's own trace marker is (section 8.1): with a
+  kind prefix as written, a bare one as `inv:`, `act:`, `fm:` (lower-cased) and `sc:`, the first
+  that names an id; sorted, once each;
+- the **source** is `<path>#<12 hex>`, the 12 hex the start of the sha256 of the heading line
+  (trailing white space dropped).
+
+Without `--apply` it prints, per record:
+
+```
+<line>: <title>
+  source: <path>#<12 hex>
+  governs: <id> <id>
+  backlog: new
+```
+
+`governs: none` without ids, and `backlog: <item id>` when an item of the backlog, open or closed,
+carries `machinery:decision-source <the same source>`: the record was imported already. The
+backlog is read with one `bd list` when `backlog.tool` is set and `bd` can run; otherwise every
+record is new and the summary says so (`backlog: not read: <reason>; every record counts as
+new`). Then:
+
+```
+decisions import: <n> record(s) in <path>, <k> naming design ids, <c> new, <e> imported already
+shed: <n> line(s): an instructions file that loads <path> is that much shorter once the file is removed from what agents load
+```
+
+where `shed` counts the lines of the file as section 18.7 does. With `--apply` it creates every
+new record, in one `bd create --graph` call, as one backlog item of type `decision` whose title
+is the record's title and whose description is
+
+```
+Why:
+<body>
+
+machinery:decision <actor>
+machinery:ids <id> <id>
+machinery:decision-source <path>#<12 hex>
+```
+
+(the `machinery:ids` line only with ids), prints `backlog: <new id>` for each and `<c> created` in
+the summary in place of `<c> new`. Running it again creates nothing twice. It reads the file and
+never writes, moves or deletes it. Refusals, exit 2, before anything is written:
+`usage: machinery decisions import needs --file <path> and --record "<regex>"`,
+`usage: --record is not a regular expression: <error>`, `usage: --file <path>: cannot read`,
+`usage: --record "<regex>" matches no line of <path>`, a path outside the project, no actor (with
+`--apply`) and, with `--apply`, a project without a backlog (`config:`, section 15.1).
 
 **Observations.** A builder who sees something outside the story's scope records it with
 `machinery proof --observation "<kind>: <text>"` (section 13); posted, it is a line
@@ -2405,6 +2545,15 @@ out of the agents' reach. A problem with it is a config error, exit 2,
 `clause <id>: effect must be allow, refuse or hold, got "<effect>"`,
 `clause <id>: limit needs an amount (a number) and a unit`, `clause <id>: note is required`.
 
+An answer on the owner's behalf comes from the delegate, never from the context that asked.
+`ask` writes the session and the agent on the question line (section 15.1). With `--delegate`,
+before the conditions below, `MACHINERY_AGENT` must be set and end in `-delegate`, and the
+question must not have been asked by this session and agent; each refuses, exit 1, nothing
+written: `machinery: refused: MACHINERY_AGENT is not set: an answer on the owner's behalf comes from the delegate, whose agent ends in -delegate`,
+`machinery: refused: MACHINERY_AGENT <agent> does not end in -delegate: an answer on the owner's behalf comes from the delegate`,
+`machinery: refused: <id> was asked in session <session> by agent <agent>: the asker does not answer its own question`
+(compared only when the question records both). The answer line records the session and the agent.
+
 With `--delegate`, `--clause` and exactly one of `--option`, `--hold` and `--refuse` are required
 (`usage: --delegate needs --clause`, `usage: --delegate needs one of --option, --hold and --refuse`),
 and a question that carries an answer of the owner, or an answer on the owner's behalf that
@@ -2459,6 +2608,103 @@ behalf, `nothing: answered by <actor>` after an answer of the owner. A question 
 its last answer is a hold. `--held` keeps the held questions, and the last line is then
 `questions: <k> held`. Exit 0. `machinery status` prints the count line when a question is open
 (section 14).
+
+### 15.10 Reviews: `machinery review`
+
+The checker (`agents/machinery-checker.md`) is called at set points and answers pass or fail. A
+review that lives only in a reply cannot hold anything, so the checker records it, and the
+gates of dispatch wait for it:
+
+```
+machinery review backlog --verdict approved|rejected [--issue "<rule>: <scope>: <instances>"]... [--actor <name>]
+machinery review design <intake id> --verdict approved|rejected [--issue "..."]... [--actor <name>]
+machinery review intake <intake id> --verdict approved|rejected [--issue "..."]... [--actor <name>]
+```
+
+| Kind | When | Recorded on | Waited for by |
+|---|---|---|---|
+| `backlog` | Before a wave is dispatched. | The review item. | `machinery waves --freeze` (section 15.4), with `review.backlog` required. |
+| `design` | After the design change of an intake, before its stories. | The intake item. | `machinery intake plan <id> --apply` (section 15.7), with `review.design` required. |
+| `intake` | After `intake plan <id> --apply`: the stories of one intake. | The intake item. | Nothing: `machinery status` shows it. |
+
+A design review names its intake, since it is the change of that one requirement that it reads
+and the plan of that one intake that waits for it. The command appends one line to the notes:
+
+```
+machinery:review <kind> <approved|rejected> commit=<full sha of HEAD> contract=<contract hash> actor=<actor>[ session=<session>][ agent=<agent>][ stories=<id>,<id>][ issue1="<text>" ... issue5="<text>"]
+```
+
+- `stories` is written for a backlog review only: the ids of wave 1 of `machinery waves` at the
+  review, sorted, comma-separated, left out when wave 1 is empty.
+- The **review item** holds the backlog reviews: the first item, by id, with the label
+  `machinery-review`. When there is none, `review backlog` creates it (type `task`, the label
+  `machinery-review`, title `Reviews of the backlog`, description `Reviews of the backlog by the
+  checker, one machinery:review line each.`) and closes it at once: it is a record, never work.
+- The **latest review** of a kind is the last such line, in the order of the lines of an item and
+  the items in id order. A gate reads the latest one for the current contract hash (and for a
+  backlog review the current wave-1 ids): a rejection after an approval withdraws it.
+- It prints `review: <kind>[ <intake id>] <verdict> at <12 hex> on <item id>`, and the warnings
+  of the comparison below as `warn: <text>`.
+
+Refusals, exit 2, before anything is written: `usage: machinery review takes backlog, design <intake id> or intake <intake id>`,
+`usage: machinery review needs --verdict approved|rejected`,
+`usage: an approved review takes no --issue`,
+`usage: a rejected review needs one to five --issue "<rule>: <scope>: <instances>"`,
+`usage: --issue "<text>": an issue names its rule and its scope: "<rule>: <scope>: <instances>"`
+(an issue is split at `: `; its rule and its scope must not be empty, its instances may be; a
+newline becomes a space), `usage: <id> is not an intake item: it has no machinery:intake line`,
+no actor, and a session or agent that is not one word (section 15.1).
+
+**The reviewer is not the planner.** The planning lines of a review are the
+`machinery:intake-base` and `machinery:intake-planned` lines that record an actor: those of the
+intake item for a design or intake review, and those of every intake item with a story in wave 1
+for a backlog review. The reviewer (its actor, session and agent) is compared with each, as the
+verifier is with the builder (section 15.6):
+
+| Reviewer and planner | Outcome |
+|---|---|
+| Both record a session, and the sessions differ | Two contexts: no finding. |
+| The same session, both record an agent, the agents equal | One context: `same session <session> and agent <agent>`. |
+| The same session, both record an agent, the agents differ | Two contexts: no finding. |
+| The same session, an agent missing, the same actor | One context: `same actor <actor> in session <session>, and no agent tells them apart`. |
+| The same session, an agent missing, other actors | `warn: reviewer and planner share session <session> and no agent is recorded for <the review|the plan>: independence rests on the actor name` |
+| A session missing, the same actor | One context: `same actor <actor>, and no session tells them apart`. |
+| A session missing, other actors | `warn: no session recorded for <the review|the plan>: independence rests on the actor name` |
+
+One context refuses, exit 1, nothing written:
+`machinery: refused: the reviewer is the planner: <reason>; the checker reviews in a fresh context`.
+`waves --freeze` and `intake plan --apply` compare the review they wait for in the same way with
+the context that runs them, the planner's.
+
+### 15.11 Stage `scope`
+
+A story's scope (`machinery:scope`, section 15.1) says which paths it writes. `waves` compares
+scopes to find competing writers; stage `scope` holds a story to its own:
+
+```
+machinery check --base <ref> --story <id>
+```
+
+The changed files are those of `git diff --name-only --no-renames --cached <merge base>`, the
+merge base being `git merge-base <ref> HEAD`: what is committed since the branch left the base,
+and what is staged to be committed. The owed list and the tests and architecture baselines are
+not judged: a builder prunes them (`machinery owed sync --prune-only`), and the ratchet holds
+them. For every other changed file, in path order:
+
+- a design source (a file of the contract hash, section 15.4), unless the story carries
+  `machinery:intake-design` (section 15.7):
+  `ERROR  scope: <file> is a design source; a design change is an intake`;
+- a file no glob of the story's `machinery:scope` lines matches (doublestar, section 2):
+  `ERROR  scope: <file> is outside the scope of <story>`.
+
+`checked:` counts the files and the scope globs. A story without a `machinery:scope` line is
+`not demonstrated: <story> declares no scope; the planner adds a machinery:scope line`, and no
+changed file is `not demonstrated: nothing changed since <ref>`. Without `--story` the stage does
+not run; asked for with `--stage scope` it is `not applicable: no story named; run machinery check --base <ref> --story <id>`.
+`--story` without `--base` is `usage: --story needs --base <ref>`, a story the backlog does not
+hold is `usage: no story <id> in the backlog: <reason>`, and a project without a backlog is a
+config error (section 15.1). The pre-commit hook runs the stage when the branch is named after a
+story (section 21.1).
 
 ## 16. Formal models
 
@@ -2951,7 +3197,23 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    before, or has been proven and pruned since; owing it again would undo the ratchet). Each
    is added, with the reason `unproven at adoption (<short sha>)`. It never removes an entry
    and never changes a reason. When a stage fails the config and the baselines are still
-   written, the findings print, no owed entry is written and the exit code is 1.
+   written, no owed entry is written and the exit code is 1. The report then says exactly what
+   blocks, and nothing else (warnings do not block and are not printed):
+
+   ```
+   blocked: machinery gen refuses while <n> finding(s) stand; no owed entry is written until they are fixed
+     <stage>: <message>
+     <stage>: not demonstrated: <reason>
+   fix in the project first: no waiver covers a finding of stage model, machines or failure-modes; only cross-reference rules are waived (section 6.7)
+   ```
+
+   one line per ERROR of the stages `model`, `machines` and `failure-modes`, in that order and
+   sorted within a stage, and one per stage that is not demonstrated; the last line prints when
+   an ERROR was listed. No adoption waiver is offered for these: a waiver covers only a
+   cross-reference rule (section 6.7), and steps 4 and 5 add one only for the rules they name. A
+   finding about the form of an imported failure catalog (a row in no table, a duplicate id, a
+   table without its column, an empty cell, an id that does not lower-case to a valid one,
+   section 5.4.1) is fixed in the catalog itself.
 4. **Failure waivers.** Findings of `failure-state-mode` and `failure-event-mode` (section 6.6)
    must not block day one: a failure state or failure event the design already has is
    unmodeled, not new. For each such finding no waiver covers, it adds a waiver to
@@ -2990,6 +3252,75 @@ model yet, so `xref-model-machine` is not demonstrated until the first one is bo
 
 The ratchet (section 11.3) holds each step: scope does not narrow, baselines do not grow without
 a wider scope, and nothing proven becomes owed.
+
+### 17.3 Rehearsing: `machinery adopt --rehearse`
+
+Adoption writes into the project. Before it does, `--rehearse` adopts a copy and reports what
+adoption would take, as `assess` reports where the project stands:
+
+```
+machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [--e2e <glob>]...
+```
+
+- The project, `--config`, `--out` and the snapshot are those of `assess` (sections 18.1 and
+  18.2), the same code with `adopt --rehearse` in the messages and `machinery-rehearse-*` as the
+  default out directory. Without `--config` the project's `machinery.yaml` is used when it
+  exists; without either the snapshot has none and adoption starts from scratch, as `adopt` does.
+  `--write` is a usage error (`usage: --rehearse writes only in its out directory; it takes no --write`).
+- In the snapshot it runs `machinery adopt --write` with the `--paths` and `--e2e` given,
+  commits the result (hooks and signing off), runs the stages of `machinery check`, and builds
+  what `machinery plan` would print, which it writes to `<out>/plan.md` and never applies.
+- It never runs the backlog tool: adopt reports the backlog as `backlog: bd, not read in a
+  rehearsal` when a `.beads` directory exists, and stage `intake` is
+  `not applicable: a rehearsal never reads the backlog`.
+- Nothing is written in the project. The output of adopt and of check is saved as
+  `<out>/stages/adopt.txt` and `<out>/stages/check.txt`.
+
+`<out>/rehearsal.md` (for people) and `<out>/rehearsal.json` hold the same content, without a
+timestamp or an absolute path:
+
+| Part | What |
+|---|---|
+| `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
+| `waivers` | The waivers adopt added, by rule, with counts. |
+| `baselines` | The tests and architecture baselines, each with its number of entries. |
+| `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total. |
+| `blocked` | When adopt was blocked (section 17.2): the lines of its `blocked` report. |
+| `check` | The summary line of `machinery check` and the outcome line of each stage. |
+| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids) and tier, with counts, their total and the number of edges. |
+| `blocks` | What blocks adoption: each stage of the check that failed or was not demonstrated, with its outcome line and its first 5 findings, and the number of the others. |
+| `fix_first` | Fix in the project first: every ERROR of stage `model`, `machines`, `failure-modes` or `risk`. No waiver covers one (section 6.7); a finding about the form of an imported failure catalog is one of them. |
+
+A finding under `blocks` carries its disposition: `fix in the project first` for an ERROR of the
+stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6.6, the message
+`<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
+`waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
+otherwise. `rehearsal.json` is `{version, project, head, config, dirty, outside_links, files:
+[{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
+blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
+count}], total, edges}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
+waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
+
+stdout:
+
+```
+out: <absolute path of the out directory>
+project: <directory name> at <short sha>
+dirty: <n> changed, <n> untracked file(s) are not rehearsed
+outside links: ...
+adopt: wrote <n> file(s), <n> waiver(s), <n> owed
+adopt: blocked: machinery gen refuses while <n> finding(s) stand; nothing is owed
+check: machinery check: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
+plan: <n> stories, <n> edge(s)
+blocks adoption: <n> stage(s): <stage>, <stage>
+fix in the project first: <n> finding(s)
+rehearse: rehearsal.md, rehearsal.json
+```
+
+One of the two `adopt:` lines prints; `blocks adoption: nothing` when every stage passed or was
+not applicable, and the `fix in the project first` line only when there is one. Exit 0 when the
+rehearsal ran, whatever it found; 1 when the snapshot could not be taken; 2 for a usage or config
+error, nothing written.
 
 ## 18. Assessing: `machinery assess`
 
@@ -3265,9 +3596,13 @@ before any code. The tool holds the order:
    the tiers in `risk.yaml`, a formal model where a critical or vital area asks for one
    (`machinery formal new`), then `machinery lint` and `machinery gen`, committed.
 3. `machinery intake status <id>` names the step that is missing and why.
-4. `machinery intake plan <id> --apply` writes every story at once from what the design now owes,
-   owes the new ids, and adds the capstone that will show the requirement on the running system.
-5. `machinery waves` schedules the stories; `machinery waves --freeze` pins the contract for a
+4. The checker reads the change against the requirement and records it:
+   `machinery review design <id> --verdict approved|rejected` (section 15.10).
+5. `machinery intake plan <id> --apply` writes every story at once from what the design now owes,
+   owes the new ids, and adds the design story that lands the change and the capstone that will
+   show the requirement on the running system.
+6. `machinery waves` schedules the stories; the checker reviews the backlog
+   (`machinery review backlog`), and `machinery waves --freeze` pins the contract for a
    wave. A design change found later is its own change that lands alone, never an edit inside a
    running wave, and `machinery intake plan` refuses while a wave is frozen.
 
@@ -3280,7 +3615,8 @@ requirement behind them (the skeleton of a new project, an adoption) become stor
 
 1. Write the end-to-end check for the story's ids, run it against the real stack, see it fail for
    the right reason.
-2. Change the code until it passes. Per change: `machinery check --base <base>` and a targeted run
+2. Change the code until it passes. Per change: `machinery check --base <base> --story <id>`
+   (stage `scope` holds the story to its paths) and a targeted run
    (`machinery run --affected`, `machinery verify --story <id>`).
 3. `machinery owed sync --prune-only`, commit, `machinery proof --story <id> --post`, with a
    `--limit` for each claim still unproven, a `--learning` for each rule the next story should
@@ -3305,8 +3641,8 @@ A new project starts with a full-breadth skeleton: every action has an operation
 handler, every machine moves state through its generated table, and effects do nothing yet. At
 that point `verify` passes with a long owed list. The work that remains is the owed list.
 
-An existing project starts with `machinery assess` (section 18), then `machinery adopt`
-(section 17.2): the first owed list is whatever the first modeled area declares, and everything
+An existing project starts with `machinery assess` (section 18), then
+`machinery adopt --rehearse` (section 17.3), then `machinery adopt` (section 17.2): the first owed list is whatever the first modeled area declares, and everything
 outside the scope is left alone.
 
 ## 20. Probe
@@ -3450,7 +3786,9 @@ after git's own options (`-C`, `-c`, `--git-dir`, `--work-tree`, `--namespace` a
 `--super-prefix` take the next word). Anything other than `commit` or `push` prints nothing; a
 command line that holds both is a push. Then, by `hooks.commit` or `hooks.push`, it runs the
 stages of `machinery check` and stage `ratchet` against the base: `backlog.base`, or `main`
-without a backlog. Before the repository's first commit the ratchet is left out; when HEAD
+without a backlog. When `backlog.tool` is set and the name of the current branch is the id of an
+item of the backlog (`bd show` finds it), stage `scope` runs too, for that story (section 15.11):
+a builder's worktree named after its story is held to its scope at every commit. Before the repository's first commit the ratchet is left out; when HEAD
 exists and the base names no commit the ratchet is `not demonstrated: base <ref> is not a commit;
 set backlog.base to the integration branch`. For a push, a red integration branch (section 12.2)
 is a finding too:
