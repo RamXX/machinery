@@ -71,11 +71,18 @@ exec machinery story shop-r1
 stdout '^checked: 2 ids, 2 proofs, 0 predictions, 0 verdicts$'
 stdout '^passed$'
 
-# a failing receipt fails the gate
-exec machinery run -- sh e2e/fail.sh
+# a failing receipt fails the gate, proof and status, also from a test that claims nothing (section 10.2)
+exec machinery run -- sh fail.sh
 exec mrun 1 story shop-r1
 stdout '^  ERROR  failed: tc:ORDE-2e883d$'
 ! stdout 'inv:terminal-is-final'
+exec mrun 1 proof --story shop-r1
+stdout '^  tc:ORDE-2e883d -> fail\.sh -> FAIL: stayed Pending$'
+exec machinery status
+stdout '^proven: 13  partial: 1  failed: 1  '
+exec mrun 1 verify --story shop-r1
+stdout '^  ERROR  failed: tc:ORDE-2e883d \(fail\.sh\)$'
+stdout '^  ERROR  receipt: tc:ORDE-2e883d: fail\.sh does not claim it; no file under trace\.tests is named fail\.sh: write test as <path of the test file> or <path>::<name>$'
 
 -- r1.txt --
 machinery:ids inv:terminal-is-final tc:ORDE-2e883d
@@ -93,9 +100,8 @@ owed:
     reason: "no test induces an outage yet"
   - id: tc:ORDE-8bd6e7
     reason: "recordCharge is still a noop"
--- e2e/fail.sh --
+-- fail.sh --
 #!/bin/sh
-# machinery:verifies tc:ORDE-2e883d
 set -eu
 [ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
 printf '{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"fail","test":"fail.sh","effects":[],"observed":"stayed Pending"}\n' >> "$MACHINERY_RECEIPTS"

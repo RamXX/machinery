@@ -34,6 +34,8 @@ type Evaluation struct {
 	Dirty       bool // the working tree has changes outside receipts and owed file
 	HasEvidence bool // at least one complete, usable run valid for Head
 	Runs        []RunInfo
+	// Refused names the receipts files section 10.2 refuses, each with why.
+	Refused []string
 	// Findings are those of stage verify (section 12), unsorted.
 	Findings []report.Finding
 
@@ -101,7 +103,12 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 			return nil, err
 		}
 		if state == notRun || state == changed {
-			add(report.Error, "receipts: %s: %s", rel, state)
+			remedy := "delete the file and run the tests through machinery run"
+			if state == changed {
+				remedy = "delete the file and run the tests again through machinery run"
+			}
+			add(report.Error, "receipts: %s: %s; %s", rel, state, remedy)
+			ev.Refused = append(ev.Refused, rel+": "+state)
 			continue
 		}
 		for _, pr := range fd.Problems {
@@ -171,9 +178,11 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	return ev, nil
 }
 
-// claimedOnly keeps the receipts whose test lies in a test file that claims
-// their id (section 10.2) and reports the others once per id and test. A
-// receipt for an id that is no obligation is kept: Judge names it.
+// claimedOnly reports, once per id and test, every receipt whose test names
+// no test file that claims its id (section 10.2), and drops those among them
+// that could prove: a pass, unless it is a replay that fails its trace. A
+// fail is never dropped. A receipt for an id that is no obligation is kept:
+// Judge names it.
 func claimedOnly(p *project.Project, d *design.Design, recs []Receipt, add func(report.Severity, string, ...any)) ([]Receipt, error) {
 	if len(recs) == 0 {
 		return nil, nil
@@ -182,15 +191,25 @@ func claimedOnly(p *project.Project, d *design.Design, recs []Receipt, add func(
 	if err != nil {
 		return nil, err
 	}
+	expect := map[string]string{}
+	for _, t := range d.Traces {
+		expect[t.ID] = t.Expect
+	}
 	var res []Receipt
 	seen := map[string]bool{}
 	for _, r := range recs {
-		if d.Obligation(r.ID) != nil && !cl.claimed(r) {
-			if key := r.ID + "\x00" + r.Test; !seen[key] {
-				seen[key] = true
-				add(report.Error, "receipt: %s: %s does not claim it", r.ID, r.Test)
+		if d.Obligation(r.ID) != nil {
+			if why := cl.unclaimed(r); why != "" {
+				if key := r.ID + "\x00" + r.Test; !seen[key] {
+					seen[key] = true
+					add(report.Error, "receipt: %s: %s does not claim it; %s", r.ID, r.Test, why)
+				}
+				want, isCX := expect[r.ID]
+				failingReplay := isCX && r.Replay != "" && (want == Undetermined || r.Replay != want)
+				if r.Outcome == Pass && !failingReplay {
+					continue
+				}
 			}
-			continue
 		}
 		res = append(res, r)
 	}

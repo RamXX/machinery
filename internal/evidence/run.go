@@ -110,7 +110,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	// the ledger binds the file to this run (section 10.2); a probe run is not evidence
 	ledger := opts.ReceiptsFile == ""
 	if ledger {
-		if err := writeEntry(p, file, ledgerEntry{Header: digest(head1)}); err != nil {
+		if err := writeEntry(p, file, ledgerEntry{}); err != nil {
 			return 1, file, err
 		}
 	}
@@ -146,7 +146,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		err = cerr
 	}
 	if err == nil && ledger {
-		err = finishEntry(p, file, digest(head1))
+		err = finishEntry(p, file)
 	}
 	return exit, file, err
 }

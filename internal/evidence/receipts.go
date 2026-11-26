@@ -72,9 +72,9 @@ type fileData struct {
 	End      *line // nil: incomplete run
 	Receipts []Receipt
 	Problems []string
-	// HeaderSum and Sum are the digests of the first line and of the whole
-	// file, compared with the run ledger (section 10.2).
-	HeaderSum, Sum string
+	// Sum is the digest of the whole file, compared with the run ledger
+	// (section 10.2).
+	Sum string
 }
 
 func parseFile(abs, rel string) (*fileData, error) {
@@ -83,9 +83,6 @@ func parseFile(abs, rel string) (*fileData, error) {
 		return nil, err
 	}
 	fd := &fileData{Rel: rel, Sum: digest(data)}
-	if first, _, ok := bytes.Cut(data, []byte("\n")); ok {
-		fd.HeaderSum = digest(append(first, '\n'))
-	}
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	sc.Buffer(make([]byte, 64*1024), 16*1024*1024)
 	n := 0
@@ -143,7 +140,7 @@ func checkReceipt(l *line) string {
 	case l.Outcome != Pass && l.Outcome != Fail && l.Outcome != Skip:
 		return fmt.Sprintf("%s: outcome must be pass, fail or skip, got %q", l.ID, l.Outcome)
 	case l.Test == "":
-		return fmt.Sprintf("%s: receipt without test", l.ID)
+		return fmt.Sprintf("%s: receipt without test: name the test file in test", l.ID)
 	case l.Replay != "" && l.Replay != Reproduced && l.Replay != Refuted:
 		return fmt.Sprintf("%s: replay must be reproduced or refuted, got %q", l.ID, l.Replay)
 	}

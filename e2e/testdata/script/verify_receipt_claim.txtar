@@ -1,65 +1,86 @@
-# a receipt counts only when its test lies in a test file that claims its id (section 10.2)
+# a pass receipt counts only when its test names a test file that claims its id (section 10.2)
 fixture shop
 cp markers.yaml machinery.yaml
 exec machinery gen
 gitinit
 
-# receipts whose test lies in no test file that claims the id do not count, whatever their outcome:
-# the owed id stays unproven, the failure is not taken, and owed sync prunes nothing
+# pass receipts that do not count: the owed ids stay unproven and owed sync prunes nothing
 exec machinery run -- sh -c 'sh e2e/orders.sh && cat refused.jsonl >> "$MACHINERY_RECEIPTS"'
 exec mrun 1 verify
-# no test file holds the test
-stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: TestNowhere does not claim it$'
-stdout '^  ERROR  receipt: fm:payment-provider-down: TestNowhere does not claim it$'
-# the test file exists and claims other ids
-stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: other\.sh does not claim it$'
-stdout '^  ERROR  receipt: tc:ORDE-2e883d: other\.sh does not claim it$'
-# the file that claims the id is not matched by trace.tests
-stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: claims\.sh does not claim it$'
-# part of a test name is not the test
-stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: TestCharg does not claim it$'
+# the name of a test function, a word some test file holds, a function that a claiming file does hold
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: TestNowhere does not claim it; no file under trace\.tests is named TestNowhere: write test as <path of the test file> or <path>::<name>$'
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: machinery does not claim it; no file under trace\.tests is named machinery: write test as <path of the test file> or <path>::<name>$'
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: TestCharge/paid does not claim it; no file under trace\.tests is named TestCharge/paid: write test as <path of the test file> or <path>::<name>$'
+# a path to no file, a file outside trace.tests that carries the tag, one colon instead of two
+stdout '^  ERROR  receipt: fm:payment-provider-down: e2e/does-not-exist\.sh::outage does not claim it; no file under trace\.tests is named e2e/does-not-exist\.sh: write test as <path of the test file> or <path>::<name>$'
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: tools/claims\.sh does not claim it; no file under trace\.tests is named tools/claims\.sh: write test as <path of the test file> or <path>::<name>$'
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: e2e/charge_test\.go:TestCharge does not claim it; no file under trace\.tests is named e2e/charge_test\.go:TestCharge: write test as <path of the test file> or <path>::<name>$'
+# a base name two test files have
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: same\.sh does not claim it; 2 files under trace\.tests are named same\.sh: write the path in test$'
+# a test file that claims other ids
+stdout '^  ERROR  receipt: tc:ORDE-8bd6e7: other\.sh does not claim it; add machinery:verifies tc:ORDE-8bd6e7 to e2e/other\.sh, or emit the receipt from the test that claims it$'
+# a skip and a fail get the same finding, and the fail still fails its obligation
+stdout '^  ERROR  receipt: fm:payment-provider-down: TestNowhere does not claim it; no file'
+stdout '^  ERROR  receipt: tc:ORDE-2e883d: other\.sh does not claim it; add machinery:verifies tc:ORDE-2e883d to e2e/other\.sh'
+stdout '^  ERROR  failed: tc:ORDE-2e883d \(other\.sh\)$'
 ! stdout 'stale owed entry'
-! stdout 'ERROR  failed:'
-stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 21 receipts$'
-stdout '^failed: 6 finding\(s\)$'
+stdout '^checked: 16 obligations, 13 proven, 1 partial, 2 owed, 25 receipts$'
+stdout '^failed: 11 finding\(s\)$'
 exec machinery owed sync --prune-only
 stdout '^owed: 2 kept, 0 added, 0 removed$'
+exec machinery status
+stdout '^proven: 13  partial: 1  failed: 1  owed: 2  unproven and not owed: 0$'
+exec mrun 1 proof --ids tc:ORDE-2e883d
+stdout '^  tc:ORDE-2e883d -> other\.sh -> FAIL: stayed Pending$'
 
-# receipts that count: a test function named in a file that claims the id, a test file named by
-# its base name or by its path, and claims made by a project's own markers
+# pass receipts that count: a path with a name, a path alone where the base name is not enough,
+# a base name only one test file has, with and without a name, and claims made by markers
 rm .machinery/receipts
-exec machinery run -- sh -c 'sh e2e/orders.sh && cat counted.jsonl >> "$MACHINERY_RECEIPTS"'
+exec machinery run -- sh -c 'cat counted.jsonl >> "$MACHINERY_RECEIPTS"'
 exec mrun 1 verify
 ! stdout 'does not claim it'
 stdout '^  ERROR  stale owed entry: tc:ORDE-8bd6e7 is proven$'
-stdout '^  ERROR  failed: inv:terminal-is-final \(other\.sh\)$'
-stdout '^  ERROR  failed: inv:paid-before-shipped \(e2e/marked\.sh::late\)$'
-stdout '^  ERROR  failed: sc:cancelled-order-refuses-payment \(marked\.sh\)$'
-stdout '^failed: 4 finding\(s\)$'
+stdout '^  ERROR  stale owed entry: fm:payment-provider-down is proven$'
+stdout '^checked: 16 obligations, 5 proven, 0 partial, 2 owed, 5 receipts$'
 exec machinery owed sync --prune-only
-stdout '^owed: 1 kept, 0 added, 1 removed$'
+stdout '^owed: 0 kept, 0 added, 2 removed$'
 
-# without trace.tests no file claims anything, so no receipt counts
+# without trace.tests there is no test file, so no pass receipt counts
 cp notrace.yaml machinery.yaml
 exec git checkout -q design/owed.yaml
 gitcommit 'no trace'
 exec machinery run -- sh e2e/orders.sh
 exec mrun 1 verify
-stdout '^  ERROR  receipt: tc:ORDE-2e883d: orders\.sh does not claim it$'
+stdout '^  ERROR  receipt: tc:ORDE-2e883d: orders\.sh does not claim it; trace\.tests is not set: list the test files there in machinery\.yaml$'
 stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 15 receipts$'
 
 -- refused.jsonl --
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestNowhere","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestNowhere","effects":["recordCharge"],"observed":"typed"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"machinery","effects":["recordCharge"],"observed":"typed"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge/paid","effects":["recordCharge"],"observed":"typed"}
+{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"pass","test":"e2e/does-not-exist.sh::outage","observed":"typed"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"tools/claims.sh","effects":["recordCharge"],"observed":"typed"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"e2e/charge_test.go:TestCharge","effects":["recordCharge"],"observed":"typed"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"same.sh","effects":["recordCharge"],"observed":"typed"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"other.sh","effects":["recordCharge"],"observed":"typed"}
 {"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"skip","test":"TestNowhere","observed":"no outage induced"}
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"other.sh","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
 {"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"fail","test":"other.sh","observed":"stayed Pending"}
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"claims.sh","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharg","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
 -- counted.jsonl --
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge/paid","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
-{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"fail","test":"other.sh","observed":"a Shipped order was cancelled"}
-{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"fail","test":"e2e/marked.sh::late","observed":"shipped while Pending"}
-{"v":1,"type":"receipt","id":"sc:cancelled-order-refuses-payment","outcome":"fail","test":"marked.sh","observed":"the payment was taken"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"e2e/charge_test.go::TestCharge/paid","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
+{"v":1,"type":"receipt","id":"tc:ORDE-2fa2af","outcome":"pass","test":"e2e/a/same.sh","observed":"ship refused, still Pending"}
+{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"pass","test":"outage.sh::down","observed":"provider down, order back to Pending"}
+{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"marked.sh","observed":"ship from Pending refused"}
+{"v":1,"type":"receipt","id":"sc:cancelled-order-refuses-payment","outcome":"pass","test":"e2e/marked.sh::scenario","observed":"pay refused on a cancelled order"}
+-- e2e/a/same.sh --
+#!/bin/sh
+# This suite lives in e2e and is run by machinery.
+# machinery:verifies tc:ORDE-8bd6e7 tc:ORDE-2fa2af
+-- e2e/b/same.sh --
+#!/bin/sh
+# machinery:verifies tc:ORDE-8bd6e7
+-- e2e/outage.sh --
+#!/bin/sh
+# machinery:verifies fm:payment-provider-down
 -- e2e/other.sh --
 #!/bin/sh
 # machinery:verifies inv:terminal-is-final

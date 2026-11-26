@@ -192,14 +192,15 @@ func wants(t *testing.T, ids ...string) {
 	t.Skipf("MACHINERY_ONLY does not ask for %v", ids)
 }
 
-// pass emits a pass receipt after the assertions held. The skeleton's
+// pass emits a pass receipt after the assertions held. The receipt names the
+// file of the caller, which must be the test file that claims the id. The skeleton's
 // effects are noops, so a test observes no effect yet and claims none.
 func pass(t *testing.T, id, observed string) {
 	t.Helper()
 	if t.Failed() {
 		return
 	}
-	if err := receipt.Pass(id, t.Name(), observed); err != nil {
+	if err := receipt.Pass(id, receipt.Test(1, t.Name()), observed); err != nil {
 		t.Errorf("emit receipt %s: %v", id, err)
 	}
 }

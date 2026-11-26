@@ -5,11 +5,11 @@
 //
 //	if receipt.Wanted("tc:ORDE-2e883d") {
 //		// drive the real system, assert ...
-//		receipt.Pass("tc:ORDE-2e883d", t.Name(), "Pending -> paying", "stampAttempt")
+//		receipt.Pass("tc:ORDE-2e883d", receipt.Test(0, t.Name()), "Pending -> paying", "stampAttempt")
 //	}
 //
-// The test name is how machinery finds the test's file, which must claim the
-// id with a machinery:verifies comment (section 10.2): pass t.Name().
+// The test of a receipt names the test file, which must claim the id with a
+// machinery:verifies comment (section 10.2). Test builds that name.
 //
 // When MACHINERY_RECEIPTS is not set every emit is a no-op, so the suite runs
 // the same outside machinery run.
@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"unicode/utf8"
 )
@@ -68,6 +70,18 @@ type wire struct {
 	Replay   string   `json:"replay,omitempty"`
 }
 
+// Test returns the test name machinery looks for: the base name of the source
+// file of its caller, then "::" and name. skip counts the callers to go up, so
+// a helper in another file passes 1 to name the file of the test that called
+// it. The base name must be the only one of its name under trace.tests.
+func Test(skip int, name string) string {
+	_, file, _, ok := runtime.Caller(skip + 1)
+	if !ok {
+		return name
+	}
+	return filepath.Base(file) + "::" + name
+}
+
 // Enabled reports whether receipts are being recorded.
 func Enabled() bool { return os.Getenv(EnvReceipts) != "" }
 
@@ -83,7 +97,7 @@ func Emit(r Receipt) error {
 		return fmt.Errorf("receipt: id is required")
 	}
 	if r.Test == "" {
-		return fmt.Errorf("receipt: %s: test is required", r.ID)
+		return fmt.Errorf("receipt: %s: test is required: name the test file, as receipt.Test does", r.ID)
 	}
 	switch r.Outcome {
 	case OutcomePass, OutcomeFail, OutcomeSkip:

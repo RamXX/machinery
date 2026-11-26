@@ -42,9 +42,9 @@ owed:
   - id: fm:payment-provider-down
     reason: "no test induces a provider outage yet"
 -- some.jsonl --
-{"v":1,"type":"receipt","id":"tc:ORDE-e6d28f","outcome":"pass","test":"TestShip","effects":["notifyCustomer","recordShipment","notifyCustomer"],"observed":"Paid -> Shipped"}
-{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"TestPay","observed":"Pending -> paying; no attempt stamp"}
-{"v":1,"type":"receipt","id":"tc:ORDE-1ded14","outcome":"pass","test":"TestCancel","effects":["recordCancellation","bogus"],"observed":"Pending -> Cancelled"}
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge","effects":[],"observed":"paying -> Paid"}
+{"v":1,"type":"receipt","id":"tc:ORDE-e6d28f","outcome":"pass","test":"order_test.go::TestShip","effects":["notifyCustomer","recordShipment","notifyCustomer"],"observed":"Paid -> Shipped"}
+{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"order_test.go::TestPay","observed":"Pending -> paying; no attempt stamp"}
+{"v":1,"type":"receipt","id":"tc:ORDE-1ded14","outcome":"pass","test":"order_test.go::TestCancel","effects":["recordCancellation","bogus"],"observed":"Pending -> Cancelled"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"order_test.go::TestCharge","effects":[],"observed":"paying -> Paid"}
 -- more.jsonl --
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"order_test.go::TestCharge","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}

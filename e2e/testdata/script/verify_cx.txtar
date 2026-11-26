@@ -25,9 +25,9 @@ stdout '^  ERROR  counterexample did not reproduce: cx:order-payment:lost: the m
 stdout '^checked: 19 obligations, 15 proven, 1 partial, 2 owed, 18 receipts$'
 stdout '^failed: 2 finding\(s\)$'
 exec machinery proof --ids cx:order-payment:race
-stdout '^  cx:order-payment:race -> TestReplayRace -> pass: the second commit was refused$'
+stdout '^  cx:order-payment:race -> replay_test\.go::TestReplayRace -> pass: the second commit was refused$'
 exec mrun 1 proof --ids cx:order-payment:lost
-stdout '^  cx:order-payment:lost -> TestReplayLost -> FAIL: the order was not lost$'
+stdout '^  cx:order-payment:lost -> replay_test\.go::TestReplayLost -> FAIL: the order was not lost$'
 
 # reproduced: proves known (expect reproduced); race (expect refuted) is a real bug, and so is lost
 rm .machinery/receipts
@@ -42,8 +42,24 @@ stdout '^failed: 2 finding\(s\)$'
 rm .machinery/receipts
 exec machinery run -- sh -c 'sh e2e/orders.sh && cat failcx.jsonl >> "$MACHINERY_RECEIPTS"'
 exec mrun 1 verify
-stdout '^  ERROR  failed: cx:order-payment:race \(TestReplayRace\)$'
+stdout '^  ERROR  failed: cx:order-payment:race \(replay_test\.go::TestReplayRace\)$'
 
+# a replay receipt from a test that claims nothing: a reproduced bug is still reported, a refutation proves nothing
+rm .machinery/receipts
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat stray-reproduced.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  receipt: cx:order-payment:race: TestNowhere does not claim it; no file'
+stdout '^  ERROR  counterexample reproduced on the real system: cx:order-payment:race: a real bug'
+rm .machinery/receipts
+exec machinery run -- sh -c 'sh e2e/orders.sh && cat stray-refuted.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  receipt: cx:order-payment:race: TestNowhere does not claim it; no file'
+stdout '^  ERROR  unproven: cx:order-payment:race$'
+
+-- stray-reproduced.jsonl --
+{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"TestNowhere","observed":"charged twice","replay":"reproduced"}
+-- stray-refuted.jsonl --
+{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"TestNowhere","observed":"the second commit was refused","replay":"refuted"}
 -- design/formal/traces/order-payment.race.trace.json --
 {
   "version": 1,
@@ -111,12 +127,12 @@ func TestReplayRace(t *testing.T) {}
 func TestReplayKnown(t *testing.T) {}
 func TestReplayLost(t *testing.T) {}
 -- refuted.jsonl --
-{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"TestReplayRace","observed":"the second commit was refused","replay":"refuted"}
-{"v":1,"type":"receipt","id":"cx:order-payment:known","outcome":"pass","test":"TestReplayKnown","observed":"charged once","replay":"refuted"}
-{"v":1,"type":"receipt","id":"cx:order-payment:lost","outcome":"pass","test":"TestReplayLost","observed":"the order was not lost","replay":"refuted"}
+{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"replay_test.go::TestReplayRace","observed":"the second commit was refused","replay":"refuted"}
+{"v":1,"type":"receipt","id":"cx:order-payment:known","outcome":"pass","test":"replay_test.go::TestReplayKnown","observed":"charged once","replay":"refuted"}
+{"v":1,"type":"receipt","id":"cx:order-payment:lost","outcome":"pass","test":"replay_test.go::TestReplayLost","observed":"the order was not lost","replay":"refuted"}
 -- reproduced.jsonl --
-{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"TestReplayRace","observed":"charged twice","replay":"reproduced"}
-{"v":1,"type":"receipt","id":"cx:order-payment:known","outcome":"pass","test":"TestReplayKnown","observed":"charged twice","replay":"reproduced"}
-{"v":1,"type":"receipt","id":"cx:order-payment:lost","outcome":"pass","test":"TestReplayLost","observed":"the order was lost","replay":"reproduced"}
+{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"replay_test.go::TestReplayRace","observed":"charged twice","replay":"reproduced"}
+{"v":1,"type":"receipt","id":"cx:order-payment:known","outcome":"pass","test":"replay_test.go::TestReplayKnown","observed":"charged twice","replay":"reproduced"}
+{"v":1,"type":"receipt","id":"cx:order-payment:lost","outcome":"pass","test":"replay_test.go::TestReplayLost","observed":"the order was lost","replay":"reproduced"}
 -- failcx.jsonl --
-{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"fail","test":"TestReplayRace","observed":"replay could not drive the steps"}
+{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"fail","test":"replay_test.go::TestReplayRace","observed":"replay could not drive the steps"}

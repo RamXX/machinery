@@ -188,7 +188,7 @@ func driveCase(t *testing.T, id string, body func() (string, []string)) {
 	}
 	defer func() {
 		if t.Failed() {
-			if err := receipt.Fail(id, t.Name(), "an assertion failed; see the test log"); err != nil {
+			if err := receipt.Fail(id, receipt.Test(0, t.Name()), "an assertion failed; see the test log"); err != nil {
 				t.Errorf("emit receipt %s: %v", id, err)
 			}
 		}
@@ -197,7 +197,7 @@ func driveCase(t *testing.T, id string, body func() (string, []string)) {
 	if t.Failed() {
 		return
 	}
-	if err := receipt.Pass(id, t.Name(), observed, effects...); err != nil {
+	if err := receipt.Pass(id, receipt.Test(0, t.Name()), observed, effects...); err != nil {
 		t.Errorf("emit receipt %s: %v", id, err)
 	}
 }

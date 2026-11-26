@@ -9,7 +9,7 @@ gitinit
 mkdir .machinery/receipts
 exec sh -c 'sed "s/COMMIT/$(git rev-parse HEAD)/" typed.jsonl > .machinery/receipts/20260102T030405.000Z-typed.jsonl'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 stdout '^failed: 1 finding\(s\)$'
 ! stdout 'checked:'
 ! stdout 'stale owed entry'
@@ -18,6 +18,7 @@ stdout '^ERROR  no complete run valid for [0-9a-f]{7}: run the tests through mac
 cmp design/owed.yaml owed.orig
 exec machinery status
 stdout '^proven: 0  partial: 0  failed: 0  owed: 2  unproven and not owed: 14$'
+stdout '^refused: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run$'
 stdout '^evidence: none at [0-9a-f]{7}$'
 
 # a real run beside it is used; the typed file still blocks and still proves nothing
@@ -25,7 +26,7 @@ exec machinery run -- sh e2e/orders.sh
 exec sh -c 'test -f .git/machinery/runs/$(ls .machinery/receipts | grep -v typed) && echo ledger-entry'
 stdout ledger-entry
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
 stdout '^failed: 1 finding\(s\)$'
 exec machinery owed sync --prune-only
@@ -37,14 +38,14 @@ stdout '^passed$'
 # a copy of a real run under another name was not produced by machinery run
 exec sh -c 'cp .machinery/receipts/*.jsonl .machinery/receipts/20260102T030405.000Z-copy.jsonl'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-copy\.jsonl: not produced by machinery run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-copy\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 stdout '^failed: 1 finding\(s\)$'
 rm .machinery/receipts/20260102T030405.000Z-copy.jsonl
 
 # a receipt added to a real run afterwards: the file changed after the run, and nothing in it counts
 exec sh -c 'f=$(ls .machinery/receipts/*.jsonl); { sed "\$d" "$f"; cat charge.jsonl; tail -n 1 "$f"; } > "$f.new" && mv "$f.new" "$f"'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl: changed after the run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
 stdout '^failed: 1 finding\(s\)$'
 ! stdout 'checked:'
 ! stdout 'stale owed entry'
@@ -58,7 +59,7 @@ exec machinery run --stack 'a laptop' -- sh e2e/orders.sh
 exec machinery verify
 exec sh -c 'f=$(ls .machinery/receipts/*.jsonl); sed "s/a laptop/production/" "$f" > "$f.new" && mv "$f.new" "$f"'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
 stdout '^failed: 1 finding\(s\)$'
 
 # an entry that is not what machinery run writes is no entry
@@ -67,7 +68,7 @@ exec machinery run -- sh e2e/orders.sh
 exec machinery verify
 exec sh -c 'echo "{}" > .git/machinery/runs/$(ls .machinery/receipts)'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: not produced by machinery run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 
 # the ledger is shared by the worktrees of the repository: a run in a worktree is evidence there
 rm .machinery/receipts

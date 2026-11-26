@@ -10,6 +10,7 @@
 //	receiptprog replay <id> <reproduced|refuted> <observed>
 //	receiptprog outcome <id> <outcome>
 //	receiptprog notest <id>
+//	receiptprog here
 //	receiptprog many <id> <n>
 package main
 
@@ -23,7 +24,7 @@ import (
 	"github.com/RamXX/machinery/pkg/receipt"
 )
 
-const test = "receiptprog"
+const test = "emit.sh"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -81,6 +82,9 @@ func run(args []string) error {
 			return err
 		}
 		return receipt.Emit(receipt.Receipt{ID: a[0], Outcome: a[1], Test: test, Observed: "custom outcome"})
+	case "here":
+		fmt.Println(receipt.Test(0, "TestHere/case"))
+		return nil
 	case "notest":
 		if err := need(1); err != nil {
 			return err
@@ -100,7 +104,7 @@ func run(args []string) error {
 			wg.Add(1)
 			go func(i int) {
 				defer wg.Done()
-				errs <- receipt.Pass(a[0], fmt.Sprintf("%s/%d", test, i), strings.Repeat("y", 250))
+				errs <- receipt.Pass(a[0], fmt.Sprintf("%s::%d", test, i), strings.Repeat("y", 250))
 			}(i)
 		}
 		wg.Wait()

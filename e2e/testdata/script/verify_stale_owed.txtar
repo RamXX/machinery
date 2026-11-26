@@ -29,4 +29,4 @@ import "testing"
 // machinery:verifies tc:ORDE-8bd6e7
 func TestCharge(t *testing.T) {}
 -- charge.jsonl --
-{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"charge_test.go::TestCharge","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}

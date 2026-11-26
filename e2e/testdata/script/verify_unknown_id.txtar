@@ -24,7 +24,7 @@ exec machinery run -- sh -c 'sh e2e/orders.sh && cat bad.jsonl >> "$MACHINERY_RE
 exec mrun 1 verify
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/[^ ]+\.jsonl: line 17: inv:terminal-is-final: outcome must be pass, fail or skip, got "maybe"$'
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/[^ ]+\.jsonl: line 18: not a JSON object$'
-stdout '^  ERROR  malformed receipts file: \.machinery/receipts/[^ ]+\.jsonl: line 19: inv:terminal-is-final: receipt without test$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/[^ ]+\.jsonl: line 19: inv:terminal-is-final: receipt without test: name the test file in test$'
 stdout '^failed: 3 finding\(s\)$'
 
 -- extra.jsonl --

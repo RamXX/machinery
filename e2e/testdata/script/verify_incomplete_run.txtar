@@ -26,7 +26,7 @@ rm .machinery/receipts
 ! exec machinery run -- sh -c 'sh e2e/orders.sh; kill -9 $PPID'
 exec sh -c 'printf "{\"v\":1,\"type\":\"end\",\"exit\":0,\"finished\":\"2026-01-02T03:04:09Z\"}\n" >> "$(ls .machinery/receipts/*.jsonl)"'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
 ! stdout 'checked:'
 stdout '^failed: 1 finding\(s\)$'
 
@@ -35,7 +35,7 @@ rm .machinery/receipts
 mkdir .machinery/receipts
 exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,\"command\":[\"sh\"],\"stack\":\"\",\"started\":\"2026-01-02T03:04:05Z\"}\n" "$(git rev-parse HEAD)" > .machinery/receipts/20260102T030405.000Z-cut.jsonl'
 exec mrun 1 verify
-stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-cut\.jsonl: not produced by machinery run$'
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-cut\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 ! stdout 'incomplete run'
 stdout '^failed: 1 finding\(s\)$'
 

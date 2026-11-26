@@ -231,13 +231,13 @@ func TestReplayDealWinRace(t *testing.T) {
 	}
 	if len(bad) > 0 {
 		obs := fmt.Sprintf("%d of %d rounds won one deal twice: %s", len(bad), replayRounds, bad[0])
-		if err := receipt.Replay(tf.ID, t.Name(), receipt.Reproduced, obs); err != nil {
+		if err := receipt.Replay(tf.ID, receipt.Test(0, t.Name()), receipt.Reproduced, obs); err != nil {
 			t.Errorf("emit receipt %s: %v", tf.ID, err)
 		}
 		t.Fatalf("assumption A1 is false in the real service: %s", obs)
 	}
 	obs := fmt.Sprintf("%d rounds: %s by owner and Admin at once, both held on the row lock before either wrote: one 200, one 409, one win audit row, one deal_wins row each", replayRounds, strings.Join(r.events, " and "))
-	if err := receipt.Replay(tf.ID, t.Name(), receipt.Refuted, obs); err != nil {
+	if err := receipt.Replay(tf.ID, receipt.Test(0, t.Name()), receipt.Refuted, obs); err != nil {
 		t.Errorf("emit receipt %s: %v", tf.ID, err)
 	}
 }

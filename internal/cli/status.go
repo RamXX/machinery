@@ -82,6 +82,9 @@ func runStatus(e *Env, args []string) int {
 		}
 	}
 	fmt.Fprintf(w, "owed without a story: %d\n", noStory)
+	for _, r := range ev.Refused {
+		fmt.Fprintf(w, "refused: %s\n", r)
+	}
 	if !ev.HasEvidence {
 		fmt.Fprintf(w, "evidence: none at %s\n", gitx.Short(ev.Head))
 	} else {

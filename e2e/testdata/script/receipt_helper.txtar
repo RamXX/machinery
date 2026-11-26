@@ -19,12 +19,12 @@ exec $WORK/bin/receiptprog pass tc:ORDE-2e883d 'Pending -> paying' stampAttempt
 exec machinery run -- sh e2e/emit.sh
 stdout '^enabled=true$'
 exec sh -c 'cat .machinery/receipts/*.jsonl'
-stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"receiptprog","effects":\["stampAttempt"\],"observed":"Pending -> paying"\}$'
-stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-e6d28f","outcome":"pass","test":"receiptprog","effects":\["recordShipment","notifyCustomer"\],"observed":"Paid -> Shipped"\}$'
-stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2fa2af","outcome":"pass","test":"receiptprog","observed":"ship refused, still Pending"\}$'
-stdout '^\{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"skip","test":"receiptprog","observed":"no outage induced"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"emit.sh","effects":\["stampAttempt"\],"observed":"Pending -> paying"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-e6d28f","outcome":"pass","test":"emit.sh","effects":\["recordShipment","notifyCustomer"\],"observed":"Paid -> Shipped"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2fa2af","outcome":"pass","test":"emit.sh","observed":"ship refused, still Pending"\}$'
+stdout '^\{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"skip","test":"emit.sh","observed":"no outage induced"\}$'
 # observed is cut at 300 characters
-stdout '"id":"inv:customer-email-unique","outcome":"pass","test":"receiptprog","observed":"x{300}"\}$'
+stdout '"id":"inv:customer-email-unique","outcome":"pass","test":"emit.sh","observed":"x{300}"\}$'
 # 200 parallel emits do not interleave
 exec sh -c 'grep -c "\"id\":\"inv:terminal-is-final\"" .machinery/receipts/*.jsonl'
 stdout '^201$'
@@ -36,18 +36,21 @@ stdout '^passed$'
 rm .machinery/receipts
 exec machinery run -- sh -c 'sh e2e/emit.sh && $WORK/bin/receiptprog fail tc:ORDE-2e883d "stayed Pending"'
 exec mrun 1 verify
-stdout '^  ERROR  failed: tc:ORDE-2e883d \(receiptprog\)$'
+stdout '^  ERROR  failed: tc:ORDE-2e883d \(emit\.sh\)$'
 
 # replay receipts for cx ids, and refusals of bad values
 env MACHINERY_RECEIPTS=$WORK/direct.jsonl
 exec $WORK/bin/receiptprog replay cx:order-payment:race refuted 'second commit refused'
-grep '^\{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"receiptprog","observed":"second commit refused","replay":"refuted"\}$' $WORK/direct.jsonl
+grep '^\{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"emit.sh","observed":"second commit refused","replay":"refuted"\}$' $WORK/direct.jsonl
 ! exec $WORK/bin/receiptprog replay cx:order-payment:race maybe 'x'
 stderr 'receipt: cx:order-payment:race: replay must be reproduced or refuted, got "maybe"'
 ! exec $WORK/bin/receiptprog outcome tc:ORDE-2e883d passed
 stderr 'receipt: tc:ORDE-2e883d: outcome must be pass, fail or skip, got "passed"'
 ! exec $WORK/bin/receiptprog notest tc:ORDE-2e883d
-stderr 'receipt: tc:ORDE-2e883d: test is required'
+stderr 'receipt: tc:ORDE-2e883d: test is required: name the test file, as receipt.Test does'
+# Test names the file of its caller, the form verify looks for (section 10.2)
+exec $WORK/bin/receiptprog here
+stdout '^main\.go::TestHere/case$'
 env MACHINERY_RECEIPTS=
 
 # MACHINERY_ONLY: Only lists the ids, Wanted says whether to run a test
@@ -64,7 +67,7 @@ exec $WORK/bin/receiptprog wanted inv:terminal-is-final
 stdout '^wanted inv:terminal-is-final: false$'
 
 -- shop/e2e/emit.sh --
-# The suite: its receipts name the test receiptprog, which this file holds and whose ids it claims.
+# The suite: its receipts name this file, which claims their ids.
 #
 # machinery:verifies tc:ORDE-* sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
 # machinery:verifies inv:paid-before-shipped inv:terminal-is-final inv:customer-email-unique fm:payment-provider-down
