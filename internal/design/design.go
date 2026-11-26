@@ -360,7 +360,7 @@ func (d *Design) ContractFiles() []string {
 	for _, m := range d.Machines {
 		set[m.Path] = true
 	}
-	files := []string{c.Design.FailureModes, c.Design.Risk, c.Design.Facts}
+	files := []string{c.Design.FailureModes, c.Design.Risk, c.Design.Facts, c.ImportedMachines().RegisterFile()}
 	if im := c.ImportedFailureModes(); im != nil {
 		files = append(files, im.File, im.Links)
 	}

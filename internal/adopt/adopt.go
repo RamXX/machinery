@@ -212,7 +212,7 @@ func describe(res *Result, p *project.Project, files []string) error {
 		gen := strings.TrimSuffix(p.Cfg.Design.Gen, "/") + "/"
 		ms, _ := p.Glob(im.Files)
 		for _, f := range ms {
-			if !strings.HasPrefix(f, gen) {
+			if !strings.HasPrefix(f, gen) && f != im.RegisterFile() {
 				res.Machines++
 			}
 		}

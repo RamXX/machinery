@@ -109,7 +109,24 @@ type ImportMachines struct {
 	States   string          `yaml:"states,omitempty"`
 	Rename   Rename          `yaml:"rename,omitempty"`
 	Terminal *Terminal       `yaml:"terminal,omitempty"`
+	Register *Register       `yaml:"register,omitempty"`
 	Bind     map[string]Bind `yaml:"bind,omitempty"`
+}
+
+// Register names a register of observed transitions and the keys of its
+// entries (section 5.2.1).
+type Register struct {
+	File     string `yaml:"file"`
+	Machine  string `yaml:"machine"`
+	Observed string `yaml:"observed"`
+}
+
+// RegisterFile returns the register file of import.machines, or "".
+func (im *ImportMachines) RegisterFile() string {
+	if im == nil || im.Register == nil {
+		return ""
+	}
+	return im.Register.File
 }
 
 // Terminal names the root key whose reason says that a machine is never
@@ -545,6 +562,16 @@ func (c *Config) validateImport() error {
 			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
 				return Errf("import.machines.rename.%s: a key and its new name must not be empty", lv.name)
 			}
+		}
+	}
+	if rg := im.Register; rg != nil {
+		for _, f := range []struct{ name, v string }{{"file", rg.File}, {"machine", rg.Machine}, {"observed", rg.Observed}} {
+			if strings.TrimSpace(f.v) == "" {
+				return Errf("import.machines.register.%s is required", f.name)
+			}
+		}
+		if err := CheckPath("import.machines.register.file", rg.File); err != nil {
+			return err
 		}
 	}
 	if t := im.Terminal; t != nil {

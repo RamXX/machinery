@@ -36,6 +36,9 @@ type Machine struct {
 	// Imported is true for a machine translated from a project's own format
 	// (section 5.2.1): Path is then the source file and Bytes the translation.
 	Imported bool
+	// Original is the original id of an imported machine: its root id, or
+	// its file name.
+	Original string
 
 	sourceSum string // sha256 of the bytes of the file Path names
 }
@@ -144,6 +147,7 @@ func Load(p *project.Project) (ms []*Machine, problems []string, err error) {
 			problems = append(problems, fmt.Sprintf("%s: %v", tm.Source, perr))
 			continue
 		}
+		m.Original = tm.Original
 		ms = append(ms, m)
 	}
 	return ms, problems, nil

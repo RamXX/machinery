@@ -68,6 +68,10 @@ import:                         # optional: design sources kept in the project's
       transition: {allowed: _requires, denied: _refusal}
     terminal:                   # optional: a root key whose reason marks the states never left (section 5.2.1)
       from_root: forever
+    register:                   # optional: a register of the transitions the code makes (section 5.2.1)
+      file: design/transitions.yaml
+      machine: flow             # the key of an entry that names its machine
+      observed: seen            # the key of an entry that lists {from, event, to}
     bind:                       # optional: what a machine binds to in the model (section 5.2.1)
       "machines/loan*.json": {lifecycle_of: Loan}       # a glob of source files, or
       "machines/loan-fines.json": {lifecycle_of: Loan, aspect: fines}   # one aspect of a lifecycle
@@ -148,7 +152,9 @@ Rules:
   (`import.machines.states must be capitalize, pascal or keep, got "<value>"`), an empty key
   or name in `rename`, and an `import.machines.terminal` without `from_root`
   (`import.machines.terminal.from_root is required`) or whose key `rename.root` also maps
-  (`import.machines.terminal.from_root: <key> is also renamed by import.machines.rename.root; keep one`).
+  (`import.machines.terminal.from_root: <key> is also renamed by import.machines.rename.root; keep one`),
+  and an `import.machines.register` without `file`, `machine` or `observed`
+  (`import.machines.register.file is required`).
   `import.machines.bind` maps a glob of source files or a machine id to exactly one of
   `lifecycle_of` (an entity name, with an optional `aspect`, section 5.2) and `serves` (a
   non-empty list of model ids): an `aspect` without `lifecycle_of`
@@ -396,8 +402,11 @@ cross-reference stages, `xstate`, `gen`, `formal gen`, `trace`, `verify`) reads 
 machine exactly as if it were a native file, and every finding names the source file, so the
 team sees where to look.
 
-Each file the `files` globs match is translated, in path order (a file under the gen directory
-is generated, never a source, and is not read):
+Each file the `files` globs match is translated, in path order, once whatever glob matches it.
+The globs may name files anywhere in the project: machines kept beside the code they drive (a
+`states.json` in each service directory) are read with the rest. A file under the gen
+directory is generated, never a source, and is not read, and neither is the register file
+below, even when a glob matches it:
 
 1. **Parsing.** A file that is not valid JSON is `ERROR  <file>: invalid JSON in <file>: <error>`,
    and one whose top level is not an object is `ERROR  <file>: machine must be a JSON object`.
@@ -471,6 +480,39 @@ is generated, never a source, and is not read):
    the machine id, upper-cased, followed by the first four hex digits, upper-cased, of the SHA-256
    of the original id. Dozens of machines whose ids share a prefix get different tags, and a tag
    does not change while the id does not.
+
+**The register.** A project may keep a register that ties each machine to the tables and code
+that hold its state and lists the transitions the code is seen to make. `import.machines.register`
+reads it as a checked source. `file` is a JSON or YAML document whose top level is a list of
+entries; `machine` names the key of an entry that holds its machine (the original id or the
+machine id), and `observed` the key that holds a list of objects with the strings `from`,
+`event` and `to`: state paths in source names, written with the `states` setting (each dotted
+segment), and an event name. Other keys of an entry are not read. Stage `machines` then holds:
+
+- `register-undeclared`: every observed transition is a declared transition of its machine, an
+  `on` row of the runtime table (section 7.3) whose event is `event`, whose source is `from`
+  or an ancestor of it, and whose target, or the leaf that target enters, is `to` (`from` for
+  an internal row):
+  `ERROR  register-undeclared: <machine id>: <register> observes <from> -> <to> on <event>, which the machine does not declare; declare it in <source file>, or correct the register`,
+  with `<from>`, `<to>` as the register writes them.
+- `register-unobserved`: every `on` row of every imported machine is observed by its entry:
+  `ERROR  register-unobserved: <machine id>: <source> -> <target> on <event> is declared and not observed in <register>; add it to the register, or remove the transition from <source file>`,
+  with ` [<guard>]` after the event for a guarded row and `<source> (internal)` as the target of
+  an internal one. A machine with `on` rows that no entry names is one finding, not one per row:
+  `ERROR  register-unobserved: <machine id>: no entry of <register> names the machine, so none of its <n> transition(s) is observed; add an entry for it (<machine key>: <original id>)`.
+- The register itself: a file that cannot be read or parsed, or whose top level is not a list,
+  is `ERROR  <register>: <what is wrong>`. An entry that is not an object, has no string under
+  the machine key, or whose observed key is not a list of such objects is
+  `ERROR  <register>: entry <n>: <what is wrong>` and is not read. An entry that names a machine
+  that was not imported is
+  `ERROR  <register>: entry <n>: <machine key> <name> names no imported machine; add its file to import.machines.files, or correct the entry`,
+  and a second entry for one machine is
+  `ERROR  <register>: entry <n>: machine <name> is also named by entry <m>; keep one`.
+
+`<n>` counts entries from 1. With a register, `checked:` of stage `machines` adds the entries
+and the observed transitions read:
+`checked: 3 machines, 9 states, 8 transitions, 3 register entries, 7 observed transitions`. The
+register is a design source: it is part of the contract hash (section 15.4).
 
 The keys a binding adds, then an added `_oracle_tag`, come last in the root; every other key
 keeps its place. A key that is still unknown after renaming is a finding of stage `machines`, as
@@ -616,7 +658,8 @@ that is neither in `_failure_events` nor an action of the machine's lifecycle en
 
 `checked:` counts machines, states and transitions. Not applicable when neither `design.machines`
 nor `import.machines` is configured. With `import.machines` the translation findings of section
-5.2.1 are findings of this stage.
+5.2.1 are findings of this stage, and so are the rules of its register (`register-undeclared`,
+`register-unobserved`), whose entries and observed transitions `checked:` then counts.
 
 ### 6.3 `failure-modes`
 
@@ -1480,8 +1523,9 @@ stories: [{id, tier, title, route, scope}]}], stage}`. The exit code follows sec
 
 Parallel work is safe only against one contract. The **contract hash** is the sha256 over the
 sorted list of `<path> <sha256 of the file>` lines of the design sources: the model files, every
-`*.machine.json` or imported machine source, the failure-mode file, the imported failure-mode
-catalog and its links file, the risk file, the facts file and the contract files.
+`*.machine.json` or imported machine source, the register of the imported machines, the
+failure-mode file, the imported failure-mode catalog and its links file, the risk file, the facts
+file and the contract files.
 Generated files, the owed list and formal models are not part of it.
 
 `machinery waves --freeze` requires a clean `gen-drift` stage and writes

@@ -34,6 +34,9 @@ func Machines(ctx *Context) *report.Stage {
 	}
 	collisions(s, d.Machines)
 	s.Count(len(d.Machines), "machines").Count(states, "states").Count(transitions, "transitions")
+	if entries, observed, on := checkRegister(s, d); on {
+		s.Count(entries, "register entries").Count(observed, "observed transitions")
+	}
 	if len(d.Machines) == 0 && len(d.MachineProblems) == 0 {
 		s.NotDemonstrated("nothing to check")
 	}

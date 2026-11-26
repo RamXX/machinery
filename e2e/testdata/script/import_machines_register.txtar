@@ -1,0 +1,206 @@
+# import.machines reads machines kept in several places, and a register that ties each machine
+# to the transitions its code makes is a checked source (docs/formats.md section 5.2.1)
+fixture empty
+exec machinery lint --stage machines
+stdout '(?s)== machines ==\nchecked: 3 machines, 7 states, 7 transitions, 3 register entries, 7 observed transitions\npassed\n'
+
+# a lifecycle file beside its service is read with the rest; the register is never a machine
+exec machinery gen
+exists design/gen/imported/machines/billing_invoice.machine.json
+exists design/gen/imported/machines/access.machine.json
+exists design/gen/imported/machines/shelf.machine.json
+! exists design/gen/imported/machines/transitions.machine.json
+
+# an observed transition the machine does not declare
+cp register-undeclared.json registry/transitions.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  register-undeclared: shelf: registry/transitions.json observes full -> empty on stock, which the machine does not declare; declare it in machines/shelf.json, or correct the register$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a declared transition nobody observed, guarded or internal
+cp register-unobserved.json registry/transitions.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  register-unobserved: billing_invoice: Sent -> Paid on pay \[amountMatches\] is declared and not observed in registry/transitions.json; add it to the register, or remove the transition from services/billing/states.json$'
+stdout '^  ERROR  register-unobserved: access: Open -> Open \(internal\) on touch is declared and not observed in registry/transitions.json; '
+stdout '^failed: 2 finding\(s\)$'
+
+# a machine no entry names is one finding, not one per transition
+cp register-missing.json registry/transitions.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  register-unobserved: shelf: no entry of registry/transitions.json names the machine, so none of its 2 transition\(s\) is observed; add an entry for it \(flow: shelf\)$'
+! stdout 'register-unobserved: shelf: Empty'
+stdout '^failed: 1 finding\(s\)$'
+
+# an entry for a machine that was not imported, a second entry for one machine, and entries of
+# the wrong shape
+cp register-bad.json registry/transitions.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  registry/transitions.json: entry 4: flow inventory.bin names no imported machine; add its file to import.machines.files, or correct the entry$'
+stdout '^  ERROR  registry/transitions.json: entry 5: machine shelf is also named by entry 3; keep one$'
+stdout '^  ERROR  registry/transitions.json: entry 6: flow must name the machine \(import.machines.register.machine\)$'
+stdout '^  ERROR  registry/transitions.json: entry 7: seen 1 must be an object with the strings from, event and to$'
+cp not-a-list.json registry/transitions.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  registry/transitions.json: the register must be a list of entries$'
+cp register.json registry/transitions.json
+
+# a machine file outside the globs is not imported, so its entry names nothing
+cp narrow.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout 'checked: 2 machines'
+stdout '^  ERROR  registry/transitions.json: entry 1: flow billing.invoice names no imported machine; '
+
+# the register needs its three keys
+cp no-observed.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.register.observed is required$'
+
+-- machinery.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json", "services/*/states.json", "registry/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores}
+    register: {file: registry/transitions.json, machine: flow, observed: seen}
+-- narrow.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores}
+    register: {file: registry/transitions.json, machine: flow, observed: seen}
+-- no-observed.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    register: {file: registry/transitions.json, machine: flow}
+-- services/billing/states.json --
+{
+  "id": "billing.invoice",
+  "initial": "draft",
+  "states": {
+    "draft": {"on": {"send": {"target": "sent"}}, "skip": {"pay": "not sent yet"}},
+    "sent": {"on": {"pay": [{"target": "paid", "guard": "amountMatches"}, {"target": "sent"}]}, "skip": {"send": "already sent"}},
+    "paid": {"type": "final"}
+  }
+}
+-- machines/access.json --
+{
+  "id": "access",
+  "initial": "open",
+  "states": {
+    "open": {"on": {"touch": {"actions": ["recordTouch"]}, "lock": {"target": "locked"}}},
+    "locked": {"type": "final"}
+  }
+}
+-- machines/shelf.json --
+{
+  "id": "shelf",
+  "initial": "empty",
+  "states": {
+    "empty": {"on": {"stock": {"target": "full"}}, "skip": {"clear": "nothing to clear"}},
+    "full": {"on": {"clear": {"target": "empty"}}, "skip": {"stock": "already stocked"}}
+  }
+}
+-- registry/transitions.json --
+[
+  {"flow": "billing.invoice", "store": "billing_invoices", "seen": [
+    {"from": "draft", "event": "send", "to": "sent", "by": "services/billing/send.go"},
+    {"from": "sent", "event": "pay", "to": "paid"},
+    {"from": "sent", "event": "pay", "to": "sent"}
+  ]},
+  {"flow": "access", "seen": [
+    {"from": "open", "event": "touch", "to": "open"},
+    {"from": "open", "event": "lock", "to": "locked"}
+  ]},
+  {"flow": "shelf", "seen": [
+    {"from": "empty", "event": "stock", "to": "full"},
+    {"from": "full", "event": "clear", "to": "empty"}
+  ]}
+]
+-- register.json --
+[
+  {"flow": "billing.invoice", "store": "billing_invoices", "seen": [
+    {"from": "draft", "event": "send", "to": "sent", "by": "services/billing/send.go"},
+    {"from": "sent", "event": "pay", "to": "paid"},
+    {"from": "sent", "event": "pay", "to": "sent"}
+  ]},
+  {"flow": "access", "seen": [
+    {"from": "open", "event": "touch", "to": "open"},
+    {"from": "open", "event": "lock", "to": "locked"}
+  ]},
+  {"flow": "shelf", "seen": [
+    {"from": "empty", "event": "stock", "to": "full"},
+    {"from": "full", "event": "clear", "to": "empty"}
+  ]}
+]
+-- register-undeclared.json --
+[
+  {"flow": "billing.invoice", "seen": [
+    {"from": "draft", "event": "send", "to": "sent"},
+    {"from": "sent", "event": "pay", "to": "paid"},
+    {"from": "sent", "event": "pay", "to": "sent"}
+  ]},
+  {"flow": "access", "seen": [
+    {"from": "open", "event": "touch", "to": "open"},
+    {"from": "open", "event": "lock", "to": "locked"}
+  ]},
+  {"flow": "shelf", "seen": [
+    {"from": "empty", "event": "stock", "to": "full"},
+    {"from": "full", "event": "clear", "to": "empty"},
+    {"from": "full", "event": "stock", "to": "empty"}
+  ]}
+]
+-- register-unobserved.json --
+[
+  {"flow": "billing_invoice", "seen": [
+    {"from": "draft", "event": "send", "to": "sent"},
+    {"from": "sent", "event": "pay", "to": "sent"}
+  ]},
+  {"flow": "access", "seen": [
+    {"from": "open", "event": "lock", "to": "locked"}
+  ]},
+  {"flow": "shelf", "seen": [
+    {"from": "empty", "event": "stock", "to": "full"},
+    {"from": "full", "event": "clear", "to": "empty"}
+  ]}
+]
+-- register-missing.json --
+[
+  {"flow": "billing.invoice", "seen": [
+    {"from": "draft", "event": "send", "to": "sent"},
+    {"from": "sent", "event": "pay", "to": "paid"},
+    {"from": "sent", "event": "pay", "to": "sent"}
+  ]},
+  {"flow": "access", "seen": [
+    {"from": "open", "event": "touch", "to": "open"},
+    {"from": "open", "event": "lock", "to": "locked"}
+  ]}
+]
+-- register-bad.json --
+[
+  {"flow": "billing.invoice", "seen": [
+    {"from": "draft", "event": "send", "to": "sent"},
+    {"from": "sent", "event": "pay", "to": "paid"},
+    {"from": "sent", "event": "pay", "to": "sent"}
+  ]},
+  {"flow": "access", "seen": [
+    {"from": "open", "event": "touch", "to": "open"},
+    {"from": "open", "event": "lock", "to": "locked"}
+  ]},
+  {"flow": "shelf", "seen": [
+    {"from": "empty", "event": "stock", "to": "full"},
+    {"from": "full", "event": "clear", "to": "empty"}
+  ]},
+  {"flow": "inventory.bin", "seen": []},
+  {"flow": "shelf", "seen": []},
+  {"owner": "nobody", "seen": []},
+  {"flow": "access", "seen": [{"from": "open", "to": "locked"}]}
+]
+-- not-a-list.json --
+{"machines": []}

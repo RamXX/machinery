@@ -20,6 +20,7 @@ import (
 type Machine struct {
 	Source      string // project-relative path of the source file
 	ID          string // the machine id
+	Original    string // the original id: the root id, or the file name
 	Bytes       []byte // the translated machine
 	SourceBytes []byte
 }
@@ -43,8 +44,8 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 	byID := map[string]string{}
 	used := map[string]bool{} // the bind keys that match a machine
 	for _, f := range files {
-		if strings.HasPrefix(f, gen) {
-			continue // generated, never a source
+		if strings.HasPrefix(f, gen) || f == im.RegisterFile() {
+			continue // generated, or the register: never a machine
 		}
 		for _, k := range im.BindKeys() {
 			if project.Match([]string{k}, f) {
@@ -78,7 +79,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 			problems = append(problems, fmt.Sprintf("%s: %v", f, err))
 			continue
 		}
-		ms = append(ms, Machine{Source: f, ID: t.id, Bytes: b, SourceBytes: data})
+		ms = append(ms, Machine{Source: f, ID: t.id, Original: t.origID, Bytes: b, SourceBytes: data})
 	}
 	for _, k := range im.BindKeys() {
 		if !used[k] {
