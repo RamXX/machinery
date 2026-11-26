@@ -1,0 +1,81 @@
+# adopt --rehearse --overlay <dir>: the rehearsal runs on the snapshot with the files of <dir>
+# laid over it, and says so (docs/formats.md section 17.3)
+fixture shop proj
+cd proj
+rm machinery.yaml
+gitinit
+cd ..
+
+# refusals, exit 2, nothing written
+exec mrun 2 -C proj adopt --overlay ov
+stderr '^usage: --overlay goes with --rehearse$'
+exec mrun 2 -C proj adopt --rehearse --overlay ov --out out
+stderr '^usage: --overlay ov needs a config \(--config, the machinery.yaml of the project or one in the overlay\): trace.code and trace.tests say what an overlay may not replace$'
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-test --out out
+stderr '^usage: --overlay ov-test: e2e/orders.sh is under trace.tests; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --overlay ov-code --out out
+stderr '^usage: --overlay ov-code: internal/domain/order.go is under trace.code; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+! exists out
+
+# the overlay adds a failure mode: one more obligation is owed than at HEAD
+exec machinery -C proj adopt --rehearse --config shop.yaml --overlay ov --out out
+stdout '^project: proj at [0-9a-f]{7}$'
+stdout '^overlay: 1 file\(s\) laid over the snapshot; this is not the result of HEAD: design/failure-modes.yaml$'
+stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 17 owed$'
+cmp out/snapshot/design/failure-modes.yaml ov/design/failure-modes.yaml
+grep '^- overlay: 1 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/rehearsal.md
+exec sh -c 'grep -x "  - \`design/failure-modes.yaml\` sha256 $(shasum -a 256 ov/design/failure-modes.yaml | cut -c1-64)" out/rehearsal.md'
+grep '^- fm: 2$' out/rehearsal.md
+grep '^      "path": "design/failure-modes.yaml",$' out/rehearsal.json
+exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/failure-modes.yaml | cut -c1-64)\"" out/rehearsal.json'
+
+# the project is as it was
+exec git -C proj status --porcelain
+! stdout .
+! exists proj/machinery.yaml
+! grep 'warehouse' proj/design/failure-modes.yaml
+
+# without an overlay the report has none
+exec machinery -C proj adopt --rehearse --config shop.yaml --out out2
+! stdout '^overlay:'
+stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 16 owed$'
+! grep 'overlay' out2/rehearsal.md
+grep '^  "overlay": \[\],$' out2/rehearsal.json
+
+-- shop.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+-- ov/design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: warehouse-flooded
+    no_subject: "the warehouse is not part of the system"
+    failure: "The warehouse floods."
+    required: surface
+    behavior: "Orders are held until the stock is counted again."
+-- ov-test/e2e/orders.sh --
+echo replaced
+-- ov-code/internal/domain/order.go --
+package domain

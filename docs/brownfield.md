@@ -53,6 +53,13 @@ never runs the backlog tool:
 machinery adopt --rehearse --config ../depot.machinery.yaml --out ../depot-rehearsal
 ```
 
+A design-side file you are still writing (the links of a failure catalog, a status or risk file,
+the config itself) does not have to be committed into the project to be tried: put it in a
+directory of its own, at the path it will have in the project, and pass `--overlay <dir>` to
+`assess` or to `adopt --rehearse`. The files are laid over the snapshot, the reports list each
+with its sha256 and say that the result is not the result of `HEAD`, and code and tests are
+refused: an overlay changes what the design says, never the evidence.
+
 `rehearsal.md` (and `rehearsal.json`) lists the files adoption would write with their sizes, the
 waivers it would add by rule, the baselines, what it would owe by kind, the result of the check,
 the stories `plan` would create by kind and tier, and what blocks adoption: each stage that fails

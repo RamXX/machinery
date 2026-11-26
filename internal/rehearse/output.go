@@ -27,6 +27,12 @@ func (r *rehearsal) markdown() string {
 	if len(r.outside) > 0 {
 		p("- outside links: %s", strings.Join(r.outside, ", "))
 	}
+	if r.overlay != nil {
+		p("- %s", r.overlay.Summary())
+		for _, f := range r.overlay.Files {
+			p("  - `%s` sha256 %s", f.Path, f.SHA256)
+		}
+	}
 	p("- %s", r.adoptLine)
 	p("- %s", r.backlogLine)
 	p("")
@@ -188,10 +194,16 @@ func (r *rehearsal) doc() map[string]any {
 	}
 	blocked := append([]string{}, r.blocked...)
 	outside := append([]string{}, r.outside...)
+	overlay := []any{}
+	if r.overlay != nil {
+		for _, f := range r.overlay.Files {
+			overlay = append(overlay, map[string]any{"path": f.Path, "sha256": f.SHA256})
+		}
+	}
 	return map[string]any{
 		"version": 1, "project": r.name, "head": r.head, "config": r.cfgLabel, "backlog": r.backlogLine,
 		"dirty":         map[string]any{"changed": r.changed, "untracked": r.untracked},
-		"outside_links": outside, "files": files, "waivers": waivers, "baselines": baselines,
+		"outside_links": outside, "overlay": overlay, "files": files, "waivers": waivers, "baselines": baselines,
 		"owed":    map[string]any{"by_kind": byKind, "total": r.owedTotal},
 		"blocked": blocked, "check": map[string]any{"result": r.checkLine, "stages": stageList},
 		"plan": plan, "blocks": blocks, "fix_first": fixFirst,

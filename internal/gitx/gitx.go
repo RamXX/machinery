@@ -337,6 +337,24 @@ func Branches(root string) ([]string, error) {
 	return res, nil
 }
 
+// HeadLinks lists the symbolic links of HEAD below root, by path relative to
+// root, sorted. It writes nothing.
+func HeadLinks(root string) ([]string, error) {
+	out, err := run(root, "ls-tree", "-r", "-z", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, entry := range strings.Split(out, "\x00") {
+		meta, name, ok := strings.Cut(entry, "\t")
+		if ok && strings.HasPrefix(meta, "120000 ") {
+			res = append(res, name)
+		}
+	}
+	sort.Strings(res)
+	return res, nil
+}
+
 // Archive extracts the tree of HEAD below root into dest: git archive piped
 // to an extraction, with no worktree and no checkout. Every write goes
 // through an os.Root bound to dest, so nothing lands outside it. A symbolic

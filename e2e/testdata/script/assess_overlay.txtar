@@ -1,0 +1,133 @@
+# assess --overlay <dir>: the files of <dir> are laid over the snapshot, same relative paths,
+# before anything runs; the report lists each with its sha256 and says the result is not the
+# result of HEAD (docs/formats.md sections 18.1, 18.2 and 18.9)
+fixture library proj
+cd proj
+symlink alias -> design
+gitinit
+cd $WORK
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../before.txt'
+
+# refusals, exit 2, nothing written
+exec mrun 2 -C proj assess --overlay nowhere --out out
+stderr '^usage: --overlay nowhere is not a directory$'
+mkdir hollow/design
+exec mrun 2 -C proj assess --overlay hollow --out out
+stderr '^usage: --overlay hollow holds no file$'
+exec mrun 2 -C proj assess --overlay ov --config other.yaml --out out
+stderr '^usage: --overlay ov holds machinery.yaml and --config is given; keep one$'
+exec mrun 2 -C proj assess --overlay ov-test --out out
+stderr '^usage: --overlay ov-test: e2e/loans.sh is under trace.tests; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+exec mrun 2 -C proj assess --overlay ov-code --out out
+stderr '^usage: --overlay ov-code: internal/desk/extra.go is under trace.code; an overlay is for design-side files \(links, status, risk, config\), never for code or tests$'
+exec mrun 2 -C proj assess --overlay ov-git --out out
+stderr '^usage: --overlay ov-git: .git/config: an overlay never writes under .git$'
+exec mrun 2 -C proj assess --overlay ov-through --out out
+stderr '^usage: --overlay ov-through: alias/risk-links.yaml: alias is a symbolic link at HEAD; an overlay never writes through or over a link$'
+exec mrun 2 -C proj assess --overlay ov-over --out out
+stderr '^usage: --overlay ov-over: alias: alias is a symbolic link at HEAD; an overlay never writes through or over a link$'
+mkdir ov-link/design
+symlink ov-link/design/risk-links.yaml -> ../../ov/design/risk-links.yaml
+exec mrun 2 -C proj assess --overlay ov-link --out out
+stderr '^usage: --overlay ov-link: design/risk-links.yaml is a symbolic link; an overlay holds regular files only$'
+mkdir ov-dirlink
+symlink ov-dirlink/design -> ../ov/design
+exec mrun 2 -C proj assess --overlay ov-dirlink --out out
+stderr '^usage: --overlay ov-dirlink: design is a symbolic link; an overlay holds regular files only$'
+exec mrun 2 -C proj assess --overlay ov-badcfg --out out
+stderr '^config: machinery.yaml: version must be 2$'
+! exists out
+
+# the overlay: a links file that leaves one row unlinked, a new file, and the config
+exec machinery -C proj assess --overlay ov --out out
+stdout '^project: proj at [0-9a-f]{7}$'
+stdout '^overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD: design/notes/why.md, design/risk-links.yaml, machinery.yaml$'
+cmp out/snapshot/design/risk-links.yaml ov/design/risk-links.yaml
+cmp out/snapshot/design/notes/why.md ov/design/notes/why.md
+grep '^systems:$' out/snapshot/machinery.yaml
+
+# the run is the run of the overlaid design: the fourth row is unlinked there, not at HEAD
+grep '^checked: 4 failure modes, 3 linked, 1 unlinked, ' out/stages/xref-failure.txt
+grep '^not demonstrated: 1 of 4 failure modes name no subject; ' out/stages/xref-failure.txt
+
+# the report lists every overlaid file with its sha256
+grep '^- config: --overlay machinery.yaml$' out/report.md
+grep '^- overlay: 3 file\(s\) laid over the snapshot; this is not the result of HEAD$' out/report.md
+exec sh -c 'grep -x "  - \`design/risk-links.yaml\` sha256 $(shasum -a 256 ov/design/risk-links.yaml | cut -c1-64)" out/report.md'
+exec sh -c 'grep -x "  - \`design/notes/why.md\` sha256 $(shasum -a 256 ov/design/notes/why.md | cut -c1-64)" out/report.md'
+exec sh -c 'grep -x "  - \`machinery.yaml\` sha256 $(shasum -a 256 ov/machinery.yaml | cut -c1-64)" out/report.md'
+grep '^  "config": "--overlay machinery.yaml",$' out/report.json
+grep '^  "overlay": \[$' out/report.json
+grep '^      "path": "design/risk-links.yaml",$' out/report.json
+exec sh -c 'grep -x "      \"sha256\": \"$(shasum -a 256 ov/design/risk-links.yaml | cut -c1-64)\"" out/report.json'
+! grep $WORK out/report.json
+! grep $WORK out/report.md
+
+# nothing in the project changed, and the overlay was only read
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../after.txt'
+cmp before.txt after.txt
+exec git -C proj status --porcelain
+! stdout .
+cmp ov/design/risk-links.yaml links.orig
+
+-- other.yaml --
+version: 2
+-- links.orig --
+version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
+  - {id: RISK-3, subject: "state:loan.Lost", required: surface}
+-- ov/design/risk-links.yaml --
+version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
+  - {id: RISK-3, subject: "state:loan.Lost", required: surface}
+-- ov/design/notes/why.md --
+Why the fourth row is not linked yet.
+-- ov/machinery.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/library.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+    bind:
+      hold_queue: {serves: ["entity:Loan"]}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+    links: design/risk-links.yaml
+systems:
+  - {name: reading-room}
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
+-- ov-test/e2e/loans.sh --
+echo replaced
+-- ov-code/internal/desk/extra.go --
+package desk
+-- ov-git/.git/config --
+[core]
+-- ov-through/alias/risk-links.yaml --
+version: 1
+links: []
+-- ov-over/alias --
+not a link any more
+-- ov-badcfg/machinery.yaml --
+version: 1

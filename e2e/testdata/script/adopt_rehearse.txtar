@@ -86,7 +86,7 @@ grep '"result": "machinery check: 9 passed, 1 failed, 0 not demonstrated, 6 not 
 grep '"waiver": "- \{rule: action-event, id: \\"act:Order.place\\", reason: \\"found at adoption \([0-9a-f]{7}\)\\"\}"' out/rehearsal.json
 grep '"by_kind": \{\n      "fm": 1,' out/rehearsal.json
 exec sh -c 'grep -o "^  \"[a-z_]*\"" out/rehearsal.json | tr -d " \"" | tr "\n" " "'
-stdout '^backlog baselines blocked blocks check config dirty files fix_first head outside_links owed plan project version waivers $'
+stdout '^backlog baselines blocked blocks check config dirty files fix_first head outside_links overlay owed plan project version waivers $'
 
 # deterministic: a second rehearsal writes the same report
 exec machinery -C proj adopt --rehearse --config shop.yaml --out out2

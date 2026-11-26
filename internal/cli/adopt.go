@@ -23,6 +23,7 @@ func runAdopt(e *Env, args []string) int {
 	rehearseIt := fs.Bool("rehearse", false, "adopt a snapshot outside the project and report what blocks")
 	config := fs.String("config", "", "with --rehearse: the machinery.yaml to use; it may live outside the project")
 	out := fs.String("out", "", "with --rehearse: the directory for everything it writes, outside the project, absent or empty")
+	overlay := fs.String("overlay", "", "with --rehearse: a directory of design-side files laid over the snapshot before the run")
 	if !e.Parse(fs, args) {
 		return 2
 	}
@@ -34,8 +35,10 @@ func runAdopt(e *Env, args []string) int {
 		return e.Usage("--rehearse writes only in its out directory; it takes no --write")
 	case !*rehearseIt && (*config != "" || *out != ""):
 		return e.Usage("--config and --out go with --rehearse")
+	case !*rehearseIt && *overlay != "":
+		return e.Usage("--overlay goes with --rehearse")
 	case *rehearseIt:
-		err := rehearse.Run(rehearse.Options{ProjectFlag: e.ProjectFlag, Config: *config, Out: *out, Paths: paths, E2E: e2e,
+		err := rehearse.Run(rehearse.Options{ProjectFlag: e.ProjectFlag, Config: *config, Out: *out, Overlay: *overlay, Paths: paths, E2E: e2e,
 			Stdout: e.Stdout, Gen: Generate})
 		var ue *assess.UsageError
 		if errors.As(err, &ue) {

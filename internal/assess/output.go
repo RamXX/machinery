@@ -78,6 +78,12 @@ type jsonEntity struct {
 	Warnings int        `json:"warnings"`
 }
 
+// jsonOverlay is one file laid over the snapshot (section 18.2).
+type jsonOverlay struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+}
+
 type jsonReport struct {
 	Config   string        `json:"config"`
 	Dirty    jsonDirty     `json:"dirty"`
@@ -85,6 +91,7 @@ type jsonReport struct {
 	Head     string        `json:"head"`
 	Machines []jsonMachine `json:"machines"`
 	Outside  []string      `json:"outside_links"`
+	Overlay  []jsonOverlay `json:"overlay"`
 	Project  string        `json:"project"`
 	Sections []jsonSection `json:"sections"`
 	Summary  jsonSummary   `json:"summary"`
@@ -124,7 +131,12 @@ func stageResult(st *report.Stage) (string, string) {
 func (a *assessment) build() jsonReport {
 	r := jsonReport{Config: a.cfgLabel, Dirty: jsonDirty{a.changed, a.untrack}, Head: a.head,
 		Outside: append([]string{}, a.outside...), Project: a.name, Sections: []jsonSection{}, Version: 1,
-		Machines: []jsonMachine{}, Entities: []jsonEntity{}}
+		Machines: []jsonMachine{}, Entities: []jsonEntity{}, Overlay: []jsonOverlay{}}
+	if a.overlay != nil {
+		for _, f := range a.overlay.Files {
+			r.Overlay = append(r.Overlay, jsonOverlay{f.Path, f.SHA256})
+		}
+	}
 	machines, entities := a.groups()
 	for _, g := range machines {
 		r.Machines = append(r.Machines, jsonMachine{g.drift, g.errors, g.name, jsonRules(g.rules()), g.source, g.warns})
@@ -181,6 +193,14 @@ func (a *assessment) markdown(r jsonReport) string {
 		w("- %s", line)
 	} else {
 		w("- outside links: none")
+	}
+	if a.overlay == nil {
+		w("- overlay: none")
+	} else {
+		w("- %s", a.overlay.Summary())
+		for _, f := range a.overlay.Files {
+			w("  - `%s` sha256 %s", f.Path, f.SHA256)
+		}
 	}
 	w("- %s", a.totalLine())
 	w("")

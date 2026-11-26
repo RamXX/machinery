@@ -283,8 +283,8 @@ Rules:
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
-| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3). |
-| `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). |
+| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3); with it, `--overlay <dir>` lays design-side files over the snapshot first (section 18.2). |
+| `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). `--overlay <dir>` lays design-side files over the snapshot first (section 18.2). |
 | `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
 | `machinery hook <event>` | Reads a harness's hook JSON on stdin and answers with hook JSON on stdout: `session-start`, `pre-tool`, `stop` (section 21.1). Always exits 0. |
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
@@ -3343,7 +3343,7 @@ Adoption writes into the project. Before it does, `--rehearse` adopts a copy and
 adoption would take, as `assess` reports where the project stands:
 
 ```
-machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [--e2e <glob>]...
+machinery adopt --rehearse [--config <file>] [--out <dir>] [--overlay <dir>] [--paths <glob>]... [--e2e <glob>]...
 ```
 
 - The project, `--config`, `--out` and the snapshot are those of `assess` (sections 18.1 and
@@ -3351,6 +3351,11 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [
   default out directory. Without `--config` the project's `machinery.yaml` is used when it
   exists; without either the snapshot has none and adoption starts from scratch, as `adopt` does.
   `--write` is a usage error (`usage: --rehearse writes only in its out directory; it takes no --write`).
+- `--overlay <dir>` is the overlay of `assess` (section 18.2), with its refusals: the files of
+  `<dir>` are laid over the snapshot before adopt runs there. It needs a config, since
+  `trace.code` and `trace.tests` say what an overlay may not replace:
+  `usage: --overlay <dir> needs a config (--config, the machinery.yaml of the project or one in the overlay): trace.code and trace.tests say what an overlay may not replace`.
+  Without `--rehearse` it is a usage error (`usage: --overlay goes with --rehearse`).
 - In the snapshot it runs `machinery adopt --write` with the `--paths` and `--e2e` given,
   commits the result (hooks and signing off), runs the stages of `machinery check`, and builds
   what `machinery plan` would print, which it writes to `<out>/plan.md` and never applies.
@@ -3366,6 +3371,7 @@ timestamp or an absolute path:
 | Part | What |
 |---|---|
 | `backlog` | The backlog line of the adopt report (section 17.2): `backlog: none found`, or `backlog: bd, not read in a rehearsal`. |
+| `overlay` | The files laid over the snapshot (section 18.2), each with its sha256. `rehearsal.md` has the line `- overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD` and one line ``  - `<path>` sha256 <hex>`` per file, and nothing when there is no overlay. |
 | `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
 | `waivers` | The waivers adopt added, by rule, with counts. |
 | `baselines` | The tests and architecture baselines, each with its number of entries. |
@@ -3380,8 +3386,8 @@ A finding under `blocks` carries its disposition: `fix in the project first` for
 stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6.6, the message
 `<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
-otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links, files:
-[{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
+otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links,
+overlay: [{path, sha256}], files: [{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
 count}], total, edges}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
 waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
@@ -3393,6 +3399,7 @@ out: <absolute path of the out directory>
 project: <directory name> at <short sha>
 dirty: <n> changed, <n> untracked file(s) are not rehearsed
 outside links: ...
+overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>
 adopt: wrote <n> file(s), <n> waiver(s), <n> owed
 adopt: blocked: machinery gen refuses while <n> finding(s) stand; nothing is owed
 check: machinery check: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
@@ -3402,7 +3409,7 @@ fix in the project first: <n> finding(s)
 rehearse: rehearsal.md, rehearsal.json
 ```
 
-One of the two `adopt:` lines prints; `blocks adoption: nothing` when every stage passed or was
+The `overlay:` line prints only with an overlay. One of the two `adopt:` lines prints; `blocks adoption: nothing` when every stage passed or was
 not applicable, and the `fix in the project first` line only when there is one. Exit 0 when the
 rehearsal ran, whatever it found; 1 when the snapshot could not be taken; 2 for a usage or config
 error, nothing written.
@@ -3414,7 +3421,7 @@ existing project stands against its own design. It is read-only: nothing is writ
 project, ever, including its `.git` directory and its tracker.
 
 ```
-machinery assess [--config <file>] [--out <dir>] [--since <git-ref>]...
+machinery assess [--config <file>] [--out <dir>] [--overlay <dir>] [--since <git-ref>]...
 ```
 
 ### 18.1 Inputs and refusals
@@ -3431,6 +3438,9 @@ machinery assess [--config <file>] [--out <dir>] [--since <git-ref>]...
   directory `machinery-assess-*` under the system temp directory, which must then be outside the
   project too.
 - `--since` (repeatable) names commits for the history section (section 18.6).
+- `--overlay` names a directory of design-side files that are laid over the snapshot before
+  anything runs (section 18.2). It is read and never written, and it may lie anywhere. When it
+  holds a `machinery.yaml`, that file is the config of the run.
 
 Each refusal exits 2 before anything is written:
 
@@ -3442,6 +3452,13 @@ Each refusal exits 2 before anything is written:
 | `--out` inside the project or its work tree | `usage: --out <dir> is inside <root>; assess never writes in the project: name a directory outside it` |
 | `--out` not empty, or not a directory | `usage: --out <dir> is not empty; name an absent or empty directory` |
 | An unknown `--since` | `usage: --since <ref>: not a commit of the project` |
+| `--overlay` is no directory, or holds no file | `usage: --overlay <dir> is not a directory`, `usage: --overlay <dir> holds no file` |
+| The overlay holds a `machinery.yaml` and `--config` is given | `usage: --overlay <dir> holds machinery.yaml and --config is given; keep one` |
+| A symbolic link in the overlay, to a file or to a directory | `usage: --overlay <dir>: <path> is a symbolic link; an overlay holds regular files only` |
+| Anything else that is not a regular file | `usage: --overlay <dir>: <path> is not a regular file; an overlay holds regular files only` |
+| A path under `.git` | `usage: --overlay <dir>: <path>: an overlay never writes under .git` |
+| A file stage `trace` reads for tags | `usage: --overlay <dir>: <path> is under trace.tests; an overlay is for design-side files (links, status, risk, config), never for code or tests` (or `trace.code`) |
+| A path at or below a symbolic link of `HEAD` | `usage: --overlay <dir>: <path>: <link> is a symbolic link at HEAD; an overlay never writes through or over a link` |
 
 ### 18.2 The snapshot
 
@@ -3458,8 +3475,31 @@ and the inventory has `warn   outside-link: <path>: leaves the project; not in t
 assessed` for each. Links that stay inside are kept. An archive entry whose name is absolute or
 holds a `..` segment stops the snapshot (exit 1).
 
+**The overlay.** A design-side file that is not committed yet (a links file, a status or risk
+file, the config) can be tried without committing it into the project: `--overlay <dir>` lays
+every file of `<dir>` over the snapshot at the same relative path, replacing the file of `HEAD`
+or adding one, after the extraction and before the config is written and the snapshot is
+committed. A `machinery.yaml` at the top of the overlay is the config of the run, as `--config`
+would give it. The files are read once, before anything is written, and what was read is what is
+laid and hashed.
+
+An overlay is for the design side, never for the evidence. Under the config of the run, a file
+that stage `trace` would read for tags is refused, whether `HEAD` has it or not: one that
+`trace.tests` matches, or that `trace.code` matches inside `scope` (with the defaults of
+section 2: a `trace` block without `code` takes `scope`, and no `trace` block refuses nothing).
+The `machinery.yaml` of the overlay is the config and is not held to this. A symbolic link in
+the overlay, a file that is not regular, a path under `.git`, and a path at or below a symbolic
+link of `HEAD` are refused as well (section 18.1): nothing is written through or over a link,
+and the overlay is written through the root bound to the snapshot, like the extraction. Should a
+path of the overlay still meet a symbolic link in the snapshot, the snapshot stops (exit 1).
+
+The result of such a run is not the result of `HEAD`, and every output says so: stdout has
+`overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>`, and the
+reports list every overlaid file with the sha256 of what was laid (section 18.9), the config
+among them when the overlay holds it.
+
 What assess reads of the project itself: `git` commands that write nothing (`archive`, `show`,
-`log`, `rev-parse`, `for-each-ref`, and `status` with optional locks off, so the index is
+`log`, `rev-parse`, `ls-tree`, `for-each-ref`, and `status` with optional locks off, so the index is
 not refreshed), the config file and the tracker export (section 18.8). When the work tree
 differs from `HEAD` the report says `dirty: <n> changed, <n> untracked file(s) are not
 assessed`: changed counts the tracked files that differ, untracked the files git neither tracks
@@ -3598,7 +3638,7 @@ than the current one (`git for-each-ref refs/heads`). A line that is not a JSON 
 
 `<out>/report.md` (for people) and `<out>/report.json` hold the same content: the project
 directory name, the short `HEAD` sha, where the config came from, the dirty counts, the outside
-links, and per section its result, reason, `checked:` counts, number of blocking findings, rules,
+links, the overlay, and per section its result, reason, `checked:` counts, number of blocking findings, rules,
 lines and, for a section made of several stages, each stage's result. `report.json` also gives
 the numbers of the lines as facts. Neither has a timestamp or an absolute path.
 
@@ -3610,6 +3650,7 @@ the numbers of the lines as facts. Neither has a timestamp or an absolute path.
   "head": "<short sha>",
   "machines": [{"drift": 0, "errors": 2, "machine": "loan", "rules": [{"count": 2, "rule": "trace: unverified", "severity": "error"}], "source": "machines/loan.json", "warnings": 0}],
   "outside_links": [],
+  "overlay": [{"path": "design/risk-links.yaml", "sha256": "<64 hex digits>"}],
   "project": "<directory name>",
   "sections": [
     {"checked": [{"n": 9, "noun": "files"}], "facts": {"code_files": 1}, "findings": 0,
@@ -3635,7 +3676,11 @@ rules (section 18.4) with their counts, most frequent first, as `  - <count> <se
 `No finding names a machine.` (`No finding names an entity.`) when none does. `report.json`
 gives the same as `machines` and `entities`, sorted by name.
 
-Keys are sorted. `config` is `machinery.yaml` or `--config <file name>`. `result` is `passed`,
+Keys are sorted. `config` is `machinery.yaml`, `--config <file name>` or `--overlay machinery.yaml`.
+`overlay` lists the files laid over the snapshot (section 18.2), sorted by path, and is empty
+without `--overlay`; `report.md` has `- overlay: none`, or
+`- overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD` followed by one
+line ``  - `<path>` sha256 <hex>`` per file. `result` is `passed`,
 `failed`, `not demonstrated` or `not applicable`, and `reason` holds the reason of the last two.
 A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`. The facts:
 
@@ -3656,12 +3701,13 @@ out: <absolute path of the out directory>
 project: <directory name> at <short sha>
 dirty: <n> changed, <n> untracked file(s) are not assessed
 outside links: <n> symbolic link(s) leave the project and are not in the snapshot: <paths>
+overlay: <n> file(s) laid over the snapshot; this is not the result of HEAD: <paths>
 <section>: <outcome>; checked: <counts>
 assess: <n> sections, <p> passed, <f> failed, <d> not demonstrated, <a> not applicable
 ```
 
-The dirty line prints only when the tree is dirty, and the outside links line only when there
-is one. `<outcome>` is the last line of a stage block (section 3.2); a not applicable section has
+The dirty line prints only when the tree is dirty, the outside links line only when there
+is one, and the overlay line only with `--overlay`. `<outcome>` is the last line of a stage block (section 3.2); a not applicable section has
 no `checked:` part. The out path is the only absolute path assess prints.
 
 | Code | Meaning |
