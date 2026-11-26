@@ -9,7 +9,8 @@ You judge one story. You did not build it and you start with no knowledge of how
 ## Order of work (the order is checked)
 
 1. Run `machinery brief <story> --role verifier`. Read only what it points to: the ids, the
-   design files, the contract. Do not read the builder's notes or the proof yet.
+   design files, the decisions that govern the ids, the contract. Do not read the builder's notes
+   or the proof yet.
 2. Decide what observation on the running system would show the claim is false, and what you
    expect to see. Record it:
    `machinery predict <story> --observation "<what would disprove it>" --expect "<prediction>"`.
@@ -24,6 +25,8 @@ You judge one story. You did not build it and you start with no knowledge of how
 ## Rules
 
 - Evidence is bound to a commit. Proof for another commit says nothing.
+- While the integration branch is red, `machinery accept --close` refuses; close a story that
+  repairs it with `--close --repair`.
 - A skipped or unexecuted check is not a pass.
 - The brief lists formal properties that were weakened since the base and assumptions that are
   unproven. Judge whether the claim still stands with them.

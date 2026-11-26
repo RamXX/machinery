@@ -18,6 +18,25 @@ story is accepted with the formality of its tier. The backlog tool is `bd`. The 
 Choose the tier at planning. When unsure, the higher one. Lowering a tier later fails the
 ratchet unless the risk file records it under `lowered:` with a reason.
 
+## Statuses: proposed and retired
+
+An id of the design is owed or proven, unless `design/status.yaml` says otherwise
+(`docs/formats.md` section 4.1):
+
+```yaml
+version: 1
+proposed:
+  - {id: "inv:refund-window", note: "candidate; no delivery commitment"}
+retired:
+  - {id: "act:Order.gift", reason: "removed in the 2.0 contract", since: "v2.0"}
+```
+
+- A proposed id is a candidate: no obligation, no story, and no code or test may claim it. An
+  intake lists it apart and plans none of it. Commit it by removing its entry.
+- A retired id is no longer promised; the entry stays as the record. Un-retire it by removing
+  the entry.
+- The ratchet refuses moving an owed or proven id to proposed, and reports retiring a proven one.
+
 ## A new requirement: intake
 
 A requirement that arrives while work runs changes the design before any story exists, and its
@@ -87,6 +106,26 @@ Routine stories pass on evidence. Consequential and critical ones need a verifie
 builder, a prediction for the same commit, and then the verdict. Critical ones also need their
 formal model proven and its counterexamples replayed.
 
+The builder posts the proof with what it does not prove and what it learned:
+`--limit "<claim still unproven>"`, `--learning "<rule for the next story>"`,
+`--observation "<bug|security|debt|perf|doc>: <seen outside the story>"`, each repeatable.
+
+## Decisions, observations, learnings
+
+```
+machinery decide "<title>" --why "<reason; alternatives>" --ids <id>,<pattern>   # a decision item
+machinery decide "<title>" --why "..." --supersedes <decision id>               # replaces one
+machinery decisions --ids <id>               # the current decisions that govern it
+machinery decisions --open-vetoes            # agent decisions the owner has not confirmed
+machinery observations --file                # one backlog item per observation, filed once
+machinery learnings --since <last plan>      # read before the next plan
+```
+
+- A decision an agent took within its remit is `--vetoable`; the owner confirms it with
+  `bd update <id> --append-notes "machinery:confirmed <name>"` or supersedes it.
+- `machinery brief` lists the decisions that govern a story's ids, as pointers.
+- `machinery intake plan` reminds you of the learnings posted since the last plan.
+
 ## Landing
 
 Testing shifts right. Per change a builder runs the affected checks only
@@ -99,5 +138,10 @@ machinery landing --base main
 
 It runs `check` with the ratchet, re-runs the formal tools against the committed results, runs
 the full end-to-end suite and `verify`, and counts attempts. After two fix-forwards a failing
-story goes back to the backlog. `machinery probe` is the measure of test quality: run it per
+story goes back to the backlog.
+
+A failed landing marks the integration branch red (`machinery status` says so first). While it
+is red, `machinery accept --close` and a landing at another head refuse: repair it (`machinery landing --repair`,
+`machinery accept <id> ... --close --repair` for the story that repairs it), or revert and run
+`machinery landing --clear-red --reason "<what was reverted>"`. `machinery probe` is the measure of test quality: run it per
 batch and before a release, or as the last step of the landing with `--probe`.

@@ -33,3 +33,5 @@ You write the formal model for one critical area. Guide: `docs/formal.md`. Contr
   `--class`. A possible bug gets a story, not a quiet pass.
 - Keep bounds small and say what they are. A weakening needs
   `machinery formal baseline --accept --reason` and is shown to the verifier.
+- A modeling choice the owner may overturn (a bound, an abstraction) is a decision:
+  `machinery decide "<title>" --why "..." --ids fv:<area> --vetoable`.

@@ -24,6 +24,11 @@ stories, are how a model drifts away from the system; the tool refuses that orde
   semantics, migrations; critical for races, lost or repeated work, structural rules. Unsure
   means higher. Read the `routine by default` line of `intake status` before planning.
 - Owed ids without a requirement (skeleton, adoption): `machinery plan --apply`.
+- A candidate the owner has not committed to goes in `design/status.yaml` as `proposed`; a
+  promise withdrawn is `retired` with a reason. Never propose what is owed or proven.
+- Before a plan: `machinery learnings --since <last plan>` and `machinery observations --file`.
+  Record each decision with `machinery decide "<title>" --why "<reason; alternatives>" --ids ...`
+  (`--vetoable` when you took it within your remit); briefs point at it.
 - `machinery waves` must pass before `machinery waves --freeze`: no cycle, no competing
   writers, no story in the design's name without ids.
 - One worker per story, in its own worktree, briefed with `machinery brief <story>` and nothing
@@ -33,7 +38,9 @@ stories, are how a model drifts away from the system; the tool refuses that orde
   for consequential and critical stories (`machinery brief <story> --role verifier`). The
   capstone closes last, with its demo lines.
 - After the wave: `machinery waves --thaw`, one `machinery landing --base <base>`, at most two
-  fix-forwards. Close an intake when `machinery check` says it is delivered.
+  fix-forwards. A failed landing marks the branch red: land the fix with `--repair`, or revert
+  and `machinery landing --clear-red --reason "..."`. Close an intake when `machinery check`
+  says it is delivered.
 
 ## Rules
 

@@ -49,13 +49,19 @@ restate its rules from memory, and do not read the long documents unless a step 
 4. `machinery waves` gives the parallel schedule. Before fan-out: `machinery waves --freeze`.
 5. Hand each story out with `machinery brief <story>`. Route by tier: the brief says which class
    of model fits. Give workers the brief, not your context.
+6. A candidate nobody committed to is `proposed` in `design/status.yaml`; nothing claims it.
+   Record decisions with `machinery decide "<title>" --why "..." --ids <id>` (`--vetoable` for
+   one you took within your remit). Before the next plan: `machinery observations --file` and
+   `machinery learnings --since <last plan>`.
 
 ## Build one story
 
 1. Write the end-to-end check first; see it fail for the right reason.
 2. Make it pass. Per change: `machinery check --base <base>`, then
    `machinery run --affected --base <base> -- <e2e command>` and `machinery verify --story <id>`.
-3. `machinery owed sync --prune-only`, commit, `machinery proof --story <id> --post`.
+3. `machinery owed sync --prune-only`, commit, `machinery proof --story <id> --post` with a
+   `--limit` per claim still unproven, a `--learning` per rule the next story should know and an
+   `--observation "<bug|security|debt|perf|doc>: <text>"` per thing seen outside the story.
 
 ## Accept and land
 
@@ -64,6 +70,8 @@ restate its rules from memory, and do not read the long documents unless a step 
   the proof, then `machinery accept`.
 - Run the whole suite once, at the head that is ready: `machinery landing --base <base>`. At most
   two fix-forwards; then return the failing stories to the backlog.
+- A failed landing marks the branch red: `accept --close` and other heads refuse until a repair
+  (`--repair`) or a revert (`machinery landing --clear-red --reason "..."`).
 - `machinery probe -- <e2e command>` per batch: a surviving mutation is a weak test, fix the test.
 
 ## When a command fails
