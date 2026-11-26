@@ -58,6 +58,7 @@ design:
   formal: design/formal         # optional, this is the default; used when the directory exists
   facts: design/facts.yaml      # optional: facts the design declares about itself (section 22.2)
   owed: design/owed.yaml        # optional, this is the default
+  status: design/status.yaml    # optional, this is the default; used when present (section 4.1)
   gen: design/gen               # optional, this is the default
 import:                         # optional: design sources kept in the project's own formats
   machines:                     # optional, instead of design.machines (section 5.2.1)
@@ -205,10 +206,10 @@ Rules:
 | `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). |
 | `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`. |
 | `machinery affected --base <ref>` | Prints the obligation ids a change touches (section 12.1). |
-| `machinery landing --base <ref>` | The end gate: `check`, the full suite through `run`, `verify` (section 12.2). |
+| `machinery landing --base <ref>` | The end gate: `check`, the full suite through `run`, `verify` (section 12.2). A failed landing marks the integration branch red. `--repair`; `--clear-red --reason <text>`. |
 | `machinery owed list` | Prints the owed list. |
 | `machinery owed sync` | Rewrites `owed.yaml` from the current evidence (section 11.2). `--prune-only` never adds. |
-| `machinery proof` | Prints a proof block (section 13). `--story <id> --post` writes it to the story. |
+| `machinery proof` | Prints a proof block (section 13). `--limit`, `--learning`, `--observation`; `--story <id> --post` writes it to the story. |
 | `machinery status` | Prints a summary (section 14). A report, never a gate. |
 | `machinery probe -- <command...>` | Stage `probe`: mutates the generated tables and expects the tests to notice (section 20). Never part of `check`. |
 | `machinery formal new <spec>` | Scaffolds a spec manifest and a property module (section 16.2). |
@@ -226,6 +227,10 @@ Rules:
 | `machinery intake new "<title>" --intent "<text>"` | Records a requirement as an intake item (section 15.7). `--refuses`, `--parent`. |
 | `machinery intake status <id>` | Prints where a requirement stands, one line per step (section 15.7). `--json`. |
 | `machinery intake plan <id>` | Prints the stories the design change owes; `--apply` creates them in one backlog call (section 15.7). |
+| `machinery decide "<title>" --why "<text>"` | Records a decision in the backlog (section 15.8). `--ids`, `--supersedes`, `--vetoable`. |
+| `machinery decisions` | Lists the current decisions (section 15.8). `--ids`, `--open-vetoes`. |
+| `machinery observations` | Lists the observations of stories that are not filed; `--file` files them (section 15.8). |
+| `machinery learnings` | Prints the learnings of closed stories, by intake (section 15.8). `--since <ref>`. |
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
@@ -302,7 +307,7 @@ configuration file is the versioned declaration; this command renders it.
 | `model` | The vocabulary every other artifact uses: entities, actions, invariants, scenarios. |
 | `machines` | Every state answers every event: a transition, a refusal or a reasoned ignore. |
 | `failure-modes` | Each declared failure and abuse case is well formed and has a required behavior. |
-| `risk` | Each risk area names real design ids, so tier gates attach to real behavior. |
+| `risk` | Each risk area and status entry names real design ids, so tier gates and statuses attach to real behavior. |
 | `xref-model-machine` | The lifecycle a machine implements is the lifecycle the model promises. |
 | `xref-contract` | Every action is reachable through a published operation. |
 | `xref-failure` | Every side effect, dependency, failure state, failure event and tiered action has a declared failure behavior. |
@@ -345,6 +350,53 @@ list refer to the design. An id is `<kind>:<name>`.
 - An id pattern is a full id or a prefix ending in `*` (`tc:ORDE-*`, `act:Order.*`).
 - An `fv` id has the tier of its area, and a `cx` id the highest tier among the areas its formal
   model lists (section 23).
+
+### 4.1 Statuses: `design/status.yaml`
+
+Every `act` and obligation id the design declares has one of four statuses:
+
+| Status | Meaning | Yields an obligation |
+|---|---|---|
+| `proposed` | A candidate. The design declares it; nobody is committed to deliver it. | No |
+| `owed` | Committed and not proven yet: listed in `owed.yaml` (section 11). | Yes |
+| `proven` | Committed and not owed: `verify` holds it proven (section 12). | Yes |
+| `retired` | No longer promised. The design still declares it; its entry is the record. | No |
+
+Owed and proven are what every id was before statuses existed. Proposed and retired are data in an
+optional file, `design.status` (default `design/status.yaml`), read when it exists:
+
+```yaml
+version: 1
+proposed:
+  - {id: "inv:refund-window", note: "candidate; no delivery commitment"}     # note optional
+retired:
+  - {id: "act:Order.gift", reason: "removed in the 2.0 contract", since: "v2.0"}   # since optional
+```
+
+- `id` is an id or an id pattern (section 4) of kind `act`, `inv`, `sc`, `tc` or `fm`. A pattern
+  gives its status to every id it matches.
+- A proposed or retired id yields no obligation. It is not in `obligations.json` (section 7.1);
+  stage `trace` asks no claim for it; `verify`, `owed sync`, `proof` and `plan` leave it out; it
+  is not a new id of an intake (section 15.7). Nothing may claim it (section 8) and it may not be
+  owed: an entry of `owed.yaml` that names it is
+  `ERROR  proposed: <id> is in <owed file>; a proposed id is not owed: remove it, or commit it first`
+  (`retired: ... a retired id is not owed: remove it, or un-retire it`) wherever the owed file is
+  read, as an unknown owed id is.
+- The lint stages judge the design as declared, with one exception: `xref-contract` and
+  `xref-failure` ask an operation, a failure mode or an abuse case of every action that yields an
+  obligation, so a proposed or retired action needs none.
+- Committing a proposed id, and un-retiring a retired one, is removing its entry: the id becomes an
+  obligation again, owed or proven like any other.
+- The file is a design source: it is part of the contract hash (section 15.4), and a change to it
+  changes `obligations.json`.
+- The ratchet (section 11.3) holds the move between statuses: what was owed or proven at the base
+  is never demoted to proposed, and retiring what was proven is reported.
+
+Stage `risk` (section 23) checks the file. Each of these is an ERROR, `<file>: <message>`: a file
+that does not parse or has an unknown key; `version must be 1`; `proposed entry <n>: id is
+required` (`retired entry <n>`); `retired: <id>: reason is required`; `<list>: <id>: only act,
+inv, sc, tc and fm ids take a status`; `<list>: <id> matches no design id`; `<list>: <id> is listed
+twice`; `<id> is both proposed and retired`, for an id that entries of both lists match.
 
 ## 5. Design sources
 
@@ -865,6 +917,7 @@ gen directory is `not applicable: no design sources configured`.
   file for `cx`, the evidence file for `ck`.
 - `effects` is present only for `tc` and may be empty.
 - `served` holds every `act` id, sorted by id.
+- A proposed or retired id (section 4.1) is in neither list.
 
 ### 7.2 Transition cases
 
@@ -1015,6 +1068,13 @@ Stage `trace` rules:
 | `unknown-id` | Every tagged id exists in the design; every `*` prefix matches at least one id. |
 | `unserved` | Every `act` id has at least one `machinery:serves`, or is listed in `owed.yaml`. |
 | `unverified` | Every obligation of kind `inv`, `sc`, `tc`, `fm`, `cx` and `ck` has at least one `machinery:verifies`, or is listed in `owed.yaml`. `fv` ids are proven by the formal stage and are not claimed by tests. |
+| `proposed` | No tag or marker names a proposed id (section 4.1): `ERROR  proposed: <id> is claimed by <file>; commit it first`, once per id and file. |
+| `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
+
+A proposed or retired id counts as an id of the design for rule `unknown-id`. A `*` token claims
+only the ids among its matches that yield an obligation, so a pattern that also matches a
+proposed or retired id is not a finding. `unserved` and `unverified` ask only for ids that yield
+an obligation, and the owed list is checked as in section 4.1.
 
 `checked:` counts code files, test files, `act` ids and obligations. Only files inside `scope`
 are read. Zero files matched by a configured glob list is an ERROR. Not applicable when `trace:`
@@ -1247,7 +1307,9 @@ that was established at the base may quietly stop being established:
 | `proven-to-owed` | An id that was an obligation at the base and was not owed there is owed now: `ERROR  ratchet: <id> was proven at <ref> and is owed now`. New obligations may be owed. |
 | `scope-narrowed` | A scope glob of the base is missing now: `ERROR  ratchet: scope narrowed: <glob>`. |
 | `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`, and stage `failure-modes` with `design.failure_modes` or `import.failure_modes`: moving from one to the other keeps it on. |
-| `obligation-removed` | An obligation of the base does not exist now: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
+| `obligation-removed` | An obligation of the base the design no longer declares: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
+| `demoted` | An `act` or obligation id of the base (owed or proven there) is proposed now (section 4.1): `ERROR  ratchet: demoted to proposed: <id>; proposed is for candidates, not a way out of an obligation`. |
+| `retired` | An `act` or obligation id that was proven at the base (not owed there) is retired now: `warn   ratchet: retired: <id> (<reason>)`. Retiring an id that was owed at the base prints nothing; the entry is the record. |
 | `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 23), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
@@ -1340,7 +1402,8 @@ ids. A targeted verify is a check for one change; only a full `verify` supports 
 ### 12.2 The end gate: `machinery landing`
 
 ```
-machinery landing --base <ref> [--stack "<description>"] [-- <command> [args...]]
+machinery landing --base <ref> [--stack "<description>"] [--repair] [-- <command> [args...]]
+machinery landing --clear-red --reason "<text>"
 ```
 
 Runs, in order and stopping at the first that does not pass: `machinery check --base <ref>`;
@@ -1361,10 +1424,39 @@ it never turns a passing landing into a failing one. A passed landing resets it.
 attempt at the same head raises the attempt number only. With neither a command after `--` nor
 `commands.e2e` it is a config error and nothing is counted.
 
+**A red integration branch.** A landing that fails writes `<git common dir>/machinery/red.json`,
+which every worktree of the repository shares:
+
+```json
+{"version": 1, "commit": "<full sha>", "base": "<the --base ref>", "stages": ["<stage>"]}
+```
+
+`commit` is the head the landing failed at. `stages` lists, in the order they ran, the stages
+whose outcome was failed or not demonstrated; the end-to-end suite is `run` when its command did
+not start or exited non-zero. A later failure rewrites the file; a landing that passes removes it.
+While the file exists the integration branch is red, and two commands refuse to move work onto
+it:
+
+- `machinery landing` at a head other than the marker's commit (another attempt at the red head
+  is allowed);
+- `machinery accept --close` (section 15.6).
+
+Both print `ERROR  the integration branch is red since <short sha> (<stages>): repair or revert
+first` and exit 1 before anything runs or is written, unless given `--repair`. With `--repair` a
+landing runs as usual (a fix-forward is still counted), and `accept --close` first appends
+`machinery:repair <short sha of the red commit>` to the story's notes. `--repair` on `accept`
+needs `--close`; without a red marker it changes nothing.
+
+`machinery landing --clear-red --reason "<text>"` removes the marker after a revert, prints
+`red: cleared <short sha> (<stages>): <reason>`, or `red: none` when there is no marker, and
+exits 0. It runs nothing else, takes no `--base`, and an empty reason is a usage error.
+`machinery status` prints the red line first (section 14).
+
 ## 13. Proof
 
 ```
 machinery proof [--ids <id>,<id>...] [--prefix <id prefix>] [--story <id> [--post]]
+                [--limit "<text>"]... [--learning "<text>"]... [--observation "<kind>: <text>"]...
 ```
 
 Prints a block for the selected obligations (all obligations when no selector is given), from the
@@ -1382,7 +1474,12 @@ criteria:
 not proven:
   <id> (<state>)
   assumption <spec> <A-id>: <text>
+limits:
+  <a claim the change makes that is still unproven>
 learnings:
+  <a rule the next story or the planner should know>
+observations:
+  <kind>: <something seen outside this story's scope>
 ```
 
 `--ids` and `--prefix` select the union; each must match something. Without evidence the block
@@ -1393,24 +1490,40 @@ left out when no run names a stack. An owed id prints under `not proven` as
 `criteria` lists one line per selected obligation that has a receipt, sorted by id; an `fv` id
 prints as `<id> -> formal -> pass: <n> run(s), <n> mutation(s) detected`. `not proven` lists the
 selected obligations that are partial, unproven or owed, and every unproven assumption of a
-formal model that covers a selected id. `learnings:` is left empty for the author. Exit 0 when
-every selected obligation is proven, 1 otherwise, 2 when a selector matches nothing.
+formal model that covers a selected id. Exit 0 when every selected obligation is proven, 1
+otherwise, 2 when a selector matches nothing.
+
+`limits`, `learnings` and `observations` are written by the author, one line per `--limit`,
+`--learning` and `--observation` (each repeatable), in the order given; a part without one prints
+`  none`. A newline inside a value becomes a space. An observation is `<kind>: <text>`, the kind one
+of `bug`, `security`, `debt`, `perf` and `doc`; a value of another shape is a usage error
+(`usage: --observation "<value>": write <kind>: <text>, the kind one of bug, security, debt, perf, doc`),
+and so is an empty value.
 
 `--story <id>` selects the ids of a backlog story. `--post` appends the block to the story's notes
-after a line `machinery:proof <full sha> <actor>` (section 15.1).
+after a line `machinery:proof <full sha> <actor>` (section 15.1), and after the block, in the same
+note, one `machinery:learning <text>` line per learning and one `machinery:observation <kind>
+<text>` line per observation: the lines `machinery learnings` and `machinery observations` read
+(section 15.8).
 
 ## 14. Status
 
 ```
+red: since <short sha> (<stages>): repair or revert first
 project: <root directory name>
 obligations: <n> (tc <n>, sc <n>, inv <n>, fm <n>)
 tiers: routine <n>, consequential <n>, critical <n>
+ids: <n> proposed, <n> owed, <n> proven, <n> retired
 proven: <n>  partial: <n>  failed: <n>  owed: <n>  unproven and not owed: <n>
 owed without a story: <n>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
 
-The first count line lists only kinds that occur, in the order `tc, sc, inv, fm, fv, cx, ck`.
+The `red` line prints only while the integration branch is red (section 12.2). The first count
+line lists only kinds that occur, in the order `tc, sc, inv, fm, fv, cx, ck`. The `ids` line
+counts every `act` and obligation id by its status (section 4.1): `owed` the entries of the owed
+list, `proven` the ids that yield an obligation and are not owed, which is what `verify` holds
+them to; the next line says what the evidence shows.
 The `tiers` line counts obligations by the tier of their area and is omitted when there is no
 risk file. When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
@@ -1447,6 +1560,14 @@ machinery:intake-planned <full sha> <contract hash>
 machinery:no-design-change <reason>
 machinery:capstone
 machinery:demo <command>
+machinery:learning <text>
+machinery:observation <kind> <text>
+machinery:observation-filed <item id> <kind> <text>
+machinery:repair <short sha>
+machinery:decision <actor>
+machinery:supersedes <decision id>
+machinery:vetoable
+machinery:confirmed <actor>
 ```
 
 - `machinery:ids` lists the design ids the story delivers. Several lines add up.
@@ -1456,6 +1577,9 @@ machinery:demo <command>
 - The actor is `--actor`, else the environment variable `BEADS_ACTOR`, else `git config user.name`.
 - `machinery:intake` with nothing after it marks an intake item; `machinery:intake <id>` marks a
   story of that intake. The other intake lines are described in section 15.7.
+- `machinery:repair` records that a story was closed while the integration branch was red, as
+  its repair (section 12.2). The learning, observation and decision lines are described in
+  section 15.8.
 
 ### 15.2 `machinery plan`
 
@@ -1557,8 +1681,8 @@ Output is sorted and deterministic. With nothing owed it prints nothing and exit
 
 ### 15.3 `machinery waves`
 
-Reads every story that is not closed, not deferred, not an epic and not an intake item (section
-15.7), with its blocking edges, and prints the layers of the graph: wave 1 holds the stories with no open blocker, wave 2 those
+Reads every story that is not closed, not deferred, not an epic, not an intake item (section
+15.7) and not a decision (section 15.8), with its blocking edges, and prints the layers of the graph: wave 1 holds the stories with no open blocker, wave 2 those
 blocked only by wave 1, and so on. Stories of one wave can run in parallel.
 
 ```
@@ -1601,8 +1725,8 @@ stories: [{id, tier, title, route, scope}]}], stage}`. The exit code follows sec
 Parallel work is safe only against one contract. The **contract hash** is the sha256 over the
 sorted list of `<path> <sha256 of the file>` lines of the design sources: the model files, every
 `*.machine.json` or imported machine source, the register of the imported machines, the
-failure-mode file, the imported failure-mode catalog and its links file, the risk file, the facts
-file and the contract files.
+failure-mode file, the imported failure-mode catalog and its links file, the risk file, the status
+file (section 4.1), the facts file and the contract files.
 Generated files, the owed list and formal models are not part of it.
 
 `machinery waves --freeze` requires a clean `gen-drift` stage and writes
@@ -1641,6 +1765,8 @@ ids:
   <id>  <title>
 read:
   <path>[#<anchor>]
+decisions:
+  <backlog id>  <title>
 scope:
   <glob>
 run:
@@ -1651,6 +1777,9 @@ done when: <one line>
 - `read` lists, for the ids of the story: the machine file and its generated table for `tc` ids,
   the model file for `act`, `inv` and `sc` ids, the failure-mode file for `fm` ids, the spec
   manifest and trace file for `fv` and `cx` ids, and `docs/formats.md` when the project has it.
+- `decisions` lists, sorted by id, the current decisions (section 15.8) that govern an id of the
+  story: an id or pattern of the decision's `machinery:ids` and an id of the story overlap. It is
+  a pointer: the decision is read in the backlog.
 - `run` for a builder: `machinery check --base <base>`, `machinery run --affected --base <base> --
   <commands.e2e>`, `machinery verify --story <id>`, `machinery proof --story <id> --post`.
 - For a verifier, `read` never contains the proof, and `run` starts with
@@ -1705,9 +1834,14 @@ without ids, `machinery proof --story` prints a block with no criteria.
 outcome>"` appends the prediction line. It refuses when a proof for the current commit was posted
 by the same actor.
 
-`machinery accept <story> --verdict accept|reject --observed "<what was seen>" [--close]` appends
-the verdict line. With `accept` it then runs the gate and exits with its code; `--close` closes
-the story in the backlog when the gate passed.
+`machinery accept <story> --verdict accept|reject --observed "<what was seen>" [--close [--repair]]`
+appends the verdict line. With `accept` it then runs the gate and exits with its code; `--close`
+closes the story in the backlog when the gate passed. While the integration branch is red,
+`--close` refuses without `--repair` (section 12.2).
+
+A story that names a proposed or retired id (section 4.1) is not accepted on it:
+`ERROR  proposed: <id> yields no obligation; commit it first` (`retired: <id> yields no
+obligation; take it out of the story`).
 
 The verifier is a fresh context that did not build the change. It receives the verifier brief,
 predicts, and only then reads the proof. machinery cannot see what an agent read, and an actor
@@ -1768,6 +1902,7 @@ base: <short sha>, contract <first 12 hex>
   generated       done     <reason>
   new ids         done     <reason>
     <id>  <tier>[ (<area>, <area>)]
+    proposed, not planned: <id> <id>
   tiers           done     <reason>
     routine by default: <act id> <act id>
   formal          done     <reason>
@@ -1789,8 +1924,11 @@ intake <id>: 6 of 7 steps done; next: planned
 (`bd update <id> --append-notes "machinery:no-design-change <reason>"`). The **new ids** are the
 `act` and obligation ids now (section 4) that are not in the generated obligation list at the base
 commit, read with `git show <base>:<gen>/obligations.json` (the gen directory of the base's own
-`machinery.yaml`); a base without that file has no ids, so every id is new. They print sorted, each
-with its tier and the areas that give it. Under `tiers`, the new `act` ids that are in no area
+`machinery.yaml`); a base without that file has no ids, so every id is new. A proposed id (section
+4.1) yields no obligation and is never new: the proposed ids now that are neither in that list nor
+proposed in the base's status file print on one line under the step,
+`proposed, not planned: <id> <id>`, left out when there is none, and `intake plan` plans none of
+them. The new ids print sorted, each with its tier and the areas that give it. Under `tiers`, the new `act` ids that are in no area
 print as `routine by default`, so the planner sees what was left routine; the line is left out
 when there is none. An item without a `machinery:intake-base` line (one not made by `intake new`)
 has neither `design changed` nor `new ids` done, and while the new ids are not known `planned`
@@ -1804,7 +1942,7 @@ every step is done:
 ```json
 {"intake": "<id>", "title": "<title>", "base": {"commit": "<full sha>", "contract": "<sha256>"}, "contract": "<sha256>",
  "steps": [{"step": "design changed", "done": true, "reason": "<reason>"}],
- "new_ids": [{"id": "<id>", "tier": "<tier>", "areas": ["<area>"]}], "routine_by_default": ["<act id>"],
+ "new_ids": [{"id": "<id>", "tier": "<tier>", "areas": ["<area>"]}], "proposed": ["<id>"], "routine_by_default": ["<act id>"],
  "done": 6, "next": "planned"}
 ```
 
@@ -1854,6 +1992,14 @@ the capstone is planned` for an intake without new ids (a rewording, a removal, 
 requirement the design already covers), and `intake <id>: every new id has a story; nothing to
 create` when there is nothing left to create. Running it again therefore creates nothing twice.
 
+When it does not refuse, both forms print first a reminder when closed stories carry learnings
+the planner has not read (section 15.8): `learnings: <n> unread since <short sha>; machinery learnings --since
+<short sha>`, where the commit is the last planned one, the newest commit of a
+`machinery:intake-planned` line of any intake item, and `<n>` counts the learning lines of the
+stories closed since it. With no planned line yet the reminder is
+`learnings: <n> unread; machinery learnings`. It is a reminder, never a refusal, and it is not
+printed when `<n>` is 0.
+
 **Stage `intake`.** Part of `machinery check`. It reads the backlog with one `bd list`, only when
 `backlog.tool` is set and `bd` is runnable. It is `not applicable: no backlog configured`,
 `not applicable: bd not runnable`, `not applicable: the backlog cannot be read` or
@@ -1866,6 +2012,116 @@ create` when there is nothing left to create. Running it again therefore creates
   story of the intake are closed.
 
 Warnings only: the stage passes. `checked:` counts the open intake items.
+
+### 15.8 Decisions, observations and learnings
+
+The backlog keeps three more records of the work: decisions taken, observations made outside a
+story's scope, and learnings for the next story. Each is a tag line (section 15.1), so the backlog
+stays the one record.
+
+**Decisions.**
+
+```
+machinery decide "<title>" --why "<reason and alternatives>" [--ids <id>...] [--supersedes <decision id>] [--vetoable] [--actor <name>]
+machinery decisions [--ids <id>...] [--open-vetoes]
+```
+
+`decide` creates one backlog item of type `decision` and prints `decision: <id>`. Its description:
+
+```
+Why:
+<why>
+
+machinery:decision <actor>
+machinery:ids <id> <id>
+machinery:supersedes <decision id>
+machinery:vetoable
+```
+
+The `machinery:ids` line lists the ids and id patterns the decision governs, sorted, and is left
+out without `--ids`; `--ids` is repeatable and takes comma-separated values, and each must name
+an id of the design or a pattern that matches one (section 4.1 statuses included). The
+`machinery:supersedes` and `machinery:vetoable` lines are written only with their flags. A
+vetoable decision is one an agent took within its remit that the owner may overturn. A newline in
+the title or the reason becomes a space. Refusals (exit 2): an empty title or reason
+(`usage: machinery decide needs --why`), an id that names nothing
+(`usage: --ids <id> names no design id`), no actor, and a `--supersedes` item that is not a
+current decision (`usage: <id> is not a decision: it has no machinery:decision line`,
+`usage: <id> is superseded already by <id>`).
+
+With `--supersedes <id>` the new item is created first, then `bd supersede <id> --with <new id>`
+closes the older one with a link to it, and `superseded: <id> by <new id>` is printed.
+
+An item is a decision when its description or notes carry a `machinery:decision` line. It is
+**current** unless another decision carries `machinery:supersedes <its id>`, whatever its status.
+The owner confirms a vetoable decision by appending `machinery:confirmed <actor>` to its notes
+(`bd update <id> --append-notes "machinery:confirmed <actor>"`) and overturns it with a decision
+that supersedes it. A decision is never a unit of build work: `waves` leaves it out.
+
+`machinery decisions` lists the current decisions, sorted by id, three lines each, then a count:
+
+```
+<id>  <title>
+  governs: <id> <id>
+  by: <actor>[, vetoable][, confirmed by <actor>]
+decisions: <n> current
+```
+
+`governs: none` when the decision has no `machinery:ids` line. `--ids` (repeatable,
+comma-separated, patterns allowed) keeps the decisions that govern one of them: a decision governs
+an id or pattern when one of its own ids or patterns overlaps it (equal ids, or an id with the
+prefix of a pattern, or two patterns of which one prefix contains the other). A decision without
+ids governs none. `--open-vetoes` keeps the vetoable decisions that are not confirmed, and the last
+line is then `decisions: <n> open to veto`. `machinery brief` lists the same decisions for the ids
+of a story (section 15.5). Exit 0.
+
+**Observations.** A builder who sees something outside the story's scope records it with
+`machinery proof --observation "<kind>: <text>"` (section 13); posted, it is a line
+`machinery:observation <kind> <text>` on the story.
+
+```
+machinery observations [--file]
+```
+
+lists, for every item of the backlog, open or closed, sorted by item id and then in the order of
+the lines, each observation line that is not filed: `<item id>  <kind>: <text>`, then
+`observations: <n> not filed`. An observation is filed when the same item carries
+`machinery:observation-filed <id> <kind> <text>` with the same kind and text; the same kind and
+text twice on one item are one observation.
+
+With `--file` each of them becomes one backlog item: type `bug` for `bug` and `security`, `task`
+for `debt`, `perf` and `doc`; the label `observation:<kind>`; the text as the title; the
+description `Observed in <item id> (<item title>): <kind>: <text>`; and a `discovered-from`
+link to the item it was seen in. Then the line
+`machinery:observation-filed <new id> <kind> <text>` is appended to that item, so a second run
+files nothing. It prints `filed: <new id>  <kind>: <text> (from <item id>)` per observation and
+`observations: <n> filed`. Exit 0; a backlog call that fails stops the run, and what was filed
+before it stays filed and marked.
+
+**Learnings.** A builder records a rule the next story or the planner should know with
+`machinery proof --learning "<text>"`; posted, it is a line `machinery:learning <text>`.
+
+```
+machinery learnings [--since <git ref>]
+```
+
+prints the learning lines of the closed stories, grouped by intake (the intake of a story, section
+15.7), the intakes sorted by id and the stories outside an intake last:
+
+```
+intake <intake id>: <intake title>
+  <story id>  <learning>
+outside an intake
+  <story id>  <learning>
+learnings: <n> from <n> closed stories since <short sha>
+```
+
+Within a group the lines are sorted by story id and keep their order on the story. With
+`--since`, a closed story counts when one of its `machinery:proof` commits is neither the ref nor
+an ancestor of it (a commit this repository does not have counts); a closed story with no proof
+line counts only without `--since`, and the last line then has no `since` part. An unknown ref is
+a usage error (`usage: --since <ref>: not a commit of the project`). Exit 0. The planner reads
+them before the next plan; `machinery intake plan` reminds it (section 15.7).
 
 ## 16. Formal models
 
@@ -2468,7 +2724,7 @@ each section is saved under `<out>/stages/`.
 | Section | What runs | Saved as |
 |---|---|---|
 | `inventory` | The facts of the adopt report (section 17.2) for the snapshot: scope, languages, code files, test files (under e2e roots, elsewhere, with test doubles), design sources. `checked:` counts the files. | `inventory.txt` |
-| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. | `<stage>.txt` each |
+| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). | `<stage>.txt` each |
 | `generation` | `machinery gen` (section 7). When gen refuses, not demonstrated: `gen refused: <stages> have errors`. | `generation.txt` |
 | `trace`, `tests`, `arch` | The stage of that name. | `<stage>.txt` |
 | `formal` | The sanity run, section 18.5. | `formal.txt` |
@@ -2562,8 +2818,15 @@ match in the snapshot: `<file>: <n> records, <n> lines, <n> words`, where a reco
 The agent instruction files at the root of the snapshot, `CLAUDE.md` and `AGENTS.md`, are
 counted too: `<file>: <n> lines, <n> words`. When one is a symbolic link to the other, or holds a
 single non-empty line that names the other, it is counted once, under the file it points at, with
-`(<file> links to it)`. Not applicable when `assess.decisions` is not configured and neither file
-exists.
+`(<file> links to it)`.
+
+When the tracker's export (section 18.8) can be read, the decision items it holds are counted
+too, so that a project that keeps its decisions in the backlog (section 15.8) shows it:
+`backlog: <n> decision item(s) in .beads/issues.jsonl, <n> current`, and `checked:` adds
+`<n> backlog decisions`. A decision item is one of type `decision` or one that carries a
+`machinery:decision` line; it is current unless an item of the export carries
+`machinery:supersedes <its id>`. Not applicable when `assess.decisions` is not configured,
+neither instruction file exists and the export holds no decision item.
 
 ### 18.8 Backlog
 
@@ -2626,11 +2889,11 @@ A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`
 | Section | Keys of `facts` |
 |---|---|
 | `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
-| `design` | `bound_machines`, `unbound_machines` (when at least one machine was read) |
+| `design` | `statuses`: `{owed, proposed, proven, retired}`; `bound_machines`, `unbound_machines` (when at least one machine was read) |
 | `generation` | `files` (generated files), `written` |
 | `formal` | `machines`: `{deadlock, distinct, machine, reason, result, states, unreachable}`; `models`: `{model, reason, result}`; `result` is `passed`, `failed` or `incomplete` (`instance found`, `no instance` or `incomplete` for a model), and `reason` says why a run did not complete, else is empty |
 | `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
-| `decisions` | `files`: `{lines, path, records, words}`; `instructions`: `{linked, lines, path, words}` |
+| `decisions` | `files`: `{lines, path, records, words}`; `instructions`: `{linked, lines, path, words}`; `backlog`: `{current, decisions}` when the export can be read |
 | `backlog` | `branches`, `by_status`, `by_type`, `export`, `in_progress` (`{id, title}`), `issues`, `open`, `open_naming_obligations` |
 
 stdout:
@@ -2682,7 +2945,9 @@ requirement behind them (the skeleton of a new project, an adoption) become stor
    the right reason.
 2. Change the code until it passes. Per change: `machinery check --base <base>` and a targeted run
    (`machinery run --affected`, `machinery verify --story <id>`).
-3. `machinery owed sync --prune-only`, commit, `machinery proof --story <id> --post`.
+3. `machinery owed sync --prune-only`, commit, `machinery proof --story <id> --post`, with a
+   `--limit` for each claim still unproven, a `--learning` for each rule the next story should
+   know and an `--observation` for each thing seen outside the story's scope.
 
 **Accept.** By tier (section 15.6): routine on evidence; consequential and critical through a
 fresh verifier who predicts, reads, then accepts; critical with its formal model current. The
@@ -2691,7 +2956,11 @@ records the commands that show the intent (`machinery:demo` lines) and a fresh v
 it. Then the intake item is closed; stage `intake` warns while a delivered one stays open.
 
 **Land.** Stories of a wave are integrated; then the whole suite runs once at the head that is
-ready, with `machinery landing --base <base>`, and at most two fix-forwards (section 12.2).
+ready, with `machinery landing --base <base>`, and at most two fix-forwards (section 12.2). A failed
+landing marks the integration branch red: no story closes and no other head lands until a repair
+(`--repair`) or a revert (`--clear-red`). Between plans the planner files the observations
+(`machinery observations --file`) and reads the learnings (`machinery learnings`); decisions are
+recorded with `machinery decide` and reach the briefs of the stories they govern.
 `machinery probe` runs per batch and before a release.
 
 A new project starts with a full-breadth skeleton: every action has an operation and a mounted
@@ -2998,9 +3267,13 @@ Stage `risk`:
 | `area-shape` | Unique names, a valid tier, a non-empty `why`, at least one id pattern. |
 | `id-resolves` | Every pattern matches at least one `act`, `inv`, `sc`, `tc` or `fm` id. |
 | `critical-question` | A critical area lists at least one question; a non-critical area lists none. |
+| `status-file` | The status file (section 4.1) is well formed and every entry names ids of the design. |
 
-`checked:` counts areas, consequential ids and critical ids. Not applicable when `design.risk` is
-absent.
+Stage `risk` holds both files the planner writes about ids: tiers and statuses. `checked:` counts
+areas, consequential ids and critical ids when `design.risk` is set, then, when the status file
+exists, the proposed ids and the retired ids it gives. Not applicable when `design.risk` is absent
+and there is no status file (`not applicable: no design.risk configured`). Not demonstrated when it
+has no area and no status entry.
 
 The tier is chosen at planning, not discovered at review. When it is unclear which tier applies,
 the higher one does. Lowering a tier is a deliberate, recorded act: the ratchet (section 11.3)
