@@ -2354,8 +2354,9 @@ file; lines before the first record belong to none. Per record, in file order:
 
 - the **title** is the heading line with its leading `#` characters and white space removed (the
   heading as written when that leaves nothing);
-- the **body** is the record's other lines, blank lines at either end dropped; a `machinery:` in it
-  is written `machinery :` so that no line of the body starts a tag;
+- the **body** is the record's other lines, blank lines at either end dropped (the title when no
+  line is left); a `machinery:` in it is written `machinery :` so that no line of the body starts
+  a tag;
 - the **ids** are every design id the text (heading and body) names that exists in the design
   (section 4.1 statuses included): each token of `[A-Za-z0-9_.:-]` characters, trailing `.` and
   `:` dropped, is resolved as a token of a project's own trace marker is (section 8.1): with a

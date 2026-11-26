@@ -166,6 +166,7 @@ machinery decide "<title>" --why "<reason; alternatives>" --ids <id>,<pattern>  
 machinery decide "<title>" --why "..." --supersedes <decision id>               # replaces one
 machinery decisions --ids <id>               # the current decisions that govern it
 machinery decisions --open-vetoes            # agent decisions the owner has not confirmed
+machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'   # records kept in a file, once each; --apply
 machinery observations --file                # one backlog item per observation, filed once
 machinery learnings --since <last plan>      # read before the next plan
 ```

@@ -1,0 +1,104 @@
+# decisions import: the records of an existing decision file become backlog decisions, once each (section 15.8)
+fixture shop
+exec machinery gen
+gitinit
+mkdir docs
+cp decisions.md docs/DECISIONS.md
+cp decisions.md decisions-before.md
+
+# usage errors
+exec mrun 2 decisions import
+stderr '^usage: machinery decisions import needs --file <path> and --record "<regex>"$'
+exec mrun 2 decisions import --file docs/DECISIONS.md
+stderr '^usage: machinery decisions import needs --file <path> and --record "<regex>"$'
+exec mrun 2 decisions import --file docs/DECISIONS.md --record '^## D[0-9'
+stderr '^usage: --record is not a regular expression: '
+exec mrun 2 decisions import --file ../outside.md --record '^## D'
+stderr '^usage: --file: "../outside.md" must stay inside the project root$'
+exec mrun 2 decisions import --file docs/NONE.md --record '^## D'
+stderr '^usage: --file docs/NONE.md: cannot read$'
+exec mrun 2 decisions import --file docs/DECISIONS.md --record '^## ADR-'
+stderr '^usage: --record "\^## ADR-" matches no line of docs/DECISIONS.md$'
+exec mrun 2 decisions import extra --file docs/DECISIONS.md --record '^## D'
+stderr '^usage: machinery decisions import takes no arguments$'
+
+# print mode without a backlog: every record is new; the ids the text names, bare or with a kind
+exec machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'
+cmp stdout want-print.txt
+
+# --apply needs the backlog
+exec mrun 2 decisions import --file docs/DECISIONS.md --record '^## D[0-9]+' --apply
+stderr '^config: no backlog configured'
+
+# with the backlog: one graph call creates the new ones as decisions
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+gitcommit 'backlog'
+exec bd init --stealth --non-interactive -p shop
+exec machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'
+stdout '^  backlog: new$'
+! stdout 'not read'
+stdout '^decisions import: 3 record\(s\) in docs/DECISIONS.md, 2 naming design ids, 3 new, 0 imported already$'
+exec machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+' --apply
+stdout '^decisions import: 3 record\(s\) in docs/DECISIONS.md, 2 naming design ids, 3 created, 0 imported already$'
+stdout '^  backlog: shop-[a-z0-9]+$'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"issue_type\": \"decision\""'
+stdout '^3$'
+exec sh -c '. ./lib.sh; bd show $(sid "D1: Charge before shipping") --json'
+stdout '"description": "Why:\\nThe order is paid \(see paid-before-shipped\) before a Clerk runs Order.ship.\\nWhen payment-provider-down, nothing ships; tc:ORDE-2e883d too.\\n\\nmachinery:decision builder\\nmachinery:ids act:Order.ship fm:payment-provider-down inv:paid-before-shipped tc:ORDE-2e883d\\nmachinery:decision-source docs/DECISIONS.md#[0-9a-f]{12}\\n"'
+exec sh -c '. ./lib.sh; bd show $(sid "D2 Prices in cents") --json'
+stdout 'No rounding anywhere: machinery :ids inv:terminal-is-final, inv:not-an-id.\\n\\nmachinery:decision builder\\nmachinery:ids inv:terminal-is-final\\n'
+exec sh -c '. ./lib.sh; bd show $(sid "D3: Nothing yet") --json'
+stdout '"description": "Why:\\nD3: Nothing yet\\n\\nmachinery:decision builder\\nmachinery:decision-source docs/DECISIONS.md#[0-9a-f]{12}\\n"'
+exec machinery decisions
+stdout '^decisions: 3 current$'
+stdout '^  governs: act:Order.ship fm:payment-provider-down inv:paid-before-shipped tc:ORDE-2e883d$'
+
+# again: nothing twice; the records name the items they became
+exec machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+' --apply
+stdout '^decisions import: 3 record\(s\) in docs/DECISIONS.md, 2 naming design ids, 0 created, 3 imported already$'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"issue_type\": \"decision\""'
+stdout '^3$'
+
+# a heading that changes is a new record; the file is never written
+exec sh -c 'printf "\n## D4: Ship from one warehouse\nOne carrier contract.\n" >> docs/DECISIONS.md'
+exec machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'
+stdout '^15: D4: Ship from one warehouse\n  source: docs/DECISIONS.md#[0-9a-f]{12}\n  governs: none\n  backlog: new$'
+stdout '^decisions import: 4 record\(s\) in docs/DECISIONS.md, 2 naming design ids, 1 new, 3 imported already$'
+stdout '^shed: 16 line\(s\): '
+exec sh -c 'head -n 13 docs/DECISIONS.md | cmp - decisions-before.md'
+
+-- decisions.md --
+# Decisions
+
+Kept by hand since the first release.
+
+## D1: Charge before shipping
+The order is paid (see paid-before-shipped) before a Clerk runs Order.ship.
+When payment-provider-down, nothing ships; tc:ORDE-2e883d too.
+
+## D2 Prices in cents
+No rounding anywhere: machinery:ids inv:terminal-is-final, inv:not-an-id.
+
+## D3: Nothing yet
+
+-- want-print.txt --
+5: D1: Charge before shipping
+  source: docs/DECISIONS.md#ab72279ed0ac
+  governs: act:Order.ship fm:payment-provider-down inv:paid-before-shipped tc:ORDE-2e883d
+  backlog: new
+9: D2 Prices in cents
+  source: docs/DECISIONS.md#ca2e06e7714f
+  governs: inv:terminal-is-final
+  backlog: new
+12: D3: Nothing yet
+  source: docs/DECISIONS.md#0a45927e6919
+  governs: none
+  backlog: new
+backlog: not read: no backlog configured; every record counts as new
+decisions import: 3 record(s) in docs/DECISIONS.md, 2 naming design ids, 3 new, 0 imported already
+shed: 13 line(s): an instructions file that loads docs/DECISIONS.md is that much shorter once the file is removed from what agents load
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
