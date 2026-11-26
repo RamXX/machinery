@@ -41,6 +41,8 @@ enforces everything below, and an unknown key is an error, never silently skippe
 - **Failure states and events.** No state is tagged both `failure` and `accepting`.
   `_failure_events` names events some state handles or ignores, none of them also in
   `_external_events`.
+- **Aliases.** `_aliases` maps events some state handles or ignores to action names, none of
+  them also in `_external_events` or `_failure_events`.
 - **Callers.** `_requires` is a non-empty list of distinct, non-empty names.
 - **Serves.** `_serves` is a non-empty list of distinct `entity:<Name>` and
   `act:<Entity>.<action>` ids.
@@ -57,7 +59,7 @@ machine file. A file that cannot be parsed is an ERROR.
 
 - **Root keys:** `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, and the
   annotations `_comment`, `_delays`, `_lifecycle_of`, `_aspect`, `_role`, `_serves`, `_oracle_tag`,
-  `_guards`, `_external_events`, `_failure_events`, `_entries`.
+  `_guards`, `_external_events`, `_failure_events`, `_aliases`, `_entries`.
 - **State keys:** `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`, `id`,
   `meta`, `description`, `tags`, `onDone`, `output`, and the annotations `_comment`, `_exhaustive`,
   `_ignores`, `_refusal`, `_terminal`.
@@ -181,7 +183,18 @@ once.
 **`_external_events`** (root, optional). An array of event names this machine receives that are not
 model actions, for example events that arrive from a bus or a peer subsystem (`docs/formats.md`
 section 6.4 reads it). Each entry is a non-empty string. An entry that no state handles or ignores
-is a stale marker and an error: remove it, or wire the event.
+is a stale marker and an error: remove it, or wire the event. An action of the model is a caller's
+command and is never listed here: stage `xref-model-machine` reports one that is.
+
+**`_aliases`** (root, optional). An object that maps an event name to the name of the model
+action it is: `"_aliases": {"handed_back": "giveBack"}` when the machine calls `handed_back` what
+the model calls `giveBack`. Rules `event-action` and `action-event` then read the event as that
+action (`docs/formats.md` section 6.4), which must be an action of the machine's entity, or of
+what an operational machine serves. Each value is a non-empty string, and each event is one some
+state handles or ignores (a stale entry is an error). An aliased event is a caller's action, so it
+is in neither `_external_events` nor `_failure_events`, and an event that is itself an action
+takes no alias. Prefer one name in the model and the machine; the alias is for a machine whose
+names cannot change.
 
 **`_serves`** (root, required on an operational machine). A non-empty array of the model ids the
 machine exists for, each `entity:<Name>` or `act:<Entity>.<action>`, none twice:
@@ -401,7 +414,8 @@ it.
 
 **Name hints.** The lint warns about a state whose name contains `fail`, `error`, `abort`,
 `crash` or `timeout` (in any case) and is not tagged `failure`, and about an event with such a
-name that is neither in `_failure_events` nor an action of the lifecycle entity. A warning never
+name that is not declared: neither in `_failure_events` nor in `_external_events`, without an
+entry in `_aliases`, and no action of the lifecycle entity. A warning never
 fails the stage; tag the state, list the event, or leave it when the name means something else.
 
 A per-state `after` is cancelled when its state exits. A bound that must hold across several
