@@ -183,10 +183,10 @@ func (t *translator) addRefusals(out *ir.Object, refusals, from, reasons map[str
 	for _, ev := range evs {
 		k := from[ev]
 		if have := res.Get2(ev); have != nil {
-			if act := textOf(have.AsObject().Get2("action")); have.Kind != ir.KindObject || act != refusals[ev] {
-				if have.Kind != ir.KindObject {
-					act = textOf(have)
-				}
+			if have.Kind != ir.KindObject {
+				continue // an entry of another shape is the lint's finding: one cause, one finding
+			}
+			if act := textOf(have.AsObject().Get2("action")); act != refusals[ev] {
 				t.fail("import.machines.annotate %s gives event %s the refused action %s, and the source gives it %s; keep one", k, ev, refusals[ev], act)
 			}
 			continue

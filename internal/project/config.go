@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -229,6 +230,38 @@ type Annotate struct {
 type Refusal struct {
 	Action string `yaml:"action"`
 	Reason string `yaml:"reason"`
+}
+
+// UnmarshalYAML reads {action, reason} and says what an entry is when it is
+// something else, such as a bare action name.
+func (r *Refusal) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.MappingNode {
+		got := n.Value
+		if n.Kind != yaml.ScalarNode {
+			got = "a list"
+		}
+		return fmt.Errorf("line %d: a refusal_events entry must be {action: <action>, reason: \"<why the event is a refusal and no failure>\"}, got %s", n.Line, got)
+	}
+	type plain Refusal
+	var p plain
+	if err := n.Decode(&p); err != nil {
+		return err
+	}
+	*r = Refusal(p)
+	return nil
+}
+
+// OneLine reports text that prints on one line: no line break and no other
+// control character. What the tool prints from a config or an annotation
+// (an action, a reason) is held to it, so that no declaration can put text
+// of its author's choice at the start of an output line.
+func OneLine(s string) bool {
+	for _, c := range s {
+		if unicode.IsControl(c) {
+			return false
+		}
+	}
+	return true
 }
 
 // AnnotateKeys returns the keys of import.machines.annotate, sorted.
@@ -927,6 +960,25 @@ func (c *Config) validateImport() error {
 		for name, reason := range a.NotFailures {
 			if strings.TrimSpace(name) == "" || strings.TrimSpace(reason) == "" {
 				return Errf("import.machines.annotate.%s.not_failures: a name and its reason must not be empty", k)
+			}
+		}
+		// a name, an action and a reason are printed: each is one line
+		texts := map[string][]string{}
+		for ev, act := range a.Aliases {
+			texts["aliases"] = append(texts["aliases"], ev, act)
+		}
+		for ev, rf := range a.RefusalEvents {
+			texts["refusal_events"] = append(texts["refusal_events"], ev, rf.Action, rf.Reason)
+		}
+		for name, reason := range a.NotFailures {
+			texts["not_failures"] = append(texts["not_failures"], name, reason)
+		}
+		for _, list := range []string{"aliases", "refusal_events", "not_failures"} {
+			sort.Strings(texts[list])
+			for _, text := range texts[list] {
+				if !OneLine(text) {
+					return Errf("import.machines.annotate.%s.%s: %q has a line break or a control character; a name, an action and a reason are one line", k, list, text)
+				}
 			}
 		}
 	}

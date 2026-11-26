@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/project"
 )
 
 // tagFailure marks a state that records that something went wrong
@@ -108,8 +109,11 @@ func (m *Machine) RefusalEvents() map[string]RefusalEvent {
 		if d == nil {
 			continue
 		}
-		if act := stringOf(d.Get2("action")); act != "" {
-			res[ev] = RefusalEvent{Action: act, Reason: stringOf(d.Get2("reason"))}
+		// an action or a reason that is not one line is the lint's
+		// finding, and is never printed
+		act, reason := d.Get2("action"), d.Get2("reason")
+		if stringOf(act) != "" && project.OneLine(act.AsString()) && (stringOf(reason) == "" || project.OneLine(reason.AsString())) {
+			res[ev] = RefusalEvent{Action: stringOf(act), Reason: stringOf(reason)}
 		}
 	}
 	return res
@@ -136,7 +140,8 @@ func eventMap(o *ir.Object, key string) map[string]string {
 	}
 	al := o.GetObject(key)
 	for _, ev := range al.Keys() {
-		if v := al.Get2(ev); v != nil && v.Kind == ir.KindString && strings.TrimSpace(v.AsString()) != "" {
+		// a value that is not one line is the lint's finding, and is never printed
+		if v := al.Get2(ev); v != nil && v.Kind == ir.KindString && strings.TrimSpace(v.AsString()) != "" && project.OneLine(v.AsString()) {
 			res[ev] = strings.TrimSpace(v.AsString())
 		}
 	}
@@ -204,6 +209,12 @@ func lintRefusalEvents(base string, ro *ir.Object, states []ir.StateEntry) (errs
 		case stringOf(d.Get2("reason")) == "":
 			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].reason must be a non-empty reason: say why the event is a refusal and no failure", base, ir.Repr(ev)))
 			continue
+		case !project.OneLine(d.Get2("action").AsString()):
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].action must be one line without control characters", base, ir.Repr(ev)))
+			continue
+		case !project.OneLine(d.Get2("reason").AsString()):
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].reason must be one line without control characters", base, ir.Repr(ev)))
+			continue
 		}
 		if !handled[ev] {
 			errs = append(errs, fmt.Sprintf("%s: _refusal_events names %s but no state handles or ignores it; the marker is stale (remove it, or wire the event)", base, ir.Repr(ev)))
@@ -246,6 +257,9 @@ func lintAliases(base string, ro *ir.Object, states []ir.StateEntry) (errs []str
 	for _, ev := range av.AsObject().Keys() {
 		if v := av.AsObject().Get2(ev); v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
 			errs = append(errs, fmt.Sprintf("%s: _aliases[%s] must be a non-empty action name", base, ir.Repr(ev)))
+			continue
+		} else if !project.OneLine(v.AsString()) {
+			errs = append(errs, fmt.Sprintf("%s: _aliases[%s] must be one line without control characters", base, ir.Repr(ev)))
 			continue
 		}
 		if !handled[ev] {
@@ -308,6 +322,8 @@ func lintNotFailures(base string, ro *ir.Object, states []ir.StateEntry) (errs [
 		switch {
 		case v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "":
 			errs = append(errs, fmt.Sprintf("%s: _not_failures[%s] must be a non-empty reason", base, ir.Repr(n)))
+		case !project.OneLine(v.AsString()):
+			errs = append(errs, fmt.Sprintf("%s: _not_failures[%s] must be one line without control characters", base, ir.Repr(n)))
 		case !handled[n] && !isState[n]:
 			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is no event a state handles or ignores and no state; the marker is stale (remove it, or correct the name)", base, ir.Repr(n)))
 		case !looksLikeFailure(n[strings.LastIndex(n, ".")+1:]):
