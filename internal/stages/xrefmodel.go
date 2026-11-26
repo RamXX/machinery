@@ -206,9 +206,11 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 // externalEvents returns the events a machine declares as arriving from
 // outside: _external_events and _failure_events (a failure event arrives
 // from outside). A list of the wrong shape is a finding of event-action,
-// and so is a listed event that is an action (isAction; of is what it is an
-// action of): an action is a caller's command, and no list hides one.
-func externalEvents(fs *xfindings, m *machine.Machine, isAction map[string]bool, of string) map[string]bool {
+// and so is a listed event that is an action (entityOf names the entity of
+// every action the machine could be asked for): an action is a caller's
+// command, and no list hides one. The finding says where the event is
+// listed: the entry of import.machines.annotate that added it, or the file.
+func externalEvents(fs *xfindings, m *machine.Machine, entityOf map[string]string) map[string]bool {
 	external := map[string]bool{}
 	for _, key := range []string{"_external_events", "_failure_events"} {
 		set, ok := eventSet(m, key)
@@ -220,8 +222,12 @@ func externalEvents(fs *xfindings, m *machine.Machine, isAction map[string]bool,
 				continue // in both lists: stage machines reports it
 			}
 			external[ev] = true
-			if isAction[ev] {
-				fs.add("event-action", m.ID+"."+ev, "listed in %s and an action of %s; an action is a caller's command, not an event from outside: remove it from %s (for an imported machine, from import.machines.annotate)", key, of, key)
+			if ent, isAction := entityOf[ev]; isAction {
+				where := fmt.Sprintf("remove it from %s in %s", key, m.Path)
+				if by := m.Listed[key+" "+ev]; by != "" {
+					where = by + "; narrow the pattern or remove it"
+				}
+				fs.add("event-action", m.ID+"."+ev, "listed in %s and an action of %s; an action is a caller's command, not an event from outside: %s", key, ent, where)
 			}
 		}
 	}
@@ -272,10 +278,21 @@ func aliasedEvents(fs *xfindings, m *machine.Machine, isAction map[string]bool, 
 func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine) int {
 	serves, _ := m.Serves()
 	allowed := map[string]bool{}
+	// entityOf holds every action of every entity behind what the machine
+	// serves, the entity of an act id too: none of them is external
+	entityOf := map[string]string{}
 	anyAction := false
 	var bare []string
 	for _, id := range serves {
 		kind, name, _ := strings.Cut(id, ":")
+		entName, _, _ := strings.Cut(name, ".")
+		if e, _ := design.FindEntity(d.Models, entName); e != nil {
+			for _, a := range e.Actions {
+				if _, have := entityOf[a.Name]; !have {
+					entityOf[a.Name] = e.Name
+				}
+			}
+		}
 		switch kind {
 		case "entity":
 			e, _ := design.FindEntity(d.Models, name)
@@ -296,7 +313,7 @@ func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine)
 		}
 	}
 	of := fmt.Sprintf("what the machine serves (%s)", strings.Join(serves, ", "))
-	external := externalEvents(fs, m, allowed, of)
+	external := externalEvents(fs, m, entityOf)
 	_, aliased := aliasedEvents(fs, m, allowed, of, "serve the action (act:<Entity>.<action>)")
 	evs := m.Table.Events()
 	var unmatched []string
@@ -329,11 +346,15 @@ func checkLifecycleEvents(fs *xfindings, g *lifecycleGroup) (events int) {
 	for _, a := range e.Actions {
 		acts[a.Name] = true
 	}
+	entityOf := map[string]string{}
+	for _, a := range e.Actions {
+		entityOf[a.Name] = e.Name
+	}
 	evSet := map[string]bool{}
 	var unmatched, ids []string
 	seen := map[string]bool{}
 	for _, m := range g.machines {
-		external := externalEvents(fs, m, acts, e.Name)
+		external := externalEvents(fs, m, entityOf)
 		alias, aliased := aliasedEvents(fs, m, acts, e.Name, "name an action of "+e.Name)
 		evs := m.Table.Events()
 		events += len(evs)

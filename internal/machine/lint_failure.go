@@ -108,12 +108,6 @@ func (m *Machine) Aliases() map[string]string {
 	return res
 }
 
-// ExternalEvents returns the root _external_events, in declaration order,
-// without duplicates.
-func (m *Machine) ExternalEvents() []string {
-	return eventList(m.Root.AsObject(), "_external_events")
-}
-
 // lintAliases holds the root _aliases: an object that maps an event some
 // state handles or ignores to a non-empty action name. An aliased event is
 // a caller's action, so it is in neither list of events from outside.
@@ -158,6 +152,68 @@ func lintAliases(base string, ro *ir.Object, states []ir.StateEntry) (errs []str
 	return errs
 }
 
+// notFailures returns the root _not_failures: the event names and state
+// paths whose name hint is dismissed, each with a non-empty reason.
+func notFailures(ro *ir.Object) map[string]bool {
+	res := map[string]bool{}
+	nf := ro.GetObject("_not_failures")
+	for _, n := range nf.Keys() {
+		if v := nf.Get2(n); v != nil && v.Kind == ir.KindString && strings.TrimSpace(v.AsString()) != "" {
+			res[n] = true
+		}
+	}
+	return res
+}
+
+// lintNotFailures holds the root _not_failures: an object that maps an
+// event some state handles or ignores, or the dotted path of a state, to
+// the reason it is no failure. A declared failure is not dismissed.
+func lintNotFailures(base string, ro *ir.Object, states []ir.StateEntry) (errs []string) {
+	nv := ro.Get2("_not_failures")
+	if nv == nil {
+		return nil
+	}
+	if nv.Kind != ir.KindObject {
+		return []string{base + ": _not_failures must be an object that maps an event name or a state path to the reason it is no failure"}
+	}
+	handled, isState, tagged := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	for _, s := range states {
+		isState[s.Path] = true
+		if tags, _ := stateTags(s.Node); tags[tagFailure] {
+			tagged[s.Path] = true
+		}
+		if o := s.Node.AsObject(); o != nil {
+			for _, k := range o.GetObject("on").Keys() {
+				handled[k] = true
+			}
+			for _, k := range o.GetObject("_ignores").Keys() {
+				handled[k] = true
+			}
+		}
+	}
+	failure := map[string]bool{}
+	for _, e := range eventList(ro, "_failure_events") {
+		failure[e] = true
+	}
+	for _, n := range nv.AsObject().Keys() {
+		v := nv.AsObject().Get2(n)
+		switch {
+		case v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "":
+			errs = append(errs, fmt.Sprintf("%s: _not_failures[%s] must be a non-empty reason", base, ir.Repr(n)))
+		case !handled[n] && !isState[n]:
+			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is no event a state handles or ignores and no state; the marker is stale (remove it, or correct the name)", base, ir.Repr(n)))
+		default:
+			if handled[n] && failure[n] {
+				errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is in _failure_events; a declared failure is not dismissed (keep one)", base, ir.Repr(n)))
+			}
+			if tagged[n] {
+				errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is a state tagged failure; a declared failure is not dismissed (keep one)", base, ir.Repr(n)))
+			}
+		}
+	}
+	return errs
+}
+
 // lintFailure holds the failure states and events: no state is tagged both
 // failure and accepting, _failure_events is a well-formed list of answered
 // events, and no event is in both _external_events and _failure_events.
@@ -193,9 +249,10 @@ func looksLikeFailure(name string) bool {
 // Hints returns the name hints of section 6.2, warnings that never fail the
 // stage: a state whose name looks like a failure and is not tagged failure,
 // and an event the machine answers whose name looks like a failure and that
-// is not declared: neither a failure event, nor an external event, nor an
-// alias of an action, nor one of actions (the actions of the machine's
-// lifecycle entity).
+// is neither a failure event, nor an alias of an action, nor one of actions
+// (the actions of the machine's lifecycle entity). An event listed as
+// external is still hinted: it may report a failure. _not_failures dismisses
+// a hint by name.
 func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 	ro := m.Root.AsObject()
 	if ro == nil {
@@ -203,8 +260,9 @@ func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 	}
 	states := ir.WalkStates(ro.Get2("states"), "")
 	events := map[string]bool{}
+	dismissed := notFailures(ro)
 	for _, s := range states {
-		if tags, _ := stateTags(s.Node); looksLikeFailure(s.Name) && !tags[tagFailure] {
+		if tags, _ := stateTags(s.Node); looksLikeFailure(s.Name) && !tags[tagFailure] && !dismissed[s.Path] {
 			hints = append(hints, fmt.Sprintf("%s: state %s looks like a failure state and is not tagged failure", m.Path, s.Path))
 		}
 		if o := s.Node.AsObject(); o != nil {
@@ -220,7 +278,7 @@ func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 	for _, e := range m.FailureEvents() {
 		declared[e] = true
 	}
-	for _, e := range m.ExternalEvents() {
+	for e := range dismissed {
 		declared[e] = true
 	}
 	for e := range m.Aliases() {

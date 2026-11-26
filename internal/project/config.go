@@ -167,6 +167,9 @@ type Annotate struct {
 	FailureEvents  []string          `yaml:"failure_events,omitempty"`
 	FailureStates  []string          `yaml:"failure_states,omitempty"`
 	Aliases        map[string]string `yaml:"aliases,omitempty"`
+	// NotFailures dismisses the name hint of an event or a state, by its
+	// exact name, with the reason it is no failure.
+	NotFailures map[string]string `yaml:"not_failures,omitempty"`
 }
 
 // AnnotateKeys returns the keys of import.machines.annotate, sorted.
@@ -773,8 +776,8 @@ func (c *Config) validateImport() error {
 		if err := CheckPath("import.machines.annotate", k); err != nil {
 			return err
 		}
-		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases) == 0 {
-			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states or aliases", k)
+		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases)+len(a.NotFailures) == 0 {
+			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states, aliases or not_failures", k)
 		}
 		for _, l := range []struct {
 			name     string
@@ -784,11 +787,19 @@ func (c *Config) validateImport() error {
 				if strings.TrimSpace(pat) == "" {
 					return Errf("import.machines.annotate.%s.%s: a pattern must not be empty", k, l.name)
 				}
+				if strings.Trim(pat, "*") == "" {
+					return Errf("import.machines.annotate.%s.%s: pattern %q has no literal part; a pattern names the events or states it is for", k, l.name, pat)
+				}
 			}
 		}
 		for ev, act := range a.Aliases {
 			if strings.TrimSpace(ev) == "" || strings.TrimSpace(act) == "" {
 				return Errf("import.machines.annotate.%s.aliases: an event and its action must not be empty", k)
+			}
+		}
+		for name, reason := range a.NotFailures {
+			if strings.TrimSpace(name) == "" || strings.TrimSpace(reason) == "" {
+				return Errf("import.machines.annotate.%s.not_failures: a name and its reason must not be empty", k)
 			}
 		}
 	}

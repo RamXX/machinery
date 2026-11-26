@@ -18,10 +18,13 @@ import (
 
 // Machine is one translated machine file.
 type Machine struct {
-	Source      string // project-relative path of the source file
-	ID          string // the machine id
-	Original    string // the original id: the root id, or the file name
-	Bytes       []byte // the translated machine
+	Source   string // project-relative path of the source file
+	ID       string // the machine id
+	Original string // the original id: the root id, or the file name
+	Bytes    []byte // the translated machine
+	// Listed says, for an event import.machines.annotate added to a root
+	// list ("<list key> <event>"), which entry and pattern did.
+	Listed      map[string]string
 	SourceBytes []byte
 }
 
@@ -85,7 +88,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 			problems = append(problems, fmt.Sprintf("%s: %v", f, err))
 			continue
 		}
-		ms = append(ms, Machine{Source: f, ID: t.id, Original: t.origID, Bytes: b, SourceBytes: data})
+		ms = append(ms, Machine{Source: f, ID: t.id, Original: t.origID, Bytes: b, SourceBytes: data, Listed: t.listed})
 	}
 	for _, k := range im.BindKeys() {
 		if !used[k] {
@@ -94,7 +97,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 	}
 	for _, k := range im.AnnotateKeys() {
 		if !annotated[k] {
-			problems = append(problems, fmt.Sprintf("import.machines.annotate %s: matches no machine file and no machine id", k))
+			problems = append(problems, fmt.Sprintf("import.machines.annotate %s: matches no machine file and no machine id; correct the key or remove the entry", k))
 		}
 	}
 	return ms, problems
@@ -112,6 +115,8 @@ type translator struct {
 	// sourceOf maps the dotted path of a translated state to its path in
 	// source names
 	sourceOf map[string]string
+	// listed is Machine.Listed
+	listed   map[string]string
 	origID   string
 	id       string
 	problems []string

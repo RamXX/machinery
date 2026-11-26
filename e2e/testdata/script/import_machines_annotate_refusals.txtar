@@ -24,7 +24,7 @@ stdout '^failed: 1 finding\(s\)$'
 # an entry that matches no machine is stale
 exec sh -c 'cat head.yaml ghost.part > machinery.yaml'
 exec mrun 1 lint --stage machines
-stdout '^  ERROR  import.machines.annotate ghost_desk: matches no machine file and no machine id$'
+stdout '^  ERROR  import.machines.annotate ghost_desk: matches no machine file and no machine id; correct the key or remove the entry$'
 stdout '^failed: 1 finding\(s\)$'
 
 # an event listed as external or as a failure that is an action of the entity is a caller's
@@ -32,12 +32,55 @@ stdout '^failed: 1 finding\(s\)$'
 exec sh -c 'cat head.yaml hide.part > machinery.yaml'
 exec machinery lint --stage machines
 exec mrun 1 lint --stage xref-model-machine
-stdout '^  ERROR  event-action: loan_desk\.lend: listed in _external_events and an action of Loan; an action is a caller''s command, not an event from outside: remove it from _external_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^  ERROR  event-action: loan_desk\.lend: listed in _external_events and an action of Loan; an action is a caller''s command, not an event from outside: import.machines.annotate loan_desk lists it for machines/loan-desk\.json \(external_events pattern l\*\); narrow the pattern or remove it$'
 stdout '^failed: 1 finding\(s\)$'
 exec sh -c 'cat head.yaml hide-failure.part > machinery.yaml'
 exec mrun 1 lint --stage xref-model-machine
-stdout '^  ERROR  event-action: loan_desk\.lend: listed in _failure_events and an action of Loan; an action is a caller''s command, not an event from outside: remove it from _failure_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^  ERROR  event-action: loan_desk\.lend: listed in _failure_events and an action of Loan; an action is a caller''s command, not an event from outside: import.machines.annotate loan_desk lists it for machines/loan-desk\.json \(failure_events pattern lend\); narrow the pattern or remove it$'
 stdout '^failed: 1 finding\(s\)$'
+
+# an operational machine is held to every action of the entities behind what it serves: giveBack
+# is an action of Loan, though the machine serves act:Loan.lend only
+cp hold-giveback.json machines/hold-queue.json
+exec sh -c 'cat head.yaml good.part > machinery.yaml'
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: hold_queue\.giveBack: event is not an action of what the machine serves \(act:Loan\.lend\); '
+stdout '^failed: 1 finding\(s\)$'
+exec sh -c 'cat head.yaml hide-served.part > machinery.yaml'
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: hold_queue\.giveBack: listed in _external_events and an action of Loan; an action is a caller''s command, not an event from outside: import.machines.annotate hold_queue lists it for machines/hold-queue\.json \(external_events pattern give\*\); narrow the pattern or remove it$'
+stdout '^failed: 1 finding\(s\)$'
+cp hold-queue.orig machines/hold-queue.json
+
+# a pattern without a literal part would name everything: it is refused before anything is read
+exec sh -c 'cat head.yaml star.part > machinery.yaml'
+exec mrun 2 lint
+stderr '^config: import.machines.annotate.machines/\*\.json.external_events: pattern "\*" has no literal part; a pattern names the events or states it is for$'
+exec sh -c 'cat head.yaml star-states.part > machinery.yaml'
+exec mrun 2 lint
+stderr '^config: import.machines.annotate.loan_desk.failure_states: pattern "\*\*" has no literal part; a pattern names the events or states it is for$'
+
+# a dismissal names an event or a state of the machine, once, and never a declared failure
+exec sh -c 'cat head.yaml dismiss-nothing.part > machinery.yaml'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk: not_failures names due_tock, which is no event and no state of the machine; correct the name or remove it$'
+stdout '^failed: 1 finding\(s\)$'
+exec sh -c 'cat head.yaml dismiss-two.part > machinery.yaml'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk and machines/loan-\*\.json both dismiss due_tick; keep one$'
+stdout '^failed: 1 finding\(s\)$'
+exec sh -c 'cat head.yaml dismiss-two.part > machinery.yaml'
+exec sh -c 'sed "s/\"initial\": \"shelved\"/\"_not_failures\": {\"due_tick\": \"a timer\"}, &/" machines/loan-desk.json > desk.tmp'
+cp machines/loan-desk.json desk.orig
+cp desk.tmp machines/loan-desk.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loan-desk\.json: import.machines.annotate loan_desk dismisses due_tick, which the source dismisses already; keep one$'
+cp desk.orig machines/loan-desk.json
+exec sh -c 'cat head.yaml dismiss-failure.part > machinery.yaml'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loan-desk\.json: _not_failures names ''scan_failed'', which is in _failure_events; a declared failure is not dismissed \(keep one\)$'
+stdout '^  ERROR  machines/loan-desk\.json: _not_failures names ''ScanFailed'', which is a state tagged failure; a declared failure is not dismissed \(keep one\)$'
+stdout '^failed: 2 finding\(s\)$'
 
 # an alias names an action of the model, for an event that is not one already
 exec sh -c 'cat head.yaml alias-unknown.part > machinery.yaml'
@@ -77,7 +120,7 @@ stdout '^failed: 1 finding\(s\)$'
 # malformed entries are config errors
 exec sh -c 'cat head.yaml empty.part > machinery.yaml'
 exec mrun 2 lint
-stderr '^config: import.machines.annotate.loan_desk: set external_events, failure_events, failure_states or aliases$'
+stderr '^config: import.machines.annotate.loan_desk: set external_events, failure_events, failure_states, aliases or not_failures$'
 exec sh -c 'cat head.yaml empty-pattern.part > machinery.yaml'
 exec mrun 2 lint
 stderr '^config: import.machines.annotate.loan_desk.failure_states: a pattern must not be empty$'
@@ -87,6 +130,12 @@ stderr '^config: import.machines.annotate.loan_desk.aliases: an event and its ac
 exec sh -c 'cat head.yaml glob.part > machinery.yaml'
 exec mrun 2 lint
 stderr '^config: import.machines.annotate: "machines/\[\.json" is not a valid glob$'
+exec sh -c 'cat head.yaml outside.part > machinery.yaml'
+exec mrun 2 lint
+stderr '^config: import.machines.annotate: "\.\./machines/\*\.json" must stay inside the project root$'
+exec sh -c 'cat head.yaml empty-reason.part > machinery.yaml'
+exec mrun 2 lint
+stderr '^config: import.machines.annotate.loan_desk.not_failures: a name and its reason must not be empty$'
 exec sh -c 'cat head.yaml key.part > machinery.yaml'
 exec mrun 2 lint
 stderr '^config: .*external'
@@ -151,7 +200,7 @@ import:
         external_events: [notice_sent]
         aliases: {lend_requested: lend}
       ghost_desk:
-        external_events: ["*"]
+        external_events: ["due_*"]
 -- hide.part --
     annotate:
       "machines/*.json":
@@ -307,11 +356,121 @@ entities:
   "states": {
     "idle": {
       "on": {"lend_requested": {"target": "sending"}},
-      "skip": {"notice_sent": "nothing is being sent", "send_failed": "nothing is being sent"}
+      "skip": {"notice_sent": "nothing is being sent", "notice_failed": "nothing is being sent"}
     },
     "sending": {
-      "on": {"notice_sent": {"target": "idle"}, "send_failed": {"target": "idle"}},
+      "on": {"notice_sent": {"target": "idle"}, "notice_failed": {"target": "idle"}},
       "skip": {"lend_requested": "a notice is already on its way"}
     }
   }
 }
+-- hold-queue.orig --
+{
+  "id": "hold-queue",
+  "initial": "idle",
+  "states": {
+    "idle": {
+      "on": {"lend_requested": {"target": "sending"}},
+      "skip": {"notice_sent": "nothing is being sent", "notice_failed": "nothing is being sent"}
+    },
+    "sending": {
+      "on": {"notice_sent": {"target": "idle"}, "notice_failed": {"target": "idle"}},
+      "skip": {"lend_requested": "a notice is already on its way"}
+    }
+  }
+}
+-- hold-giveback.json --
+{
+  "id": "hold-queue",
+  "initial": "idle",
+  "states": {
+    "idle": {
+      "on": {"lend_requested": {"target": "sending"}, "giveBack": {"target": "idle"}},
+      "skip": {"notice_sent": "nothing is being sent", "notice_failed": "nothing is being sent"}
+    },
+    "sending": {
+      "on": {"notice_sent": {"target": "idle"}, "notice_failed": {"target": "idle"}},
+      "skip": {"lend_requested": "a notice is already on its way", "giveBack": "the copy is handed back at the desk, not here"}
+    }
+  }
+}
+-- hide-served.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+      hold_queue:
+        external_events: [notice_sent, "give*"]
+        aliases: {lend_requested: lend}
+-- star.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+        external_events: ["*"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- star-states.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["**"]
+        aliases: {handed_back: giveBack}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- dismiss-nothing.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+        not_failures: {due_tock: "a tick is no failure"}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- dismiss-two.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+        not_failures: {due_tick: "a tick is no failure"}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+      "machines/loan-*.json":
+        not_failures: {due_tick: "a tick is a timer"}
+-- dismiss-failure.part --
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+        not_failures: {scan_failed: "the scanner is flaky", ScanFailed: "the scanner is flaky"}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- outside.part --
+    annotate:
+      "../machines/*.json":
+        external_events: ["due_*"]
+-- empty-reason.part --
+    annotate:
+      loan_desk:
+        not_failures: {due_tick: " "}

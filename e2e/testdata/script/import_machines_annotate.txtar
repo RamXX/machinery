@@ -7,7 +7,7 @@ cp before.yaml machinery.yaml
 exec machinery lint --stage machines
 stdout '^  warn   machines/loan-desk\.json: state ScanFailed looks like a failure state and is not tagged failure$'
 stdout '^  warn   machines/loan-desk\.json: event scan_failed looks like a failure event and is not in _failure_events$'
-stdout '^  warn   machines/hold-queue\.json: event send_failed looks like a failure event and is not in _failure_events$'
+stdout '^  warn   machines/hold-queue\.json: event notice_failed looks like a failure event and is not in _failure_events$'
 exec mrun 1 lint --stage xref-model-machine
 stdout '^  ERROR  event-action: loan_desk\.due_tick: event is not an action of Loan; '
 stdout '^  ERROR  event-action: loan_desk\.handed_back: event is not an action of Loan; '
@@ -15,7 +15,7 @@ stdout '^  ERROR  event-action: loan_desk\.scan_failed: event is not an action o
 stdout '^  ERROR  action-event: act:Loan\.giveBack: no on event giveBack in machine loan_desk \(machines/loan-desk\.json\)$'
 stdout '^  ERROR  event-action: hold_queue\.lend_requested: event is not an action of what the machine serves \(act:Loan\.lend\); '
 stdout '^  ERROR  event-action: hold_queue\.notice_sent: '
-stdout '^  ERROR  event-action: hold_queue\.send_failed: '
+stdout '^  ERROR  event-action: hold_queue\.notice_failed: '
 stdout '^failed: 7 finding\(s\)$'
 
 # with it, every entry that names the machine id or matches the source file applies, and nothing
@@ -37,13 +37,13 @@ grep '"_lifecycle_of":"Loan","_external_events":\["due_tick"\],"_failure_events"
 grep '"ScanFailed":\{"on":\{"handed_back":\{"target":"Shelved"\}\},"_ignores":\{[^}]*\},"tags":"failure"\}' desk.flat
 exec sh -c 'test "$(grep -o "\"tags\"" desk.flat | wc -l | tr -d " ")" = 1'
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/hold_queue.machine.json > hold.flat'
-grep '"_role":"operational","_serves":\["act:Loan.lend"\],"_external_events":\["notice_sent"\],"_failure_events":\["send_failed"\],"_aliases":\{"lend_requested":"lend"\},"_oracle_tag":' hold.flat
+grep '"_role":"operational","_serves":\["act:Loan.lend"\],"_external_events":\["notice_sent"\],"_failure_events":\["notice_failed"\],"_aliases":\{"lend_requested":"lend"\},"_oracle_tag":' hold.flat
 
 # every later stage reads them: the failure state and the failure events now ask for a failure mode
 exec mrun 1 lint --stage xref-failure
 stdout '^  ERROR  failure-state-mode: state:loan_desk\.ScanFailed: '
 stdout '^  ERROR  failure-event-mode: event:loan_desk\.scan_failed: '
-stdout '^  ERROR  failure-event-mode: event:hold_queue\.send_failed: '
+stdout '^  ERROR  failure-event-mode: event:hold_queue\.notice_failed: '
 stdout '^failed: 3 finding\(s\)$'
 
 # names the source already declares are kept, first, and the config adds to them; a state that has
@@ -52,15 +52,40 @@ stdout '^failed: 3 finding\(s\)$'
 cp desk-declared.json machines/loan-desk.json
 cp declared.yaml machinery.yaml
 exec machinery lint --stage machines
+stdout '^passed$'
+
+# an event that arrives from outside may still report a failure: listing it as external does not
+# stop the hint
+stdout '^  warn   machines/loan-desk\.json: event count_aborted looks like a failure event and is not in _failure_events$'
+stdout -count=1 '^  warn   '
+
+# the hint stops when the name is dismissed with a reason, and the generated machine says so
+cp dismissed.yaml machinery.yaml
+exec machinery lint --stage machines
 ! stdout 'warn'
 stdout '^passed$'
+exec machinery gen
+grep '"_not_failures": \{' design/gen/imported/machines/loan_desk.machine.json
+grep '"count_aborted": "a stocktake that is called off changes no loan"' design/gen/imported/machines/loan_desk.machine.json
 exec machinery lint --stage xref-model-machine
 stdout '^passed$'
 exec machinery gen
 exec sh -c 'tr -d " \n" < design/gen/imported/machines/loan_desk.machine.json > desk.flat'
-grep '"_external_events":\["recount","due_tick"\],"_aliases":\{"handed_back":"giveBack"\},"initial"' desk.flat
+grep '"_external_events":\["count_aborted","due_tick"\],"_aliases":\{"handed_back":"giveBack"\},"initial"' desk.flat
 grep '"tags":\["accounted","failure"\]' desk.flat
-grep '"_failure_events":\["scan_failed"\],"_oracle_tag"' desk.flat
+grep '"_failure_events":\["scan_failed"\],"_not_failures":\{"count_aborted":"[a-z]*"\},"_oracle_tag"' desk.flat
+
+# a pattern names a state at any depth by its dotted path, and so does a dismissal
+cp scanner.yaml machinery.yaml
+exec machinery lint --stage machines
+! stdout 'matches no state'
+! stdout 'is no event and no state'
+! stdout 'looks like a failure'
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
+grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"_not_failures":\{"read_bad":"x","Reading.RetryError":"asecondtryisthenormalpathofawornlabel"\}' scanner.flat
+exec sh -c 'test "$(grep -o "\"tags\"" scanner.flat | wc -l | tr -d " ")" = 1'
 
 -- before.yaml --
 version: 2
@@ -118,12 +143,73 @@ import:
       "machines/*.json":
         failure_events: ["*_failed"]
       "machines/loan-desk.json":
-        external_events: ["due_*", recount]
+        external_events: ["due_*", count_aborted]
         failure_states: [ScanFailed]
         aliases: {handed_back: giveBack}
       hold_queue:
         external_events: [notice_sent]
         aliases: {lend_requested: lend}
+-- dismissed.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores}
+    bind:
+      "machines/loan-desk.json": {lifecycle_of: Loan}
+      hold_queue: {serves: ["act:Loan.lend"]}
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      "machines/loan-desk.json":
+        external_events: ["due_*", count_aborted]
+        failure_states: [ScanFailed]
+        aliases: {handed_back: giveBack}
+        not_failures: {count_aborted: "a stocktake that is called off changes no loan"}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+-- scanner.yaml --
+version: 2
+import:
+  machines:
+    files: ["scanner/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores}
+    annotate:
+      scanner:
+        failure_states: ["reading.gave_up"]
+        not_failures: {"reading.retry_error": "a second try is the normal path of a worn label", read_bad: "x"}
+-- scanner/scanner.json --
+{
+  "id": "scanner",
+  "_role": "operational",
+  "_serves": ["entity:Loan"],
+  "_external_events": ["scan", "read_ok", "read_bad"],
+  "initial": "idle",
+  "states": {
+    "idle": {
+      "on": {"scan": {"target": "reading"}},
+      "skip": {"read_ok": "nothing is being read", "read_bad": "nothing is being read"}
+    },
+    "reading": {
+      "initial": "first_try",
+      "on": {"read_ok": {"target": "idle"}},
+      "skip": {"scan": "a copy is under the scanner"},
+      "states": {
+        "first_try": {"on": {"read_bad": {"target": "retry_error"}}},
+        "retry_error": {"on": {"read_bad": {"target": "gave_up"}}},
+        "gave_up": {"on": {"read_bad": {"target": "gave_up"}}}
+      }
+    }
+  }
+}
 -- design/model/desk.modelith.yaml --
 kind: DomainModel
 version: v1
@@ -180,10 +266,10 @@ entities:
   "states": {
     "idle": {
       "on": {"lend_requested": {"target": "sending"}},
-      "skip": {"notice_sent": "nothing is being sent", "send_failed": "nothing is being sent"}
+      "skip": {"notice_sent": "nothing is being sent", "notice_failed": "nothing is being sent"}
     },
     "sending": {
-      "on": {"notice_sent": {"target": "idle"}, "send_failed": {"target": "idle"}},
+      "on": {"notice_sent": {"target": "idle"}, "notice_failed": {"target": "idle"}},
       "skip": {"lend_requested": "a notice is already on its way"}
     }
   }
@@ -191,12 +277,12 @@ entities:
 -- desk-declared.json --
 {
   "id": "loan-desk",
-  "_external_events": ["recount"],
+  "_external_events": ["count_aborted"],
   "_aliases": {"handed_back": "giveBack"},
   "initial": "shelved",
   "states": {
     "shelved": {
-      "on": {"lend": {"target": "lent"}, "recount": {"target": "shelved"}},
+      "on": {"lend": {"target": "lent"}, "count_aborted": {"target": "shelved"}},
       "skip": {
         "handed_back": "nothing is lent; the desk refuses with NOT_LENT",
         "due_tick": "nothing is due on the shelf",
@@ -209,7 +295,7 @@ entities:
         "due_tick": {"target": "lent"},
         "scan_failed": {"target": "scan_failed"}
       },
-      "skip": {"lend": "already lent; the desk refuses with ALREADY_LENT", "recount": "a lent copy is not on the shelf to count"}
+      "skip": {"lend": "already lent; the desk refuses with ALREADY_LENT", "count_aborted": "a lent copy is not on the shelf to count"}
     },
     "scan_failed": {
       "tags": "accounted",
@@ -218,7 +304,7 @@ entities:
         "lend": "the copy is not on the shelf; the desk refuses with ALREADY_LENT",
         "due_tick": "a copy that cannot be scanned is not chased",
         "scan_failed": "already recorded",
-        "recount": "a copy that cannot be scanned is not counted"
+        "count_aborted": "a copy that cannot be scanned is not counted"
       }
     }
   }

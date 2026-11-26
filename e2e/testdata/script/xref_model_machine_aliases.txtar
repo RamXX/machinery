@@ -32,11 +32,11 @@ stdout '^failed: 1 finding\(s\)$'
 # an action of the entity is a caller's command: it is not listed as external or as a failure
 cp order-external.json design/machines/Order.machine.json
 exec mrun 1 lint --stage xref-model-machine
-stdout '^  ERROR  event-action: order\.cancel: listed in _external_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _external_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^  ERROR  event-action: order\.cancel: listed in _external_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _external_events in design/machines/Order\.machine\.json$'
 stdout '^failed: 1 finding\(s\)$'
 cp order-failure.json design/machines/Order.machine.json
 exec mrun 1 lint --stage xref-model-machine
-stdout '^  ERROR  event-action: order\.cancel: listed in _failure_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _failure_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^  ERROR  event-action: order\.cancel: listed in _failure_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _failure_events in design/machines/Order\.machine\.json$'
 stdout '^failed: 1 finding\(s\)$'
 
 # the finding is a cross-reference finding: it is waived by <machine id>.<event>, with a reason
@@ -62,7 +62,13 @@ stdout '^  ERROR  event-action: envelope\.pay: _aliases gives the event the acti
 stdout '^failed: 1 finding\(s\)$'
 cp envelope-external.json design/machines/Envelope.machine.json
 exec mrun 1 lint --stage xref-model-machine
-stdout '^  ERROR  event-action: envelope\.pay: listed in _external_events and an action of what the machine serves \(act:Order\.pay\); an action is a caller''s command, not an event from outside: remove it from _external_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^  ERROR  event-action: envelope\.pay: listed in _external_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _external_events in design/machines/Envelope\.machine\.json$'
+stdout '^failed: 1 finding\(s\)$'
+
+# every action of the entity behind a served act id counts, not only the served one
+cp envelope-other.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope\.cancel: listed in _external_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _external_events in design/machines/Envelope\.machine\.json$'
 stdout '^failed: 1 finding\(s\)$'
 
 -- machinery.yaml --
@@ -226,6 +232,18 @@ entities:
   "initial": "idle",
   "states": {
     "idle": { "on": { "pay": { "target": "charging" } } },
+    "charging": { "on": { "settled": { "target": "idle" } } }
+  }
+}
+-- envelope-other.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": ["act:Order.pay"],
+  "_external_events": ["settled", "cancel"],
+  "initial": "idle",
+  "states": {
+    "idle": { "on": { "cancel": { "target": "charging" } } },
     "charging": { "on": { "settled": { "target": "idle" } } }
   }
 }
