@@ -249,10 +249,10 @@ func looksLikeFailure(name string) bool {
 // Hints returns the name hints of section 6.2, warnings that never fail the
 // stage: a state whose name looks like a failure and is not tagged failure,
 // and an event the machine answers whose name looks like a failure and that
-// is neither a failure event, nor an alias of an action, nor one of actions
-// (the actions of the machine's lifecycle entity). An event listed as
-// external is still hinted: it may report a failure. _not_failures dismisses
-// a hint by name.
+// is neither a failure event nor one of actions (the actions of the
+// machine's lifecycle entity). An event listed as external or given an alias
+// is still hinted: it may report a failure. _not_failures dismisses a hint
+// by name.
 func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 	ro := m.Root.AsObject()
 	if ro == nil {
@@ -279,9 +279,6 @@ func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 		declared[e] = true
 	}
 	for e := range dismissed {
-		declared[e] = true
-	}
-	for e := range m.Aliases() {
 		declared[e] = true
 	}
 	for _, ev := range sortedSet(events) {

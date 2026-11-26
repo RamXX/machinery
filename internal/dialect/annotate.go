@@ -68,7 +68,7 @@ func (t *translator) annotate(out *ir.Object) {
 
 	external, failure := map[string]bool{}, map[string]bool{}
 	aliases, aliasKey := map[string]string{}, map[string]string{}
-	dismissed, dismissKey := ir.NewObject(), map[string]string{}
+	dismissed, dismissOrder := map[string]dismissal{}, []string{}
 	t.listed = map[string]string{}
 	for _, k := range keys {
 		a := t.im.Annotate[k]
@@ -106,7 +106,7 @@ func (t *translator) annotate(out *ir.Object) {
 				t.fail("import.machines.annotate %s: failure_states pattern %s matches no state of the machine; correct the pattern or remove it", k, pat)
 			}
 		}
-		t.dismiss(k, a.NotFailures, events, states, dismissed, dismissKey)
+		t.dismiss(k, a.NotFailures, events, states, dismissed, &dismissOrder)
 		evs := make([]string, 0, len(a.Aliases))
 		for ev := range a.Aliases {
 			evs = append(evs, ev)
@@ -127,50 +127,64 @@ func (t *translator) annotate(out *ir.Object) {
 	t.addNames(out, "_external_events", external)
 	t.addNames(out, "_failure_events", failure)
 	t.addAliases(out, aliases, aliasKey)
-	t.addDismissed(out, dismissed, dismissKey)
+	t.addDismissed(out, dismissed, dismissOrder)
+}
+
+// dismissal is one target of import.machines.annotate.<key>.not_failures:
+// an event name or the translated dotted path of a state.
+type dismissal struct {
+	key, name, reason string
+	state             bool
 }
 
 // dismiss collects the not_failures of one entry: each names, exactly, an
 // event of the machine, or a state by its name or dotted path as the source
-// or the translation writes it. An event keeps its name and a state gets
-// its translated dotted path.
-func (t *translator) dismiss(k string, nf map[string]string, events map[string]bool, states []ir.StateEntry, into *ir.Object, from map[string]string) {
+// or the translation writes it; a name that is both dismisses both. An
+// event keeps its name and a state gets its translated dotted path.
+func (t *translator) dismiss(k string, nf map[string]string, events map[string]bool, states []ir.StateEntry, into map[string]dismissal, order *[]string) {
 	names := make([]string, 0, len(nf))
 	for n := range nf {
 		names = append(names, n)
 	}
 	sort.Strings(names)
+	add := func(target, n string, state bool) {
+		switch have, dup := into[target]; {
+		case dup && have.key != k:
+			t.fail("import.machines.annotate %s and %s both dismiss %s; keep one", have.key, k, n)
+		case dup && have.name != n:
+			t.fail("import.machines.annotate %s: not_failures names %s and %s, which are one state (%s); keep one", k, have.name, n, target)
+		case !dup:
+			into[target] = dismissal{key: k, name: n, reason: nf[n], state: state}
+			*order = append(*order, target)
+		}
+	}
 	for _, n := range names {
-		var targets []string
+		found := false
 		if events[n] {
-			targets = append(targets, n)
+			found = true
+			add(n, n, false)
 		}
 		for _, s := range states {
 			src := t.sourceOf[s.Path]
-			if (n == s.Name || n == s.Path || n == lastSegment(src) || n == src) && (len(targets) == 0 || targets[0] != s.Path) {
-				targets = append(targets, s.Path)
-			}
-		}
-		if len(targets) == 0 {
-			t.fail("import.machines.annotate %s: not_failures names %s, which is no event and no state of the machine; correct the name or remove it", k, n)
-		}
-		for _, tg := range targets {
-			if other, dup := from[tg]; dup {
-				if other != k {
-					t.fail("import.machines.annotate %s and %s both dismiss %s; keep one", other, k, n)
+			if n == s.Name || n == s.Path || n == lastSegment(src) || n == src {
+				found = true
+				if !(events[n] && s.Path == n) { // one key in the file says both
+					add(s.Path, n, true)
 				}
-				continue
 			}
-			from[tg] = k
-			into.Set(tg, ir.StringValue(nf[n]))
+		}
+		if !found {
+			t.fail("import.machines.annotate %s: not_failures names %s, which is no event and no state of the machine; correct the name or remove it", k, n)
 		}
 	}
 }
 
 // addDismissed adds the dismissals to the root _not_failures, after the
-// ones the source has. A name the source dismisses already is a problem.
-func (t *translator) addDismissed(out, dismissed *ir.Object, from map[string]string) {
-	if dismissed.Len() == 0 {
+// ones the source has. A name the source dismisses already is a problem,
+// and so is a declared failure, by the source or by an entry: the problem
+// names the entry, which the lint of the translated machine could not.
+func (t *translator) addDismissed(out *ir.Object, dismissed map[string]dismissal, order []string) {
+	if len(order) == 0 {
 		return
 	}
 	res := ir.NewObject()
@@ -182,14 +196,52 @@ func (t *translator) addDismissed(out, dismissed *ir.Object, from map[string]str
 			res.Set(n, v.AsObject().Get2(n))
 		}
 	}
-	for _, n := range dismissed.Keys() {
-		if res.Has(n) {
-			t.fail("import.machines.annotate %s dismisses %s, which the source dismisses already; keep one", from[n], n)
-			continue
-		}
-		res.Set(n, dismissed.Get2(n))
+	failure := map[string]bool{}
+	for _, e := range out.Get2("_failure_events").AsArray() {
+		failure[e.AsString()] = true
 	}
-	out.Set("_not_failures", ir.ObjectValue(res))
+	tagged := map[string]bool{}
+	for _, s := range ir.WalkStates(out.Get2("states"), "") {
+		if hasFailureTag(s.Node.AsObject()) {
+			tagged[s.Path] = true
+		}
+	}
+	for _, target := range order {
+		d := dismissed[target]
+		switch {
+		case !d.state && failure[target]:
+			t.fail("import.machines.annotate %s: not_failures names %s, which is a failure event of the machine; a declared failure is not dismissed (keep one)", d.key, d.name)
+		case d.state && tagged[target]:
+			t.fail("import.machines.annotate %s: not_failures names %s, which is the state %s, tagged failure; a declared failure is not dismissed (keep one)", d.key, d.name, target)
+		case res.Has(target):
+			t.fail("import.machines.annotate %s dismisses %s, which the source dismisses already; keep one", d.key, d.name)
+		default:
+			res.Set(target, ir.StringValue(d.reason))
+		}
+	}
+	if res.Len() > 0 {
+		out.Set("_not_failures", ir.ObjectValue(res))
+	}
+}
+
+// hasFailureTag reports whether a state carries the tag failure.
+func hasFailureTag(o *ir.Object) bool {
+	if o == nil {
+		return false
+	}
+	v := o.Get2("tags")
+	if v == nil {
+		return false
+	}
+	if v.Kind == ir.KindString {
+		return v.AsString() == "failure"
+	}
+	for _, e := range v.AsArray() {
+		if e != nil && e.Kind == ir.KindString && e.AsString() == "failure" {
+			return true
+		}
+	}
+	return false
 }
 
 // tagFailure adds the tag failure to a state that does not have it. Tags of
@@ -273,6 +325,7 @@ func (t *translator) addAliases(out *ir.Object, aliases, from map[string]string)
 			continue
 		}
 		res.Set(ev, ir.StringValue(aliases[ev]))
+		t.listed["_aliases "+ev] = fmt.Sprintf("remove the alias from import.machines.annotate %s (for %s)", from[ev], t.src)
 	}
 	out.Set("_aliases", ir.ObjectValue(res))
 }

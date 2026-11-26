@@ -26,7 +26,9 @@ exec machinery lint --stage machines
 stdout '^checked: 2 machines, 5 states, 8 transitions$'
 stdout '^passed$'
 exec machinery lint --stage xref-model-machine
-stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 7 events, 2 actions, 1 entities with actions$'
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 7 events, 2 actions, 1 entities with actions, 2 aliases$'
+stdout '^  warn   alias: hold_queue: lend_requested stands for lend$'
+stdout '^  warn   alias: loan_desk: handed_back stands for giveBack$'
 stdout '^passed$'
 
 # the generated machine carries the annotations of the native format: the matched names, sorted,
@@ -86,6 +88,30 @@ exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > sc
 grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
 grep '"_not_failures":\{"read_bad":"x","Reading.RetryError":"asecondtryisthenormalpathofawornlabel"\}' scanner.flat
 exec sh -c 'test "$(grep -o "\"tags\"" scanner.flat | wc -l | tr -d " ")" = 1'
+
+# the same two, by the translated dotted path
+exec sh -c 'sed "s/reading.gave_up/Reading.GaveUp/; s/reading.retry_error/Reading.RetryError/" scanner.yaml > machinery.yaml'
+grep 'Reading.GaveUp' machinery.yaml
+exec machinery lint --stage machines
+! stdout 'matches no state'
+! stdout 'is no event and no state'
+! stdout 'looks like a failure'
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
+grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"Reading.RetryError":"asecondtryisthenormalpathofawornlabel"' scanner.flat
+
+# and by the name the source gives the nested state
+exec sh -c 'sed "s/reading.gave_up/gave_up/; s/reading.retry_error/retry_error/" scanner.yaml > machinery.yaml'
+grep '\["gave_up"\]' machinery.yaml
+exec machinery lint --stage machines
+! stdout 'matches no state'
+! stdout 'is no event and no state'
+! stdout 'looks like a failure'
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/scanner.machine.json > scanner.flat'
+grep '"GaveUp":\{"on":\{"read_bad":\{"target":"GaveUp"\}\},"tags":"failure"\}' scanner.flat
+grep '"Reading.RetryError":"asecondtryisthenormalpathofawornlabel"' scanner.flat
 
 -- before.yaml --
 version: 2

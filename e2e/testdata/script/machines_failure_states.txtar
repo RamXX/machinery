@@ -33,11 +33,11 @@ exec machinery lint --stage machines
 ! stdout 'warn'
 stdout '^passed$'
 
-# an alias of an action is an action: no hint for it
+# an alias does not stop the hint either: an aliased event may still report a failure
 exec sh -c 'sed "s/\"_failure_events\": \[/\"_aliases\": {\"workerError\": \"abort\"}, &/" hints.json > design/machines/Job.machine.json'
 exec machinery lint --stage machines
-! stdout 'event workerError looks'
-stdout -count=1 '^  warn   '
+stdout '^  warn   design/machines/Job\.machine\.json: event workerError looks like a failure event and is not in _failure_events$'
+stdout -count=2 '^  warn   '
 stdout '^passed$'
 
 # a dismissal is an object of reasons, for names the machine has, none of them a declared failure
