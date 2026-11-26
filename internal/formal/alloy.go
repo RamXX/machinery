@@ -40,9 +40,16 @@ var alloyCommandRe = regexp.MustCompile(`(?m)^\s*(check|run)\s+\w`)
 func (a *alloyRunner) exec(dir, fileName string, timeout time.Duration) (found map[string]map[string]map[string][]string, known map[string]bool, errLine string) {
 	out := filepath.Join(dir, "out")
 	os.RemoveAll(out)
+	// A private Java temporary directory: Alloy writes its solver files
+	// there, and no run shares a file with another (section 16.9).
+	jtmp, err := os.MkdirTemp(dir, "alloy-tmp-")
+	if err != nil {
+		return nil, nil, err.Error()
+	}
+	defer os.RemoveAll(jtmp)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, a.java, "-jar", a.jar, "exec", "-f", "-q", "-o", out, "-t", "json", fileName)
+	cmd := exec.CommandContext(ctx, a.java, "-Djava.io.tmpdir="+jtmp, "-jar", a.jar, "exec", "-f", "-q", "-o", out, "-t", "json", fileName)
 	cmd.Dir = dir
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf

@@ -149,12 +149,23 @@ func (t *tlcRunner) run(dir, module, cfg string, deadlock bool, timeout time.Dur
 // exec runs TLC on a module in dir with a config file already there, and
 // returns its output. failure is set when TLC could not run to its end.
 func (t *tlcRunner) exec(dir, module, cfgName string, extra []string, timeout time.Duration) (out string, runErr error, failure string) {
-	meta, err := os.MkdirTemp(dir, "meta-")
+	// Each run gets its own directory for TLC's states (the metadir) and for
+	// the Java temporary directory. TLC unpacks its standard modules
+	// (Naturals.tla and the others) into java.io.tmpdir and deletes them when
+	// it exits; with a shared one, a run deletes or truncates the modules
+	// another run is still reading (section 16.9).
+	scratch, err := os.MkdirTemp(dir, "tlc-")
 	if err != nil {
 		return "", nil, err.Error()
 	}
-	defer os.RemoveAll(meta)
-	args := []string{"-XX:+UseParallelGC", "-cp", t.jar, "tlc2.TLC", "-workers", strconv.Itoa(t.workers), "-metadir", meta, "-config", cfgName}
+	defer os.RemoveAll(scratch)
+	meta, jtmp := filepath.Join(scratch, "meta"), filepath.Join(scratch, "tmp")
+	for _, d := range []string{meta, jtmp} {
+		if err := os.Mkdir(d, 0o755); err != nil {
+			return "", nil, err.Error()
+		}
+	}
+	args := []string{"-XX:+UseParallelGC", "-Djava.io.tmpdir=" + jtmp, "-cp", t.jar, "tlc2.TLC", "-workers", strconv.Itoa(t.workers), "-metadir", meta, "-config", cfgName}
 	args = append(append(args, extra...), module)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
