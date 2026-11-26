@@ -74,7 +74,7 @@ func Judge(d *design.Design) (*Judgement, error) {
 	add := func(sev report.Severity, spec, format string, a ...any) {
 		j.Findings = append(j.Findings, Finding{Sev: sev, Spec: spec, Msg: fmt.Sprintf(format, a...)})
 	}
-	noResult := map[string]bool{}
+	notDemonstrated := map[string]string{} // spec -> why: no result, or a run that did not complete
 	live := map[string]bool{}
 	for _, s := range specs {
 		live[s.Spec] = true
@@ -123,10 +123,7 @@ func Judge(d *design.Design) (*Judgement, error) {
 			j.Reach += len(r.Reach)
 		}
 		if !ok {
-			noResult[s.Spec] = true
-			if j.ND == "" {
-				j.ND = fmt.Sprintf("no result for %s; run machinery formal check", s.Spec)
-			}
+			notDemonstrated[s.Spec] = fmt.Sprintf("no result for %s; run machinery formal check", s.Spec)
 		} else {
 			j.Results[s.Spec] = res
 			if res.InputSHA256 != s.InputHash(skeleton, props) {
@@ -134,6 +131,13 @@ func Judge(d *design.Design) (*Judgement, error) {
 			}
 			judgeRuns(s, res, add)
 			judgeMutations(d, s, res, add)
+			// a tool run that did not complete has no verdict to judge (16.9)
+			if inc := res.Incomplete(); len(inc) > 0 {
+				for _, msg := range inc {
+					add(report.Warn, s.Spec, "%s", msg)
+				}
+				notDemonstrated[s.Spec] = inc[0] + "; fix the cause and run machinery formal check"
+			}
 		}
 		// baseline
 		if rec, ok := base.Specs[s.Spec]; !ok {
@@ -226,21 +230,18 @@ func Judge(d *design.Design) (*Judgement, error) {
 			f.Msg = "owed: " + f.Msg
 		}
 	}
-	if j.ND != "" {
-		allOwed := true
-		for name := range noResult {
-			if !specOwed[name] {
-				allOwed = false
-			}
-		}
-		if allOwed {
-			j.ND = ""
+	// the first spec, in path order, that is not owed and has no verdict
+	for _, s := range specs {
+		if why, nd := notDemonstrated[s.Spec]; nd && !specOwed[s.Spec] {
+			j.ND = why
+			break
 		}
 	}
 	for _, a := range critical {
 		ok := covered[a.Name]
 		for _, s := range specs {
-			if contains(s.Areas, a.Name) && (blocking[s.Spec] || noResult[s.Spec] || len(s.Problems) > 0) {
+			_, nd := notDemonstrated[s.Spec]
+			if contains(s.Areas, a.Name) && (blocking[s.Spec] || nd || len(s.Problems) > 0) {
 				ok = false
 			}
 		}
@@ -258,10 +259,11 @@ func judgeRuns(s *Spec, res *Result, add adder) {
 		if rr == nil {
 			continue // the stale-result finding covers it
 		}
+		if rr.Outcome != "passed" && rr.Outcome != "violated" {
+			continue // no verdict: Incomplete reports it
+		}
 		cx := "cx:" + s.Spec + ":" + r.Name
 		switch {
-		case rr.Outcome == "error":
-			add(report.Error, s.Spec, "%s run %s: the model checker failed: %s", s.Spec, r.Name, rr.Violated)
 		case r.Expect == "pass" && rr.Outcome == "violated":
 			add(report.Error, s.Spec, "%s run %s: %s violated; replay %s against the real system", s.Spec, r.Name, rr.Violated, cx)
 		case r.Expect == "finding" && rr.Outcome == "passed":

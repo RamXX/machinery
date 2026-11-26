@@ -57,9 +57,18 @@ func Check(p *project.Project, d *design.Design, s *Spec, workers int) (*Result,
 // Recheck runs one spec for real, writes nothing, and returns the committed
 // files that differ from the fresh run. Committed results are data anyone can
 // edit; a fresh run is what makes them trustworthy.
+//
+// A fresh run that did not complete has no verdict to compare: it returns a
+// ToolError naming the first run or mutation that did not complete.
 func Recheck(p *project.Project, d *design.Design, s *Spec, workers int) (differ []string, err error) {
-	_, differ, err = run(p, d, s, workers, false)
-	return differ, err
+	res, differ, err := run(p, d, s, workers, false)
+	if err != nil {
+		return nil, err
+	}
+	if inc := res.Incomplete(); len(inc) > 0 {
+		return nil, &ToolError{inc[0]}
+	}
+	return differ, nil
 }
 
 func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool) (_ *Result, differ []string, _ error) {
@@ -140,7 +149,10 @@ func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool)
 		}
 		rr, trace := chk.run(dir, run)
 		tracePath := s.TracePath(run.Name)
-		if trace != nil {
+		switch {
+		case rr.Outcome == "incomplete":
+			// no verdict: the trace file stays as it was (section 16.9)
+		case trace != nil:
 			trace.Version, trace.ID, trace.Spec, trace.Run, trace.Tool = 1, "cx:"+s.Spec+":"+run.Name, s.Spec, run.Name, s.Tool
 			trace.Violates, trace.Expect, trace.Machine = rr.Violated, expectOf(run), machineID
 			if trace.Steps == nil {
@@ -153,7 +165,7 @@ func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool)
 				return nil, nil, err
 			}
 			rr.Trace = strings.TrimPrefix(tracePath, s.Dir+"/")
-		} else if p.Exists(tracePath) {
+		case p.Exists(tracePath):
 			if write {
 				os.Remove(p.Abs(tracePath))
 			} else {
@@ -167,7 +179,8 @@ func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool)
 	}
 	for _, m := range s.Mutations {
 		fn := s.MutationFile(m)
-		outcome := "inapplicable"
+		// inapplicable is decided here, before any tool runs, and only here
+		outcome, reason := "inapplicable", ""
 		if src, ok := files[fn]; ok && bytes.Count(src, []byte(m.From)) == 1 {
 			mutated := bytes.Replace(src, []byte(m.From), []byte(m.To), 1)
 			dir, err := stage("mut-"+m.ID, map[string][]byte{fn: mutated})
@@ -175,10 +188,10 @@ func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool)
 				return nil, nil, err
 			}
 			if run := s.RunByName(m.Run); run != nil {
-				outcome = chk.mutation(dir, run, m.Detects)
+				outcome, reason = chk.mutation(dir, run, m.Detects)
 			}
 		}
-		res.Mutations = append(res.Mutations, MutationResult{ID: m.ID, Outcome: outcome})
+		res.Mutations = append(res.Mutations, MutationResult{ID: m.ID, Outcome: outcome, Reason: reason})
 	}
 	if err := put(s.ResultPath(), res); err != nil {
 		return nil, nil, err
@@ -186,10 +199,16 @@ func run(p *project.Project, d *design.Design, s *Spec, workers int, write bool)
 	return res, differ, nil
 }
 
-// checker runs one tool.
+// checker runs one tool. A run whose tool run did not complete is
+// "incomplete" with a reason, and so is a mutation (section 16.9).
 type checker interface {
 	run(dir string, r *Run) (RunResult, *Trace)
-	mutation(dir string, r *Run, detects string) string
+	mutation(dir string, r *Run, detects string) (outcome, reason string)
+}
+
+// incomplete is the result of a run that gave no verdict.
+func incomplete(r *Run, reason string) (RunResult, *Trace) {
+	return RunResult{Name: r.Name, Outcome: "incomplete", Reason: reason, Reach: map[string]bool{}}, nil
 }
 
 type tlaChecker struct {
@@ -200,6 +219,9 @@ type tlaChecker struct {
 func (c *tlaChecker) run(dir string, r *Run) (RunResult, *Trace) {
 	rr := RunResult{Name: r.Name, Reach: map[string]bool{}}
 	out := c.r.run(dir, c.s.Properties, tlcConfig(r, r.Invariants, r.Properties), true, timeoutOf(r))
+	if out.Outcome == "incomplete" {
+		return incomplete(r, out.Reason)
+	}
 	rr.Outcome, rr.Violated = out.Outcome, out.Violated
 	var trace *Trace
 	if out.Outcome == "violated" {
@@ -208,6 +230,9 @@ func (c *tlaChecker) run(dir string, r *Run) (RunResult, *Trace) {
 			if len(r.Properties) > 1 {
 				for _, prop := range r.Properties {
 					one := c.r.run(dir, c.s.Properties, tlcConfig(r, nil, []string{prop}), false, timeoutOf(r))
+					if one.Outcome == "incomplete" {
+						return incomplete(r, "property "+prop+": "+one.Reason)
+					}
 					if one.Outcome == "violated" {
 						rr.Violated = prop
 						out = one
@@ -231,6 +256,9 @@ func (c *tlaChecker) run(dir string, r *Run) (RunResult, *Trace) {
 			default:
 				det = single.run(dir, c.s.Properties, tlcConfig(r, []string{rr.Violated}, nil), false, timeoutOf(r))
 			}
+			if det.Outcome == "incomplete" {
+				return incomplete(r, "trace: "+det.Reason)
+			}
 			if det.Outcome == "violated" {
 				out = det
 			}
@@ -241,16 +269,18 @@ func (c *tlaChecker) run(dir string, r *Run) (RunResult, *Trace) {
 		mod := "MCReach"
 		text := fmt.Sprintf("---- MODULE %s ----\nEXTENDS %s\nMCNotReached == ~(%s)\n====\n", mod, c.s.Properties, name)
 		if err := os.WriteFile(filepath.Join(dir, mod+".tla"), []byte(text), 0o644); err != nil {
-			rr.Reach[name] = false
-			continue
+			return incomplete(r, "reach "+name+": "+relativeTo(dir, err.Error()))
 		}
 		one := c.r.run(dir, mod, tlcConfig(r, []string{"MCNotReached"}, nil), false, timeoutOf(r))
+		if one.Outcome == "incomplete" {
+			return incomplete(r, "reach "+name+": "+one.Reason)
+		}
 		rr.Reach[name] = one.Outcome == "violated" && one.Violated == "MCNotReached"
 	}
 	return rr, trace
 }
 
-func (c *tlaChecker) mutation(dir string, r *Run, detects string) string {
+func (c *tlaChecker) mutation(dir string, r *Run, detects string) (string, string) {
 	var out tlcOutcome
 	if contains(r.Properties, detects) {
 		out = c.r.run(dir, c.s.Properties, tlcConfig(r, nil, []string{detects}), false, timeoutOf(r))
@@ -259,11 +289,11 @@ func (c *tlaChecker) mutation(dir string, r *Run, detects string) string {
 	}
 	switch out.Outcome {
 	case "violated":
-		return "detected"
+		return "detected", ""
 	case "passed":
-		return "missed"
+		return "missed", ""
 	}
-	return "inapplicable"
+	return "incomplete", out.Reason
 }
 
 type alloyChecker struct {
@@ -292,21 +322,26 @@ func (c *alloyChecker) run(dir string, r *Run) (RunResult, *Trace) {
 		cmds = append(cmds, fmt.Sprintf("run %s for %d", pd, scope))
 	}
 	if err := c.withCommands(dir, cmds); err != nil {
-		rr.Outcome, rr.Violated = "error", err.Error()
-		return rr, nil
+		return incomplete(r, relativeTo(dir, err.Error()))
 	}
-	found, known, errLine := c.r.exec(dir, c.s.Properties+".als", timeoutOf(r))
-	if errLine != "" {
-		rr.Outcome, rr.Violated = "error", errLine
-		return rr, nil
+	found, known, reason := c.r.exec(dir, c.s.Properties+".als", timeoutOf(r))
+	if reason != "" {
+		return incomplete(r, reason)
+	}
+	// a receipt without one of the commands is output that cannot be read
+	for _, a := range r.Invariants {
+		if !known[a] {
+			return incomplete(r, "Alloy did not check assertion "+a)
+		}
+	}
+	for _, pd := range r.Reach {
+		if !known[pd] {
+			return incomplete(r, "Alloy did not run predicate "+pd)
+		}
 	}
 	rr.Outcome = "passed"
 	var trace *Trace
 	for _, a := range r.Invariants {
-		if !known[a] {
-			rr.Outcome, rr.Violated = "error", "assertion "+a+" was not checked"
-			return rr, nil
-		}
 		if inst, ok := found[a]; ok && rr.Outcome == "passed" {
 			rr.Outcome, rr.Violated = "violated", a
 			trace = &Trace{Instance: inst}
@@ -319,18 +354,21 @@ func (c *alloyChecker) run(dir string, r *Run) (RunResult, *Trace) {
 	return rr, trace
 }
 
-func (c *alloyChecker) mutation(dir string, r *Run, detects string) string {
+func (c *alloyChecker) mutation(dir string, r *Run, detects string) (string, string) {
 	if err := c.withCommands(dir, []string{fmt.Sprintf("check %s for %d", detects, alloyScope(r))}); err != nil {
-		return "inapplicable"
+		return "incomplete", relativeTo(dir, err.Error())
 	}
-	found, known, errLine := c.r.exec(dir, c.s.Properties+".als", timeoutOf(r))
-	if errLine != "" || !known[detects] {
-		return "inapplicable"
+	found, known, reason := c.r.exec(dir, c.s.Properties+".als", timeoutOf(r))
+	switch {
+	case reason != "":
+		return "incomplete", reason
+	case !known[detects]:
+		return "incomplete", "Alloy did not check assertion " + detects
 	}
 	if _, ok := found[detects]; ok {
-		return "detected"
+		return "detected", ""
 	}
-	return "missed"
+	return "missed", ""
 }
 
 // HasCommands reports whether an Alloy property file carries its own commands.

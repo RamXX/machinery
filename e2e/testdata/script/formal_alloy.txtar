@@ -29,7 +29,11 @@ exec sed -i.bak 's/invariants: \[NoOrphanOrder, OwnerListsOrder, EveryCustomerOr
 exec mrun 1 check --stage formal
 stdout 'ERROR  order-ownership: property Undefined is not defined in design/formal/shop_props.als'
 
-# a syntax error is an error of the run, never a pass
+# a syntax error leaves the run without a verdict: it did not complete, never a pass
 exec sh -c 'printf "\nassert Broken { all o: Order | \n" >> design/formal/shop_props.als'
 exec mrun 1 formal check order-ownership
-stdout 'ERROR  order-ownership run strict: the model checker failed: '
+stdout '^  warn   order-ownership run strict did not complete: .*Syntax error in shop_props\.als at line [0-9]+ column [0-9]+'
+stdout '^  warn   order-ownership mutation M1 did not complete: '
+! stdout 'the pass is vacuous|missed|does not apply'
+! stdout '/private/|/var/|/tmp/|machinery-formal-'
+grep '"outcome": "incomplete"' design/formal/order-ownership.result.json

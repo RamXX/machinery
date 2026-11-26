@@ -3,6 +3,7 @@ package formal
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,8 +17,9 @@ import (
 
 // tlcOutcome is what one TLC invocation established.
 type tlcOutcome struct {
-	Outcome  string // passed | violated | error
-	Violated string // property name, "Deadlock", or the first error line
+	Outcome  string // passed | violated | incomplete
+	Violated string // property name or "Deadlock"
+	Reason   string // why the run did not complete (section 16.9)
 	Kind     string // invariant | property | action | deadlock
 	States   []tlcState
 	Loop     int
@@ -119,6 +121,7 @@ var (
 	invViolRe  = regexp.MustCompile(`Error: Invariant (\S+) is violated`)
 	actViolRe  = regexp.MustCompile(`Error: Action property (\S+) is violated`)
 	stateHdrRe = regexp.MustCompile(`^State ([0-9]+): (.*)$`)
+	errCountRe = regexp.MustCompile(`^\*\*\* ?(Errors|Abort messages|Warnings): [0-9]+$`)
 	backRe     = regexp.MustCompile(`^Back to state ([0-9]+)`)
 	fieldRe    = regexp.MustCompile(`(\w+) \|-> "([^"]*)"`)
 )
@@ -133,7 +136,7 @@ type tlcRunner struct {
 func (t *tlcRunner) run(dir, module, cfg string, deadlock bool, timeout time.Duration) tlcOutcome {
 	cfgPath := filepath.Join(dir, "run.cfg")
 	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
-		return tlcOutcome{Outcome: "error", Violated: err.Error()}
+		return tlcOutcome{Outcome: "incomplete", Reason: relativeTo(dir, err.Error())}
 	}
 	var extra []string
 	if !deadlock {
@@ -141,13 +144,16 @@ func (t *tlcRunner) run(dir, module, cfg string, deadlock bool, timeout time.Dur
 	}
 	out, runErr, failure := t.exec(dir, module, "run.cfg", extra, timeout)
 	if failure != "" {
-		return tlcOutcome{Outcome: "error", Violated: failure}
+		return tlcOutcome{Outcome: "incomplete", Reason: relativeTo(dir, failure)}
 	}
-	return parseTLC(out, runErr)
+	o := parseTLC(out, runErr)
+	o.Reason = relativeTo(dir, o.Reason)
+	return o
 }
 
 // exec runs TLC on a module in dir with a config file already there, and
-// returns its output. failure is set when TLC could not run to its end.
+// returns its output. failure is set when TLC did not run to its own end: it
+// timed out, did not start or was killed.
 func (t *tlcRunner) exec(dir, module, cfgName string, extra []string, timeout time.Duration) (out string, runErr error, failure string) {
 	// Each run gets its own directory for TLC's states (the metadir) and for
 	// the Java temporary directory. TLC unpacks its standard modules
@@ -174,12 +180,48 @@ func (t *tlcRunner) exec(dir, module, cfgName string, extra []string, timeout ti
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	runErr = cmd.Run()
-	if ctx.Err() == context.DeadlineExceeded {
-		return buf.String(), runErr, fmt.Sprintf("timed out after %s", timeout)
+	var exit *exec.ExitError
+	switch {
+	case ctx.Err() == context.DeadlineExceeded:
+		return buf.String(), runErr, fmt.Sprintf("timed out after %ds", int(timeout.Seconds()))
+	case runErr != nil && !errors.As(runErr, &exit):
+		return buf.String(), runErr, "TLC did not start: " + runErr.Error()
+	case exit != nil && !exit.Exited():
+		return buf.String(), runErr, "TLC was killed: " + runErr.Error()
 	}
 	return buf.String(), runErr, ""
 }
 
+// exitStatus is the exit status of a process that ended on its own.
+func exitStatus(runErr error) int {
+	var exit *exec.ExitError
+	if errors.As(runErr, &exit) {
+		return exit.ExitCode()
+	}
+	return 0
+}
+
+// relativeTo removes the run directory from a line of tool output, so that a
+// reason names files as the spec does and output holds no absolute path. The
+// tools print the directory with symbolic links resolved (/private/var for
+// /var on macOS), so both forms go, the longer first.
+func relativeTo(dir, line string) string {
+	forms := []string{dir}
+	if real, err := filepath.EvalSymlinks(dir); err == nil && real != dir {
+		forms = append(forms, real)
+	}
+	sort.Slice(forms, func(i, j int) bool { return len(forms[i]) > len(forms[j]) })
+	for _, f := range forms {
+		line = strings.ReplaceAll(line, f+string(filepath.Separator), "")
+		line = strings.ReplaceAll(line, f, ".")
+	}
+	return line
+}
+
+// parseTLC reads the verdict of a TLC run that ended on its own. A verdict
+// counts only when TLC's exit status agrees with it: 0 for a pass, 10 to 14
+// (assumption, deadlock, safety, liveness, assert) for a violation. Anything
+// else did not complete and gives no verdict (section 16.9).
 func parseTLC(out string, runErr error) tlcOutcome {
 	res := tlcOutcome{}
 	lines := strings.Split(out, "\n")
@@ -196,23 +238,16 @@ func parseTLC(out string, runErr error) tlcOutcome {
 		res.Outcome, res.Kind, res.Violated = "violated", "deadlock", "Deadlock"
 	case strings.Contains(out, "Model checking completed. No error has been found."):
 		res.Outcome = "passed"
+	}
+	code := exitStatus(runErr)
+	switch {
+	case res.Outcome == "passed" && code == 0:
 		return res
+	case res.Outcome == "violated" && code >= 10 && code <= 14:
+	case res.Outcome != "":
+		return tlcOutcome{Outcome: "incomplete", Reason: fmt.Sprintf("TLC reported %s and exited with status %d", res.Outcome, code)}
 	default:
-		res.Outcome = "error"
-		for _, l := range lines {
-			l = strings.TrimSpace(l)
-			if strings.HasPrefix(l, "Error:") || strings.HasPrefix(l, "***") || strings.Contains(l, "Semantic error") || strings.Contains(l, "Parsing or semantic analysis failed") || strings.HasPrefix(l, "Was expecting") || strings.HasPrefix(l, "Encountered") {
-				res.Violated = l
-				break
-			}
-		}
-		if res.Violated == "" {
-			res.Violated = "the model checker did not finish"
-			if runErr != nil {
-				res.Violated += ": " + runErr.Error()
-			}
-		}
-		return res
+		return tlcOutcome{Outcome: "incomplete", Reason: tlcErrorLine(lines, code)}
 	}
 	// trace
 	var cur *tlcState
@@ -255,6 +290,24 @@ func parseTLC(out string, runErr error) tlcOutcome {
 	}
 	flush()
 	return res
+}
+
+// tlcErrorLine is why a TLC run gave no verdict: its first error line that
+// says something (not a count of errors), or its exit status.
+func tlcErrorLine(lines []string, code int) string {
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		if errCountRe.MatchString(l) || l == "***Parse Error***" {
+			continue
+		}
+		if strings.HasPrefix(l, "Error:") || strings.HasPrefix(l, "***") || strings.Contains(l, "Semantic error") ||
+			strings.Contains(l, "Parsing or semantic analysis failed") || strings.HasPrefix(l, "Was expecting") ||
+			strings.HasPrefix(l, "Encountered") || strings.HasPrefix(l, "Lexical error") ||
+			strings.HasPrefix(l, "Cannot find source file") || strings.HasPrefix(l, "Unknown operator") {
+			return l
+		}
+	}
+	return fmt.Sprintf("TLC ended without a verdict (exit status %d)", code)
 }
 
 // steps turns parsed states into trace steps (section 16.10).

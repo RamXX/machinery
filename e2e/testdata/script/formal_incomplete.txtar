@@ -1,0 +1,74 @@
+# A tool run that did not complete gives no verdict (docs/formats.md section 16.9): it is
+# reported as not demonstrated with its reason, never as detected, missed, inapplicable,
+# passed, violated or not reached.
+fixture shop
+fixture shop-formal
+exec shopformal
+
+# a complete run, recorded and committed
+exec mrun 1 formal check
+exec machinery formal baseline
+exec machinery check --stage formal
+stdout '^passed$'
+gitcommit 'formal models'
+cp design/formal/order-payment.spec.yaml spec.orig
+cp design/formal/traces/order-payment.race.trace.json race.orig
+
+# a mutation the tool cannot parse did not complete: incomplete, not inapplicable
+exec sh -c 'cat m5.yaml.in >> design/formal/order-payment.spec.yaml'
+exec mrun 1 formal check order-payment
+stdout '^  warn   order-payment mutation M5 did not complete: \S'
+stdout '^not demonstrated: order-payment mutation M5 did not complete: .+; fix the cause and run machinery formal check$'
+! stdout 'does not apply'
+! stdout '/private/|/var/|/tmp/|machinery-formal-'
+grep '"id": "M5",\n\s+"outcome": "incomplete",\n\s+"reason": "\S' design/formal/order-payment.result.json
+! grep '"outcome": "inapplicable"' design/formal/order-payment.result.json
+grep -count=4 '"outcome": "detected"' design/formal/order-payment.result.json
+
+# the pure stage reads the same: no verdict, not demonstrated
+exec mrun 1 check --stage formal
+stdout '^  warn   order-payment mutation M5 did not complete: '
+stdout '^not demonstrated: order-payment mutation M5 did not complete: '
+
+# a fresh run that does not complete confirms nothing: no file is compared
+exec mrun 1 formal check --verify order-payment
+stdout '^== formal-verify ==$'
+stdout '^not demonstrated: order-payment mutation M5 did not complete: \S'
+! stdout 'does not reproduce'
+
+# a run that reaches timeout_seconds did not complete; so do the mutations it bounds
+cp spec.orig design/formal/order-payment.spec.yaml
+exec sh -c 'awk ''{print} /^  - name: strict$/ {print "    timeout_seconds: 1"}'' spec.orig > design/formal/order-payment.spec.yaml'
+grep 'timeout_seconds: 1' design/formal/order-payment.spec.yaml
+exec mrun 1 formal check order-payment
+stdout '^  warn   order-payment run strict did not complete: timed out after 1s$'
+stdout '^  warn   order-payment mutation M4 did not complete: timed out after 1s$'
+stdout '^not demonstrated: order-payment run strict did not complete: timed out after 1s; fix the cause and run machinery formal check$'
+! stdout 'missed'
+! stdout 'not reached'
+! stdout 'does not apply'
+grep '"name": "strict",\n\s+"outcome": "incomplete",\n\s+"violated": "",\n\s+"reason": "timed out after 1s",\n\s+"reach": \{\}' design/formal/order-payment.result.json
+grep '"id": "M4",\n\s+"outcome": "incomplete",\n\s+"reason": "timed out after 1s"' design/formal/order-payment.result.json
+
+# a property file the tool cannot parse: every run is incomplete, and the trace of the
+# run that found the race is left as it was, with its obligation
+cp spec.orig design/formal/order-payment.spec.yaml
+exec sed -i.bak 's/^SomeShipped == /SomeShipped == (((/' design/formal/OrderProps.tla
+exec mrun 1 formal check order-payment
+stdout '^  warn   order-payment run race did not complete: \S'
+stdout '^  warn   order-payment run strict did not complete: \S'
+! stdout 'expected a finding and the run passed'
+! stdout 'not reached'
+! stdout '/private/|/var/|/tmp/|machinery-formal-'
+grep -count=6 '"outcome": "incomplete"' design/formal/order-payment.result.json
+! grep '"trace":' design/formal/order-payment.result.json
+cmp design/formal/traces/order-payment.race.trace.json race.orig
+grep '"id": "cx:order-payment:race"' design/gen/obligations.json
+
+-- m5.yaml.in --
+  - id: M5
+    bug: "Fairness is written so that the model does not parse."
+    from: "Fairness == \\A i \\in Instances : WF_vars(InternalOf(i))"
+    to: "Fairness == \\A i \\in Instances : WF_vars(InternalOf(i)"
+    detects: PayingSettles
+    run: strict

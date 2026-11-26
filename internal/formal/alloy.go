@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -35,9 +36,10 @@ type alloyReceipt struct {
 var alloyCommandRe = regexp.MustCompile(`(?m)^\s*(check|run)\s+\w`)
 
 // exec runs the Alloy file (props text plus commands) in dir and returns the
-// commands that found an instance. errLine is non-empty when Alloy could not
-// check the file.
-func (a *alloyRunner) exec(dir, fileName string, timeout time.Duration) (found map[string]map[string]map[string][]string, known map[string]bool, errLine string) {
+// commands that found an instance and the commands Alloy executed. reason is
+// non-empty when the run did not complete (section 16.9): it timed out, did
+// not start, was killed, exited non-zero or left no readable receipt.
+func (a *alloyRunner) exec(dir, fileName string, timeout time.Duration) (found map[string]map[string]map[string][]string, known map[string]bool, reason string) {
 	out := filepath.Join(dir, "out")
 	os.RemoveAll(out)
 	// A private Java temporary directory: Alloy writes its solver files
@@ -54,26 +56,24 @@ func (a *alloyRunner) exec(dir, fileName string, timeout time.Duration) (found m
 	var buf bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	runErr := cmd.Run()
-	if ctx.Err() == context.DeadlineExceeded {
-		return nil, nil, fmt.Sprintf("timed out after %s", timeout)
+	var exit *exec.ExitError
+	switch {
+	case ctx.Err() == context.DeadlineExceeded:
+		return nil, nil, fmt.Sprintf("timed out after %ds", int(timeout.Seconds()))
+	case runErr != nil && !errors.As(runErr, &exit):
+		return nil, nil, "Alloy did not start: " + runErr.Error()
+	case exit != nil && !exit.Exited():
+		return nil, nil, "Alloy was killed: " + runErr.Error()
+	case runErr != nil:
+		return nil, nil, relativeTo(dir, firstLine(buf.String(), fmt.Sprintf("Alloy ended without a verdict (exit status %d)", exit.ExitCode())))
 	}
 	data, err := os.ReadFile(filepath.Join(out, "receipt.json"))
 	if err != nil {
-		line := "alloy did not finish"
-		for _, l := range strings.Split(buf.String(), "\n") {
-			if l = strings.TrimSpace(l); l != "" {
-				line = l
-				break
-			}
-		}
-		if runErr != nil && line == "alloy did not finish" {
-			line += ": " + runErr.Error()
-		}
-		return nil, nil, line
+		return nil, nil, relativeTo(dir, firstLine(buf.String(), "Alloy wrote no receipt"))
 	}
 	var rc alloyReceipt
 	if err := json.Unmarshal(data, &rc); err != nil {
-		return nil, nil, "alloy wrote an unreadable receipt"
+		return nil, nil, "Alloy wrote an unreadable receipt"
 	}
 	found = map[string]map[string]map[string][]string{}
 	known = map[string]bool{}
@@ -105,6 +105,16 @@ func (a *alloyRunner) exec(dir, fileName string, timeout time.Duration) (found m
 		found[name] = inst
 	}
 	return found, known, ""
+}
+
+// firstLine returns the first non-empty line of tool output, or def.
+func firstLine(out, def string) string {
+	for _, l := range strings.Split(out, "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			return l
+		}
+	}
+	return def
 }
 
 // atomName strips the module prefix and the "$" of an Alloy atom ("shop/Order$0" is "Order0").

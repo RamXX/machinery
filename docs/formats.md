@@ -1880,9 +1880,9 @@ no tool:
 - `warn   <spec> run <run> did not complete: <reason>` and
   `warn   <spec> mutation <id> did not complete: <reason>` for every incomplete run and
   mutation, and the stage is `not demonstrated: <the first of them>; fix the cause and run
-  machinery formal check`. There is no verdict to judge, so the stage neither passes nor fails on
-  that account; when it also has an ERROR or DRIFT it is failed (section 3.2), and the warn lines
-  still say what did not complete.
+  machinery formal check` (runs before mutations, in manifest order). There is no verdict to
+  judge, so the stage neither passes nor fails on that account; when it also has an ERROR or
+  DRIFT it is failed (section 3.2), and the warn lines still say what did not complete.
 
 An `fv:<area>` obligation is proven when the area is covered (16.1), no ERROR or DRIFT names a
 spec that lists the area, and every such spec has a result in which every run and mutation

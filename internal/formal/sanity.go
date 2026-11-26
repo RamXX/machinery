@@ -235,7 +235,7 @@ func sanityMachine(tlc *tlcRunner, dir string, m *machine.Machine) (MachineSanit
 		o = parseTLC(out, runErr)
 	}
 	if o.Outcome != "passed" {
-		res.Error = o.Violated
+		res.Error = o.Reason
 		if o.Outcome == "violated" {
 			res.Error = "TLC reported " + o.Violated
 		}
