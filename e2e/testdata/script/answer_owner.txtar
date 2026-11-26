@@ -1,0 +1,51 @@
+# the owner's answer: recorded with the actor, the item closed; refusals of a malformed answer
+# (docs/formats.md section 15.9)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-q1 --title 'Name the new state' --body-file q1.txt --silent
+exec bd create --id shop-t1 --title 'Not a question' --body-file t1.txt --silent
+
+exec mrun 2 answer shop-t1 --option 1 --reason x
+stderr '^usage: shop-t1 is not a question: it has no machinery:question line$'
+exec mrun 2 answer shop-q1 --option 3 --reason x
+stderr '^usage: --option 3 names no option of shop-q1: give 1 to 2$'
+exec mrun 2 answer shop-q1 --option 1
+stderr '^usage: machinery answer needs --reason$'
+exec mrun 2 answer shop-q1 --reason x
+stderr '^usage: machinery answer needs --option <n>, or --delegate$'
+exec mrun 2 answer shop-q1 --hold --reason x
+stderr '^usage: --hold, --refuse and --clause go with --delegate$'
+exec mrun 2 answer shop-q1 --option 1 --clause naming --reason x
+stderr '^usage: --hold, --refuse and --clause go with --delegate$'
+exec mrun 2 answer shop-nope --option 1 --reason x
+stderr '^usage: no story shop-nope in the backlog'
+
+# without a delegate policy any actor's answer is the owner's
+env BEADS_ACTOR=owner
+exec sh -c 'machinery answer shop-q1 --option 2 --reason "$(printf "Closed reads\nbetter")"'
+stdout '^answered: shop-q1 option 2: Closed$'
+stdout '^closed: shop-q1$'
+exec bd show shop-q1 --json
+stdout '"status": "closed"'
+stdout 'machinery:answer 2 actor=owner reason=\\"Closed reads better\\"'
+exec mrun 2 answer shop-q1 --option 1 --reason again
+stderr '^usage: shop-q1 is answered already by owner$'
+exec mrun 2 answer shop-q1 --delegate --clause naming --option 1 --reason again
+stderr '^usage: shop-q1 is answered already by owner$'
+
+exec machinery questions
+stdout '^questions: 0 open, 0 held$'
+exec machinery status
+! stdout 'questions:'
+
+-- q1.txt --
+machinery:question builder
+machinery:option 1 Settled
+machinery:option 2 Closed
+machinery:recommend 2
+machinery:default Closed
+machinery:about naming
+-- t1.txt --
+machinery:ids tc:ORDE-e6d28f

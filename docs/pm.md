@@ -135,6 +135,22 @@ machinery learnings --since <last plan>      # read before the next plan
 - A decision an agent took within its remit is `--vetoable`; the owner confirms it with
   `bd update <id> --append-notes "machinery:confirmed <name>"` or supersedes it.
 - `machinery brief` lists the decisions that govern a story's ids, as pointers.
+
+## Questions for the owner (experimental)
+
+```
+machinery ask "<question>" --option "<a>" --option "<b>" --recommend <n> --default "<if nobody answers>" --about <topic>
+machinery questions                          # what waits for the owner, and why
+machinery answer <id> --option <n> --reason "..."                                   # the owner
+machinery answer <id> --delegate --clause <clause> --option <n>|--hold|--refuse --reason "..."   # an agent, under the owner's policy
+```
+
+- Ask instead of stalling: the question carries your recommendation and what happens if nobody
+  answers, and you go on with other work. Topics `publish`, `payment`, `destructive`, `method`
+  and `delegate-policy` are reserved: only a clause that names them may answer.
+- `delegate.policy` names the owner's policy file, outside the project. An answer on the owner's
+  behalf is a vetoable decision; when a clause does not permit it, the only answer left is
+  `--hold`. Amounts under a clause add up against its limit.
 - `machinery intake plan` reminds you of the learnings posted since the last plan.
 
 ## Landing

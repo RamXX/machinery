@@ -30,7 +30,8 @@ type Waves struct {
 }
 
 // BuildWaves layers the stories that are not closed, not deferred, not
-// epics, not intake items and not decisions by their blocking edges.
+// epics, not intake items, not decisions and not questions by their blocking
+// edges.
 func BuildWaves(d *design.Design, issues []backlog.Issue) *Waves {
 	w := &Waves{Contract: ContractOf(d), Stage: report.New("waves")}
 	s := w.Stage
@@ -44,7 +45,7 @@ func BuildWaves(d *design.Design, issues []backlog.Issue) *Waves {
 	var ids []string
 	for i := range issues {
 		is := &issues[i]
-		if is.Open() && is.Type != "epic" && !intakes[is.ID] && !IsDecision(is) {
+		if is.Open() && is.Type != "epic" && !intakes[is.ID] && !IsDecision(is) && !IsQuestion(is) {
 			open[is.ID] = is
 			ids = append(ids, is.ID)
 		}

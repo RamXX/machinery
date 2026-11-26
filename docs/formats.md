@@ -128,6 +128,8 @@ commands:
 backlog:                        # optional: the backlog bridge (section 15)
   tool: bd                      # only bd
   base: main                    # optional: the branch work is cut from; default main
+delegate:                       # optional, experimental: answers on the owner's behalf (section 15.9)
+  policy: ../owner/delegate.yaml   # required: the owner's policy file; may lie outside the project
 routing:                        # optional: model routing guidance printed in briefs (section 15.5)
   routine: "small model"
   consequential: "standard model; fresh verifier"
@@ -181,6 +183,9 @@ Rules:
   `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
   `columns.failure` and `columns.behavior` (`import.failure_modes.columns.failure is required`).
   It may be set beside `design.failure_modes`.
+- `delegate.policy` is the one path that may leave the project root: it is absolute, or relative to
+  the root, and names a file the owner keeps (section 15.9). An empty one is a config error
+  (`delegate.policy is required`).
 - An empty marker in `trace.markers` is a config error
   (`trace.markers.verifies: a marker must not be empty`).
 - `constraints.cores` needs `max_file_lines` and `max_func_lines`, each a positive number
@@ -247,6 +252,9 @@ Rules:
 | `machinery intake plan <id>` | Prints the stories the design change owes; `--apply` creates them in one backlog call (section 15.7). |
 | `machinery decide "<title>" --why "<text>"` | Records a decision in the backlog (section 15.8). `--ids`, `--supersedes`, `--vetoable`. |
 | `machinery decisions` | Lists the current decisions (section 15.8). `--ids`, `--open-vetoes`. |
+| `machinery ask "<question>"` | Records a question for the owner, with its options, a recommendation and the default (section 15.9). Experimental. |
+| `machinery answer <id>` | Records the owner's answer; with `--delegate`, an answer on the owner's behalf under the delegate policy (section 15.9). Experimental. |
+| `machinery questions` | Lists the open questions and what each waits for (section 15.9). `--held`. |
 | `machinery observations` | Lists the observations of stories that are not filed; `--file` files them (section 15.8). |
 | `machinery learnings` | Prints the learnings of closed stories, by intake (section 15.8). `--since <ref>`. |
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
@@ -1644,7 +1652,8 @@ id a property is over that the evidence proves, and one `assumed, unproven` line
 whose evidence is owed, each group sorted. When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
-`intake <id>: <n> of 7 steps done; next: <step>`. Exit 0 unless the config is invalid.
+`intake <id>: <n> of 7 steps done; next: <step>`, and then, when a question is open (section 15.9),
+`questions: <n> open, <k> held`. Exit 0 unless the config is invalid.
 
 ## 15. Backlog and scheduling
 
@@ -1684,6 +1693,15 @@ machinery:decision <actor>
 machinery:supersedes <decision id>
 machinery:vetoable
 machinery:confirmed <actor>
+machinery:overruled <actor>
+machinery:question <actor>
+machinery:option <n> <text>
+machinery:recommend <n>
+machinery:default <text>
+machinery:about <topic> <topic>
+machinery:amount <number> <unit>
+machinery:story <id>
+machinery:answer <n|refuse|hold> actor=<actor> [clause=<clause id>] reason="<text>"
 ```
 
 - `machinery:ids` lists the design ids the story delivers. Several lines add up.
@@ -1703,7 +1721,7 @@ machinery:confirmed <actor>
   story of that intake. The other intake lines are described in section 15.7.
 - `machinery:repair` records that a story was closed while the integration branch was red, as
   its repair (section 12.2). The learning, observation and decision lines are described in
-  section 15.8.
+  section 15.8, the question and answer lines in section 15.9.
 
 ### 15.2 `machinery plan`
 
@@ -1806,7 +1824,7 @@ Output is sorted and deterministic. With nothing owed it prints nothing and exit
 ### 15.3 `machinery waves`
 
 Reads every story that is not closed, not deferred, not an epic, not an intake item (section
-15.7) and not a decision (section 15.8), with its blocking edges, and prints the layers of the graph: wave 1 holds the stories with no open blocker, wave 2 those
+15.7), not a decision (section 15.8) and not a question (section 15.9), with its blocking edges, and prints the layers of the graph: wave 1 holds the stories with no open blocker, wave 2 those
 blocked only by wave 1, and so on. Stories of one wave can run in parallel.
 
 ```
@@ -2192,7 +2210,9 @@ With `--supersedes <id>` the new item is created first, then `bd supersede <id> 
 closes the older one with a link to it, and `superseded: <id> by <new id>` is printed.
 
 An item is a decision when its description or notes carry a `machinery:decision` line. It is
-**current** unless another decision carries `machinery:supersedes <its id>`, whatever its status.
+**current** unless another decision carries `machinery:supersedes <its id>`, whatever its status,
+or it carries `machinery:overruled <actor>` (an answer on the owner's behalf that the owner
+answered otherwise, section 15.9).
 The owner confirms a vetoable decision by appending `machinery:confirmed <actor>` to its notes
 (`bd update <id> --append-notes "machinery:confirmed <actor>"`) and overturns it with a decision
 that supersedes it. A decision is never a unit of build work: `waves` leaves it out.
@@ -2261,6 +2281,155 @@ an ancestor of it (a commit this repository does not have counts); a closed stor
 line counts only without `--since`, and the last line then has no `since` part. An unknown ref is
 a usage error (`usage: --since <ref>: not a commit of the project`). Exit 0. The planner reads
 them before the next plan; `machinery intake plan` reminds it (section 15.7).
+
+### 15.9 Questions for the owner
+
+**Experimental.** Questions and answers on the owner's behalf are an experiment: the commands,
+lines and policy format of this section may change in any release.
+
+Agents stall when a decision is the owner's and the owner is away. A question puts the decision
+in the backlog with what the owner needs to answer it at a glance, and with what happens if
+nobody does. A policy the owner writes lets an agent answer some questions on the owner's
+behalf, within limits, as a decision the owner may overturn.
+
+```
+machinery ask "<question>" --option "<a>" --option "<b>" [--option "<c>"]... --recommend <n> --default "<what happens if nobody answers>"
+              [--about <topic>]... [--amount <number> --unit <unit>] [--story <id>] [--actor <name>]
+machinery answer <id> --option <n> --reason "<text>" [--actor <name>]
+machinery answer <id> --delegate --clause <clause id> (--option <n> | --hold | --refuse) --reason "<text>" [--actor <name>]
+machinery questions [--held]
+```
+
+**Asking.** `ask` creates one backlog item of type `task` whose title is the question, and prints
+`question: <id>`. Its description:
+
+```
+machinery:question <actor>
+machinery:option 1 <a>
+machinery:option 2 <b>
+machinery:recommend <n>
+machinery:default <what happens if nobody answers>
+machinery:about <topic> <topic>
+machinery:amount <number> <unit>
+machinery:story <id>
+```
+
+The options are numbered from 1 in the order given. `machinery:about` lists the topics sorted, once
+each; it, `machinery:amount` and `machinery:story` are written only with their flags. A newline in a
+value becomes a space. A topic is a free word of `^[a-z][a-z0-9-]*$` that says what the question is
+about (`refund`, `naming`, `dependency`). Five topics are reserved, because a wrong answer to them
+is hard to undo or changes the rules themselves: `publish`, `payment`, `destructive`, `method` and
+`delegate-policy`. An amount is what the answer may spend or move: a number of
+`^[0-9]+(\.[0-9]+)?$` in a unit that is one word (`EUR`, `hours`). `--story` names the story the
+question holds up.
+
+`ask` refuses an incomplete question, exit 2, before anything is written:
+`usage: machinery ask takes one question`, `usage: a question needs at least two --option`,
+`usage: --option: an option must not be empty`,
+`usage: a question needs --recommend <n>: the number of the option you recommend`,
+`usage: --recommend <n> names no option: give 1 to <k>`,
+`usage: a question needs --default: what happens if nobody answers`,
+`usage: --about "<topic>": a topic is one word of ^[a-z][a-z0-9-]*$`,
+`usage: --amount and --unit go together`, `usage: --amount "<value>" is not a number`,
+`usage: --unit "<value>" is not one word`, no actor, and a `--story` the backlog does not hold.
+
+An item is a question when its description carries a `machinery:question` line. A question is
+never a unit of build work: `waves` leaves it out.
+
+**The owner's answer.** `machinery answer <id> --option <n> --reason "<text>"` appends
+`machinery:answer <n> actor=<actor> reason="<text>"` to the item's notes, prints
+`answered: <id> option <n>: <option>`, closes the item when it is open and prints `closed: <id>`.
+When the question carries an answer given on the owner's behalf that decided (an option or a
+refusal), the owner's answer settles it, in the same note: the same option appends
+`machinery:confirmed <actor>` and prints `confirmed: <id>`; another answer appends
+`machinery:overruled <actor>` and prints `overruled: <id>`. Usage errors, exit 2:
+`usage: machinery answer takes one question id`, `usage: machinery answer needs --option <n>, or --delegate`,
+`usage: <id> is not a question: it has no machinery:question line`,
+`usage: --option <n> names no option of <id>: give 1 to <k>`, `usage: machinery answer needs --reason`,
+`usage: --hold, --refuse and --clause go with --delegate`, `usage: <id> is answered already by <actor>`
+(an answer of the owner exists) and no actor. When a delegate policy is configured, the actor must
+be the owner it names, else exit 1:
+`machinery: refused: <actor> is not the owner the delegate policy names (<owner>); an agent answers with --delegate`.
+
+**An answer on the owner's behalf.** `delegate.policy` in `machinery.yaml` (section 2) names the
+owner's policy file:
+
+```yaml
+version: 1
+owner: <name>                    # the actor whose answers are the owner's
+clauses:
+  - id: small-refunds            # ^[a-z][a-z0-9-]+$, unique
+    about: [refund]              # the topics it covers; "*" covers every topic that is not reserved
+    effect: allow                # allow | refuse | hold
+    limit: {amount: 200, unit: EUR}   # optional: the most the option answers under it move together
+    confirm: true                # optional, default false: the item stays open for the owner
+    note: "refunds below the limit while I am away"   # required: why the owner grants it
+```
+
+The path is absolute or relative to the project root and may lie outside the project. It is the
+owner's file: machinery reads it and never writes it, and keeping it outside the project keeps it
+out of the agents' reach. A problem with it is a config error, exit 2,
+`config: delegate.policy <path>: <message>`: the file cannot be read or is not YAML of this shape
+(unknown keys included), `version must be 1`, `owner is required`,
+`clause <n>: id must match ^[a-z][a-z0-9-]+$`, `clause <id>: duplicate id`,
+`clause <id>: about needs at least one topic`,
+`clause <id>: effect must be allow, refuse or hold, got "<effect>"`,
+`clause <id>: limit needs an amount (a number) and a unit`, `clause <id>: note is required`.
+
+With `--delegate`, `--clause` and exactly one of `--option`, `--hold` and `--refuse` are required
+(`usage: --delegate needs --clause`, `usage: --delegate needs one of --option, --hold and --refuse`),
+and a question that carries an answer of the owner, or an answer on the owner's behalf that
+decided, is `usage: <id> is answered already by <actor>`. The answer is accepted only when every
+condition below holds, checked in this order; the first that fails refuses it, exit 1, with
+`machinery: refused: <reason>` on stderr, and nothing is written. A hold decides nothing: it is
+accepted once the clause exists, so every later refusal ends with `; answer --hold`.
+
+| Condition | Reason when it fails |
+|---|---|
+| `delegate.policy` is set | `no delegate policy: delegate.policy is not set in machinery.yaml; only the owner answers <id>` |
+| The clause is in the policy | `clause <clause> is not in the delegate policy` |
+| The question names a topic | `<id> names no topic: a clause covers only the topics it names; answer --hold` |
+| Each reserved topic of the question is named in the clause's `about` | `<id> is about <topic>, a reserved topic, and clause <clause> does not name it; answer --hold` |
+| The clause covers every topic of the question: `about` names it, or holds `*` and the topic is not reserved | `clause <clause> does not cover <topic>; answer --hold` |
+| The clause's effect permits the answer: `allow` an option, `refuse` `--refuse`, `hold` only `--hold` | `clause <clause> has effect <effect>: it does not permit <--option or --refuse>; answer --hold` |
+| An option to a question with an amount: the clause has a limit | `clause <clause> sets no limit: an answer that moves <amount> <unit> needs one; answer --hold` |
+| ... in the question's unit | `clause <clause> limits <unit>, the question is in <unit>; answer --hold` |
+| ... that the amount and the earlier option answers under the clause do not exceed | `<amount> <unit> with <spent> <unit> answered under clause <clause> exceeds its limit of <limit> <unit>; answer --hold` |
+
+The earlier option answers under a clause are the `machinery:answer <n> ... clause=<clause>` lines
+of every item of the backlog, open or closed, read when the answer is given, each counted with
+the amount of its question when that amount is in the limit's unit. An answer overruled or
+superseded later still counts: the ledger records what agents committed to. Amounts are added
+exactly, as decimals, and printed without trailing zeros.
+
+An accepted option or refusal appends, in one note, `machinery:answer <n|refuse> actor=<actor>
+clause=<clause> reason="<text>"`, `machinery:decision <actor>` and `machinery:vetoable`: the
+question is now a vetoable decision (section 15.8), listed by `machinery decisions --open-vetoes`
+until the owner confirms or overrules it with `machinery answer`, or supersedes it with
+`machinery decide --supersedes`. It prints `answered: <id> option <n>: <option> (on the owner's
+behalf, clause <clause>)`, or `answered: <id> refuse (on the owner's behalf, clause <clause>)`, then
+`closed: <id>`; under a clause with `confirm: true` the item stays open and the line is
+`open: <id> waits for the owner's confirmation (clause <clause>)`. An accepted hold appends
+`machinery:answer hold actor=<actor> clause=<clause> reason="<text>"`, prints
+`held: <id> (clause <clause>): <reason>` and leaves the item open.
+
+**Listing.** `machinery questions` lists the open questions, sorted by id, three lines each, then a
+count:
+
+```
+<id>  <question>[ (story <story id>)]
+  recommended: <n> <option>; default: <default>
+  waits for: <what>
+questions: <n> open, <k> held
+```
+
+`<what>` follows the last answer: `the owner` when there is none, `the owner; held under clause
+<clause>: <reason>` after a hold, `the owner's confirmation of option <n> under clause <clause>` or
+`the owner's confirmation of the refusal under clause <clause>` after an answer on the owner's
+behalf, `nothing: answered by <actor>` after an answer of the owner. A question is **held** when
+its last answer is a hold. `--held` keeps the held questions, and the last line is then
+`questions: <k> held`. Exit 0. `machinery status` prints the count line when a question is open
+(section 14).
 
 ## 16. Formal models
 

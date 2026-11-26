@@ -34,6 +34,9 @@ stderr 'posture must be real or sandbox'
 cp bad-waiver.yaml machinery.yaml
 exec mrun 2 config
 stderr 'is not a rule that can be waived'
+cp bad-delegate.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: delegate.policy is required$'
 
 -- bad-key.yaml --
 version: 2
@@ -48,6 +51,9 @@ design:
 version: 2
 dependencies:
   - {name: postgres, posture: fake}
+-- bad-delegate.yaml --
+version: 2
+delegate: {policy: ""}
 -- bad-waiver.yaml --
 version: 2
 waivers:

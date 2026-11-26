@@ -33,6 +33,7 @@ type Config struct {
 	Receipts     Receipts          `yaml:"receipts"`
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
+	Delegate     *Delegate         `yaml:"delegate,omitempty"`
 	Routing      map[string]string `yaml:"routing,omitempty"`
 	Vital        *Vital            `yaml:"vital,omitempty"`
 	Tools        Tools             `yaml:"tools"`
@@ -268,6 +269,12 @@ type Commands struct {
 type Backlog struct {
 	Tool string `yaml:"tool"`
 	Base string `yaml:"base,omitempty"`
+}
+
+// Delegate names the owner's policy for answers on the owner's behalf
+// (section 15.9). Policy may lie outside the project.
+type Delegate struct {
+	Policy string `yaml:"policy"`
 }
 
 type Tools struct {
@@ -514,6 +521,9 @@ func (c *Config) validate() error {
 	}
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
+	}
+	if c.Delegate != nil && strings.TrimSpace(c.Delegate.Policy) == "" {
+		return Errf("delegate.policy is required")
 	}
 	for k := range c.Routing {
 		if k != "routine" && k != "consequential" && k != "critical" && k != "vital" {

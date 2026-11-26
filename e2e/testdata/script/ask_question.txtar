@@ -1,0 +1,66 @@
+# a question for the owner: its parts, the refusals of an incomplete one, the list, the count in
+# status, and waves leaving it out (docs/formats.md section 15.9)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-s1 --title 'Refund a paid order' --body-file s1.txt --silent
+
+# an incomplete question is refused and nothing is written
+exec mrun 2 ask
+stderr '^usage: machinery ask takes one question$'
+exec mrun 2 ask 'Which provider?' --option A --recommend 1 --default A
+stderr '^usage: a question needs at least two --option$'
+exec mrun 2 ask 'Which provider?' --option A --option '' --recommend 1 --default A
+stderr '^usage: --option: an option must not be empty$'
+exec mrun 2 ask 'Which provider?' --option A --option B --default A
+stderr '^usage: a question needs --recommend <n>: the number of the option you recommend$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 3 --default A
+stderr '^usage: --recommend 3 names no option: give 1 to 2$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 1
+stderr '^usage: a question needs --default: what happens if nobody answers$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 1 --default A --about 'Pay Ments'
+stderr '^usage: --about "Pay Ments": a topic is one word of \^\[a-z\]\[a-z0-9-\]\*\$$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 1 --default A --amount 10
+stderr '^usage: --amount and --unit go together$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 1 --default A --amount ten --unit EUR
+stderr '^usage: --amount "ten" is not a number$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 1 --default A --amount 10 --unit 'euro cents'
+stderr '^usage: --unit "euro cents" is not one word$'
+exec mrun 2 ask 'Which provider?' --option A --option B --recommend 1 --default A --story shop-nope
+stderr '^usage: no story shop-nope in the backlog'
+exec bd list --all --json --limit 0
+! stdout 'machinery:question'
+
+# a complete question; topics are sorted once each, newlines become spaces
+exec sh -c 'machinery ask "Refund the duplicate charge of order 42?" --option "refund now" --option "$(printf "wait for\nthe provider")" --recommend 1 --default "nothing is refunded; the order stays Paid" --about refund --about payment --about refund --amount 49.90 --unit EUR --story shop-s1'
+stdout '^question: shop-[a-z0-9]+$'
+exec bd list --all --json --limit 0
+stdout '"description": "machinery:question builder\\nmachinery:option 1 refund now\\nmachinery:option 2 wait for the provider\\nmachinery:recommend 1\\nmachinery:default nothing is refunded; the order stays Paid\\nmachinery:about payment refund\\nmachinery:amount 49.90 EUR\\nmachinery:story shop-s1\\n"'
+exec machinery ask 'Name the new state' --option Settled --option Closed --recommend 2 --default Closed
+stdout '^question: shop-[a-z0-9]+$'
+
+exec machinery questions
+stdout '^shop-[a-z0-9]+  Refund the duplicate charge of order 42\? \(story shop-s1\)$'
+stdout '^  recommended: 1 refund now; default: nothing is refunded; the order stays Paid$'
+stdout '^shop-[a-z0-9]+  Name the new state$'
+stdout '^  recommended: 2 Closed; default: Closed$'
+stdout '^  waits for: the owner$'
+stdout '^questions: 2 open, 0 held$'
+exec machinery questions --held
+! stdout 'shop-'
+stdout '^questions: 0 held$'
+
+exec machinery status
+stdout '^questions: 2 open, 0 held$'
+
+# a question is not build work
+exec machinery waves
+stdout 'shop-s1'
+! stdout 'Refund the duplicate'
+! stdout 'Name the new state'
+
+-- s1.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**

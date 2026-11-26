@@ -54,6 +54,8 @@ restate its rules from memory, and do not read the long documents unless a step 
    Record decisions with `machinery decide "<title>" --why "..." --ids <id>` (`--vetoable` for
    one you took within your remit). Before the next plan: `machinery observations --file` and
    `machinery learnings --since <last plan>`.
+7. A decision only the owner can take: `machinery ask "<question>" --option ... --recommend <n>
+   --default "..."`, then go on with other work; `machinery questions` lists what waits.
 
 ## Build one story
 

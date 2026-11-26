@@ -51,4 +51,4 @@ stories, are how a model drifts away from the system; the tool refuses that orde
 - The backlog is the record of work. Proof and verdicts live in the story.
 - Never weaken a check, lower a tier or grow a baseline to land. Those show in the ratchet.
 - Ask the owner only what only the owner can answer: one question, the options, your
-  recommendation, the default.
+  recommendation, the default, with `machinery ask`; `machinery questions` lists what waits.

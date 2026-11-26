@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/gitx"
@@ -291,7 +292,41 @@ type Tags struct {
 	Supersedes   []string      // machinery:supersedes <decision id>
 	Vetoable     bool          // machinery:vetoable
 	Confirmed    []string      // machinery:confirmed <actor>
+	Overruled    []string      // machinery:overruled <actor>
+
+	// questions for the owner (section 15.9)
+	Question  bool     // a machinery:question line: the item is a question
+	AskedBy   string   // the actor of the machinery:question line
+	Options   []string // machinery:option <n> <text>, option n at index n-1
+	Recommend int      // machinery:recommend <n>
+	Default   string   // machinery:default <text>
+	About     []string // machinery:about <topic>...
+	Amount    string   // machinery:amount <number> <unit>
+	Unit      string
+	StoryOf   string   // machinery:story <id>
+	Answers   []Answer // machinery:answer lines, in order
 }
+
+// Answer is a machinery:answer line (section 15.9).
+type Answer struct {
+	What   string // an option number, "refuse" or "hold"
+	Actor  string
+	Clause string // the clause of an answer on the owner's behalf; "" for the owner's
+	Reason string
+	Seq    int
+}
+
+// Option returns the option number of the answer, 0 for a refusal or a hold.
+func (a Answer) Option() int {
+	n, err := strconv.Atoi(a.What)
+	if err != nil || n < 1 {
+		return 0
+	}
+	return n
+}
+
+// Delegated reports whether the answer was given on the owner's behalf.
+func (a Answer) Delegated() bool { return a.Clause != "" }
 
 // Observation is a machinery:observation line, or with Item set a
 // machinery:observation-filed line.
@@ -405,6 +440,42 @@ func ParseTags(is *Issue) Tags {
 			t.Vetoable = true
 		case "confirmed":
 			t.Confirmed = append(t.Confirmed, strings.TrimSpace(args))
+		case "overruled":
+			t.Overruled = append(t.Overruled, strings.TrimSpace(args))
+		case "question":
+			if !t.Question {
+				t.Question, t.AskedBy = true, strings.TrimSpace(args)
+			}
+		case "option":
+			num, text, _ := strings.Cut(strings.TrimSpace(args), " ")
+			if n, err := strconv.Atoi(num); err == nil && n >= 1 && n <= maxOptions {
+				for len(t.Options) < n {
+					t.Options = append(t.Options, "")
+				}
+				t.Options[n-1] = strings.TrimSpace(text)
+			}
+		case "recommend":
+			if n, err := strconv.Atoi(strings.TrimSpace(args)); err == nil && t.Recommend == 0 {
+				t.Recommend = n
+			}
+		case "default":
+			if t.Default == "" {
+				t.Default = strings.TrimSpace(args)
+			}
+		case "about":
+			t.About = append(t.About, strings.Fields(args)...)
+		case "amount":
+			if f := strings.Fields(args); len(f) == 2 && t.Amount == "" {
+				t.Amount, t.Unit = f[0], f[1]
+			}
+		case "story":
+			if f := strings.Fields(args); len(f) > 0 && t.StoryOf == "" {
+				t.StoryOf = f[0]
+			}
+		case "answer":
+			what, more, _ := strings.Cut(strings.TrimSpace(args), " ")
+			kv := parseKV(more)
+			t.Answers = append(t.Answers, Answer{What: what, Actor: kv["actor"], Clause: kv["clause"], Reason: kv["reason"], Seq: seq})
 		case "proof":
 			f := strings.Fields(args)
 			if len(f) < 2 {
@@ -422,13 +493,7 @@ func ParseTags(is *Issue) Tags {
 				v, more, _ := strings.Cut(strings.TrimSpace(args), " ")
 				st.Verdict, args = v, more
 			}
-			for _, m := range kvRe.FindAllStringSubmatch(args, -1) {
-				val := m[2]
-				if strings.HasPrefix(val, "\"") {
-					val = strings.NewReplacer("\\\"", "\"", "\\\\", "\\").Replace(val[1 : len(val)-1])
-				}
-				st.Fields[m[1]] = val
-			}
+			st.Fields = parseKV(args)
 			st.Commit, st.Actor = st.Fields["commit"], st.Fields["actor"]
 			if word == "verdict" {
 				t.Verdicts = append(t.Verdicts, st)
@@ -439,6 +504,31 @@ func ParseTags(is *Issue) Tags {
 	}
 	sort.Strings(t.IDs)
 	return t
+}
+
+// maxOptions bounds the option numbers a question line may carry.
+const maxOptions = 99
+
+// parseKV reads the key=value fields of a tag line; a quoted value is unquoted.
+func parseKV(s string) map[string]string {
+	res := map[string]string{}
+	for _, m := range kvRe.FindAllStringSubmatch(s, -1) {
+		val := m[2]
+		if strings.HasPrefix(val, "\"") {
+			val = strings.NewReplacer("\\\"", "\"", "\\\\", "\\").Replace(val[1 : len(val)-1])
+		}
+		res[m[1]] = val
+	}
+	return res
+}
+
+// Value renders a value for a key=value tag field: bare when it is one word,
+// quoted otherwise.
+func Value(s string) string {
+	if s != "" && !strings.ContainsAny(s, " \t\r\n\"\\") {
+		return s
+	}
+	return Quote(s)
 }
 
 // SessionEnv names the environment variable that holds the harness session

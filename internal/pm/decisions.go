@@ -18,7 +18,8 @@ type Decision struct {
 	Vetoable   bool
 	Confirmed  []string
 	Supersedes []string
-	By         string // the decision that supersedes it, "" while current
+	Overruled  []string // the owner answered otherwise (section 15.9)
+	By         string   // the decision that supersedes it, "" when none does
 }
 
 // Decisions reads every decision of the backlog, sorted by id, with the
@@ -32,7 +33,7 @@ func Decisions(issues []backlog.Issue) []Decision {
 			continue
 		}
 		res = append(res, Decision{ID: issues[i].ID, Title: issues[i].Title, Actor: t.DecidedBy, IDs: t.IDs,
-			Vetoable: t.Vetoable, Confirmed: t.Confirmed, Supersedes: t.Supersedes})
+			Vetoable: t.Vetoable, Confirmed: t.Confirmed, Supersedes: t.Supersedes, Overruled: t.Overruled})
 		for _, old := range t.Supersedes {
 			if by[old] == "" || issues[i].ID < by[old] {
 				by[old] = issues[i].ID
@@ -46,11 +47,12 @@ func Decisions(issues []backlog.Issue) []Decision {
 	return res
 }
 
-// CurrentDecisions keeps the decisions no other decision supersedes.
+// CurrentDecisions keeps the decisions no other decision supersedes and the
+// owner did not overrule.
 func CurrentDecisions(issues []backlog.Issue) []Decision {
 	var res []Decision
 	for _, d := range Decisions(issues) {
-		if d.By == "" {
+		if d.By == "" && len(d.Overruled) == 0 {
 			res = append(res, d)
 		}
 	}

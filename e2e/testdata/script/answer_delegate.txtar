@@ -1,0 +1,274 @@
+# an answer on the owner's behalf: accepted only within a clause of the owner's policy, which lies
+# outside the project; every refusal, the ledger of amounts, reserved topics, holds, and the
+# owner's confirmation or overruling (docs/formats.md section 15.9)
+fixture shop proj
+cd proj
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-r1 --title 'Refund order 1?' --body-file ../r1.txt --silent
+exec bd create --id shop-r2 --title 'Refund order 2?' --body-file ../r2.txt --silent
+exec bd create --id shop-r3 --title 'Refund order 3?' --body-file ../r3.txt --silent
+exec bd create --id shop-r4 --title 'Refund order 4?' --body-file ../r4.txt --silent
+exec bd create --id shop-p1 --title 'Refund order 5 through the provider?' --body-file ../p1.txt --silent
+exec bd create --id shop-n1 --title 'Name the new state' --body-file ../n1.txt --silent
+exec bd create --id shop-u1 --title 'Publish the release notes?' --body-file ../u1.txt --silent
+exec bd create --id shop-d1 --title 'Add a dependency?' --body-file ../d1.txt --silent
+exec bd create --id shop-x1 --title 'Anything?' --body-file ../x1.txt --silent
+exec bd create --id shop-c1 --title 'Refund and ship again?' --body-file ../c1.txt --silent
+exec bd create --id shop-l1 --title 'Rename and pay the fee?' --body-file ../l1.txt --silent
+exec bd create --id shop-h1 --title 'Bill support?' --body-file ../h1.txt --silent
+
+# no policy configured: only the owner answers
+exec mrun 1 answer shop-r1 --delegate --clause small-refunds --option 1 --reason 'small'
+stderr '^machinery: refused: no delegate policy: delegate.policy is not set in machinery.yaml; only the owner answers shop-r1$'
+
+# a configured policy that cannot be read, or is malformed, is a config error
+exec sh -c 'printf "delegate:\n  policy: ../owner/delegate.yaml\n" >> machinery.yaml'
+exec mrun 2 answer shop-r1 --delegate --clause small-refunds --option 1 --reason 'small'
+stderr '^config: delegate.policy ../owner/delegate.yaml: cannot read: no such file or directory$'
+mkdir ../owner
+cp ../bad-policy.yaml ../owner/delegate.yaml
+exec mrun 2 answer shop-r1 --delegate --clause small-refunds --option 1 --reason 'small'
+stderr '^config: delegate.policy ../owner/delegate.yaml: clause shout: effect must be allow, refuse or hold, got "maybe"$'
+cp ../policy.yaml ../owner/delegate.yaml
+
+# usage
+exec mrun 2 answer shop-r1 --delegate --option 1 --reason 'small'
+stderr '^usage: --delegate needs --clause$'
+exec mrun 2 answer shop-r1 --delegate --clause small-refunds --reason 'small'
+stderr '^usage: --delegate needs one of --option, --hold and --refuse$'
+exec mrun 2 answer shop-r1 --delegate --clause small-refunds --hold --refuse --reason 'small'
+stderr '^usage: --delegate needs one of --option, --hold and --refuse$'
+
+# the refusals, in order; nothing is written
+exec mrun 1 answer shop-r1 --delegate --clause nope --option 1 --reason 'small'
+stderr '^machinery: refused: clause nope is not in the delegate policy$'
+exec mrun 1 answer shop-x1 --delegate --clause naming --option 1 --reason 'why not'
+stderr '^machinery: refused: shop-x1 names no topic: a clause covers only the topics it names; answer --hold$'
+exec mrun 1 answer shop-u1 --delegate --clause naming --option 1 --reason 'looks fine'
+stderr '^machinery: refused: shop-u1 is about publish, a reserved topic, and clause naming does not name it; answer --hold$'
+exec mrun 1 answer shop-p1 --delegate --clause small-refunds --option 1 --reason 'small'
+stderr '^machinery: refused: shop-p1 is about payment, a reserved topic, and clause small-refunds does not name it; answer --hold$'
+exec mrun 1 answer shop-c1 --delegate --clause small-refunds --option 1 --reason 'small'
+stderr '^machinery: refused: clause small-refunds does not cover shipping; answer --hold$'
+exec mrun 1 answer shop-u1 --delegate --clause no-publishing --option 1 --reason 'looks fine'
+stderr '^machinery: refused: clause no-publishing has effect refuse: it does not permit --option; answer --hold$'
+exec mrun 1 answer shop-r1 --delegate --clause small-refunds --refuse --reason 'no'
+stderr '^machinery: refused: clause small-refunds has effect allow: it does not permit --refuse; answer --hold$'
+exec mrun 1 answer shop-d1 --delegate --clause wait-for-me --option 1 --reason 'needed'
+stderr '^machinery: refused: clause wait-for-me has effect hold: it does not permit --option; answer --hold$'
+exec mrun 1 answer shop-l1 --delegate --clause naming --option 1 --reason 'cheap'
+stderr '^machinery: refused: clause naming sets no limit: an answer that moves 5 EUR needs one; answer --hold$'
+exec mrun 1 answer shop-h1 --delegate --clause hourly --option 1 --reason 'cheap'
+stderr '^machinery: refused: clause hourly limits hours, the question is in EUR; answer --hold$'
+exec bd list --all --json --limit 0
+! stdout 'machinery:answer'
+
+# the ledger: answers under a clause add up exactly, up to its limit and not beyond
+exec machinery answer shop-r1 --delegate --clause small-refunds --option 1 --reason 'a duplicate charge'
+stdout '^answered: shop-r1 option 1: yes \(on the owner.s behalf, clause small-refunds\)$'
+stdout '^closed: shop-r1$'
+exec machinery answer shop-r2 --delegate --clause small-refunds --option 1 --reason 'a duplicate charge'
+exec mrun 1 answer shop-r3 --delegate --clause small-refunds --option 1 --reason 'a duplicate charge'
+stderr '^machinery: refused: 30 EUR with 80.5 EUR answered under clause small-refunds exceeds its limit of 100 EUR; answer --hold$'
+exec machinery answer shop-r4 --delegate --clause small-refunds --option 1 --reason 'a duplicate charge'
+stdout '^closed: shop-r4$'
+exec mrun 1 answer shop-r3 --delegate --clause small-refunds --option 1 --reason 'a duplicate charge'
+stderr '^machinery: refused: 30 EUR with 100 EUR answered under clause small-refunds exceeds its limit of 100 EUR; answer --hold$'
+exec mrun 2 answer shop-r1 --delegate --clause small-refunds --option 1 --reason 'again'
+stderr '^usage: shop-r1 is answered already by builder$'
+
+# a hold is always open to the delegate once the clause exists; it decides nothing
+exec machinery answer shop-r3 --delegate --clause small-refunds --hold --reason 'over the limit'
+stdout '^held: shop-r3 \(clause small-refunds\): over the limit$'
+exec machinery answer shop-d1 --delegate --clause wait-for-me --hold --reason 'a new dependency'
+exec bd show shop-r3 --json
+stdout '"status": "open"'
+stdout 'machinery:answer hold actor=builder clause=small-refunds reason=\\"over the limit\\"'
+! stdout 'machinery:decision'
+
+# a reserved topic the clause names; confirm: true leaves the item open for the owner
+exec machinery answer shop-p1 --delegate --clause refunds-confirmed --option 1 --reason 'the provider charged twice'
+stdout '^open: shop-p1 waits for the owner.s confirmation \(clause refunds-confirmed\)$'
+exec machinery answer shop-u1 --delegate --clause no-publishing --refuse --reason 'nothing is published while the owner is away'
+stdout '^answered: shop-u1 refuse \(on the owner.s behalf, clause no-publishing\)$'
+exec machinery answer shop-n1 --delegate --clause naming --option 2 --reason 'shorter'
+exec bd show shop-p1 --json
+stdout 'machinery:answer 1 actor=builder clause=refunds-confirmed reason=\\"the provider charged twice\\"\\nmachinery:decision builder\\nmachinery:vetoable'
+
+exec machinery questions
+stdout '^shop-c1  Refund and ship again\?$'
+stdout '^  waits for: the owner$'
+stdout '^shop-d1  Add a dependency\?$'
+stdout '^  waits for: the owner; held under clause wait-for-me: a new dependency$'
+stdout '^  waits for: the owner; held under clause small-refunds: over the limit$'
+stdout '^  waits for: the owner.s confirmation of option 1 under clause refunds-confirmed$'
+! stdout 'shop-r1'
+stdout '^questions: 7 open, 2 held$'
+exec machinery questions --held
+stdout '^shop-d1  '
+stdout '^shop-r3  '
+! stdout 'shop-p1'
+stdout '^questions: 2 held$'
+exec machinery status
+stdout '^questions: 7 open, 2 held$'
+
+# the answers that decided are vetoable decisions until the owner settles them
+exec machinery decisions --open-vetoes
+stdout '^shop-n1  Name the new state$'
+stdout '^shop-p1  Refund order 5 through the provider\?$'
+stdout '^shop-r1  Refund order 1\?$'
+stdout '^shop-u1  Publish the release notes\?$'
+stdout '^  by: builder, vetoable$'
+stdout '^decisions: 6 open to veto$'
+
+# only the owner the policy names gives the owner's answer
+exec mrun 1 answer shop-p1 --option 1 --reason 'yes'
+stderr '^machinery: refused: builder is not the owner the delegate policy names \(owner\); an agent answers with --delegate$'
+env BEADS_ACTOR=owner
+exec machinery answer shop-p1 --option 1 --reason 'right call'
+stdout '^answered: shop-p1 option 1: yes$'
+stdout '^confirmed: shop-p1$'
+stdout '^closed: shop-p1$'
+exec machinery answer shop-n1 --option 1 --reason 'Settled is the domain word'
+stdout '^overruled: shop-n1$'
+! stdout 'closed:'
+exec machinery decisions
+stdout '^shop-p1  Refund order 5 through the provider\?$'
+stdout '^  by: builder, vetoable, confirmed by owner$'
+! stdout 'shop-n1'
+exec machinery decisions --open-vetoes
+stdout '^decisions: 4 open to veto$'
+
+-- policy.yaml --
+version: 1
+owner: owner
+clauses:
+  - id: small-refunds
+    about: [refund]
+    effect: allow
+    limit: {amount: 100, unit: EUR}
+    note: "small refunds while I am away"
+  - id: refunds-confirmed
+    about: [refund, payment]
+    effect: allow
+    limit: {amount: 500, unit: EUR}
+    confirm: true
+    note: "refunds that touch the payment provider; I confirm each"
+  - id: naming
+    about: ["*"]
+    effect: allow
+    note: "names of things"
+  - id: no-publishing
+    about: [publish]
+    effect: refuse
+    note: "nothing is published while I am away"
+  - id: wait-for-me
+    about: [dependency]
+    effect: hold
+    note: "a new dependency waits for me"
+  - id: hourly
+    about: [support]
+    effect: allow
+    limit: {amount: 10, unit: hours}
+    note: "support time"
+-- bad-policy.yaml --
+version: 1
+owner: owner
+clauses:
+  - id: shout
+    about: [naming]
+    effect: maybe
+    note: "x"
+-- r1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about refund
+machinery:amount 30 EUR
+-- r2.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about refund
+machinery:amount 50.50 EUR
+-- r3.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about refund
+machinery:amount 30 EUR
+-- r4.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about refund
+machinery:amount 19.50 EUR
+-- p1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about payment refund
+machinery:amount 200 EUR
+-- n1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about naming
+-- u1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about publish
+-- d1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about dependency
+-- x1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+-- c1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about refund shipping
+machinery:amount 10 EUR
+-- l1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about naming
+machinery:amount 5 EUR
+-- h1.txt --
+machinery:question builder
+machinery:option 1 yes
+machinery:option 2 no
+machinery:recommend 1
+machinery:default nothing happens
+machinery:about support
+machinery:amount 3 EUR

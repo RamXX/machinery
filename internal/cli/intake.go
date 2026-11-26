@@ -189,8 +189,8 @@ func intakeState(p *project.Project, c *backlog.Client) (*pm.DesignState, []back
 	return ds, issues, nil
 }
 
-// statusIntakes prints the summary line of every open intake item, when the
-// backlog can be read (section 14).
+// statusIntakes prints the summary line of every open intake item, and the
+// count of open questions, when the backlog can be read (sections 14 and 15.9).
 func statusIntakes(e *Env, p *project.Project) {
 	if p.Cfg.Backlog == nil {
 		return
@@ -203,15 +203,14 @@ func statusIntakes(e *Env, p *project.Project) {
 	if err != nil {
 		return
 	}
-	open := pm.OpenIntakes(issues)
-	if len(open) == 0 {
-		return
+	if open := pm.OpenIntakes(issues); len(open) > 0 {
+		if ds, _, err := intakeState(p, c); err == nil {
+			for _, in := range open {
+				fmt.Fprintln(e.Stdout, ds.Assess(in, issues).Summary())
+			}
+		}
 	}
-	ds, _, err := intakeState(p, c)
-	if err != nil {
-		return
-	}
-	for _, in := range open {
-		fmt.Fprintln(e.Stdout, ds.Assess(in, issues).Summary())
+	if line := questionCount(issues); line != "" {
+		fmt.Fprintln(e.Stdout, line)
 	}
 }
