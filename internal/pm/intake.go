@@ -71,7 +71,7 @@ func OneLine(s string) string {
 }
 
 // IntakeDescription renders the description of a new intake item.
-func IntakeDescription(intent string, refuses []string, head, contract string) string {
+func IntakeDescription(intent string, refuses []string, head, contract string, me Who) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Intent:\n%s\n\nRefuses:\n", OneLine(intent))
 	if len(refuses) == 0 {
@@ -80,7 +80,7 @@ func IntakeDescription(intent string, refuses []string, head, contract string) s
 	for _, r := range refuses {
 		fmt.Fprintf(&b, "- %s\n", OneLine(r))
 	}
-	fmt.Fprintf(&b, "\nmachinery:intake\nmachinery:intake-base %s %s\n", head, contract)
+	fmt.Fprintf(&b, "\nmachinery:intake\nmachinery:intake-base %s %s actor=%s%s\n", head, contract, backlog.Value(me.Actor), me.Part())
 	return b.String()
 }
 
@@ -648,7 +648,7 @@ type IntakeResult struct {
 // ApplyIntake creates the plan's stories and edges in one backlog call, then
 // owes their ids and records the planned line (section 15.7). Nothing is
 // written when the backlog call fails.
-func ApplyIntake(c *backlog.Client, ds *DesignState, st *IntakeStatus, plan *Plan) (IntakeResult, error) {
+func ApplyIntake(c *backlog.Client, ds *DesignState, st *IntakeStatus, plan *Plan, me Who) (IntakeResult, error) {
 	res := IntakeResult{Existing: len(st.Stories)}
 	d := ds.D
 	if len(plan.Stories) > 0 {
@@ -690,7 +690,7 @@ func ApplyIntake(c *backlog.Client, ds *DesignState, st *IntakeStatus, plan *Pla
 			return res, nil
 		}
 	}
-	if err := c.Note(st.In.ID, fmt.Sprintf("machinery:intake-planned %s %s", ds.Head, ds.Contract.Hash)); err != nil {
+	if err := c.Note(st.In.ID, fmt.Sprintf("machinery:intake-planned %s %s actor=%s%s", ds.Head, ds.Contract.Hash, backlog.Value(me.Actor), me.Part())); err != nil {
 		return res, err
 	}
 	res.Planned = true

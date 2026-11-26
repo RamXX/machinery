@@ -280,6 +280,7 @@ type Tags struct {
 	Planned        []Mark   // machinery:intake-planned
 	NoDesignChange string   // machinery:no-design-change <reason>
 	Capstone       bool     // machinery:capstone
+	IntakeDesign   bool     // machinery:intake-design: the story lands the design of its intake
 	Demos          []string // machinery:demo <command>
 
 	// the records of the work (section 15.8)
@@ -289,6 +290,7 @@ type Tags struct {
 	Repairs      []string      // machinery:repair <short sha>
 	Decision     bool          // a machinery:decision line: the item is a decision
 	DecidedBy    string        // the actor of the machinery:decision line
+	Sources      []string      // machinery:decision-source <path>#<12 hex>
 	Supersedes   []string      // machinery:supersedes <decision id>
 	Vetoable     bool          // machinery:vetoable
 	Confirmed    []string      // machinery:confirmed <actor>
@@ -297,6 +299,7 @@ type Tags struct {
 	// questions for the owner (section 15.9)
 	Question  bool     // a machinery:question line: the item is a question
 	AskedBy   string   // the actor of the machinery:question line
+	AskedIn   Who      // the session and the agent of the machinery:question line
 	Options   []string // machinery:option <n> <text>, option n at index n-1
 	Recommend int      // machinery:recommend <n>
 	Default   string   // machinery:default <text>
@@ -305,6 +308,22 @@ type Tags struct {
 	Unit      string
 	StoryOf   string   // machinery:story <id>
 	Answers   []Answer // machinery:answer lines, in order
+
+	// the checker's reviews (section 15.10)
+	Reviews []Review // machinery:review lines, in order
+}
+
+// Review is a machinery:review line (section 15.10).
+type Review struct {
+	Kind     string // backlog | design | intake
+	Verdict  string // approved | rejected
+	Commit   string
+	Contract string
+	Actor    string
+	Who      Who
+	Stories  []string // the wave-1 ids of a backlog review, sorted
+	Issues   []string
+	Seq      int
 }
 
 // Answer is a machinery:answer line (section 15.9).
@@ -337,10 +356,13 @@ type Observation struct {
 }
 
 // Mark is a commit and a contract hash (machinery:intake-base and
-// machinery:intake-planned).
+// machinery:intake-planned), with the planner who wrote the line when it
+// records one.
 type Mark struct {
 	Commit   string
 	Contract string
+	Actor    string
+	Who      Who
 }
 
 // Proof is a machinery:proof line.
@@ -397,7 +419,8 @@ func ParseTags(is *Issue) Tags {
 			if len(f) < 2 {
 				continue
 			}
-			m := Mark{Commit: f[0], Contract: f[1]}
+			kv := parseKV(strings.Join(f[2:], " "))
+			m := Mark{Commit: f[0], Contract: f[1], Actor: kv["actor"], Who: Who{kv["session"], kv["agent"]}}
 			if word == "intake-planned" {
 				t.Planned = append(t.Planned, m)
 			} else if t.Base == nil {
@@ -409,6 +432,14 @@ func ParseTags(is *Issue) Tags {
 			}
 		case "capstone":
 			t.Capstone = true
+		case "intake-design":
+			t.IntakeDesign = true
+		case "decision-source":
+			if f := strings.Fields(args); len(f) > 0 {
+				t.Sources = append(t.Sources, f[0])
+			}
+		case "review":
+			t.Reviews = append(t.Reviews, parseReview(args, seq))
 		case "demo":
 			if cmd := strings.TrimSpace(args); cmd != "" {
 				t.Demos = append(t.Demos, cmd)
@@ -445,7 +476,8 @@ func ParseTags(is *Issue) Tags {
 			t.Overruled = append(t.Overruled, strings.TrimSpace(args))
 		case "question":
 			if !t.Question {
-				t.Question, t.AskedBy = true, strings.TrimSpace(args)
+				t.Question = true
+				t.AskedBy, t.AskedIn = actorAndWho(strings.Fields(args))
 			}
 		case "option":
 			num, text, _ := strings.Cut(strings.TrimSpace(args), " ")
@@ -483,18 +515,9 @@ func ParseTags(is *Issue) Tags {
 				continue
 			}
 			pr := Proof{Commit: f[0], Seq: seq}
-			for len(f) >= 3 {
-				last := f[len(f)-1]
-				if v, ok := strings.CutPrefix(last, "session="); ok && pr.Session == "" {
-					pr.Session = v
-				} else if v, ok := strings.CutPrefix(last, "agent="); ok && pr.Agent == "" {
-					pr.Agent = v
-				} else {
-					break
-				}
-				f = f[:len(f)-1]
-			}
-			pr.Actor = strings.Join(f[1:], " ")
+			var who Who
+			pr.Actor, who = actorAndWho(f[1:])
+			pr.Session, pr.Agent = who.Session, who.Agent
 			t.Proofs = append(t.Proofs, pr)
 		case "prediction", "verdict":
 			st := Stamp{Fields: map[string]string{}, Seq: seq}
@@ -513,6 +536,43 @@ func ParseTags(is *Issue) Tags {
 	}
 	sort.Strings(t.IDs)
 	return t
+}
+
+// actorAndWho reads the words of a line that end with optional session= and
+// agent= words: the words before them are the actor.
+func actorAndWho(f []string) (string, Who) {
+	var w Who
+	for len(f) >= 2 {
+		last := f[len(f)-1]
+		if v, ok := strings.CutPrefix(last, "session="); ok && w.Session == "" {
+			w.Session = v
+		} else if v, ok := strings.CutPrefix(last, "agent="); ok && w.Agent == "" {
+			w.Agent = v
+		} else {
+			break
+		}
+		f = f[:len(f)-1]
+	}
+	return strings.Join(f, " "), w
+}
+
+// parseReview reads the words after machinery:review.
+func parseReview(args string, seq int) Review {
+	kind, rest, _ := strings.Cut(strings.TrimSpace(args), " ")
+	verdict, rest, _ := strings.Cut(strings.TrimSpace(rest), " ")
+	kv := parseKV(rest)
+	r := Review{Kind: kind, Verdict: verdict, Commit: kv["commit"], Contract: kv["contract"], Actor: kv["actor"],
+		Who: Who{kv["session"], kv["agent"]}, Seq: seq}
+	if s := kv["stories"]; s != "" {
+		r.Stories = strings.Split(s, ",")
+		sort.Strings(r.Stories)
+	}
+	for n := 1; n <= 5; n++ {
+		if v, ok := kv[fmt.Sprintf("issue%d", n)]; ok {
+			r.Issues = append(r.Issues, v)
+		}
+	}
+	return r
 }
 
 // maxOptions bounds the option numbers a question line may carry.

@@ -34,6 +34,10 @@ func runIntakeNew(e *Env, args []string) int {
 	case strings.TrimSpace(*intent) == "":
 		return e.Usage("machinery intake new needs --intent")
 	}
+	who, err := backlog.WhoFromEnv()
+	if err != nil {
+		return e.Usage("%v", err)
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2
@@ -41,6 +45,9 @@ func runIntakeNew(e *Env, args []string) int {
 	c, err := backlog.New(p, "")
 	if err != nil {
 		return e.Fail(err)
+	}
+	if c.Actor == "" {
+		return e.Usage("no actor: set BEADS_ACTOR")
 	}
 	head, err := gitx.Head(p.Root)
 	if err != nil {
@@ -55,7 +62,8 @@ func runIntakeNew(e *Env, args []string) int {
 		fmt.Fprintf(e.Stderr, "machinery: uncommitted design change: %s; a requirement starts from a committed design\n", strings.Join(u, ", "))
 		return 1
 	}
-	desc := pm.IntakeDescription(*intent, refuses, head, pm.ContractOf(d).Hash)
+	me := pm.Who{Actor: c.Actor, Session: who.Session, Agent: who.Agent}
+	desc := pm.IntakeDescription(*intent, refuses, head, pm.ContractOf(d).Hash, me)
 	id, err := c.Create(pm.OneLine(pos[0]), "feature", desc, *parent, []string{pm.IntakeLabel})
 	if err != nil {
 		return e.Fail(err)
@@ -125,6 +133,24 @@ func runIntakePlan(e *Env, args []string) int {
 	if probs := ds.D.OwedProblems; len(probs) > 0 {
 		return e.Fail(fmt.Errorf("%s", probs[0]))
 	}
+	var me pm.Who
+	if *apply {
+		who, err := backlog.WhoFromEnv()
+		if err != nil {
+			return e.Usage("%v", err)
+		}
+		me = pm.Who{Actor: c.Actor, Session: who.Session, Agent: who.Agent}
+		if p.Cfg.ReviewOn(pm.ReviewDesign) && in.Tags.Base != nil && in.Tags.Base.Contract != ds.Contract.Hash {
+			refusal, warns := pm.DesignReviewGate(in, ds.Contract, me)
+			if refusal != "" {
+				fmt.Fprintf(e.Stderr, "machinery: cannot plan intake %s: %s\n", in.ID, refusal)
+				return 1
+			}
+			for _, w := range warns {
+				fmt.Fprintf(e.Stdout, "warn: %s\n", w)
+			}
+		}
+	}
 	plan := st.Plan(ds.D)
 	if line := pm.LearningsReminder(p.Root, issues); line != "" {
 		fmt.Fprintln(e.Stdout, line)
@@ -139,7 +165,7 @@ func runIntakePlan(e *Env, args []string) int {
 		plan.Markdown(e.Stdout)
 		return 0
 	}
-	res, err := pm.ApplyIntake(c, ds, st, plan)
+	res, err := pm.ApplyIntake(c, ds, st, plan, me)
 	if err != nil {
 		return e.Fail(err)
 	}
@@ -209,6 +235,9 @@ func statusIntakes(e *Env, p *project.Project) {
 				fmt.Fprintln(e.Stdout, ds.Assess(in, issues).Summary())
 			}
 		}
+	}
+	for _, line := range pm.ReviewStatus(issues) {
+		fmt.Fprintln(e.Stdout, line)
 	}
 	if line := questionCount(issues); line != "" {
 		fmt.Fprintln(e.Stdout, line)

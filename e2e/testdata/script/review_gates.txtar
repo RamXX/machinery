@@ -1,0 +1,147 @@
+# the review gates: waves --freeze waits for an approved backlog review, intake plan --apply for a design review (sections 15.4, 15.7, 15.10)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a --title 'Prove order pay' --body-file a.txt --silent
+
+# backlog.tool set and no review key: both reviews are required
+exec machinery config
+stdout '^review:\n  backlog: required\n  design: required$'
+
+# no review: the freeze refuses with the finding in the waves stage, and writes nothing
+exec mrun 1 waves --freeze
+stdout '^checked: 1 stories, 0 edges, 1 waves, 0 reviews$'
+stdout '^  ERROR  no approved review of this backlog at [0-9a-f]{12}: the checker runs machinery review backlog$'
+stderr '^machinery: cannot freeze: stage waves does not pass$'
+! exists .git/machinery/wave.json
+exec machinery waves
+stdout '^passed$'
+! stdout 'review'
+
+# a rejected review does not open it
+exec machinery review backlog --verdict rejected --issue 'walking skeleton: wave 1: no story crosses the api' --actor checker
+exec mrun 1 waves --freeze
+stdout '^checked: 1 stories, 0 edges, 1 waves, 1 reviews$'
+stdout 'ERROR  no approved review of this backlog at'
+
+# an approved one does, from another context than the one that freezes
+exec machinery review backlog --verdict approved --actor checker
+exec machinery waves --freeze
+stdout '^  warn   no session recorded for the review and the plan: independence rests on the actor name$'
+stdout '^passed$'
+stdout '^wave: frozen [0-9a-f]{12} at [0-9a-f]{7}, 1 stories$'
+exec machinery waves --thaw
+
+# the approval is for one set of wave-1 stories: a new story in wave 1 needs a new review
+exec bd create --id shop-b --title 'Prove order ship' --body-file b.txt --silent
+exec mrun 1 waves --freeze
+stdout 'ERROR  no approved review of this backlog at'
+exec machinery review backlog --verdict approved --actor checker
+exec machinery waves --freeze
+stdout '^wave: frozen [0-9a-f]{12} at [0-9a-f]{7}, 2 stories$'
+exec machinery waves --thaw
+
+# and for one contract: a design change needs a new review
+exec sed -i.bak 's/Order lifecycle/The order lifecycle/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: a comment'
+exec mrun 1 waves --freeze
+stdout 'ERROR  no approved review of this backlog at'
+
+# a rejection after an approval withdraws it
+exec machinery review backlog --verdict approved --actor checker
+exec machinery review backlog --verdict rejected --issue 'shared premise: payment: unsettled' --actor checker
+exec mrun 1 waves --freeze
+stdout 'ERROR  no approved review of this backlog at'
+
+# a review from the context that freezes is the planner's
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=backlog-checker
+exec machinery review backlog --verdict approved --actor checker
+exec mrun 1 waves --freeze
+stdout '^  ERROR  the review of this backlog at [0-9a-f]{12} is the planner.s: same session s1 and agent backlog-checker; the checker reviews in a fresh context$'
+env MACHINERY_AGENT=pm
+exec machinery waves --freeze
+! stdout 'warn'
+stdout '^wave: frozen'
+exec machinery waves --thaw
+env MACHINERY_SESSION= MACHINERY_AGENT=
+
+# review.backlog off: the freeze does not wait
+cp machinery.yaml machinery.on
+exec sh -c 'printf "review:\n  backlog: off\n" >> machinery.yaml'
+exec machinery config
+stdout '^review:\n  backlog: "?off"?\n  design: required$'
+exec bd create --id shop-c --title 'Prove the terminal invariant' --body-file c.txt --silent
+exec machinery waves --freeze
+stdout '^checked: 3 stories, 0 edges, 1 waves$'
+stdout '^wave: frozen'
+exec machinery waves --thaw
+cp machinery.on machinery.yaml
+
+# a value outside the two is a config error
+exec sh -c 'printf "review:\n  design: maybe\n" >> machinery.yaml'
+exec mrun 2 waves
+stderr '^config: review.design must be required or off, got "maybe"$'
+cp machinery.on machinery.yaml
+
+# intake plan --apply waits for an approved design review of an intake that changed the design
+exec machinery intake new 'Word the lifecycle' --intent 'The machine says what an order is'
+exec sed -i.bak 's/The order lifecycle/The lifecycle of an order/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: word the lifecycle'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle")'
+stdout '^## Demonstrate: Word the lifecycle$'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(sid "Word the lifecycle") --apply'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: no approved design review of shop-[a-z0-9]+ at [0-9a-f]{12}: the checker runs machinery review design shop-[a-z0-9]+$'
+! stdout .
+exec sh -c '. ./lib.sh; machinery review design $(sid "Word the lifecycle") --verdict rejected --issue "omission: the intent: nothing names an order" --actor checker'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(sid "Word the lifecycle") --apply'
+stderr 'no approved design review of'
+exec sh -c '. ./lib.sh; bd show $(sid "Word the lifecycle") --json | grep -c intake-planned || true'
+stdout '^0$'
+
+# a review by the context that applies the plan is the planner's
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(sid "Word the lifecycle") --verdict approved --actor checker'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(sid "Word the lifecycle") --apply'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: the design review of shop-[a-z0-9]+ at [0-9a-f]{12} is the planner.s: same session s1 and agent design-checker; the checker reviews in a fresh context$'
+env MACHINERY_AGENT=pm
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") --apply'
+! stdout 'warn'
+stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
+exec sh -c '. ./lib.sh; bd show $(sid "Word the lifecycle") --json'
+stdout 'machinery:intake-planned [0-9a-f]{40} [0-9a-f]{64} actor=builder session=s1 agent=pm"'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+
+# an intake the design already covers needs no design review; nor does any with review.design off
+exec machinery intake new 'Cancel an unpaid order' --intent 'A Customer cancels a pending order'
+exec sh -c '. ./lib.sh; bd update $(sid "Cancel an unpaid order") --append-notes "machinery:no-design-change cancel is designed"'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Cancel an unpaid order") --apply'
+stdout '^intake shop-[a-z0-9]+: planned at'
+exec machinery intake new 'Word it again' --intent 'The machine says it plainly'
+exec sed -i.bak 's/The lifecycle of an order/An order, from placed to done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: word it again'
+exec sh -c 'printf "review:\n  design: off\n" >> machinery.yaml'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word it again") --apply'
+stdout '^intake shop-[a-z0-9]+: planned at'
+
+-- a.txt --
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**
+-- b.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**
+-- c.txt --
+machinery:ids inv:terminal-is-final
+machinery:scope internal/other/**
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}

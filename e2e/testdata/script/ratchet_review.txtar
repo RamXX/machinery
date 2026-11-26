@@ -1,0 +1,35 @@
+# ratchet: a review gate the base required is reported when it is off now (section 11.3)
+fixture shop
+exec machinery gen
+gitinit
+
+# a base without a backlog required no review: adopting with the reviews off reports nothing
+exec git tag nobacklog
+exec sh -c 'printf "backlog:\n  tool: bd\nreview:\n  backlog: off\n  design: off\n" >> machinery.yaml'
+exec machinery check --stage ratchet --base nobacklog
+! stdout 'review switched off'
+stdout '^passed$'
+gitcommit 'adopt the backlog with the reviews off'
+
+# a base that required them by default: switching one off is reported, not refused
+exec git tag reviewsoff
+cp machinery.yaml machinery.off
+exec sh -c 'grep -v "^review:\|^  backlog: off\|^  design: off" machinery.off > machinery.yaml'
+gitcommit 'reviews on by default'
+exec git tag reviewson
+cp machinery.off machinery.yaml
+exec machinery check --stage ratchet --base reviewson
+stdout '^  warn   ratchet: review switched off: review.backlog was required at reviewson and is off now$'
+stdout '^  warn   ratchet: review switched off: review.design was required at reviewson and is off now$'
+stdout '^passed$'
+
+# one of them back on: only the other is reported
+exec sh -c 'grep -v "^  backlog: off" machinery.off > machinery.yaml'
+exec machinery check --stage ratchet --base reviewson
+! stdout 'review.backlog'
+stdout '^  warn   ratchet: review switched off: review.design was required at reviewson and is off now$'
+
+# against a base that had them off, nothing to report
+cp machinery.off machinery.yaml
+exec machinery check --stage ratchet --base reviewsoff
+! stdout 'review switched off'

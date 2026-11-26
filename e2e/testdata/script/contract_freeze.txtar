@@ -113,6 +113,8 @@ waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
 backlog:
   tool: bd
+review:
+  backlog: off
 routing:
   routine: "small model, one pass"
 -- risk.yaml --

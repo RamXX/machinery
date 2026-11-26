@@ -65,9 +65,11 @@ still needs a verifier in a fresh context.
 1. Planner: record the requirement (`machinery intake new`), choose the tiers.
 2. Modeler: change the model, the machines, the failure modes, the risk file and the formal model of
    a critical area; `machinery lint`, `machinery gen`; commit the design alone.
-3. Checker: design review against the requirement (omission, invention, contradiction).
+3. Checker: design review against the requirement (omission, invention, contradiction), recorded
+   with `machinery review design <id> --verdict approved|rejected`.
 4. Planner: `machinery intake plan <id> --apply` writes every story and the capstone at once. Review
-   the backlog; the checker reviews it; then `machinery waves --freeze` and one brief per worker.
+   the backlog; the checker reviews it (`machinery review backlog`); then `machinery waves --freeze`
+   and one brief per worker.
 5. Builder: see the end-to-end check fail, make it pass, `machinery verify --story <id>`, then
    `machinery proof --story <id> --post` with limits, learnings and observations.
 6. Verifier, for a consequential, critical or vital story: `machinery predict`, read the proof,

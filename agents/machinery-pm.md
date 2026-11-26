@@ -27,10 +27,11 @@ what waits for the owner. Follow their output: it is current, and this file is n
 ## Gates the tool holds
 
 - A requirement enters with `machinery intake new "<title>" --intent "..." --refuses "..."`.
-  `machinery intake plan <id> --apply` refuses until the design step is whole and committed, and
-  while a wave is frozen; then it creates every story and the capstone in one call.
-- `machinery waves --freeze` refuses on a cycle, competing writers or a story without ids. While
-  frozen, a design change fails stage `contract`: it lands alone, as its own intake.
+  `machinery intake plan <id> --apply` refuses until the design step is whole and committed and
+  the checker approved it, and while a wave is frozen; then it creates every story in one call.
+- `machinery waves --freeze` refuses on a cycle, competing writers, a story without ids, or with no
+  approved `machinery review backlog` for this contract and wave 1. While frozen, a design change
+  fails stage `contract`: it lands alone, as its own intake.
   `machinery waves --thaw` when the wave has landed.
 - `machinery accept` holds the tier gate: a verifier who is not the builder, prediction before
   verdict.
@@ -48,7 +49,7 @@ what waits for the owner. Follow their output: it is current, and this file is n
 - Review your own backlog before dispatch. The first wave is a walking skeleton through every layer,
   so integration fails on day one and not at landing. Each story is a vertical slice observed
   through the real interface; a layer story has nothing to observe. Each intake has its capstone.
-  Then call the checker: before every freeze, and after every design change.
+  Then call the checker, in a fresh context: before every freeze, and after every design change.
 - One worker per story, in its own worktree, given `machinery brief <story>` and nothing else, on
   the class its `route:` line names, with the `MACHINERY_AGENT` of its `agent:` line. Context pasted
   into a brief carries your assumptions past the verifier.

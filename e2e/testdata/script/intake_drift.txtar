@@ -130,6 +130,8 @@ waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
 backlog:
   tool: bd
+review:
+  design: off
 -- lib.sh --
 # sid <title>: the id of the item with that title
 sid() {

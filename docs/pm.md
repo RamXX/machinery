@@ -57,13 +57,15 @@ machinery intake new "<title>" --intent "<who needs what, and what is observed>"
 # change the design: model, machines, failure modes, tiers, a formal spec for a critical area
 machinery lint                      # then machinery gen, and commit the design change
 machinery intake status <id>        # each step done or missing, with the reason
+machinery review design <id> --verdict approved   # the checker, in a fresh context
 machinery intake plan <id>          # the stories it would create
 machinery intake plan <id> --apply  # all of them in one backlog call, owed, with the capstone
 ```
 
 - `intake plan` refuses until the design changed, lints, is generated and committed, has its
-  tiers, and every critical area it touches has a formal spec. It refuses while a wave is
-  frozen: a contract change lands alone.
+  tiers, and every critical area it touches has a formal spec. `--apply` also waits for the
+  checker's approved design review of the change (`review.design` in `machinery.yaml`). It
+  refuses while a wave is frozen: a contract change lands alone.
 - The capstone, `Demonstrate: <title>`, closes last. It shows the intent and each refusal on
   the running system through its real interface, records the commands as `machinery:demo`
   lines, and is accepted by a fresh verifier.
@@ -91,6 +93,7 @@ the area's formal model; a failure-mode story needs the invoke path it is induce
 
 ```
 machinery waves                # layers of the graph: one wave runs in parallel
+machinery review backlog --verdict approved   # the checker, in a fresh context
 machinery waves --freeze       # pin the contract for the wave
 machinery brief <story>        # what one worker needs, as pointers
 machinery waves --thaw         # when the wave has landed
@@ -122,7 +125,11 @@ The checker answers pass or fail with at most five issues, each with its general
 fix the class, not the instance, and ask again. It is also called after every design change,
 before `machinery intake plan <id> --apply`, to read the change against its requirement for
 omission, invention and contradiction; and periodically for drift, with `machinery assess` on the
-project itself. No command records a review: the planner holds itself to it.
+project itself. The checker records each review with `machinery review`: `waves --freeze` waits
+for an approved backlog review for the contract and the first wave, and `intake plan --apply` for
+an approved design review, each from another session and agent than the planner's
+(`review.backlog` and `review.design` in `machinery.yaml`; an adopted project may switch them
+off, and the ratchet reports it).
 
 ## Accepting a story
 

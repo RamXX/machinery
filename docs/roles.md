@@ -13,7 +13,7 @@ are judgment. The contract is `docs/formats.md`, sections 15, 21 and 23.
 | Modeler | `agents/machinery-modeler.md` | A design that states the requirement, all of it and no more. | Design sources: model, machines, failure modes, the risk and status files, formal models. | Code, tests, stories. |
 | Builder | `agents/machinery-builder.md` | The ids of one story observed on the real system. | Code and end-to-end tests in the story's scope, in one worktree; its proof. | The design, generated files, other stories' paths. |
 | Verifier | `agents/machinery-verifier.md` | A verdict from its own observation. | Its prediction and its verdict. | Anything else. It did not build the story. |
-| Checker | `agents/machinery-checker.md` | Pass or fail on a backlog, a design change, or drift. | Nothing: it returns its answer to the caller. | Fixes. |
+| Checker | `agents/machinery-checker.md` | Pass or fail on a backlog, a design change, or drift. | Its review, with `machinery review`. | Fixes. |
 | Delegate | `agents/machinery-delegate.md` | The owner's written answer to a question, or a hold. | An answer under a clause of the owner's policy. | Building, verifying, planning; the policy file. |
 
 The delegate is experimental. The owner has not settled the concept, the policy file is the owner's
@@ -23,11 +23,11 @@ and lies outside the project, and section 15.9 may change in any release.
 
 | Role | Held by the tool | Not held: rests on the role |
 |---|---|---|
-| Planner | The order of intake: `machinery intake plan` refuses before the design is changed, sound, generated, tiered and modeled, and while a wave is frozen; it creates the stories and the capstone whole or not at all. `machinery waves` fails on a cycle, competing writers and a story without ids. A failed `machinery landing` marks the branch red. The ratchet reports a lowered tier. | That it wrote no code. That the backlog was reviewed. That the learnings were read (`intake plan` only reminds). That the stories are vertical slices. |
+| Planner | The order of intake: `machinery intake plan` refuses before the design is changed, sound, generated, tiered and modeled, and while a wave is frozen; it creates the stories and the capstone whole or not at all. `machinery waves` fails on a cycle, competing writers and a story without ids. `--freeze` waits for an approved backlog review and `intake plan --apply` for a design review, each from another context. A failed `machinery landing` marks the branch red. The ratchet reports a lowered tier and a review switched off. | That it wrote no code. That it reviewed its own backlog first. That the learnings were read (`intake plan` only reminds). That the stories are vertical slices. |
 | Modeler | `machinery lint`, stage `gen-drift`, stage `formal` (reach predicates, mutations, baseline, sync), stage `risk`, and the ratchet on a vital area that states less. | That the design says what the requirement asked. This is the checker's design review. |
 | Builder | Stages `tests`, `trace` and `arch`; stage `contract` on a design source changed during a frozen wave; `machinery verify` on evidence at the commit; the tier gate of `machinery story`; the commit and push hooks. | That it stayed inside its scope: a scope is read only to find competing writers. That it left the design alone when no wave is frozen. That it posted what it saw. |
 | Verifier | A prediction for the commit before the verdict, by an actor who posted no proof for it, and not from the builder's session and agent (`docs/hooks.md`). | What it read before predicting. That it made the observation. |
-| Checker | Nothing. No command records a review and no gate waits for one. | The whole review. |
+| Checker | Its verdict, once recorded with `machinery review`: a rejection names one to five issues, each with its rule and scope, and a review from the planner's session and agent is refused. | What it read, what it missed, and whether each issue names its whole class. |
 | Delegate | Every condition of the clause: topics, reserved topics, effect, limit, the sum of earlier amounts. The answer is a vetoable decision. | Who calls `machinery answer --delegate`: any agent can. That a hold was preferred in doubt. |
 
 A cell in the right column is where a run can drift without a finding. The rules below cover those
@@ -35,11 +35,14 @@ cells.
 
 ## When the checker is called
 
-At set points, by the planner, each time in a fresh context:
+At set points, by the planner, each time in a fresh context, and each review is recorded with
+`machinery review` (`docs/formats.md` section 15.10):
 
-- before a wave is dispatched, on the backlog (before `machinery waves --freeze`);
-- after a design change, on the change against its requirement (before
-  `machinery intake plan <id> --apply`);
+- before a wave is dispatched, on the backlog: `machinery review backlog`, which
+  `machinery waves --freeze` waits for;
+- after a design change, on the change against its requirement: `machinery review design <id>`,
+  which `machinery intake plan <id> --apply` waits for; after the plan, on its stories:
+  `machinery review intake <id>`;
 - periodically, on drift: `machinery assess` on the project itself, with backlog, design and code
   compared. After a landing, and before a release, are the natural moments.
 

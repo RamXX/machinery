@@ -1,7 +1,7 @@
 # intake plan --apply is whole or nothing: when the backlog call fails, owed.yaml and the backlog are unchanged;
 # a later design change gets stories only for its new ids (section 15.7)
 fixture shop
-exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec sh -c 'printf "backlog:\n  tool: bd\nreview:\n  design: off\n" >> machinery.yaml'
 exec machinery gen
 gitinit
 exec bd init --stealth --non-interactive -p shop
@@ -83,6 +83,8 @@ waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
 backlog:
   tool: bd
+review:
+  design: off
 -- lib.sh --
 # sid <title>: the id of the item with that title
 sid() {

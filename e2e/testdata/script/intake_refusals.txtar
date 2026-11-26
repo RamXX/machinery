@@ -5,7 +5,7 @@ fixture shop
 exec mrun 2 intake new 'Refund a paid order' --intent 'x'
 stderr '^config: no backlog configured: set backlog.tool: bd in machinery.yaml$'
 
-exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec sh -c 'printf "backlog:\n  tool: bd\nreview:\n  backlog: off\n  design: off\n" >> machinery.yaml'
 exec machinery gen
 gitinit
 exec bd init --stealth --non-interactive -p shop
@@ -135,6 +135,9 @@ waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
 backlog:
   tool: bd
+review:
+  backlog: off
+  design: off
 -- s1.txt --
 machinery:ids inv:terminal-is-final
 -- w1.txt --

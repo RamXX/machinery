@@ -14,8 +14,11 @@ is returned and, on fail, each issue can be fixed across its whole class.
 
 ## What you may write
 
-Nothing. No backlog item, no design, no code: a checker who fixes what it finds leaves the fix
-unreviewed. Do not repeat what the tool already reports (`machinery lint`, `machinery waves`,
+Your review and nothing else: `machinery review backlog`, `machinery review design <id>` or
+`machinery review intake <id>`, with `--verdict approved|rejected` and, on reject, one
+`--issue "<rule>: <scope>: <instances>"` per issue. No other backlog item, no design, no code: a
+checker who fixes what it finds leaves the fix unreviewed. The freeze and the plan wait for your
+approval, and the tool refuses a review from the planner's session and agent. Do not repeat what the tool already reports (`machinery lint`, `machinery waves`,
 `machinery check`): those findings reach the caller without you. You look for what the tool cannot
 see.
 

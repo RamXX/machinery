@@ -12,7 +12,7 @@ stdout '^shop-[a-z0-9]+$'
 exec sh -c '. ./lib.sh; bd show $(iid) --json'
 stdout '"issue_type": "feature"'
 stdout '"machinery-intake"'
-stdout '"description": "Intent:\\nA Clerk refunds a paid order: it ends Cancelled and the payment is returned\\n\\nRefuses:\\n- a refund of an order that is not paid\\n\\nmachinery:intake\\nmachinery:intake-base [0-9a-f]{40} [0-9a-f]{64}\\n"'
+stdout '"description": "Intent:\\nA Clerk refunds a paid order: it ends Cancelled and the payment is returned\\n\\nRefuses:\\n- a refund of an order that is not paid\\n\\nmachinery:intake\\nmachinery:intake-base [0-9a-f]{40} [0-9a-f]{64} actor=builder\\n"'
 exec sh -c '. ./lib.sh; bd show $(iid) --json | grep -c "intake-base $(git rev-parse HEAD) "'
 stdout '^1$'
 
@@ -84,8 +84,17 @@ cmp stdout want-plan.md
 exec git status --short
 ! stdout .
 
+# --apply waits for the checker's design review of the change, from another context
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(iid) --apply'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: no approved design review of shop-[a-z0-9]+ at [0-9a-f]{12}: the checker runs machinery review design shop-[a-z0-9]+$'
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(iid) --verdict approved --actor checker'
+stdout '^review: design shop-[a-z0-9]+ approved at [0-9a-f]{12} on shop-[a-z0-9]+$'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+
 # --apply: every story and edge in one backlog call, under the intake; then the owed list
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
+stdout '^warn: no session recorded for the plan: independence rests on the actor name$'
 stdout '^plan: 3 created, 0 existing, 2 edge\(s\)$'
 stdout '^owed: 3 added$'
 stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'

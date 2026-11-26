@@ -67,6 +67,13 @@ func runWaves(e *Env, args []string) int {
 		}
 		return w.Print(e.Stdout)
 	}
+	if p.Cfg.ReviewOn(pm.ReviewBacklog) {
+		who, err := backlog.WhoFromEnv()
+		if err != nil {
+			return e.Usage("%v", err)
+		}
+		pm.HoldBacklogReview(w.Stage, issues, w.Contract, w.Wave1(), pm.Who{Actor: c.Actor, Session: who.Session, Agent: who.Agent})
+	}
 	return freezeWave(e, ctx, d, w, *asJSON)
 }
 

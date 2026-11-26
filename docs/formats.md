@@ -2667,11 +2667,12 @@ verifier is with the builder (section 15.6):
 | The same session, both record an agent, the agents equal | One context: `same session <session> and agent <agent>`. |
 | The same session, both record an agent, the agents differ | Two contexts: no finding. |
 | The same session, an agent missing, the same actor | One context: `same actor <actor> in session <session>, and no agent tells them apart`. |
-| The same session, an agent missing, other actors | `warn: reviewer and planner share session <session> and no agent is recorded for <the review|the plan>: independence rests on the actor name` |
+| The same session, an agent missing, other actors | `warn: reviewer and planner share session <session> and no agent is recorded for <which>: independence rests on the actor name` |
 | A session missing, the same actor | One context: `same actor <actor>, and no session tells them apart`. |
-| A session missing, other actors | `warn: no session recorded for <the review|the plan>: independence rests on the actor name` |
+| A session missing, other actors | `warn: no session recorded for <which>: independence rests on the actor name` |
 
-One context refuses, exit 1, nothing written:
+`<which>` is `the review`, `the plan` or `the review and the plan`, whichever lacks it. One context
+refuses, exit 1, nothing written:
 `machinery: refused: the reviewer is the planner: <reason>; the checker reviews in a fresh context`.
 `waves --freeze` and `intake plan --apply` compare the review they wait for in the same way with
 the context that runs them, the planner's.

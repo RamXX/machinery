@@ -1,6 +1,6 @@
 # intake without a design change: a requirement the design covers, a rewording; only the capstone is planned (section 15.7)
 fixture shop
-exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec sh -c 'printf "backlog:\n  tool: bd\nreview:\n  design: off\n" >> machinery.yaml'
 exec machinery gen
 gitinit
 exec bd init --stealth --non-interactive -p shop

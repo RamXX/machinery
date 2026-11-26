@@ -1,0 +1,126 @@
+# review: the checker records its review as a tag line, on the intake item or on the review item (section 15.10)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a --title 'Prove order pay' --body-file a.txt --silent
+
+# usage errors, before anything is written
+exec mrun 2 review
+stderr '^usage: machinery review takes backlog, design <intake id> or intake <intake id>$'
+exec mrun 2 review design
+stderr '^usage: machinery review takes backlog, design <intake id> or intake <intake id>$'
+exec mrun 2 review backlog shop-a
+stderr '^usage: machinery review takes backlog, design <intake id> or intake <intake id>$'
+exec mrun 2 review backlog
+stderr '^usage: machinery review needs --verdict approved\|rejected$'
+exec mrun 2 review backlog --verdict maybe
+stderr '^usage: machinery review needs --verdict approved\|rejected$'
+exec mrun 2 review backlog --verdict approved --issue 'slices: wave 1: shop-a'
+stderr '^usage: an approved review takes no --issue$'
+exec mrun 2 review backlog --verdict rejected
+stderr '^usage: a rejected review needs one to five --issue "<rule>: <scope>: <instances>"$'
+exec mrun 2 review backlog --verdict rejected --issue 'a: 1' --issue 'b: 2' --issue 'c: 3' --issue 'd: 4' --issue 'e: 5' --issue 'f: 6'
+stderr '^usage: a rejected review needs one to five --issue "<rule>: <scope>: <instances>"$'
+exec mrun 2 review backlog --verdict rejected --issue 'vertical slices'
+stderr '^usage: --issue "vertical slices": an issue names its rule and its scope: "<rule>: <scope>: <instances>"$'
+exec mrun 2 review backlog --verdict rejected --issue ': wave 1: shop-a'
+stderr '^usage: --issue ": wave 1: shop-a": an issue names its rule and its scope'
+exec mrun 2 review design shop-a --verdict approved --actor checker
+stderr '^usage: shop-a is not an intake item: it has no machinery:intake line$'
+exec mrun 2 review design shop-zzz --verdict approved --actor checker
+stderr '^usage: no story shop-zzz in the backlog'
+env MACHINERY_AGENT='two words'
+exec mrun 2 review backlog --verdict approved --actor checker
+stderr '^usage: MACHINERY_AGENT must be one word, got "two words"$'
+env MACHINERY_AGENT=
+exec sh -c 'bd list --all --json --limit 0 | grep -c "machinery:review" || true'
+stdout '^0$'
+
+# a backlog review goes on a review item that review creates and closes: a record, never work
+exec machinery review backlog --verdict rejected --issue 'every story is a vertical slice: wave 1: shop-a observes nothing' --issue 'each refusal has a story: the intakes: none' --actor checker
+stdout '^review: backlog rejected at [0-9a-f]{12} on shop-[a-z0-9]+$'
+! stdout 'warn'
+exec sh -c '. ./lib.sh; bd show $(sid "Reviews of the backlog") --json'
+stdout '"status": "closed"'
+stdout '"machinery-review"'
+stdout '"issue_type": "task"'
+stdout '"description": "Reviews of the backlog by the checker, one machinery:review line each.\\n"'
+stdout '"notes": "machinery:review backlog rejected commit=[0-9a-f]{40} contract=[0-9a-f]{64} actor=checker stories=shop-a issue1=\\"every story is a vertical slice: wave 1: shop-a observes nothing\\" issue2=\\"each refusal has a story: the intakes: none\\""'
+exec sh -c '. ./lib.sh; bd show $(sid "Reviews of the backlog") --json | grep -c "commit=$(git rev-parse HEAD) contract=$(machinery waves --json | sed -n "s/^  \"contract\": \"\([0-9a-f]*\)\",/\1/p") "'
+stdout '^1$'
+exec machinery status
+stdout '^review backlog: rejected at [0-9a-f]{12} by checker, 2 issue\(s\)$'
+
+# the next one goes on the same item, with the session and the agent; status shows the latest
+env MACHINERY_SESSION=s9 MACHINERY_AGENT=backlog-checker
+exec machinery review backlog --verdict approved --actor checker
+stdout '^review: backlog approved at [0-9a-f]{12} on shop-[a-z0-9]+$'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"title\": \"Reviews of the backlog\""'
+stdout '^1$'
+exec sh -c '. ./lib.sh; bd show $(sid "Reviews of the backlog") --json'
+stdout 'machinery:review backlog approved commit=[0-9a-f]{40} contract=[0-9a-f]{64} actor=checker session=s9 agent=backlog-checker stories=shop-a"'
+exec machinery status
+stdout '^review backlog: approved at [0-9a-f]{12} by checker$'
+exec machinery waves
+stdout '^checked: 1 stories, 0 edges, 1 waves$'
+
+# design and intake reviews go on the intake item; the planner is the actor of its planning lines
+exec machinery intake new 'Refund a paid order' --intent 'A Clerk refunds a paid order'
+exec sh -c '. ./lib.sh; bd show $(sid "Refund a paid order") --json'
+stdout 'machinery:intake-base [0-9a-f]{40} [0-9a-f]{64} actor=builder\\n"'
+exec sh -c '. ./lib.sh; mrun 1 review design $(sid "Refund a paid order") --verdict approved'
+stderr '^machinery: refused: the reviewer is the planner: same actor builder, and no session tells them apart; the checker reviews in a fresh context$'
+! stdout .
+exec sh -c '. ./lib.sh; machinery review design $(sid "Refund a paid order") --verdict approved --actor checker'
+stdout '^warn: no session recorded for the review and the plan: independence rests on the actor name$'
+stdout '^review: design shop-[a-z0-9]+ approved at [0-9a-f]{12} on shop-[a-z0-9]+$'
+exec sh -c '. ./lib.sh; machinery review intake $(sid "Refund a paid order") --verdict rejected --issue "each refusal has a story: the intake: no refusal listed" --actor checker'
+stdout '^review: intake shop-[a-z0-9]+ rejected at [0-9a-f]{12} on shop-[a-z0-9]+$'
+exec sh -c '. ./lib.sh; bd show $(sid "Refund a paid order") --json'
+stdout 'machinery:review design approved commit=[0-9a-f]{40} contract=[0-9a-f]{64} actor=checker\\nmachinery:review intake rejected commit=[0-9a-f]{40} contract=[0-9a-f]{64} actor=checker issue1=\\"each refusal has a story: the intake: no refusal listed\\""'
+! stdout 'stories='
+exec machinery status
+stdout '^review backlog: approved at [0-9a-f]{12} by checker\nreview design shop-[a-z0-9]+: approved at [0-9a-f]{12} by checker\nreview intake shop-[a-z0-9]+: rejected at [0-9a-f]{12} by checker, 1 issue\(s\)$'
+
+# sessions and agents tell contexts apart, as for the verifier
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=pm
+exec machinery intake new 'Ship a paid order' --intent 'A Clerk ships a paid order'
+exec sh -c '. ./lib.sh; bd show $(sid "Ship a paid order") --json'
+stdout 'machinery:intake-base [0-9a-f]{40} [0-9a-f]{64} actor=builder session=s1 agent=pm\\n"'
+exec sh -c '. ./lib.sh; mrun 1 review design $(sid "Ship a paid order") --verdict approved --actor checker'
+stderr '^machinery: refused: the reviewer is the planner: same session s1 and agent pm; the checker reviews in a fresh context$'
+env MACHINERY_AGENT=
+exec sh -c '. ./lib.sh; mrun 1 review design $(sid "Ship a paid order") --verdict approved'
+stderr '^machinery: refused: the reviewer is the planner: same actor builder in session s1, and no agent tells them apart; the checker reviews in a fresh context$'
+exec sh -c '. ./lib.sh; machinery review design $(sid "Ship a paid order") --verdict approved --actor checker'
+stdout '^warn: reviewer and planner share session s1 and no agent is recorded for the review: independence rests on the actor name$'
+env MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(sid "Ship a paid order") --verdict approved'
+! stdout 'warn'
+stdout '^review: design shop-[a-z0-9]+ approved'
+env MACHINERY_SESSION=s2 MACHINERY_AGENT=pm
+exec sh -c '. ./lib.sh; machinery review design $(sid "Ship a paid order") --verdict approved'
+! stdout 'warn'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+
+# a backlog review is compared with the planners of the intakes that have a story in wave 1
+exec sh -c '. ./lib.sh; bd create --title "Prove order refund" --body-file b.txt --parent $(sid "Refund a paid order") --silent'
+exec mrun 1 review backlog --verdict approved
+stderr '^machinery: refused: the reviewer is the planner: same actor builder, and no session tells them apart; the checker reviews in a fresh context$'
+exec machinery review backlog --verdict approved --actor checker
+stdout '^warn: no session recorded for the review and the plan: independence rests on the actor name$'
+
+-- a.txt --
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**
+-- b.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}

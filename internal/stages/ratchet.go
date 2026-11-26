@@ -90,6 +90,13 @@ func Ratchet(ctx *Context) *report.Stage {
 		}
 	}
 
+	// review-off: a review gate the base required is reported when it is off now
+	for _, kind := range []string{"backlog", "design"} {
+		if bcfg.ReviewOn(kind) && !p.Cfg.ReviewOn(kind) {
+			s.Warnf("ratchet: review switched off: review.%s was required at %s and is off now", kind, ref)
+		}
+	}
+
 	// scope-narrowed
 	nowScope := set(p.Cfg.Scope)
 	for _, g := range bcfg.Scope {

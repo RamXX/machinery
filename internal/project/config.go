@@ -34,6 +34,7 @@ type Config struct {
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
 	Hooks        *Hooks            `yaml:"hooks,omitempty"`
+	Review       *Review           `yaml:"review,omitempty"`
 	Delegate     *Delegate         `yaml:"delegate,omitempty"`
 	Routing      map[string]string `yaml:"routing,omitempty"`
 	Vital        *Vital            `yaml:"vital,omitempty"`
@@ -304,6 +305,35 @@ func (c *Config) HookMode(point string) string {
 	return h.Stop
 }
 
+// Review says which of the checker's reviews gate dispatch (section 15.10):
+// required or off.
+type Review struct {
+	Backlog string `yaml:"backlog,omitempty"`
+	Design  string `yaml:"design,omitempty"`
+}
+
+// The review settings (section 2).
+const (
+	ReviewRequired = "required"
+	ReviewOff      = "off"
+)
+
+// ReviewOn reports whether a review of the kind ("backlog" or "design") is
+// required before dispatch.
+func (c *Config) ReviewOn(kind string) bool {
+	v := ""
+	if c.Review != nil {
+		v = c.Review.Backlog
+		if kind == "design" {
+			v = c.Review.Design
+		}
+	}
+	if v == "" {
+		return c.Backlog != nil
+	}
+	return v == ReviewRequired
+}
+
 // Delegate names the owner's policy for answers on the owner's behalf
 // (section 15.9). Policy may lie outside the project.
 type Delegate struct {
@@ -564,6 +594,15 @@ func (c *Config) validate() error {
 			}
 		}
 	}
+	if r := c.Review; r != nil {
+		for _, pt := range []struct{ key, v string }{{"backlog", r.Backlog}, {"design", r.Design}} {
+			switch pt.v {
+			case "", ReviewRequired, ReviewOff:
+			default:
+				return Errf("review.%s must be required or off, got %q", pt.key, pt.v)
+			}
+		}
+	}
 	if c.Delegate != nil && strings.TrimSpace(c.Delegate.Policy) == "" {
 		return Errf("delegate.policy is required")
 	}
@@ -787,6 +826,22 @@ func (c *Config) applyDefaults() {
 				*f.v = f.def
 			}
 		}
+	}
+	if c.Review != nil || c.Backlog != nil {
+		r := Review{}
+		if c.Review != nil {
+			r = *c.Review
+		}
+		def := ReviewOff
+		if c.Backlog != nil {
+			def = ReviewRequired
+		}
+		for _, v := range []*string{&r.Backlog, &r.Design} {
+			if *v == "" {
+				*v = def
+			}
+		}
+		c.Review = &r
 	}
 	if c.Routing == nil {
 		c.Routing = map[string]string{}
