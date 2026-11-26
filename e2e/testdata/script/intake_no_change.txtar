@@ -6,23 +6,27 @@ gitinit
 exec bd init --stealth --non-interactive -p shop
 
 # a requirement the design already covers closes on machinery:no-design-change
-exec machinery intake new 'Ship a paid order' --intent 'A Clerk ships a paid order; it ends Shipped and the customer is told' --refuses 'shipping an unpaid order'
+exec bd create --id shop-ep --title 'Order desk' --type epic --silent
+exec machinery intake new 'Ship a paid order' --intent 'A Clerk ships a paid order; it ends Shipped and the customer is told' --refuses 'shipping an unpaid order' --parent shop-ep
+stdout '^shop-ep\.[0-9]+$'
+exec sh -c '. ./lib.sh; bd show $(sid "Ship a paid order") --json'
+stdout '"parent": "shop-ep"'
 exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Ship a paid order")'
 stdout '^  design changed  missing  the contract is the base contract: change the design first, or record machinery:no-design-change <reason>$'
 exec sh -c '. ./lib.sh; bd update $(sid "Ship a paid order") --append-notes "machinery:no-design-change the order lifecycle already ships a paid order"'
 exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Ship a paid order")'
 stdout '^  design changed  done     no design change: the order lifecycle already ships a paid order; the design already covers it$'
 stdout '^  new ids         done     none since [0-9a-f]{7}: only the capstone is planned$'
-stdout '^intake shop-[a-z0-9]+: 6 of 7 steps done; next: planned$'
+stdout '^intake shop-[a-z0-9.]+: 6 of 7 steps done; next: planned$'
 exec sh -c '. ./lib.sh; machinery intake plan $(sid "Ship a paid order") | sed "s/$(sid "Ship a paid order")/INTAKE/g"'
 cmp stdout want-capstone.md
 exec sh -c '. ./lib.sh; machinery intake plan $(sid "Ship a paid order") --apply'
-stdout '^intake shop-[a-z0-9]+: no new id: the design change adds none; only the capstone is planned$'
+stdout '^intake shop-[a-z0-9.]+: no new id: the design change adds none; only the capstone is planned$'
 stdout '^plan: 1 created, 0 existing, 0 edge\(s\)$'
 stdout '^owed: 0 added$'
-stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
+stdout '^intake shop-[a-z0-9.]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
 exec sh -c '. ./lib.sh; mrun 0 intake status $(sid "Ship a paid order")'
-stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+$'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9.]+$'
 exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Ship a paid order") --json'
 stdout '"tier:consequential"'
 exec git status --short
@@ -48,7 +52,7 @@ exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Replay the payment race")'
 stdout '^  design changed  missing  machinery:no-design-change needs a plan without new ids: 1 id\(s\) are new$'
 stdout '^    cx:order-payment:race  routine$'
 exec sh -c '. ./lib.sh; mrun 1 intake plan $(sid "Replay the payment race")'
-stderr '^machinery: cannot plan intake shop-[a-z0-9]+: design changed is missing: machinery:no-design-change needs a plan without new ids: 1 id\(s\) are new$'
+stderr '^machinery: cannot plan intake shop-[a-z0-9.]+: design changed is missing: machinery:no-design-change needs a plan without new ids: 1 id\(s\) are new$'
 
 # a rewording changes the design and adds no id: the capstone alone
 exec machinery intake new 'Explain the order lifecycle' --intent 'A reader of the machine learns why paying is transient'
@@ -59,7 +63,7 @@ exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Explain the order lifecycle"
 stdout '^  design changed  done     contract [0-9a-f]{12}, base [0-9a-f]{12}$'
 stdout '^  new ids         done     none since [0-9a-f]{7}: only the capstone is planned$'
 exec sh -c '. ./lib.sh; machinery intake plan $(sid "Explain the order lifecycle") --apply'
-stdout '^intake shop-[a-z0-9]+: no new id: the design change adds none; only the capstone is planned$'
+stdout '^intake shop-[a-z0-9.]+: no new id: the design change adds none; only the capstone is planned$'
 stdout '^plan: 1 created, 0 existing, 0 edge\(s\)$'
 
 -- race.trace.json --

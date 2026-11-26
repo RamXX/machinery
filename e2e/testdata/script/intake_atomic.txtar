@@ -1,4 +1,5 @@
-# intake plan --apply is whole or nothing: when the backlog call fails, owed.yaml and the backlog are unchanged (section 15.7)
+# intake plan --apply is whole or nothing: when the backlog call fails, owed.yaml and the backlog are unchanged;
+# a later design change gets stories only for its new ids (section 15.7)
 fixture shop
 exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
 exec machinery gen
@@ -34,6 +35,26 @@ cp machinery-bd.yaml machinery.yaml
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
 stdout '^plan: 3 created, 0 existing, 2 edge\(s\)$'
 stdout '^owed: 3 added$'
+gitcommit 'owe the refund'
+
+# the design changes again: only the new id gets a story, and the capstone waits for it too
+cp refund2/Order.machine.json design/machines/Order.machine.json
+exec machinery gen
+gitcommit 'design: no refund while paying'
+exec machinery check --stage intake
+stdout '^  warn   intake shop-[a-z0-9]+: the design changed and no stories were planned from it; run machinery intake plan shop-[a-z0-9]+$'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^  new ids         done     4 new id\(s\) since [0-9a-f]{7}$'
+stdout '^  planned         missing  1 new id\(s\) without a story; run machinery intake plan shop-[a-z0-9]+ --apply$'
+exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
+stdout '^plan: 1 created, 3 existing, 1 edge\(s\)$'
+stdout '^owed: 1 added$'
+stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
+exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Refund a paid order") --json | grep -c "\"dependency_type\": \"blocks\""'
+stdout '^3$'
+exec sh -c '. ./lib.sh; mrun 0 intake status $(iid)'
+exec machinery check --stage intake
+! stdout 'warn'
 
 -- bd-readonly.sh --
 #!/bin/sh
@@ -70,6 +91,52 @@ sid() {
 # iid: the id of the intake item of this script
 iid() {
   sid 'Refund a paid order'
+}
+-- refund2/Order.machine.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": { "orderId": null, "lastError": null },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          { "target": "paying", "guard": "hasPaymentMethod", "actions": "stampAttempt" },
+          { "actions": "recordPayRefused" }
+        ],
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID",
+        "refund": "an unpaid order has nothing to refund; the API refuses with ORDER_NOT_PAID"
+      }
+    },
+    "paying": {
+      "_ignores": { "refund": "a payment in flight cannot be refunded; the API refuses with ORDER_PAYING" },
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid", "actions": "recordCharge" },
+        "onError": { "target": "Pending", "actions": "recordPaymentFailure" }
+      },
+      "after": {
+        "payTimeout": { "target": "Pending", "actions": "recordPaymentTimeout" }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": { "target": "Shipped", "actions": "recordShipment" },
+        "cancel": { "target": "Cancelled", "actions": ["refundPayment", "recordCancellation"] },
+        "refund": { "target": "Cancelled", "actions": ["refundPayment", "recordRefund"] }
+      },
+      "_ignores": { "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID" }
+    },
+    "Shipped": { "type": "final", "entry": "notifyCustomer" },
+    "Cancelled": { "type": "final" }
+  }
 }
 -- refund/shop.modelith.yaml --
 kind: DomainModel

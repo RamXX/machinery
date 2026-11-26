@@ -162,6 +162,10 @@ stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Prove order refund: t
 stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Serve Order actions: the capstone closes last$'
 stdout '^  ERROR  owed: act:Order.refund$'
 stdout '^  ERROR  unproven: tc:ORDE-10c92a$'
+exec sh -c '. ./lib.sh; machinery brief $(sid "Demonstrate: Refund a paid order") --role verifier'
+stdout '^tier: consequential$'
+stdout '^  tc:ORDE-10c92a  Paid on:refund -> Cancelled$'
+stdout '^  act:Order.refund  action refund of Order$'
 
 # the stories are built: the refund is served and observed; they close
 exec sh -c 'sed -i.bak "s/act:Order.cancel$/act:Order.cancel act:Order.refund/" internal/domain/order.go && rm internal/domain/order.go.bak'
