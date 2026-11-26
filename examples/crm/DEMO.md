@@ -47,7 +47,7 @@ checked: 2 specs, 3 runs, 4 reach predicates, 10 mutations, 5 assumptions
   warn   finding: deal-win run race: WinAuditedOnce violated (assumption A1)
 passed
 ...
-machinery check: 13 passed, 0 failed, 0 not demonstrated, 2 not applicable
+machinery check: 13 passed, 0 failed, 0 not demonstrated, 3 not applicable
 ```
 
 What each stage protects, in one line each:
@@ -69,6 +69,7 @@ arch                The layering the design declares holds in the code.
 tests               Evidence comes from the real system: no unit tests, no test doubles.
 trace               Every action is served by code and every obligation is claimed by a test or owed.
 contract            (not applicable: no wave is frozen) Stories in parallel build against the same design.
+intake              (not applicable: no backlog configured) A requirement reaches the backlog only through the design it changed.
 ratchet             (machinery check --base <ref>) What was proven, covered or modeled stays so.
 verify              (machinery verify) Each obligation is observed on the running system at this commit.
 probe               (machinery probe) The tests would notice a wrong transition or a missing effect.
@@ -293,7 +294,7 @@ $ make verify
 == ratchet ==
 checked: 60 obligations, 1 scope globs, 18 tiered ids, 0 baseline entries
 passed
-machinery check: 14 passed, 0 failed, 0 not demonstrated, 2 not applicable
+machinery check: 14 passed, 0 failed, 0 not demonstrated, 3 not applicable
 == formal-verify ==
 checked: 2 specs
 passed
