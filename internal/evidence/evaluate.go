@@ -2,6 +2,8 @@ package evidence
 
 import (
 	"fmt"
+	"path"
+	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
@@ -103,26 +105,50 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	v := newValidity(p, head)
 	var recs []Receipt
 	dirtyUsed := false
+	// the ledger is asked before the header is believed (section 10.2)
+	entries, err := ledgerEntries(p)
+	if err != nil {
+		return nil, err
+	}
+	refuse := func(rel, state, remedy string) {
+		add(report.Error, "receipts: %s: %s; %s", rel, state, remedy)
+		ev.Refused = append(ev.Refused, rel+": "+state)
+	}
+	present := map[string]bool{}
 	for _, rel := range files {
 		fd, err := parseFile(p.Abs(rel), rel)
 		if err != nil {
 			return nil, err
 		}
-		if fd.Header == nil || !v.valid(fd.Header.Commit) {
-			continue
-		}
-		// a file machinery run did not write, or that changed since, proves nothing (section 10.2)
-		state, err := binding(p, fd)
-		if err != nil {
-			return nil, err
-		}
-		if state == notRun || state == changed {
-			remedy := "delete the file and run the tests through machinery run"
-			if state == changed {
-				remedy = "delete the file and run the tests again through machinery run"
+		present[path.Base(rel)] = true
+		headerValid := fd.Header != nil && v.valid(fd.Header.Commit)
+		state := bound
+		switch e, has := entries[path.Base(rel)]; {
+		case !has:
+			if !headerValid {
+				continue // not a receipts file, or one of another commit
 			}
-			add(report.Error, "receipts: %s: %s; %s", rel, state, remedy)
-			ev.Refused = append(ev.Refused, rel+": "+state)
+			state = notRun
+		case e.File != "":
+			if e.File != fd.Sum {
+				state = changed
+			} else if !headerValid {
+				continue // the untouched run of another commit
+			}
+		default: // machinery run started the file and never ended it
+			if !v.valid(e.Commit) {
+				continue
+			}
+			if fd.End != nil || fd.Header == nil || fd.Header.Commit != e.Commit {
+				state = changed
+			}
+		}
+		switch state {
+		case notRun:
+			refuse(rel, state, "delete the file and run the tests through machinery run")
+			continue
+		case changed:
+			refuse(rel, state, "delete the file and run the tests again through machinery run")
 			continue
 		}
 		for _, pr := range fd.Problems {
@@ -145,6 +171,17 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		ev.Runs = append(ev.Runs, RunInfo{File: rel, Commit: fd.Header.Commit, Command: fd.Header.Command,
 			Stack: fd.Header.Stack, Exit: *fd.End.Exit, Dirty: fd.Header.Dirty, Receipts: len(fd.Receipts)})
 		recs = append(recs, fd.Receipts...)
+	}
+	// a run the ledger holds for this directory and commit whose file is gone
+	var missing []string
+	for name, e := range entries {
+		if !present[name] && e.Dir == ledgerDir(p) && v.valid(e.Commit) {
+			missing = append(missing, name)
+		}
+	}
+	sort.Strings(missing)
+	for _, name := range missing {
+		refuse(Dir(p)+"/"+name, gone, "run the tests again through machinery run")
 	}
 	if dirtyUsed {
 		add(report.Warn, "dirty evidence: not valid for acceptance")

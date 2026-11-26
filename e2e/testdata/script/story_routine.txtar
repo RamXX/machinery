@@ -117,6 +117,46 @@ stdout '^result:   1 receipts file\(s\) refused: delete them and run the tests t
 exec machinery status
 stdout '^refused: \.machinery/receipts/[^ ]+\.jsonl: incomplete run$'
 
+# nor does an edit of its header, to another commit or to no header at all: the ledger knows the file
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery run -- sh fail.sh
+exec sh -c 'f=$(ls .machinery/receipts/*.jsonl | tail -n 1); sed "1s/\"commit\":\"[0-9a-f]*\"/\"commit\":\"0000000000000000000000000000000000000000\"/" "$f" > "$f.new" && mv "$f.new" "$f"'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
+exec mrun 1 proof --story shop-r1
+stdout '^result:   1 receipts file\(s\) refused: delete them and run the tests through machinery run$'
+exec sh -c 'f=$(ls .machinery/receipts/*.jsonl | tail -n 1); sed "1s/^/x/" "$f" > "$f.new" && mv "$f.new" "$f"'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
+
+# nor does the same edit in a failing run that never ended
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+! exec machinery run -- sh -c 'sh fail.sh; kill -9 $PPID'
+exec sh -c 'f=$(ls .machinery/receipts/*.jsonl | tail -n 1); sed "1s/\"commit\":\"[0-9a-f]*\"/\"commit\":\"0000000000000000000000000000000000000000\"/" "$f" > "$f.new" && mv "$f.new" "$f"'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
+
+# nor does deleting the file: the ledger still holds the run, until the tests run again
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery run -- sh fail.sh
+exec sh -c 'rm "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: recorded by machinery run and no longer present; run the tests again through machinery run$'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: recorded by machinery run and no longer present; run the tests again through machinery run$'
+exec mrun 1 proof --story shop-r1
+stdout '^result:   1 receipts file\(s\) refused: delete them and run the tests through machinery run$'
+exec machinery status
+stdout '^refused: \.machinery/receipts/[^ ]+\.jsonl: recorded by machinery run and no longer present$'
+exec machinery run -- sh e2e/orders.sh
+exec machinery status
+! stdout '^refused'
+exec machinery story shop-r1
+stdout '^passed$'
+
 -- r1.txt --
 machinery:ids inv:terminal-is-final tc:ORDE-2e883d
 machinery:scope internal/domain/**

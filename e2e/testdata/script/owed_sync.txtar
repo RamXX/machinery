@@ -18,6 +18,25 @@ rm .machinery/receipts
 # this emitter observes recordCharge and no longer checks the email invariant
 exec machinery run -- sh e2e/sync.sh
 
+# while a receipts file is refused or a run is incomplete nothing is pruned, whatever the other
+# runs prove: the failure may be in that file (section 11.2)
+exec sh -c 'cp .machinery/receipts/*.jsonl .machinery/receipts/20260102T030405.000Z-copy.jsonl'
+exec mrun 1 owed sync --prune-only
+stdout '^ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-copy\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
+! stdout '^owed:'
+cmp design/owed.yaml owed-story.yaml
+rm .machinery/receipts/20260102T030405.000Z-copy.jsonl
+! exec machinery run -- sh -c 'kill -9 $PPID'
+exec mrun 1 owed sync
+stdout '^ERROR  incomplete run: \.machinery/receipts/[^ ]+\.jsonl$'
+cmp design/owed.yaml owed-story.yaml
+exec sh -c 'rm "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+exec mrun 1 owed sync --prune-only
+stdout '^ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: recorded by machinery run and no longer present; run the tests again through machinery run$'
+cmp design/owed.yaml owed-story.yaml
+rm .machinery/receipts
+exec machinery run -- sh e2e/sync.sh
+
 # --prune-only removes proven entries and never adds
 exec machinery owed sync --prune-only
 stdout '^owed: 1 kept, 0 added, 1 removed$'

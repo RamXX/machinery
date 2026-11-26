@@ -110,7 +110,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	// the ledger binds the file to this run (section 10.2); a probe run is not evidence
 	ledger := opts.ReceiptsFile == ""
 	if ledger {
-		if err := writeEntry(p, file, ledgerEntry{}); err != nil {
+		if err := writeEntry(p, file, ledgerEntry{Commit: head, Dir: ledgerDir(p)}); err != nil {
 			return 1, file, err
 		}
 	}
@@ -146,7 +146,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		err = cerr
 	}
 	if err == nil && ledger {
-		err = finishEntry(p, file)
+		err = finishEntry(p, file, ledgerEntry{Commit: head, Dir: ledgerDir(p)})
 	}
 	return exit, file, err
 }
@@ -195,6 +195,9 @@ func newFileName(dir string, now time.Time, short string) (string, error) {
 // pruneStale deletes receipts files that are not valid for the head (step 2
 // of section 10).
 func pruneStale(p *project.Project, head string) error {
+	if err := forgetGone(p); err != nil {
+		return err
+	}
 	files, err := receiptFiles(p)
 	if err != nil {
 		return err

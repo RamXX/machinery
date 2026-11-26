@@ -37,7 +37,9 @@ exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,
 exec mrun 1 verify
 stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-cut\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 ! stdout 'incomplete run'
-stdout '^failed: 1 finding\(s\)$'
+# and the unfinished run deleted above is still in the ledger
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: recorded by machinery run and no longer present; run the tests again through machinery run$'
+stdout '^failed: 2 finding\(s\)$'
 
 # a run that exits non-zero is complete: a warning, and its receipts count
 rm .machinery/receipts

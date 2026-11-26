@@ -77,6 +77,16 @@ func runOwedSync(e *Env, args []string) int {
 	if err != nil {
 		return e.Fail(err)
 	}
+	// a receipts file that is refused or incomplete may hold a failure: nothing is pruned (section 11.2)
+	if refused := ev.RefusedFindings(); len(refused) > 0 {
+		for _, f := range refused {
+			fmt.Fprintf(e.Stdout, "ERROR  %s\n", f.Msg)
+		}
+		if !ev.HasEvidence {
+			fmt.Fprintf(e.Stdout, "ERROR  no complete run valid for %s: run the tests through machinery run first\n", gitx.Short(ev.Head))
+		}
+		return 1
+	}
 	res, err := evidence.Sync(p, d, ev, *pruneOnly)
 	if errors.Is(err, evidence.ErrNoRun) {
 		fmt.Fprintf(e.Stdout, "ERROR  no complete run valid for %s: run the tests through machinery run first\n", gitx.Short(ev.Head))

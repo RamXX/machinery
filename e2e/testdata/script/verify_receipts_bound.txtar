@@ -29,8 +29,9 @@ exec mrun 1 verify
 stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
 stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
 stdout '^failed: 1 finding\(s\)$'
-exec machinery owed sync --prune-only
-stdout '^owed: 2 kept, 0 added, 0 removed$'
+exec mrun 1 owed sync --prune-only
+stdout '^ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run; delete the file and run the tests through machinery run$'
+! stdout '^owed:'
 rm .machinery/receipts/20260102T030405.000Z-typed.jsonl
 exec machinery verify
 stdout '^passed$'

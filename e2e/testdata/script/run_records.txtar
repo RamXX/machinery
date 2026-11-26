@@ -20,7 +20,7 @@ exec sh -c 'grep -c "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 stdout '^15$'
 # the run is entered in the ledger under the name of its file, outside the working tree (section 10.2)
 exec sh -c 'cat .git/machinery/runs/$(ls .machinery/receipts)'
-stdout '^\{"v":1,"file":"[0-9a-f]{64}"\}$'
+stdout '^\{"v":1,"commit":"[0-9a-f]{40}","dir":"/.+/\.machinery/receipts","file":"[0-9a-f]{64}"\}$'
 exec git status --porcelain
 ! stdout .
 
