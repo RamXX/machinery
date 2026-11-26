@@ -21,5 +21,12 @@ exec machinery verify
 stdout '^checked: 16 obligations, 15 proven, 0 partial, 1 owed, 16 receipts$'
 stdout '^passed$'
 
+-- e2e/charge_test.go --
+package e2e
+
+import "testing"
+
+// machinery:verifies tc:ORDE-8bd6e7
+func TestCharge(t *testing.T) {}
 -- charge.jsonl --
 {"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge","effects":["recordCharge"],"observed":"paying -> Paid; charge row written"}

@@ -8,6 +8,9 @@
 //		receipt.Pass("tc:ORDE-2e883d", t.Name(), "Pending -> paying", "stampAttempt")
 //	}
 //
+// The test name is how machinery finds the test's file, which must claim the
+// id with a machinery:verifies comment (section 10.2): pass t.Name().
+//
 // When MACHINERY_RECEIPTS is not set every emit is a no-op, so the suite runs
 // the same outside machinery run.
 package receipt
@@ -48,7 +51,7 @@ const (
 type Receipt struct {
 	ID       string   // an obligation id
 	Outcome  string   // OutcomePass, OutcomeFail or OutcomeSkip
-	Test     string   // the name of the test that observed it
+	Test     string   // the name of the test that observed it; required
 	Effects  []string // for tc ids: the effects actually observed
 	Observed string   // one short sentence
 	Replay   string   // for cx ids: Reproduced or Refuted
@@ -78,6 +81,9 @@ func Emit(r Receipt) error {
 	}
 	if r.ID == "" {
 		return fmt.Errorf("receipt: id is required")
+	}
+	if r.Test == "" {
+		return fmt.Errorf("receipt: %s: test is required", r.ID)
 	}
 	switch r.Outcome {
 	case OutcomePass, OutcomeFail, OutcomeSkip:

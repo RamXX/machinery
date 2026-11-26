@@ -9,6 +9,7 @@
 //	receiptprog skip <id> <observed>
 //	receiptprog replay <id> <reproduced|refuted> <observed>
 //	receiptprog outcome <id> <outcome>
+//	receiptprog notest <id>
 //	receiptprog many <id> <n>
 package main
 
@@ -80,6 +81,11 @@ func run(args []string) error {
 			return err
 		}
 		return receipt.Emit(receipt.Receipt{ID: a[0], Outcome: a[1], Test: test, Observed: "custom outcome"})
+	case "notest":
+		if err := need(1); err != nil {
+			return err
+		}
+		return receipt.Emit(receipt.Receipt{ID: a[0], Outcome: receipt.OutcomePass, Observed: "no test named"})
 	case "many":
 		if err := need(2); err != nil {
 			return err

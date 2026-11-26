@@ -86,6 +86,8 @@ func Pay() {}
 -- only.sh.in --
 #!/bin/sh
 # Emits a receipt for each id in MACHINERY_ONLY that it knows, like a suite that honors the variable.
+#
+# machinery:verifies tc:ORDE-* inv:paid-before-shipped
 set -eu
 mkdir -p .machinery
 printf '%s\n' "${MACHINERY_ONLY-unset}" > .machinery/only.txt

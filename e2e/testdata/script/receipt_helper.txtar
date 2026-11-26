@@ -16,7 +16,7 @@ exec $WORK/bin/receiptprog pass tc:ORDE-2e883d 'Pending -> paying' stampAttempt
 ! exists .machinery/receipts
 
 # through machinery run: one line per receipt in the shape of section 10
-exec machinery run -- sh $WORK/emit.sh
+exec machinery run -- sh e2e/emit.sh
 stdout '^enabled=true$'
 exec sh -c 'cat .machinery/receipts/*.jsonl'
 stdout '^\{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"receiptprog","effects":\["stampAttempt"\],"observed":"Pending -> paying"\}$'
@@ -34,7 +34,7 @@ stdout '^passed$'
 
 # fail receipts
 rm .machinery/receipts
-exec machinery run -- sh -c 'sh $WORK/emit.sh && $WORK/bin/receiptprog fail tc:ORDE-2e883d "stayed Pending"'
+exec machinery run -- sh -c 'sh e2e/emit.sh && $WORK/bin/receiptprog fail tc:ORDE-2e883d "stayed Pending"'
 exec mrun 1 verify
 stdout '^  ERROR  failed: tc:ORDE-2e883d \(receiptprog\)$'
 
@@ -46,6 +46,8 @@ grep '^\{"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","t
 stderr 'receipt: cx:order-payment:race: replay must be reproduced or refuted, got "maybe"'
 ! exec $WORK/bin/receiptprog outcome tc:ORDE-2e883d passed
 stderr 'receipt: tc:ORDE-2e883d: outcome must be pass, fail or skip, got "passed"'
+! exec $WORK/bin/receiptprog notest tc:ORDE-2e883d
+stderr 'receipt: tc:ORDE-2e883d: test is required'
 env MACHINERY_RECEIPTS=
 
 # MACHINERY_ONLY: Only lists the ids, Wanted says whether to run a test
@@ -61,7 +63,11 @@ stdout ': true$'
 exec $WORK/bin/receiptprog wanted inv:terminal-is-final
 stdout '^wanted inv:terminal-is-final: false$'
 
--- emit.sh --
+-- shop/e2e/emit.sh --
+# The suite: its receipts name the test receiptprog, which this file holds and whose ids it claims.
+#
+# machinery:verifies tc:ORDE-* sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
+# machinery:verifies inv:paid-before-shipped inv:terminal-is-final inv:customer-email-unique fm:payment-provider-down
 rp=$WORK/bin/receiptprog
 $rp enabled
 $rp pass tc:ORDE-2e883d 'Pending -> paying' stampAttempt

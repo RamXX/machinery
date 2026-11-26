@@ -95,6 +95,15 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		if fd.Header == nil || !v.valid(fd.Header.Commit) {
 			continue
 		}
+		// a file machinery run did not write, or that changed since, proves nothing (section 10.2)
+		state, err := binding(p, fd)
+		if err != nil {
+			return nil, err
+		}
+		if state == notRun || state == changed {
+			add(report.Error, "receipts: %s: %s", rel, state)
+			continue
+		}
 		for _, pr := range fd.Problems {
 			add(report.Error, "malformed receipts file: %s: %s", rel, pr)
 		}
@@ -129,7 +138,11 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	ev.HasEvidence = len(ev.Runs) > 0
 	ev.NReceipts = len(recs)
 	ev.Obligations = len(d.Obligations)
-	j := Judge(d, recs)
+	counted, err := claimedOnly(p, d, recs, add)
+	if err != nil {
+		return nil, err
+	}
+	j := Judge(d, counted)
 	ev.states, ev.receipts = j.States, j.Receipts
 	if ev.HasEvidence {
 		ev.Findings = append(ev.Findings, j.Findings...)
@@ -156,6 +169,32 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		}
 	}
 	return ev, nil
+}
+
+// claimedOnly keeps the receipts whose test lies in a test file that claims
+// their id (section 10.2) and reports the others once per id and test. A
+// receipt for an id that is no obligation is kept: Judge names it.
+func claimedOnly(p *project.Project, d *design.Design, recs []Receipt, add func(report.Severity, string, ...any)) ([]Receipt, error) {
+	if len(recs) == 0 {
+		return nil, nil
+	}
+	cl, err := newClaims(p, d)
+	if err != nil {
+		return nil, err
+	}
+	var res []Receipt
+	seen := map[string]bool{}
+	for _, r := range recs {
+		if d.Obligation(r.ID) != nil && !cl.claimed(r) {
+			if key := r.ID + "\x00" + r.Test; !seen[key] {
+				seen[key] = true
+				add(report.Error, "receipt: %s: %s does not claim it", r.ID, r.Test)
+			}
+			continue
+		}
+		res = append(res, r)
+	}
+	return res, nil
 }
 
 // Judgment is the state of every obligation from one set of receipts.

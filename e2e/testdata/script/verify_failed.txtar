@@ -27,6 +27,15 @@ stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 16 receipts$'
 ! stdout 'stale owed entry'
 stdout '^passed$'
 
+-- e2e/order_test.go --
+package e2e
+
+import "testing"
+
+// machinery:verifies tc:ORDE-2e883d tc:ORDE-8bd6e7 fm:payment-provider-down
+func TestPay(t *testing.T) {}
+func TestCharge(t *testing.T) {}
+func TestOutage(t *testing.T) {}
 -- fail.jsonl --
 {"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"fail","test":"TestPay","observed":"stayed Pending"}
 -- fail-owed.jsonl --

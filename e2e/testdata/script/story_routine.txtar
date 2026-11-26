@@ -72,7 +72,7 @@ stdout '^checked: 2 ids, 2 proofs, 0 predictions, 0 verdicts$'
 stdout '^passed$'
 
 # a failing receipt fails the gate
-exec machinery run -- sh fail.sh
+exec machinery run -- sh e2e/fail.sh
 exec mrun 1 story shop-r1
 stdout '^  ERROR  failed: tc:ORDE-2e883d$'
 ! stdout 'inv:terminal-is-final'
@@ -93,8 +93,9 @@ owed:
     reason: "no test induces an outage yet"
   - id: tc:ORDE-8bd6e7
     reason: "recordCharge is still a noop"
--- fail.sh --
+-- e2e/fail.sh --
 #!/bin/sh
+# machinery:verifies tc:ORDE-2e883d
 set -eu
 [ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
 printf '{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"fail","test":"fail.sh","effects":[],"observed":"stayed Pending"}\n' >> "$MACHINERY_RECEIPTS"

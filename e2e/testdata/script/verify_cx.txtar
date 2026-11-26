@@ -101,6 +101,15 @@ stdout '^  ERROR  failed: cx:order-payment:race \(TestReplayRace\)$'
   "loop": 0,
   "instance": {}
 }
+-- e2e/replay_test.go --
+package e2e
+
+import "testing"
+
+// machinery:verifies cx:order-payment:race cx:order-payment:known cx:order-payment:lost
+func TestReplayRace(t *testing.T) {}
+func TestReplayKnown(t *testing.T) {}
+func TestReplayLost(t *testing.T) {}
 -- refuted.jsonl --
 {"v":1,"type":"receipt","id":"cx:order-payment:race","outcome":"pass","test":"TestReplayRace","observed":"the second commit was refused","replay":"refuted"}
 {"v":1,"type":"receipt","id":"cx:order-payment:known","outcome":"pass","test":"TestReplayKnown","observed":"charged once","replay":"refuted"}

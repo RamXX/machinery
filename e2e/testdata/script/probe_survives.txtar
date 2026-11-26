@@ -26,6 +26,8 @@ stdout '^failed: 15 finding\(s\)$'
 # A stand-in system and its test. The system takes its transitions from
 # MACHINERY_TABLES_DIR when set (unless "ignore" is given); the test expects the
 # committed table and emits what it observed. "silent" emits nothing during a probe.
+#
+# machinery:verifies tc:ORDE-*
 set -eu
 [ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
 mode=${1:-}

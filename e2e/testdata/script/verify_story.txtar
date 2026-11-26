@@ -14,7 +14,7 @@ exec mrun 1 verify --story shop-v1
 stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
 
 # a run that proves the story's ids, fails another and leaves the rest unproven
-exec machinery run -- sh some.sh
+exec machinery run -- sh e2e/some.sh
 exec mrun 1 verify
 stdout 'ERROR  unproven: sc:customer-pays-and-the-order-ships'
 exec mrun 1 verify --story shop-v1
@@ -59,8 +59,9 @@ machinery:ids tc:ORDE-8bd6e7 fm:payment-provider-down
 Nothing machine-readable.
 -- v4.txt --
 machinery:ids tc:ORDE-ffffff tc:ORDE-2e883d
--- some.sh --
+-- e2e/some.sh --
 #!/bin/sh
+# machinery:verifies tc:ORDE-2e883d tc:ORDE-1ded14 inv:terminal-is-final
 set -eu
 [ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
 printf '{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"some.sh","effects":["stampAttempt"],"observed":"Pending -> paying"}\n' >> "$MACHINERY_RECEIPTS"

@@ -1,14 +1,14 @@
-# a receipts file without an end line is an incomplete run; a non-zero exit is a warning (section 12)
+# a run machinery run did not finish is an incomplete run; a non-zero exit is a warning (sections 10.2, 12)
 fixture shop
 exec machinery gen
 gitinit
 
-# only an incomplete run: an ERROR, and its receipts are not used
-mkdir .machinery/receipts
-exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,\"command\":[\"sh\"],\"stack\":\"\",\"started\":\"2026-01-02T03:04:05Z\"}\n" "$(git rev-parse HEAD)" > .machinery/receipts/20260102T030405.000Z-cut.jsonl'
-exec sh -c 'cat fail.jsonl >> .machinery/receipts/20260102T030405.000Z-cut.jsonl'
+# machinery run is killed before the command ends: an ERROR, and the receipts are not used
+! exec machinery run -- sh -c 'cat fail.jsonl >> "$MACHINERY_RECEIPTS"; kill -9 $PPID'
+exec sh -c 'grep -c "\"type\":\"end\"" .machinery/receipts/*.jsonl || true'
+stdout '^0$'
 exec mrun 1 verify
-stdout '^  ERROR  incomplete run: \.machinery/receipts/20260102T030405\.000Z-cut\.jsonl$'
+stdout '^  ERROR  incomplete run: \.machinery/receipts/[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl$'
 ! stdout 'checked:'
 ! stdout 'failed: tc:ORDE-2e883d'
 stdout '^failed: 1 finding\(s\)$'
@@ -17,8 +17,26 @@ stdout '^failed: 1 finding\(s\)$'
 exec machinery run -- sh e2e/orders.sh
 exec mrun 1 verify
 stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
-stdout 'ERROR  incomplete run: \.machinery/receipts/20260102T030405\.000Z-cut\.jsonl'
+stdout 'ERROR  incomplete run: \.machinery/receipts/[^ ]+\.jsonl'
 ! stdout 'ERROR  failed:'
+stdout '^failed: 1 finding\(s\)$'
+
+# an end line typed under the unfinished run does not finish it: the file changed after the run
+rm .machinery/receipts
+! exec machinery run -- sh -c 'sh e2e/orders.sh; kill -9 $PPID'
+exec sh -c 'printf "{\"v\":1,\"type\":\"end\",\"exit\":0,\"finished\":\"2026-01-02T03:04:09Z\"}\n" >> "$(ls .machinery/receipts/*.jsonl)"'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run$'
+! stdout 'checked:'
+stdout '^failed: 1 finding\(s\)$'
+
+# a file typed by hand without an end line was not produced by machinery run
+rm .machinery/receipts
+mkdir .machinery/receipts
+exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,\"command\":[\"sh\"],\"stack\":\"\",\"started\":\"2026-01-02T03:04:05Z\"}\n" "$(git rev-parse HEAD)" > .machinery/receipts/20260102T030405.000Z-cut.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-cut\.jsonl: not produced by machinery run$'
+! stdout 'incomplete run'
 stdout '^failed: 1 finding\(s\)$'
 
 # a run that exits non-zero is complete: a warning, and its receipts count

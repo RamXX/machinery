@@ -8,6 +8,7 @@ gitinit
 exec mrun 1 owed sync
 stdout '^ERROR  no complete run valid for [0-9a-f]{7}: run the tests through machinery run first$'
 cmp design/owed.yaml owed-story.yaml
+# a file machinery run did not write is no run either (section 10.2)
 mkdir .machinery/receipts
 exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,\"command\":[\"sh\"],\"stack\":\"\",\"started\":\"2026-01-02T03:04:05Z\"}\n" "$(git rev-parse HEAD)" > .machinery/receipts/20260102T030405.000Z-cut.jsonl'
 exec mrun 1 owed sync
@@ -60,6 +61,8 @@ owed:
     story: bd-7
 -- e2e/sync.sh --
 #!/bin/sh
+# machinery:verifies tc:ORDE-* sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
+# machinery:verifies inv:paid-before-shipped inv:terminal-is-final
 set -eu
 [ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
 pass() {

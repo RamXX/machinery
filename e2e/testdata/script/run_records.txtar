@@ -18,6 +18,11 @@ exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
 stdout '^\{"v":1,"type":"end","exit":0,"finished":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"\}$'
 exec sh -c 'grep -c "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 stdout '^15$'
+# the run is entered in the ledger under the name of its file, outside the working tree (section 10.2)
+exec sh -c 'cat .git/machinery/runs/$(ls .machinery/receipts)'
+stdout '^\{"v":1,"header":"[0-9a-f]{64}","file":"[0-9a-f]{64}"\}$'
+exec git status --porcelain
+! stdout .
 
 # the extra environment; inherited MACHINERY_* values are dropped; the command runs at the project root
 env MACHINERY_ONLY=tc:ORDE-2e883d
@@ -41,6 +46,8 @@ stdout '^\{"v":1,"type":"end","exit":3,'
 exec mrun 127 run -- ./no-such-command
 stderr 'machinery: run: cannot start ./no-such-command'
 exec sh -c 'ls .machinery/receipts | wc -l'
+stdout '^ *3$'
+exec sh -c 'ls .git/machinery/runs | wc -l'
 stdout '^ *3$'
 
 # usage errors
@@ -67,6 +74,9 @@ exec sh -c 'ls .machinery/receipts/*.jsonl | wc -l'
 stdout '^ *1$'
 exec sh -c 'grep -q "\"commit\":\"$(git rev-parse HEAD)\"" .machinery/receipts/*.jsonl && echo header-commit-ok'
 stdout header-commit-ok
+# the ledger entries of the deleted files are gone with them
+exec sh -c 'ls .git/machinery/runs | wc -l'
+stdout '^ *1$'
 
 -- env.sh --
 echo "receipts=$MACHINERY_RECEIPTS"

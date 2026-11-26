@@ -26,6 +26,16 @@ stdout '^checked: 16 obligations, 2 proven, 2 partial, 1 owed, 5 receipts$'
 
 -- emit.sh --
 cat "$1" >> "$MACHINERY_RECEIPTS"
+-- e2e/order_test.go --
+package e2e
+
+import "testing"
+
+// machinery:verifies tc:ORDE-*
+func TestShip(t *testing.T) {}
+func TestPay(t *testing.T) {}
+func TestCancel(t *testing.T) {}
+func TestCharge(t *testing.T) {}
 -- owed-fm.yaml --
 version: 1
 owed:

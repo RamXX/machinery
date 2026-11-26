@@ -1,0 +1,87 @@
+# a receipts file is evidence only when machinery run produced it and nothing changed it since (section 10.2)
+fixture shop
+cp design/owed.yaml owed.orig
+exec machinery gen
+gitinit
+
+# a file typed by hand, well formed and at the current commit, is not evidence: verify refuses it
+# and owed sync prunes nothing on it
+mkdir .machinery/receipts
+exec sh -c 'sed "s/COMMIT/$(git rev-parse HEAD)/" typed.jsonl > .machinery/receipts/20260102T030405.000Z-typed.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run$'
+stdout '^failed: 1 finding\(s\)$'
+! stdout 'checked:'
+! stdout 'stale owed entry'
+exec mrun 1 owed sync --prune-only
+stdout '^ERROR  no complete run valid for [0-9a-f]{7}: run the tests through machinery run first$'
+cmp design/owed.yaml owed.orig
+exec machinery status
+stdout '^proven: 0  partial: 0  failed: 0  owed: 2  unproven and not owed: 14$'
+stdout '^evidence: none at [0-9a-f]{7}$'
+
+# a real run beside it is used; the typed file still blocks and still proves nothing
+exec machinery run -- sh e2e/orders.sh
+exec sh -c 'test -f .git/machinery/runs/$(ls .machinery/receipts | grep -v typed) && echo ledger-entry'
+stdout ledger-entry
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-typed\.jsonl: not produced by machinery run$'
+stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
+stdout '^failed: 1 finding\(s\)$'
+exec machinery owed sync --prune-only
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+rm .machinery/receipts/20260102T030405.000Z-typed.jsonl
+exec machinery verify
+stdout '^passed$'
+
+# a copy of a real run under another name was not produced by machinery run
+exec sh -c 'cp .machinery/receipts/*.jsonl .machinery/receipts/20260102T030405.000Z-copy.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/20260102T030405\.000Z-copy\.jsonl: not produced by machinery run$'
+stdout '^failed: 1 finding\(s\)$'
+rm .machinery/receipts/20260102T030405.000Z-copy.jsonl
+
+# a receipt added to a real run afterwards: the file changed after the run, and nothing in it counts
+exec sh -c 'f=$(ls .machinery/receipts/*.jsonl); { sed "\$d" "$f"; cat charge.jsonl; tail -n 1 "$f"; } > "$f.new" && mv "$f.new" "$f"'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl: changed after the run$'
+stdout '^failed: 1 finding\(s\)$'
+! stdout 'checked:'
+! stdout 'stale owed entry'
+exec mrun 1 owed sync --prune-only
+stdout '^ERROR  no complete run valid for'
+cmp design/owed.yaml owed.orig
+
+# so does an edit of the header
+rm .machinery/receipts
+exec machinery run --stack 'a laptop' -- sh e2e/orders.sh
+exec machinery verify
+exec sh -c 'f=$(ls .machinery/receipts/*.jsonl); sed "s/a laptop/production/" "$f" > "$f.new" && mv "$f.new" "$f"'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an entry that is not what machinery run writes is no entry
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+exec sh -c 'echo "{}" > .git/machinery/runs/$(ls .machinery/receipts)'
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: not produced by machinery run$'
+
+# the ledger is shared by the worktrees of the repository: a run in a worktree is evidence there
+rm .machinery/receipts
+exec git worktree add -q $WORK/wt -b side
+cd $WORK/wt
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
+stdout '^passed$'
+
+-- typed.jsonl --
+{"v":1,"type":"run","commit":"COMMIT","dirty":false,"command":["true"],"stack":"","started":"2026-01-02T03:04:05Z"}
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"none","effects":["recordCharge"],"observed":"typed by hand"}
+{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"pass","test":"none","observed":"typed by hand"}
+{"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z"}
+-- charge.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"orders.sh","effects":["recordCharge"],"observed":"added by hand"}

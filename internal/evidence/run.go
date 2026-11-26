@@ -100,11 +100,19 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	if err != nil {
 		return 1, "", err
 	}
-	_, err = f.Write(jsonLine(header{V: 1, Type: "run", Commit: head, Dirty: dirty, Command: argv,
-		Stack: opts.Stack, Started: now.Format(time.RFC3339)}))
+	head1 := jsonLine(header{V: 1, Type: "run", Commit: head, Dirty: dirty, Command: argv,
+		Stack: opts.Stack, Started: now.Format(time.RFC3339)})
+	_, err = f.Write(head1)
 	f.Close()
 	if err != nil {
 		return 1, file, err
+	}
+	// the ledger binds the file to this run (section 10.2); a probe run is not evidence
+	ledger := opts.ReceiptsFile == ""
+	if ledger {
+		if err := writeEntry(p, file, ledgerEntry{Header: digest(head1)}); err != nil {
+			return 1, file, err
+		}
 	}
 
 	cmd := exec.Command(argv[0], argv[1:]...)
@@ -123,6 +131,9 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	cmd.Env = append(env, opts.Env...)
 	if err := cmd.Start(); err != nil {
 		os.Remove(file)
+		if ledger {
+			forget(p, file)
+		}
 		return ExitNotStarted, "", fmt.Errorf("cannot start %s: %v", argv[0], err)
 	}
 	exit = exitCode(cmd.Wait())
@@ -130,8 +141,13 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	if err != nil {
 		return exit, file, err
 	}
-	defer f.Close()
 	_, err = f.Write(jsonLine(endLine{V: 1, Type: "end", Exit: exit, Finished: time.Now().UTC().Format(time.RFC3339)}))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil && ledger {
+		err = finishEntry(p, file, digest(head1))
+	}
 	return exit, file, err
 }
 
@@ -193,6 +209,7 @@ func pruneStale(p *project.Project, head string) error {
 			if err := os.Remove(p.Abs(rel)); err != nil {
 				return err
 			}
+			forget(p, rel)
 		}
 	}
 	return nil
