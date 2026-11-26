@@ -41,8 +41,9 @@ grep '^- 1 drift: model: missing$' out/report.md
 grep '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$' out/report.md
 grep '^checked: 8 stages, 2 bound machines, 0 unbound machines$' out/report.md
 grep '^ids: 0 proposed, 1 owed, 21 proven, 0 retired$' out/report.md
-grep '^claimed by a test: 21 \(tc 11, sc 2, inv 2, fm 3, act 3\)$' out/report.md
-grep '^no test names it: 1 \(fm 1\)$' out/report.md
+grep '^owed, claimed by a test, no receipt yet: 0$' out/report.md
+grep '^owed, no test names it: 1 \(fm 1\)$' out/report.md
+! grep 'act 3' out/report.md
 grep '^loan: 4 states, 4 distinct states found, passed$' out/report.md
 grep '^hold_queue: 2 states, 2 distinct states found, passed$' out/report.md
 grep '^design/model/library.modelith.yaml: instance found$' out/report.md
@@ -107,8 +108,6 @@ grep '"source": "machines/hold-queue.json",' out3/report.json
 exec sh -c 'grep -v -e "serves: \[\"Implements:\"\]" -e "verifies: \[\"Checks:\", \"Proves:\"\]" proj/machinery.yaml > nomarks.yaml'
 exec machinery -C proj assess --config nomarks.yaml --out out4
 stdout '^trace: failed: 19 finding\(s\); '
-grep '^claimed by a test: 2 \(sc 2\)$' out4/report.md
-grep '^no test names it: 20 \(tc 11, inv 2, fm 4, act 3\)$' out4/report.md
 grep '^- hold_queue \(machines/hold-queue.json\): 4 error\(s\), 0 drift, 0 warn\(s\)$' out4/report.md
 grep '^- loan \(machines/loan.json\): 7 error\(s\), 0 drift, 0 warn\(s\)$' out4/report.md
 grep '^  - 7 error: trace: unverified$' out4/report.md

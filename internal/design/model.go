@@ -62,6 +62,7 @@ type Action struct {
 type Invariant struct {
 	ID        string
 	Statement string
+	Line      int // of the statement, 1-based
 }
 
 type Scenario struct {
@@ -123,7 +124,11 @@ func seq(n *yaml.Node, key string) []*yaml.Node {
 func invariants(n *yaml.Node) []Invariant {
 	var res []Invariant
 	for _, e := range seq(n, "invariants") {
-		res = append(res, Invariant{ID: str(e, "id"), Statement: str(e, "statement")})
+		inv := Invariant{ID: str(e, "id"), Statement: str(e, "statement"), Line: e.Line}
+		if c := child(e, "statement"); c != nil {
+			inv.Line = c.Line
+		}
+		res = append(res, inv)
 	}
 	return res
 }

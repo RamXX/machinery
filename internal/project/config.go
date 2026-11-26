@@ -723,25 +723,26 @@ func (c *Config) validateImport() error {
 	if err := c.validateImportedFailureModes(); err != nil {
 		return err
 	}
-	for _, pl := range c.ImportedPlanned() {
+	for n, pl := range c.ImportedPlanned() {
+		at := fmt.Sprintf("import.planned: entry %d", n+1)
 		switch pl.In {
 		case PlannedInStatement:
 		case PlannedInFailureRow:
 			if c.ImportedFailureModes() == nil {
-				return Errf("import.planned: in: failure-row needs import.failure_modes; it reads the rows of that catalog")
+				return Errf("%s: in: failure-row needs import.failure_modes; it reads the rows of that catalog", at)
 			}
 		default:
-			return Errf("import.planned: in must be model-statement or failure-row, got %q", pl.In)
+			return Errf("%s: in must be model-statement or failure-row, got %q", at, pl.In)
 		}
 		if strings.TrimSpace(pl.Pattern) == "" {
-			return Errf("import.planned: pattern is required")
+			return Errf("%s: pattern is required", at)
 		}
 		re, err := pl.Regexp()
 		if err != nil {
-			return Errf("import.planned: pattern is not a regular expression: %v", err)
+			return Errf("%s: pattern is not a regular expression: %v", at, err)
 		}
 		if re.SubexpIndex("story") < 0 {
-			return Errf("import.planned: pattern %q needs a named group story, as in (?P<story>[a-z0-9-]+)", pl.Pattern)
+			return Errf("%s: pattern %q needs a named group story, as in (?P<story>[a-z0-9-]+)", at, pl.Pattern)
 		}
 	}
 	im := c.ImportedMachines()

@@ -610,8 +610,12 @@ func uniqueKey(k string, used map[string]bool) string {
 	return key
 }
 
-// ApplyResult counts what Apply did.
-type ApplyResult struct{ Created, Existing, Edges int }
+// ApplyResult counts what Apply did. External lists the ids planned at
+// adoption whose story, the project's own, is not in the backlog.
+type ApplyResult struct {
+	Created, Existing, Edges int
+	External                 []design.OwedEntry
+}
 
 // Apply creates the stories that are not linked to an existing story yet and
 // writes the new story ids into the owed list (section 15.2).
@@ -636,6 +640,17 @@ func Apply(c *backlog.Client, d *design.Design, plan *Plan, parent string) (Appl
 		}
 		if linked {
 			res.Existing++
+			continue
+		}
+		// a story the project supplied is never replaced: its group gets none
+		var external []design.OwedEntry
+		for _, id := range s.IDs {
+			if e := owed[id]; supplied(e) && !exists[e.Story] {
+				external = append(external, e)
+			}
+		}
+		if len(external) > 0 {
+			res.External = append(res.External, external...)
 			continue
 		}
 		keep[s.Key] = true
@@ -663,6 +678,22 @@ func Apply(c *backlog.Client, d *design.Design, plan *Plan, parent string) (Appl
 	return res, setStories(d, storyOf)
 }
 
+// supplied reports an entry whose story the project supplied: planned at
+// adoption, with the story of its mark.
+func supplied(e design.OwedEntry) bool { return e.PlannedAtAdoption() && e.Story != "" }
+
+// Supplied returns the first of the ids whose owed entry carries a story the
+// project supplied, which plan never replaces.
+func Supplied(d *design.Design, ids []string) (design.OwedEntry, bool) {
+	owed := d.OwedSet()
+	for _, id := range ids {
+		if e := owed[id]; supplied(e) {
+			return e, true
+		}
+	}
+	return design.OwedEntry{}, false
+}
+
 // Link attaches ids to an existing story (section 15.2).
 func Link(c *backlog.Client, d *design.Design, story string, ids []string) error {
 	if err := c.Note(story, "machinery:ids "+strings.Join(ids, " ")); err != nil {
@@ -679,7 +710,7 @@ func setStories(d *design.Design, storyOf map[string]string) error {
 	entries := append([]design.OwedEntry(nil), d.Owed...)
 	changed := false
 	for i := range entries {
-		if st, ok := storyOf[entries[i].ID]; ok && entries[i].Story != st {
+		if st, ok := storyOf[entries[i].ID]; ok && entries[i].Story != st && !supplied(entries[i]) {
 			entries[i].Story = st
 			changed = true
 		}

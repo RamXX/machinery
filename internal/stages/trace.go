@@ -1,6 +1,7 @@
 package stages
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
@@ -53,7 +54,7 @@ func Trace(ctx *Context) *report.Stage {
 	ids := d.DeclaredIDs()
 	scenarios := d.ScenarioIDs()
 	claims := tags.ClaimsOf(d, found)
-	nonAction := map[string]bool{}
+	nonAction, warned := map[string]bool{}, map[string]bool{}
 	claimedHeld := map[string]bool{}
 	proofs := d.ProofIDs()
 	for _, t := range found {
@@ -97,9 +98,10 @@ func Trace(ctx *Context) *report.Stage {
 					}
 					continue
 				}
-				if t.Kind == tags.Serves && !d.IsAct(id) && !nonAction[id] {
+				if key := fmt.Sprintf("%s:%d: %s", t.File, t.Line, id); t.Kind == tags.Serves && !d.IsAct(id) && !warned[key] {
+					warned[key] = true
 					nonAction[id] = true
-					s.Warnf("serves: %s is not an action; a serves tag credits only actions", id)
+					s.Warnf("serves: %s is not an action; a serves tag credits only actions", key)
 				}
 			}
 		}

@@ -53,6 +53,10 @@ func (a *assessment) inventory(s *section) {
 // to the model.
 func (a *assessment) design(s *section) {
 	s.stages = stages.Run(a.ctx, stages.LintStages)
+	// an owed list with a problem is not counted as if it were sound (section 11.1)
+	for _, msg := range a.ctx.Design().OwedProblems {
+		s.own.Errorf("%s", msg)
+	}
 	proposed, owed, proven, retired := a.ctx.Design().StatusCounts()
 	s.lines = append(s.lines, fmt.Sprintf("ids: %d proposed, %d owed, %d proven, %d retired", proposed, owed, proven, retired))
 	s.facts = map[string]any{"statuses": map[string]any{"proposed": proposed, "owed": owed, "proven": proven, "retired": retired}}
@@ -93,8 +97,8 @@ func (a *assessment) vitalLines(s *section) {
 	s.facts["vital_dismissed"] = dismissed
 }
 
-// trace: the stage, and every id by whether something names it. A snapshot
-// holds no receipt, so a claim here is a claim and no more (section 18.3).
+// trace: the stage, and the owed ids of the snapshot by claim, counted as
+// machinery status counts them (sections 14 and 18.3).
 func (a *assessment) trace(s *section) {
 	s.stages = stages.Run(a.ctx, []string{"trace"})
 	if a.p.Cfg.Trace == nil {
@@ -106,9 +110,14 @@ func (a *assessment) trace(s *section) {
 		s.own.Errorf("cannot read tags: %v", err)
 		return
 	}
-	split := claims.SplitIDs(d.AllIDs())
-	s.lines = split.Lines("", "claimed by a test")
-	s.facts = map[string]any{"claimed": split.Claimed.Doc(), "unnamed": split.Unnamed.Doc()}
+	ev, err := evidence.Evaluate(a.p, d, true)
+	if err != nil {
+		s.own.Errorf("cannot read the evidence: %v", err)
+		return
+	}
+	split := claims.SplitOwed(d, func(id string) bool { return ev.State(id) == evidence.Proven })
+	s.lines = split.Lines("owed, ")
+	s.facts = split.Doc()
 }
 
 func stageSection(name string) func(a *assessment, s *section) {

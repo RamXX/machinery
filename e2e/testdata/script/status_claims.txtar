@@ -1,0 +1,39 @@
+# the owed, lines of an adopted project: a claim counts only while no receipt proves the id, and
+# actions are counted on a line of their own (section 14)
+fixture shop
+cp owed.yaml design/owed.yaml
+exec sh -c 'sed "s/ act:Order.cancel//" internal/domain/order.go > o.tmp && mv o.tmp internal/domain/order.go'
+exec machinery gen
+gitinit
+
+exec machinery status
+stdout '^owed, claimed by a test, no receipt yet: 2 \(tc 2\)$'
+stdout '^owed, no test names it: 1 \(fm 1\)$'
+stdout '^owed, actions: 1 served by code, 1 not served$'
+! stdout '^owed, proven'
+! stdout '^owed, planned'
+! stdout 'act 1'
+
+# after a run the two ids have a valid pass receipt: they leave the claimed line
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 verify
+stdout 'stale owed entry: tc:ORDE-1ded14 is proven'
+exec machinery status
+stdout '^owed, claimed by a test, no receipt yet: 0$'
+stdout '^owed, no test names it: 1 \(fm 1\)$'
+stdout '^owed, proven by a receipt, still listed: 2 \(tc 2\)$'
+stdout '^owed, actions: 1 served by code, 1 not served$'
+
+-- owed.yaml --
+version: 1
+owed:
+  - id: act:Order.cancel
+    reason: "unproven at adoption (abc1234)"
+  - id: act:Order.place
+    reason: "unproven at adoption (abc1234)"
+  - id: fm:payment-provider-down
+    reason: "unproven at adoption (abc1234)"
+  - id: tc:ORDE-1ded14
+    reason: "claimed at adoption (abc1234)"
+  - id: tc:ORDE-507e4f
+    reason: "claimed at adoption (abc1234)"

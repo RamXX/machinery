@@ -88,7 +88,8 @@ func runStatus(e *Env, args []string) int {
 		if err != nil {
 			return e.Fail(err)
 		}
-		for _, l := range claims.SplitOwed(d).Lines("owed, ", "claimed by a test, no receipt yet") {
+		proven := func(id string) bool { return ev.State(id) == evidence.Proven }
+		for _, l := range claims.SplitOwed(d, proven).Lines("owed, ") {
 			fmt.Fprintln(w, l)
 		}
 	}

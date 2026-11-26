@@ -17,6 +17,7 @@ import (
 	"github.com/RamXX/machinery/internal/assess"
 	"github.com/RamXX/machinery/internal/baseline"
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/pm"
 	"github.com/RamXX/machinery/internal/project"
@@ -257,7 +258,12 @@ func (r *rehearsal) rehearse(o Options, root, out, snap string) error {
 	if err != nil {
 		return err
 	}
-	r.claims = claims.SplitOwed(d)
+	// a snapshot holds no receipts, but the count is the one status makes
+	ev, err := evidence.Evaluate(p, d, true)
+	if err != nil {
+		return err
+	}
+	r.claims = claims.SplitOwed(d, func(id string) bool { return ev.State(id) == evidence.Proven })
 	if len(r.blocked) > 0 {
 		r.adoptLine = fmt.Sprintf("adopt: blocked: machinery gen refuses while %d finding(s) stand; nothing is owed", blockedCount(r.blocked))
 	} else {

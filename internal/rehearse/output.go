@@ -59,7 +59,7 @@ func (r *rehearsal) markdown() string {
 			p("- %s: %d", c.Key, c.Count)
 		}
 		p("- total: %d", r.owedTotal)
-		for _, l := range r.claims.Lines("- ", "claimed by a test, no receipt yet") {
+		for _, l := range r.claims.Lines("- ") {
 			p("%s", l)
 		}
 	}
@@ -97,7 +97,7 @@ func (r *rehearsal) markdown() string {
 			p("- wire evidence: %s", r.planWire)
 		}
 		if r.plannedStories > 0 {
-			p("- already planned in the project: %d story(ies) are for ids planned at adoption; `plan --apply` skips each whose story is in the backlog", r.plannedStories)
+			p("- already planned in the project: %d story(ies) are for ids planned at adoption; `plan --apply` creates nothing for them: each keeps the story the project gave it", r.plannedStories)
 		}
 		if len(r.planStories) > 0 {
 			p("")
@@ -173,6 +173,8 @@ func (r *rehearsal) doc() map[string]any {
 	for _, c := range r.owed {
 		byKind[c.Key] = c.Count
 	}
+	owed := r.claims.Doc()
+	owed["by_kind"], owed["total"] = byKind, r.owedTotal
 	stageList := []any{}
 	for _, s := range r.stageOutcomes {
 		stageList = append(stageList, map[string]any{"name": s.Key, "outcome": r.outcomes[s.Key]})
@@ -205,8 +207,7 @@ func (r *rehearsal) doc() map[string]any {
 		"version": 1, "project": r.name, "head": r.head, "config": r.cfgLabel, "backlog": r.backlogLine,
 		"dirty":         map[string]any{"changed": r.changed, "untracked": r.untracked},
 		"outside_links": outside, "files": files, "waivers": waivers, "baselines": baselines,
-		"owed": map[string]any{"by_kind": byKind, "total": r.owedTotal, "claimed": r.claims.Claimed.Doc(),
-			"unnamed": r.claims.Unnamed.Doc(), "planned": r.claims.Planned.Doc()},
+		"owed":    owed,
 		"blocked": blocked, "check": map[string]any{"result": r.checkLine, "stages": stageList},
 		"plan": plan, "blocks": blocks, "fix_first": fixFirst,
 	}

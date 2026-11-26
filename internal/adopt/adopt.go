@@ -77,6 +77,9 @@ func Run(o Options) (*Result, error) {
 		if oldP, err = project.Load(root); err != nil {
 			return nil, err
 		}
+		if msg := design.OwedUnreadable(oldP); msg != "" {
+			return nil, fmt.Errorf("%s", msg)
+		}
 	} else {
 		cfgBytes = nil
 	}
@@ -151,10 +154,18 @@ func Run(o Options) (*Result, error) {
 		p = &project.Project{Root: root, Cfg: *cfg}
 	}
 
+	// a planned mark that names no story id is refused before anything is written
+	var planned map[string]string
+	if len(p.Cfg.ImportedPlanned()) > 0 {
+		var problems []string
+		if planned, problems = design.Load(p).PlannedMarks(); len(problems) > 0 {
+			return nil, fmt.Errorf("%s", strings.Join(problems, "\n"))
+		}
+	}
 	if err := describe(res, p, files); err != nil {
 		return nil, err
 	}
-	w := &worker{o: o, res: res, oldP: oldP, p: p, head: head, written: map[string]bool{}}
+	w := &worker{planned: planned, o: o, res: res, oldP: oldP, p: p, head: head, written: map[string]bool{}}
 	if newBytes != nil {
 		what := "new config"
 		if existing {
@@ -327,6 +338,7 @@ type worker struct {
 	oldP, p *project.Project
 	head    string
 	written map[string]bool
+	planned map[string]string // the project's planned marks: id to story
 }
 
 func (w *worker) record(rel, what string) {
@@ -450,7 +462,7 @@ func (w *worker) addOwed(d *design.Design) error {
 		return err
 	}
 	served := claims.Served
-	planned := d.PlannedMarks()
+	planned := w.planned
 	// Only what is new is owed: an id the committed obligation list already
 	// has was owed, or proven and pruned, before. Owing it again would undo
 	// the ratchet.
@@ -462,7 +474,7 @@ func (w *worker) addOwed(d *design.Design) error {
 			switch {
 			case planned[o.ID] != "":
 				e.Reason, e.Story = design.ReasonPlanned+at, planned[o.ID]
-			case claims.Claimed(o.ID):
+			case len(claims.Tests[o.ID]) > 0:
 				e.Reason = design.ReasonClaimed + at
 			}
 			entries = append(entries, e)
