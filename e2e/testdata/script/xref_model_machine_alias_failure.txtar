@@ -1,0 +1,412 @@
+# an event may be an alias of an action and a failure event at once, when the action itself is the
+# failing outcome: model action fail, machine events send_failed and verify_failed
+# (docs/formats.md sections 6.2, 6.4 and 6.6)
+mkdir design/machines
+
+# as failure events only, the action has no event
+cp as-failure.json design/machines/Message.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  action-event: act:Message\.fail: no on event fail in machine message '
+stdout '^failed: 1 finding\(s\)$'
+
+# as aliases only, both names are hinted as failures, and dismissing the hints would be untrue
+cp as-alias.json design/machines/Message.machine.json
+exec machinery lint --stage machines
+stdout '^  warn   design/machines/Message\.machine\.json: event send_failed looks like a failure event and is not in _failure_events$'
+stdout '^  warn   design/machines/Message\.machine\.json: event verify_failed looks like a failure event and is not in _failure_events$'
+
+# as both, nothing is hinted, the action has its events, every alias is printed and counted, and
+# each event asks for a failure mode like any failure event
+cp both.json design/machines/Message.machine.json
+exec machinery lint --stage machines
+! stdout 'warn'
+stdout '^passed$'
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   alias: message: send_failed stands for fail$'
+stdout '^  warn   alias: message: verify_failed stands for fail$'
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions, 2 aliases$'
+stdout '^passed$'
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  failure-event-mode: event:message\.send_failed: no failure mode names this failure event; '
+stdout '^  ERROR  failure-event-mode: event:message\.verify_failed: no failure mode names this failure event; '
+stdout '^failed: 2 finding\(s\)$'
+cp all-modes.yaml design/failure-modes.yaml
+exec machinery lint --stage xref-failure
+stdout '^checked: 3 failure modes, 0 invokes, 0 dependencies, 0 tiered actions, 1 failure states, 2 failure events$'
+stdout '^passed$'
+
+# the combination hides no caller command: an event that names an action is neither listed nor aliased
+cp hides.json design/machines/Message.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: message\.fail: listed in _failure_events and an action of Message; an action is a caller''s command, not an event from outside: remove it from _failure_events in design/machines/Message\.machine\.json$'
+stdout '^  ERROR  event-action: message\.fail: _aliases gives the event the action send, and fail is itself an action of Message; an action is not hidden behind another: remove it from _aliases in design/machines/Message\.machine\.json$'
+! stdout 'alias: message: fail '
+
+# and an action that has an event of its own name still takes no alias
+cp own.json design/machines/Message.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: message\.send_failed: _aliases gives the event the action send, and send has an event of its own name in message; an action has its own event or stands behind aliases, not both: remove it from _aliases in design/machines/Message\.machine\.json$'
+! stdout 'alias: message: send_failed'
+
+# an aliased event that arrives from outside without reporting a failure is still refused
+cp external.json design/machines/Message.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Message\.machine\.json: event ''send_failed'' is in both _aliases and _external_events; an alias says the event is a caller''s action, so it does not arrive from outside \(keep one\)$'
+
+# a declared failure is not dismissed, aliased or not
+cp dismissed.json design/machines/Message.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Message\.machine\.json: _not_failures names ''send_failed'', which is in _failure_events; a declared failure is not dismissed \(keep one\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/post.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: message-failed
+    subject: state:message.Failed
+    failure: "The message ends as failed."
+    required: surface
+    behavior: "The sender sees MESSAGE_FAILED."
+-- all-modes.yaml --
+version: 1
+failure_modes:
+  - id: message-failed
+    subject: state:message.Failed
+    failure: "The message ends as failed."
+    required: surface
+    behavior: "The sender sees MESSAGE_FAILED."
+  - id: send-failed
+    subject: event:message.send_failed
+    failure: "The carrier does not take the message."
+    required: surface
+    behavior: "The message ends as failed."
+  - id: verify-failed
+    subject: event:message.verify_failed
+    failure: "The carrier cannot confirm the delivery."
+    required: surface
+    behavior: "The message ends as failed."
+-- design/model/post.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Post
+enums:
+  MessageStatus:
+    values:
+      - {name: Queued, definition: "Waiting to be sent."}
+      - {name: Sent, definition: "Handed to the carrier."}
+      - {name: Failed, definition: "Not delivered."}
+entities:
+  Message:
+    definition: "One message to one reader."
+    attributes:
+      - {name: status, type: MessageStatus}
+    actions:
+      - {name: send, actor: Sender}
+      - {name: fail, actor: Carrier}
+-- as-failure.json --
+{
+  "id": "message",
+  "_failure_events": [
+    "send_failed",
+    "verify_failed"
+  ],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}
+-- as-alias.json --
+{
+  "id": "message",
+  "_aliases": {
+    "send_failed": "fail",
+    "verify_failed": "fail"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}
+-- both.json --
+{
+  "id": "message",
+  "_failure_events": [
+    "send_failed",
+    "verify_failed"
+  ],
+  "_aliases": {
+    "send_failed": "fail",
+    "verify_failed": "fail"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}
+-- hides.json --
+{
+  "id": "message",
+  "_failure_events": [
+    "fail",
+    "verify_failed"
+  ],
+  "_aliases": {
+    "fail": "send",
+    "verify_failed": "fail"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        },
+        "fail": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}
+-- own.json --
+{
+  "id": "message",
+  "_failure_events": [
+    "send_failed",
+    "verify_failed"
+  ],
+  "_aliases": {
+    "send_failed": "send",
+    "verify_failed": "fail"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}
+-- external.json --
+{
+  "id": "message",
+  "_failure_events": [
+    "verify_failed"
+  ],
+  "_external_events": [
+    "send_failed"
+  ],
+  "_aliases": {
+    "send_failed": "fail",
+    "verify_failed": "fail"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}
+-- dismissed.json --
+{
+  "id": "message",
+  "_failure_events": [
+    "send_failed",
+    "verify_failed"
+  ],
+  "_aliases": {
+    "send_failed": "fail",
+    "verify_failed": "fail"
+  },
+  "_not_failures": {
+    "send_failed": "the action is fail"
+  },
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {
+        "send": {
+          "target": "Sent"
+        },
+        "send_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "verify_failed": "nothing was sent, so nothing is verified"
+      }
+    },
+    "Sent": {
+      "on": {
+        "verify_failed": {
+          "target": "Failed"
+        }
+      },
+      "_ignores": {
+        "send": "already sent; refused with MESSAGE_SENT",
+        "send_failed": "the carrier took it; a late report is dropped"
+      }
+    },
+    "Failed": {
+      "type": "final",
+      "tags": "failure"
+    }
+  }
+}

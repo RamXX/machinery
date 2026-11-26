@@ -68,6 +68,7 @@ func (t *translator) annotate(out *ir.Object) {
 
 	external, failure := map[string]bool{}, map[string]bool{}
 	aliases, aliasKey := map[string]string{}, map[string]string{}
+	refusals, refusalKey := map[string]string{}, map[string]string{}
 	dismissed, dismissOrder := map[string]dismissal{}, []string{}
 	t.listed = map[string]string{}
 	for _, k := range keys {
@@ -107,26 +108,33 @@ func (t *translator) annotate(out *ir.Object) {
 			}
 		}
 		t.dismiss(k, a.NotFailures, events, states, dismissed, &dismissOrder)
-		evs := make([]string, 0, len(a.Aliases))
-		for ev := range a.Aliases {
-			evs = append(evs, ev)
-		}
-		sort.Strings(evs)
-		for _, ev := range evs {
-			act := a.Aliases[ev]
-			switch have, dup := aliases[ev]; {
-			case !events[ev]:
-				t.fail("import.machines.annotate %s: aliases names event %s, which no state of the machine handles or ignores; correct the name or remove the alias", k, ev)
-			case dup && have != act:
-				t.fail("import.machines.annotate %s and %s give event %s different actions (%s, %s); keep one", aliasKey[ev], k, ev, have, act)
-			default:
-				aliases[ev], aliasKey[ev] = act, k
+		for _, m := range []struct {
+			list, noun, actions string
+			given               map[string]string
+			into, from          map[string]string
+		}{{"aliases", "alias", "actions", a.Aliases, aliases, aliasKey}, {"refusal_events", "refusal", "refused actions", a.RefusalEvents, refusals, refusalKey}} {
+			evs := make([]string, 0, len(m.given))
+			for ev := range m.given {
+				evs = append(evs, ev)
+			}
+			sort.Strings(evs)
+			for _, ev := range evs {
+				act := m.given[ev]
+				switch have, dup := m.into[ev]; {
+				case !events[ev]:
+					t.fail("import.machines.annotate %s: %s names event %s, which no state of the machine handles or ignores; correct the name or remove the %s", k, m.list, ev, m.noun)
+				case dup && have != act:
+					t.fail("import.machines.annotate %s and %s give event %s different %s (%s, %s); keep one", m.from[ev], k, ev, m.actions, have, act)
+				default:
+					m.into[ev], m.from[ev] = act, k
+				}
 			}
 		}
 	}
 	t.addNames(out, "_external_events", external)
 	t.addNames(out, "_failure_events", failure)
-	t.addAliases(out, aliases, aliasKey)
+	t.addEventMap(out, "_aliases", "alias", "action", aliases, aliasKey)
+	t.addEventMap(out, "_refusal_events", "refusal", "refused action", refusals, refusalKey)
 	t.addDismissed(out, dismissed, dismissOrder)
 }
 
@@ -235,11 +243,14 @@ func (t *translator) addDismissed(out *ir.Object, dismissed map[string]dismissal
 			tagged[s.Path] = true
 		}
 	}
+	refusal := out.GetObject("_refusal_events")
 	for _, target := range order {
 		d := dismissed[target]
 		switch {
 		case !d.state && failure[target]:
 			t.fail("import.machines.annotate %s: not_failures names %s, which is a failure event of the machine; a declared failure is not dismissed (keep one)", d.key, d.name)
+		case !d.state && refusal.Has(target):
+			t.fail("import.machines.annotate %s: not_failures names %s, which is a refusal event of the machine; a refusal is never hinted, so there is no hint to dismiss (remove it)", d.key, d.name)
 		case d.state && tagged[target]:
 			t.fail("import.machines.annotate %s: not_failures names %s, which is the state %s, tagged failure; a declared failure is not dismissed (keep one)", d.key, d.name, target)
 		case res.Has(target):
@@ -325,15 +336,17 @@ func (t *translator) addNames(out *ir.Object, key string, names map[string]bool)
 	out.Set(key, ir.ArrayValue(list))
 }
 
-// addAliases adds the aliases, in event order, to the root _aliases, after
-// the ones the source has. An event the source gives another action is a
-// problem; a value of another shape is left to the lint.
-func (t *translator) addAliases(out *ir.Object, aliases, from map[string]string) {
+// addEventMap adds the aliases or the refusal events, in event order, to the
+// root object of that key (_aliases, _refusal_events), after the entries
+// the source has. An event the source gives another action is a problem; a
+// value of another shape is left to the lint. noun and action name the
+// entry and its value in messages.
+func (t *translator) addEventMap(out *ir.Object, key, noun, action string, aliases, from map[string]string) {
 	if len(aliases) == 0 {
 		return
 	}
 	res := ir.NewObject()
-	if v := out.Get2("_aliases"); v != nil {
+	if v := out.Get2(key); v != nil {
 		if v.Kind != ir.KindObject {
 			return
 		}
@@ -349,12 +362,12 @@ func (t *translator) addAliases(out *ir.Object, aliases, from map[string]string)
 	for _, ev := range evs {
 		if have := res.Get2(ev); have != nil {
 			if have.Kind != ir.KindString || have.AsString() != aliases[ev] {
-				t.fail("import.machines.annotate %s gives event %s the action %s, and the source gives it %s; keep one", from[ev], ev, aliases[ev], textOf(have))
+				t.fail("import.machines.annotate %s gives event %s the %s %s, and the source gives it %s; keep one", from[ev], ev, action, aliases[ev], textOf(have))
 			}
 			continue
 		}
 		res.Set(ev, ir.StringValue(aliases[ev]))
-		t.listed["_aliases "+ev] = fmt.Sprintf("remove the alias from import.machines.annotate %s (for %s)", from[ev], t.src)
+		t.listed[key+" "+ev] = fmt.Sprintf("remove the %s from import.machines.annotate %s (for %s)", noun, from[ev], t.src)
 	}
-	out.Set("_aliases", ir.ObjectValue(res))
+	out.Set(key, ir.ObjectValue(res))
 }

@@ -215,6 +215,9 @@ type Annotate struct {
 	FailureEvents  []string          `yaml:"failure_events,omitempty"`
 	FailureStates  []string          `yaml:"failure_states,omitempty"`
 	Aliases        map[string]string `yaml:"aliases,omitempty"`
+	// RefusalEvents maps an event by which the machine writes that it
+	// refused a caller's command to the action it refuses.
+	RefusalEvents map[string]string `yaml:"refusal_events,omitempty"`
 	// NotFailures dismisses the name hint of an event or a state, by its
 	// exact name, with the reason it is no failure.
 	NotFailures map[string]string `yaml:"not_failures,omitempty"`
@@ -878,8 +881,8 @@ func (c *Config) validateImport() error {
 		if err := CheckPath("import.machines.annotate", k); err != nil {
 			return err
 		}
-		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases)+len(a.NotFailures) == 0 {
-			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states, aliases or not_failures", k)
+		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases)+len(a.RefusalEvents)+len(a.NotFailures) == 0 {
+			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states, aliases, refusal_events or not_failures", k)
 		}
 		for _, l := range []struct {
 			name     string
@@ -897,6 +900,11 @@ func (c *Config) validateImport() error {
 		for ev, act := range a.Aliases {
 			if strings.TrimSpace(ev) == "" || strings.TrimSpace(act) == "" {
 				return Errf("import.machines.annotate.%s.aliases: an event and its action must not be empty", k)
+			}
+		}
+		for ev, act := range a.RefusalEvents {
+			if strings.TrimSpace(ev) == "" || strings.TrimSpace(act) == "" {
+				return Errf("import.machines.annotate.%s.refusal_events: an event and its action must not be empty", k)
 			}
 		}
 		for name, reason := range a.NotFailures {

@@ -303,10 +303,15 @@ func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevent
 			return ""
 		}
 		mid, ev, _ := strings.Cut(name, ".")
-		if d.MachineByID(mid) == nil {
+		m := d.MachineByID(mid)
+		if m == nil {
 			return fmt.Sprintf("no machine has the id %s", mid)
 		}
-		return fmt.Sprintf("%s is not in the _failure_events of machine %s", ev, mid)
+		if m.RefusalEvents()[ev] != "" {
+			// a declared refusal: a failure mode may name it, none is asked for
+			return ""
+		}
+		return fmt.Sprintf("%s is not in the _failure_events of machine %s (nor in its _refusal_events)", ev, mid)
 	case "machine":
 		// the machine as a whole, bound to the model or not
 		if d.MachineByID(name) == nil {

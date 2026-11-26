@@ -25,15 +25,16 @@ exec mrun 1 lint --stage machines
 stdout '^  ERROR  design/machines/Job\.machine\.json: _aliases names ''handed_over'' but no state handles or ignores it; the marker is stale \(remove it, or wire the event\)$'
 stdout '^failed: 1 finding\(s\)$'
 
-# an aliased event is a caller's action: it is not external and not a failure event
+# an aliased event is a caller's action: it is not external
 cp external.json design/machines/Job.machine.json
 exec mrun 1 lint --stage machines
 stdout '^  ERROR  design/machines/Job\.machine\.json: event ''picked_up'' is in both _aliases and _external_events; an alias says the event is a caller''s action, so it does not arrive from outside \(keep one\)$'
 stdout '^failed: 1 finding\(s\)$'
+
+# it may be a failure event: the action it stands for is then itself the failing outcome
 cp failure.json design/machines/Job.machine.json
-exec mrun 1 lint --stage machines
-stdout '^  ERROR  design/machines/Job\.machine\.json: event ''picked_up'' is in both _aliases and _failure_events; an alias says the event is a caller''s action, so it does not arrive from outside \(keep one\)$'
-stdout '^failed: 1 finding\(s\)$'
+exec machinery lint --stage machines
+stdout '^passed$'
 
 -- machinery.yaml --
 version: 2

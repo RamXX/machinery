@@ -142,8 +142,9 @@ func servesResolves(d *design.Design, id string) bool {
 // xrefCounts is what the stage reports as checked.
 type xrefCounts struct {
 	machines, lifecycle, operational, states, events, actions, withActions int
-	// aliases holds one line per alias in effect (section 6.4)
-	aliases []string
+	// aliases holds one line per alias in effect (section 6.4), and
+	// refusals one per refusal event that holds
+	aliases, refusals []string
 }
 
 // lifecycleGroup is an entity with its lifecycle machines, in machine order.
@@ -166,7 +167,7 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 		if b.operational {
 			c.operational++
 			if len(b.problems) == 0 {
-				c.events += checkOperationalEvents(&fs, &c.aliases, d, m)
+				c.events += checkOperationalEvents(&fs, &c, d, m)
 			}
 			continue
 		}
@@ -188,7 +189,7 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 			c.states += len(domainStates(m))
 		}
 		checkStateEnum(&fs, d, g)
-		c.events += checkLifecycleEvents(&fs, &c.aliases, g)
+		c.events += checkLifecycleEvents(&fs, &c, g)
 		c.actions += len(g.entity.Actions)
 	}
 	for _, md := range d.Models {
@@ -303,12 +304,60 @@ func aliasedEvents(fs *xfindings, lines *[]string, m *machine.Machine, r aliasRu
 	return valid, all
 }
 
+// refusalRules is what the refusal events of a machine are held to
+// (section 6.4).
+type refusalRules struct {
+	entityOf map[string]string // every action behind the machine, with its entity
+	of       string            // what those are the actions of
+	missing  string            // what to do about an action that is not one
+	handled  map[string]bool   // the events the machine handles under on
+}
+
+// refusalEvents returns the events a machine declares as the refusal of a
+// caller's command (_refusal_events). One holds when the event is no action
+// of any entity behind the machine, the action it refuses is one of those,
+// and that action has an event of its own name in the machine; the others
+// are findings of event-action. Every one that holds is a line of lines:
+// none is silent.
+func refusalEvents(fs *xfindings, lines *[]string, m *machine.Machine, r refusalRules) (all map[string]bool) {
+	all = map[string]bool{}
+	refusals := m.RefusalEvents()
+	for _, ev := range sortedKeys(refusals) {
+		act := refusals[ev]
+		all[ev] = true
+		where := "remove it from _refusal_events in " + m.Path
+		if by := m.Listed["_refusal_events "+ev]; by != "" {
+			where = by
+		}
+		switch ent, evIsAction := r.entityOf[ev]; {
+		case evIsAction:
+			fs.add("event-action", m.ID+"."+ev, "_refusal_events gives the event the action %s, and %s is itself an action of %s; an action is a caller's command, not the refusal of one: %s", act, ev, ent, where)
+		case r.entityOf[act] == "":
+			fs.add("event-action", m.ID+"."+ev, "_refusal_events names action %s, which is not an action of %s; %s, or %s", act, r.of, r.missing, where)
+		case !r.handled[act]:
+			fs.add("event-action", m.ID+"."+ev, "_refusal_events gives the event the action %s, and %s has no event of its own name in %s; a refusal is of a command the machine handles: %s", act, act, m.ID, where)
+		default:
+			*lines = append(*lines, fmt.Sprintf("refusal: %s: %s refuses %s", m.ID, ev, act))
+		}
+	}
+	return all
+}
+
+func sortedKeys(m map[string]string) []string {
+	res := make([]string, 0, len(m))
+	for k := range m {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
+}
+
 // checkOperationalEvents applies event-action to an operational machine
 // that binds to the model and returns how many events it has: each event is
 // an action of an entity it serves, the action of an act id it serves, or
 // declared external. A machine that serves only entities with no action
 // compared nothing, and that is one finding, not one per event.
-func checkOperationalEvents(fs *xfindings, aliasLines *[]string, d *design.Design, m *machine.Machine) int {
+func checkOperationalEvents(fs *xfindings, c *xrefCounts, d *design.Design, m *machine.Machine) int {
 	serves, _ := m.Serves()
 	allowed := map[string]bool{}
 	// entityOf holds every action of every entity behind what the machine
@@ -352,10 +401,11 @@ func checkOperationalEvents(fs *xfindings, aliasLines *[]string, d *design.Desig
 	for _, ev := range evs {
 		ownIn[ev] = m.ID
 	}
-	_, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: allowed, of: of, missing: "serve the action (act:<Entity>.<action>)", ownIn: ownIn, handled: eventSetOf(m)})
+	_, aliased := aliasedEvents(fs, &c.aliases, m, aliasRules{entityOf: entityOf, isAction: allowed, of: of, missing: "serve the action (act:<Entity>.<action>)", ownIn: ownIn, handled: eventSetOf(m)})
+	refused := refusalEvents(fs, &c.refusals, m, refusalRules{entityOf: entityOf, of: "an entity behind " + of, missing: "name one", handled: eventSetOf(m)})
 	var unmatched []string
 	for _, ev := range evs {
-		if !allowed[ev] && !external[ev] && !aliased[ev] {
+		if !allowed[ev] && !external[ev] && !aliased[ev] && !refused[ev] {
 			unmatched = append(unmatched, ev)
 		}
 	}
@@ -377,7 +427,7 @@ func checkOperationalEvents(fs *xfindings, aliasLines *[]string, d *design.Desig
 // lifecycle machines of one entity and returns how many events they have.
 // An entity that declares no action is one finding, not one per event: the
 // one missing declaration is the cause of all of them.
-func checkLifecycleEvents(fs *xfindings, aliasLines *[]string, g *lifecycleGroup) (events int) {
+func checkLifecycleEvents(fs *xfindings, c *xrefCounts, g *lifecycleGroup) (events int) {
 	e := g.entity
 	acts := map[string]bool{}
 	for _, a := range e.Actions {
@@ -402,7 +452,8 @@ func checkLifecycleEvents(fs *xfindings, aliasLines *[]string, g *lifecycleGroup
 	}
 	for _, m := range g.machines {
 		external := externalEvents(fs, m, entityOf)
-		alias, aliased := aliasedEvents(fs, aliasLines, m, aliasRules{entityOf: entityOf, isAction: acts, of: e.Name, missing: "name an action of " + e.Name, ownIn: ownIn, handled: eventSetOf(m)})
+		alias, aliased := aliasedEvents(fs, &c.aliases, m, aliasRules{entityOf: entityOf, isAction: acts, of: e.Name, missing: "name an action of " + e.Name, ownIn: ownIn, handled: eventSetOf(m)})
+		refused := refusalEvents(fs, &c.refusals, m, refusalRules{entityOf: entityOf, of: e.Name, missing: "name an action of " + e.Name, handled: eventSetOf(m)})
 		evs := m.Table.Events()
 		events += len(evs)
 		ids = append(ids, m.ID)
@@ -411,7 +462,7 @@ func checkLifecycleEvents(fs *xfindings, aliasLines *[]string, g *lifecycleGroup
 			if act, ok := alias[ev]; ok {
 				evSet[act] = true // the event is that action under another name
 			}
-			if acts[ev] || external[ev] || aliased[ev] {
+			if acts[ev] || external[ev] || aliased[ev] || refused[ev] {
 				continue
 			}
 			if len(e.Actions) > 0 {
@@ -462,13 +513,16 @@ func XrefModelMachine(ctx *Context) *report.Stage {
 		w.find(s, f.rule, f.subject, "%s", f.msg)
 	}
 	w.stale(s)
-	for _, line := range c.aliases {
+	for _, line := range append(append([]string{}, c.aliases...), c.refusals...) {
 		s.Warnf("%s", line)
 	}
 	s.Count(c.machines, "machines").Count(c.lifecycle, "lifecycle machines").Count(c.operational, "operational machines").
 		Count(c.states, "domain states").Count(c.events, "events").Count(c.actions, "actions").Count(c.withActions, "entities with actions")
 	if len(c.aliases) > 0 {
 		s.Count(len(c.aliases), "aliases")
+	}
+	if len(c.refusals) > 0 {
+		s.Count(len(c.refusals), "refusal events")
 	}
 	if len(d.Machines) == 0 && len(d.MachineProblems) == 0 {
 		s.NotDemonstrated("nothing to check")

@@ -1,0 +1,391 @@
+# _refusal_events declares the event by which a machine writes that it refused a caller's command:
+# rule event-action accepts it, and every declaration is printed and counted
+# (docs/formats.md section 6.4)
+mkdir design/machines
+
+# undeclared, the event is no action; an alias is no way out, the action has its own event
+cp plain.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: event is not an action of Order; '
+stdout '^failed: 1 finding\(s\)$'
+cp alias.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _aliases gives the event the action cancel, and cancel has an event of its own name in order; '
+
+# declared, the rule holds, and the declaration is one line of the stage and counted
+cp declared.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   refusal: order: cancel_refused refuses cancel$'
+stdout -count=1 '^  warn   '
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions, 1 refusal events$'
+stdout '^passed$'
+
+# the action must be one of the entity
+cp unknown.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events names action revoke, which is not an action of Order; name an action of Order, or remove it from _refusal_events in design/machines/Order\.machine\.json$'
+! stdout 'refusal: order'
+! stdout 'refusal events$'
+stdout '^failed: 1 finding\(s\)$'
+
+# and have an event of its own name in the machine: a refusal is of a command the machine handles
+cp no-event.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events gives the event the action cancel, and cancel has no event of its own name in order; a refusal is of a command the machine handles: remove it from _refusal_events in design/machines/Order\.machine\.json$'
+stdout '^  ERROR  action-event: act:Order\.cancel: no on event cancel in machine order '
+! stdout 'refusal: order'
+stdout '^failed: 2 finding\(s\)$'
+
+# an event that names an action is that action, never the refusal of another
+cp action.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel: _refusal_events gives the event the action pay, and cancel is itself an action of Order; an action is a caller''s command, not the refusal of one: remove it from _refusal_events in design/machines/Order\.machine\.json$'
+! stdout 'refusal: order: cancel '
+stdout '^failed: 1 finding\(s\)$'
+
+# the finding is a cross-reference finding and is waived like one
+cp waived.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: event-action: order\.cancel: _refusal_events gives the event the action pay, '
+cp base.yaml machinery.yaml
+cp declared.json design/machines/Order.machine.json
+
+# an operational machine: the action is one of an entity behind what it serves, with its event in the machine
+cp envelope.json design/machines/Envelope.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   refusal: envelope: pay_refused refuses pay$'
+stdout '^  warn   refusal: order: cancel_refused refuses cancel$'
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 5 events, 2 actions, 1 entities with actions, 2 refusal events$'
+stdout '^passed$'
+cp envelope-unknown.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope\.pay_refused: _refusal_events names action revoke, which is not an action of an entity behind what the machine serves \(act:Order\.pay\); name one, or remove it from _refusal_events in design/machines/Envelope\.machine\.json$'
+cp envelope-no-event.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope\.pay_refused: _refusal_events gives the event the action cancel, and cancel has no event of its own name in envelope; a refusal is of a command the machine handles: remove it from _refusal_events in design/machines/Envelope\.machine\.json$'
+rm design/machines/Envelope.machine.json
+
+# a refusal is no failure: no failure mode is asked for it, and one may still name it
+exec machinery lint --stage xref-failure
+stdout '^checked: 1 failure modes, 0 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events$'
+stdout '^passed$'
+cp other-event.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  subject-resolves: event:order\.pay: failure mode pay-late: pay is not in the _failure_events of machine order \(nor in its _refusal_events\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+waivers:
+  - {rule: event-action, id: "order.cancel", reason: "the event is renamed next"}
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: cancel-too-late
+    subject: event:order.cancel_refused
+    failure: "A customer cancels an order that is paid."
+    required: surface
+    behavior: "The caller sees ORDER_ALREADY_PAID and the order stays paid."
+-- other-event.yaml --
+version: 1
+failure_modes:
+  - id: pay-late
+    subject: event:order.pay
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- plain.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "actions": "recordRefusal"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- alias.json --
+{
+  "id": "order",
+  "_aliases": {
+    "cancel_refused": "cancel"
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "actions": "recordRefusal"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- declared.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": "cancel"
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "actions": "recordRefusal"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- unknown.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": "revoke"
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "actions": "recordRefusal"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- no-event.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": "cancel"
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "actions": "recordRefusal"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- action.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel": "pay",
+    "cancel_refused": "cancel"
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "actions": "recordRefusal"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- envelope.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": [
+    "act:Order.pay"
+  ],
+  "_refusal_events": {
+    "pay_refused": "pay"
+  },
+  "initial": "idle",
+  "states": {
+    "idle": {
+      "on": {
+        "pay": {
+          "target": "busy"
+        }
+      }
+    },
+    "busy": {
+      "on": {
+        "pay_refused": {
+          "target": "idle"
+        }
+      }
+    }
+  }
+}
+-- envelope-unknown.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": [
+    "act:Order.pay"
+  ],
+  "_refusal_events": {
+    "pay_refused": "revoke"
+  },
+  "initial": "idle",
+  "states": {
+    "idle": {
+      "on": {
+        "pay": {
+          "target": "busy"
+        }
+      }
+    },
+    "busy": {
+      "on": {
+        "pay_refused": {
+          "target": "idle"
+        }
+      }
+    }
+  }
+}
+-- envelope-no-event.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": [
+    "act:Order.pay"
+  ],
+  "_refusal_events": {
+    "pay_refused": "cancel"
+  },
+  "initial": "idle",
+  "states": {
+    "idle": {
+      "on": {
+        "pay": {
+          "target": "busy"
+        }
+      }
+    },
+    "busy": {
+      "on": {
+        "pay_refused": {
+          "target": "idle"
+        }
+      }
+    }
+  }
+}
