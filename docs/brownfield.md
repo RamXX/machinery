@@ -132,6 +132,15 @@ lifecycle machine per attribute, each an aspect with its own `_aspect` name
 (`{lifecycle_of, aspect}` in `import.machines.bind`). An operational machine's events are held to what it serves: an action
 it serves, or an event it lists in `_external_events`.
 
+**Link the failure catalog.** A catalog read through `import.failure_modes` owes every row, and
+stage `xref-failure` is not demonstrated while one row names no subject: it prints how many are
+linked and how many are not, and one linked row among hundreds is no pass. The links file
+(`docs/formats.md` section 5.4.1) takes many rows per entry, `ids: [RISK-10..RISK-24, RISK-31]`,
+so a catalog is linked group by group. A row about the system as a whole or a part of it that
+is no entity, dependency or machine (a build, a deployment) takes the subject `system:<name>`,
+with the name declared under `systems` in `machinery.yaml`; a row that names nothing in the
+system at all is declared `no_subject`, with the reason.
+
 **Read your machines as they are.** `import.machines` (`docs/formats.md` section 5.2.1) takes
 globs anywhere in the project, so a lifecycle file kept beside its service is read with the
 rest. `states: pascal` turns `on_hold` into the domain state `OnHold`;

@@ -96,6 +96,9 @@ checkers:                       # optional: external checkers (section 22)
 dependencies:                   # optional: external dependencies of the system
   - name: postgres
     posture: real               # real | sandbox
+systems:                        # optional: the system as a whole and its named parts, for failure-mode subjects (section 5.4)
+  - name: build                 # required: ^[a-z][a-z0-9-]*$, unique
+    about: "how the shop is built and released"   # optional
 trace:                          # optional
   code: ["internal/**/*.go"]    # files that may carry machinery:serves tags; default: scope
   tests: ["e2e/**"]             # files that may carry machinery:verifies tags
@@ -197,6 +200,12 @@ Rules:
 - `delegate.policy` is the one path that may leave the project root: it is absolute, or relative to
   the root, and names a file the owner keeps (section 15.9). An empty one is a config error
   (`delegate.policy is required`).
+- `systems` names what a failure mode may be about that is not an entity, a dependency or a
+  machine: the system as a whole, or a part of it such as its build or its deployment. A failure
+  mode names one as `system:<name>` (section 5.4). An entry without a name
+  (`systems: name is required`), a name that does not match the pattern
+  (`systems: name "<name>" must match ^[a-z][a-z0-9-]*$`) and a name declared twice
+  (`systems: duplicate name "<name>"`) are config errors.
 - An empty marker in `trace.markers` is a config error
   (`trace.markers.verifies: a marker must not be empty`).
 - `constraints.cores` needs `max_file_lines` and `max_func_lines`, each a positive number
@@ -660,9 +669,33 @@ failure_modes:
 `id`, `subject`, `failure`, `required` and `behavior` are required. Unknown keys are an ERROR.
 
 Subject forms: `invoke:<machine id>.<src>`, `dependency:<name>`, `act:<Entity>.<action>`,
-`entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path)
-and `event:<machine id>.<event>` (a failure event). `required: refuse` is only valid with
-`kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject.
+`entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path),
+`event:<machine id>.<event>` (a failure event) and `system:<name>` (the system as a whole or a
+named part of it, declared under `systems`, section 2). `required: refuse` is only valid with
+`kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject. A subject of another form
+is `ERROR  <file>: <id>: subject "<subject>" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>`.
+
+A `system:` subject is for a failure mode about nothing the model, the machines or the
+dependencies hold: a release built without a signature, clocks that disagree. Its name must be
+declared (rule `subject-resolves`, section 6.6) and that is the only cross-reference rule it
+takes part in: it is compared with no entity, action, state or event, and no rule asks for a
+failure mode per declared system. `required`, `failure` and `behavior` are as mandatory as for
+any failure mode.
+
+A failure mode that names no subject at all says so, with the reason, in place of `subject`:
+
+```yaml
+  - id: audit-log-full
+    no_subject: "the audit log is written by the host, which the design does not model"
+    failure: "The audit log cannot take another line."
+    required: fail-closed
+    behavior: "The shop stops taking orders until there is room."
+```
+
+It is an obligation like any other and takes part in no subject rule of `xref-failure`. Both
+keys together are `ERROR  <file>: <id>: subject and no_subject are both set; name the subject or say why there is none`,
+a blank reason is `ERROR  <file>: <id>: no_subject needs a reason`, and `kind: abuse` is refused
+as for any failure mode without an `act` or `entity` subject.
 
 #### 5.4.1 Failure modes kept as Markdown tables
 
@@ -705,20 +738,54 @@ version: 1
 links:
   - {id: RISK-3, subject: "invoke:loan_desk.reserveCopy", required: retry-bounded}
   - {id: RISK-7, kind: abuse, subject: "act:Loan.renew", required: refuse}
+  - {ids: [RISK-10..RISK-24, RISK-31], subject: "system:build", required: fail-closed}
+  - {id: RISK-40, no_subject: "the shelf list is kept on paper, outside the system"}
 ```
 
-`id` is the catalog id, compared case-insensitively. `subject` and `required` are required and
-`kind` is optional (default `fault`), with the value rules of section 5.4 and its messages,
-prefixed `<links file>: <id>`. An id that is not an imported row is
-`ERROR  <links file>: <id>: no failure-mode row of <file> has this id`, one listed twice is
-`ERROR  <links file>: <id>: listed twice`, and an unknown key is an ERROR.
+An entry names one row with `id` or many with `ids`, never both
+(`ERROR  <links file>: link <n>: id and ids are both set; keep one`,
+`ERROR  <links file>: link <n>: id or ids is required`; `<n>` counts the entries from 1). An id is
+the catalog id, compared case-insensitively.
 
-- A **linked** row is a failure mode like a native one, and takes part in every rule of stage
-  `xref-failure`.
-- An **unlinked** row is an obligation all the same: `fm:<id>` is owed, claimed and traced like
-  any failure mode. It names nothing, so it takes part in no subject rule of `xref-failure`: it
-  neither resolves nor covers an invoke, a dependency, an action, a failure state or a failure
-  event.
+- **`ids`** is a list of ids and of inclusive ranges `<first>..<last>`. The two ends of a range
+  share everything before their trailing digits, compared case-insensitively, and the range
+  names that prefix followed by every number from the first to the last, each written with at
+  least as many digits as the first end has: `FM-01..FM-23` is `FM-01`, `FM-02` to `FM-23`, and
+  `FM-08..FM-101` is `FM-08` to `FM-99`, then `FM-100` and `FM-101`. A range holds at most 10000
+  ids.
+- **Values.** `subject` and `required` are required and `kind` is optional (default `fault`),
+  with the value rules of section 5.4 and its messages. `no_subject: "<reason>"` in place of
+  `subject` declares the rows subject-less (section 5.4); `required` and `kind` are then
+  optional. Every row an entry names takes its values. The value rules are checked once per
+  entry.
+- **Messages** are prefixed `<links file>: <entry>`, where `<entry>` is the `id`, or the items of
+  `ids` as written, joined by `, ` (the first three and `, ...` when there are more). A
+  malformed item is `<item> is not an id or a range <first>..<last>`,
+  `the ends of the range <item> must end in a number`,
+  `the ends of the range <item> do not share a prefix`, `the range <item> runs backwards` or
+  `the range <item> names <n> ids; a range holds at most 10000`, and the entry is then not read.
+  An id an entry names twice is `<id> is listed twice`.
+- **Every id must be a row.** For `id`:
+  `ERROR  <links file>: <id>: no failure-mode row of <file> has this id`. For `ids`, one finding
+  per entry: `no failure-mode row of <file> has the id <id>`, or
+  `has the ids <id>, <id>` with the first five and `and <n> more`. The rows that do exist take the
+  entry's values.
+- **Overlap.** A row two entries name is one finding per pair of entries, naming both:
+  `ERROR  <links file>: links <n> (<entry>) and <m> (<entry>) overlap: <ids>` (the first five ids
+  as the later entry writes them, and `and <n> more`). The row keeps the values of the first.
+- An unknown key is an ERROR.
+
+Every imported row is then one of three:
+
+- A **linked** row (an entry gives it a subject) is a failure mode like a native one, and takes
+  part in every rule of stage `xref-failure`.
+- A **subject-less** row (an entry declares it `no_subject`, with the reason) is an obligation
+  like any failure mode and takes part in no subject rule.
+- An **unlinked** row (no entry names it) is an obligation all the same: `fm:<id>` is owed,
+  claimed and traced like any failure mode. It names nothing, so it takes part in no subject
+  rule of `xref-failure`: it neither resolves nor covers an invoke, a dependency, an action, a
+  failure state or a failure event. While one row is unlinked, stage `xref-failure` is not
+  demonstrated (section 6.6).
 
 ### 5.5 Risk file
 
@@ -773,7 +840,8 @@ nor `import.machines` is configured. With `import.machines` the translation find
 Parses the file against section 5.4, and the catalog and its links file against section 5.4.1.
 Unique ids, valid `kind` and `required` values, well-formed `subject`. `checked:` counts failure
 modes, native and imported, and, of those, abuse cases. When `import.failure_modes` is configured
-it also counts the imported rows and, of those, the unlinked ones:
+it also counts the imported rows and, of those, the unlinked ones (a row declared subject-less is
+not unlinked, section 5.4.1):
 `checked: 9 failure modes, 1 abuse cases, 7 imported, 4 unlinked`. Not applicable when neither
 `design.failure_modes` nor `import.failure_modes` is configured.
 
@@ -849,7 +917,7 @@ Operations without a binding are counted and are not an error (reads and queries
 
 | Rule | Check |
 |---|---|
-| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
+| `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a configured system (`systems`, section 2: `<name> is not a configured system; declare it under systems in machinery.yaml`), a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
 | `invoke-failure-mode` | Every `invoke` `src` of every machine is the subject of at least one failure mode. |
 | `dependency-failure-mode` | Every configured dependency is the subject of at least one failure mode. |
 | `tiered-action-abuse` | Every action that belongs to a consequential, critical or vital area (section 23) is the subject of at least one failure mode of kind `abuse`. |
@@ -858,22 +926,34 @@ Operations without a binding are counted and are not an error (reads and queries
 
 The stage applies when `design.failure_modes` or `import.failure_modes` is configured, or when
 any machine declares a failure state or a failure event (section 5.2). An imported row that is
-not linked (section 5.4.1) is counted among the failure modes and takes part in no rule. A
+not linked (section 5.4.1) and a failure mode declared subject-less (`no_subject`, section 5.4)
+are counted among the failure modes and take part in no rule. A `system:` subject takes part in
+`subject-resolves` alone. A
 finding that asks for a failure mode says where to declare it: in the file of
 `design.failure_modes` when there is one, else in the links file of `import.failure_modes`
 (`a links file (import.failure_modes.links)` when none is configured). `checked:` counts
 failure modes, invokes,
-dependencies, tiered actions, failure states and failure events. With no failure-mode file
+dependencies, tiered actions, failure states and failure events. When `import.failure_modes` is
+configured it counts, right after the failure modes, those that name a subject (`linked`, native
+ones included) and the unlinked rows; when at least one failure mode is declared subject-less it
+counts those next:
+`checked: 964 failure modes, 640 linked, 12 unlinked, 312 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
+With no failure-mode file
 configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
 event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
 states and failure events only. Not applicable when there is neither a failure-mode file nor a
 failure state or failure event.
 
-When there are failure modes and none of them names a subject (every one is an imported row that
-is not linked, section 5.4.1), the stage compared no failure mode with the design, and its result
-is `not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing
-at all to compare), never passed, waivers or not; with findings it is failed (section 3.2). A
-waiver does not link a row.
+While any imported row is unlinked (it names no subject and no entry declares it subject-less,
+section 5.4.1), the stage did not compare every failure mode with the design: one linked row among
+many is no pass. Its result is
+`not demonstrated: <n> of <m> failure modes name no subject; link each in <links file> or declare it there with no_subject and a reason`,
+where `<n>` counts the unlinked rows, `<m>` every failure mode, and `<links file>` is
+`a links file (import.failure_modes.links)` when none is configured. When no row is unlinked and
+still no failure mode names a subject (every one is declared subject-less), it compared none:
+`not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing at
+all to compare). Neither is ever passed, waivers or not; with findings the stage is failed
+(section 3.2). A waiver does not link a row.
 
 ### 6.7 Waivers
 

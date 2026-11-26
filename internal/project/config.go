@@ -27,6 +27,7 @@ type Config struct {
 	Contracts    []Contract        `yaml:"contracts,omitempty"`
 	Checkers     []Checker         `yaml:"checkers,omitempty"`
 	Dependencies []Dependency      `yaml:"dependencies,omitempty"`
+	Systems      []System          `yaml:"systems,omitempty"`
 	Trace        *Trace            `yaml:"trace,omitempty"`
 	Tests        *Tests            `yaml:"tests,omitempty"`
 	Constraints  *Constraints      `yaml:"constraints,omitempty"`
@@ -205,6 +206,13 @@ type Checker struct {
 type Dependency struct {
 	Name    string `yaml:"name"`
 	Posture string `yaml:"posture"`
+}
+
+// System names the system as a whole, or a part of it that is not an entity,
+// a dependency or a machine, for failure-mode subjects (section 5.4).
+type System struct {
+	Name  string `yaml:"name"`
+	About string `yaml:"about,omitempty"`
 }
 
 type Trace struct {
@@ -445,7 +453,8 @@ func cleanYAMLError(err error) string {
 }
 
 var (
-	checkerIDRe = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
+	checkerIDRe  = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
+	systemNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 	// WaivableRules are the cross-reference rules a waiver may name (section 6.7).
 	WaivableRules = map[string]bool{
 		"machine-binding": true, "state-enum": true, "event-action": true, "action-event": true,
@@ -524,6 +533,18 @@ func (c *Config) validate() error {
 		if dep.Posture != "real" && dep.Posture != "sandbox" {
 			return Errf("dependencies: %s: posture must be real or sandbox, got %q", dep.Name, dep.Posture)
 		}
+	}
+	systems := map[string]bool{}
+	for _, sy := range c.Systems {
+		switch {
+		case sy.Name == "":
+			return Errf("systems: name is required")
+		case !systemNameRe.MatchString(sy.Name):
+			return Errf("systems: name %q must match ^[a-z][a-z0-9-]*$", sy.Name)
+		case systems[sy.Name]:
+			return Errf("systems: duplicate name %q", sy.Name)
+		}
+		systems[sy.Name] = true
 	}
 	if c.Trace != nil {
 		steps = append(steps, check("trace.code", c.Trace.Code...), check("trace.tests", c.Trace.Tests...))

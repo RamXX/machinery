@@ -54,18 +54,27 @@ func XrefFailure(ctx *Context) *report.Stage {
 	for _, dep := range p.Cfg.Dependencies {
 		deps["dependency:"+dep.Name] = true
 	}
+	systems := map[string]bool{}
+	for _, sy := range p.Cfg.Systems {
+		systems["system:"+sy.Name] = true
+	}
 	named, abused := map[string]bool{}, map[string]bool{}
-	linked := 0
+	linked, unlinked, subjectLess := 0, 0, 0
 	for _, fm := range d.FailureModes {
-		if fm.Unlinked() {
+		switch {
+		case fm.Unlinked():
+			unlinked++
 			continue // names nothing (section 5.4.1)
+		case fm.SubjectLess():
+			subjectLess++
+			continue // names nothing, and says why (section 5.4)
 		}
 		linked++
 		named[fm.Subject] = true
 		if fm.Kind == "abuse" {
 			abused[fm.Subject] = true
 		}
-		if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
+		if why := unresolved(d, fm.Subject, invokes, deps, systems, fstates, fevents); why != "" {
 			w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
 		}
 	}
@@ -99,17 +108,37 @@ func XrefFailure(ctx *Context) *report.Stage {
 		return "declare what the system must do when it " + when + " in " + d.FailureModeTarget()
 	})
 	w.stale(s)
-	s.Count(len(d.FailureModes), "failure modes").Count(len(invokes), "invokes").Count(len(deps), "dependencies").Count(tiered, "tiered actions").
+	s.Count(len(d.FailureModes), "failure modes")
+	if d.ImportsFM {
+		s.Count(linked, "linked").Count(unlinked, "unlinked")
+	}
+	if subjectLess > 0 {
+		s.Count(subjectLess, "subject-less")
+	}
+	s.Count(len(invokes), "invokes").Count(len(deps), "dependencies").Count(tiered, "tiered actions").
 		Count(len(fstates), "failure states").Count(len(fevents), "failure events")
 	if len(d.FailureModes) == 0 && len(invokes) == 0 && len(deps) == 0 && tiered == 0 && len(fstates) == 0 && len(fevents) == 0 && len(d.FMProblems) == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
-	if len(d.FailureModes) > 0 && linked == 0 {
-		// every failure mode is an unlinked row: none was compared with the
-		// design, so the stage is never a pass
+	switch {
+	case unlinked > 0:
+		// a row that names nothing and does not say why was not compared
+		// with the design: one linked row among many is no pass
+		s.NotDemonstrated(fmt.Sprintf("%d of %d failure modes name no subject; link each in %s or declare it there with no_subject and a reason",
+			unlinked, len(d.FailureModes), linksTarget(p)))
+	case len(d.FailureModes) > 0 && linked == 0:
+		// every failure mode is declared subject-less: none was compared
 		s.NotDemonstrated("no failure mode names a subject")
 	}
 	return s
+}
+
+// linksTarget names where an imported row is linked or declared subject-less.
+func linksTarget(p *project.Project) string {
+	if im := p.Cfg.ImportedFailureModes(); im != nil && im.Links != "" {
+		return im.Links
+	}
+	return "a links file (import.failure_modes.links)"
 }
 
 // failureSubjects returns the subject of every failure state
@@ -155,7 +184,7 @@ func UnmodeledFailures(ctx *Context) []project.Waiver {
 	states, events := failureSubjects(d)
 	named := map[string]bool{}
 	for _, fm := range d.FailureModes {
-		if !fm.Unlinked() {
+		if fm.Named() {
 			named[fm.Subject] = true
 		}
 	}
@@ -179,7 +208,7 @@ func UnmodeledFailures(ctx *Context) []project.Waiver {
 
 // unresolved says why a well-formed subject names nothing, or "".
 // Malformed subjects are the failure-modes stage's finding.
-func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevents map[string]bool) string {
+func unresolved(d *design.Design, subject string, invokes, deps, systems, fstates, fevents map[string]bool) string {
 	kind, name, ok := strings.Cut(subject, ":")
 	if !ok {
 		return ""
@@ -197,6 +226,10 @@ func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevent
 	case "dependency":
 		if !deps[subject] {
 			return fmt.Sprintf("%s is not a configured dependency", name)
+		}
+	case "system":
+		if !systems[subject] {
+			return fmt.Sprintf("%s is not a configured system; declare it under systems in machinery.yaml", name)
 		}
 	case "act":
 		if !d.IsAct(subject) {

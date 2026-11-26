@@ -115,7 +115,8 @@ without converting anything. Generated files are not part of the fixture.
 - `design/model/library.modelith.yaml`: entity `Loan` (statuses Reserved, Lent, Returned, Lost),
   3 actions, 2 invariants, 2 scenarios.
 - `docs/risks.md`: 4 failure modes `RISK-1` to `RISK-4` in two table layouts, beside a table that
-  holds none; `design/risk-links.yaml` links 3 of them (one abuse case). `fm:risk-4` is owed.
+  holds none; `design/risk-links.yaml` links 3 of them (one abuse case) and declares the fourth
+  subject-less (`no_subject`). `fm:risk-4` is owed.
 - `internal/desk/desk.go` and `e2e/loans.sh` claim every id through the markers `Implements:`,
   `Checks:`, `Proves:` and `Scenario:`.
 
