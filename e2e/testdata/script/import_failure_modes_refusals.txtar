@@ -45,13 +45,13 @@ stdout 'ERROR  docs/risks.md:25: RISK-8: the row is in no table \(a table needs 
 ! stdout 'RISK-7'
 stdout 'checked: 6 failure modes, 0 abuse cases, 6 imported, 6 unlinked'
 
-# links: an id with no row, an id listed twice, the value rules of a failure mode, unknown keys
+# links: an id with no row, an id two entries name, the value rules of a failure mode, unknown keys
 cp good-links.yaml machinery.yaml
 cp clean.md docs/risks.md
 cp bad-links.yaml design/links.yaml
 exec mrun 1 lint --stage failure-modes
 stdout 'ERROR  design/links.yaml: RISK-9: no failure-mode row of docs/risks.md has this id'
-stdout 'ERROR  design/links.yaml: risk-1: listed twice'
+stdout 'ERROR  design/links.yaml: links 1 \(RISK-1\) and 2 \(risk-1\) overlap: risk-1$'
 stdout 'ERROR  design/links.yaml: RISK-2: required must be fail-closed, retry-bounded, surface or refuse, got "maybe"'
 stdout 'ERROR  design/links.yaml: RISK-3: required: refuse is only valid with kind: abuse'
 stdout 'ERROR  design/links.yaml: RISK-4: subject "nowhere" is not invoke:'

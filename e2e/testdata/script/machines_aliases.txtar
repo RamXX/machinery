@@ -1,0 +1,157 @@
+# _aliases: the events that are model actions under another name (docs/machine-format.md)
+mkdir design/machines
+
+# an event some state handles, mapped to the name of an action
+cp valid.json design/machines/Job.machine.json
+exec machinery lint --stage machines
+stdout '^checked: 1 machines, 3 states, 2 transitions$'
+stdout '^passed$'
+
+# the annotation is an object
+cp not_object.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _aliases must be an object that maps an event name to the name of the model action it is$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an action name is a non-empty string
+cp empty.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _aliases\[''picked_up''\] must be a non-empty action name$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an event no state handles or ignores makes the marker stale
+cp stale.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _aliases names ''handed_over'' but no state handles or ignores it; the marker is stale \(remove it, or wire the event\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an aliased event is a caller's action: it is not external and not a failure event
+cp external.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: event ''picked_up'' is in both _aliases and _external_events; an alias says the event is a caller''s action, so it does not arrive from outside \(keep one\)$'
+stdout '^failed: 1 finding\(s\)$'
+cp failure.json design/machines/Job.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: event ''picked_up'' is in both _aliases and _failure_events; an alias says the event is a caller''s action, so it does not arrive from outside \(keep one\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- valid.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": ["entity:Job"],
+  "_aliases": {"picked_up": "claim"},
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {"picked_up": {"target": "Running"}},
+      "_ignores": {"finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"}
+    },
+    "Running": {
+      "on": {"finish": {"target": "Done"}},
+      "_ignores": {"picked_up": "already claimed; a second worker is refused with JOB_CLAIMED"}
+    },
+    "Done": {"type": "final"}
+  }
+}
+-- not_object.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": ["entity:Job"],
+  "_aliases": ["picked_up"],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {"picked_up": {"target": "Running"}},
+      "_ignores": {"finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"}
+    },
+    "Running": {
+      "on": {"finish": {"target": "Done"}},
+      "_ignores": {"picked_up": "already claimed; a second worker is refused with JOB_CLAIMED"}
+    },
+    "Done": {"type": "final"}
+  }
+}
+-- empty.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": ["entity:Job"],
+  "_aliases": {"picked_up": " "},
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {"picked_up": {"target": "Running"}},
+      "_ignores": {"finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"}
+    },
+    "Running": {
+      "on": {"finish": {"target": "Done"}},
+      "_ignores": {"picked_up": "already claimed; a second worker is refused with JOB_CLAIMED"}
+    },
+    "Done": {"type": "final"}
+  }
+}
+-- stale.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": ["entity:Job"],
+  "_aliases": {"handed_over": "claim"},
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {"picked_up": {"target": "Running"}},
+      "_ignores": {"finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"}
+    },
+    "Running": {
+      "on": {"finish": {"target": "Done"}},
+      "_ignores": {"picked_up": "already claimed; a second worker is refused with JOB_CLAIMED"}
+    },
+    "Done": {"type": "final"}
+  }
+}
+-- external.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": ["entity:Job"],
+  "_aliases": {"picked_up": "claim"},
+  "_external_events": ["picked_up"],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {"picked_up": {"target": "Running"}},
+      "_ignores": {"finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"}
+    },
+    "Running": {
+      "on": {"finish": {"target": "Done"}},
+      "_ignores": {"picked_up": "already claimed; a second worker is refused with JOB_CLAIMED"}
+    },
+    "Done": {"type": "final"}
+  }
+}
+-- failure.json --
+{
+  "id": "job",
+  "_role": "operational",
+  "_serves": ["entity:Job"],
+  "_aliases": {"picked_up": "claim"},
+  "_failure_events": ["picked_up"],
+  "initial": "Queued",
+  "states": {
+    "Queued": {
+      "on": {"picked_up": {"target": "Running"}},
+      "_ignores": {"finish": "nothing runs yet; a stray result is refused with JOB_NOT_RUNNING"}
+    },
+    "Running": {
+      "on": {"finish": {"target": "Done"}},
+      "_ignores": {"picked_up": "already claimed; a second worker is refused with JOB_CLAIMED"}
+    },
+    "Done": {"type": "final"}
+  }
+}

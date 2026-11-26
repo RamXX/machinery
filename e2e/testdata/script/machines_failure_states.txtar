@@ -20,6 +20,47 @@ stdout -count=2 '^  warn   '
 ! stdout 'event abort looks'
 stdout '^passed$'
 
+# an event from outside may still report a failure: listing it as external does not stop the hint
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_external_events\": [\"workerError\"], &/" hints.json > design/machines/Job.machine.json'
+exec machinery lint --stage machines
+stdout '^  warn   design/machines/Job\.machine\.json: event workerError looks like a failure event and is not in _failure_events$'
+stdout -count=2 '^  warn   '
+stdout '^passed$'
+
+# a hint is dismissed by name, with the reason: an event, or a state by its dotted path
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_not_failures\": {\"workerError\": \"the worker reports its own restart, which is routine\", \"CrashLoop\": \"the name of the restart policy\"}, &/" hints.json > design/machines/Job.machine.json'
+exec machinery lint --stage machines
+! stdout 'warn'
+stdout '^passed$'
+
+# an alias does not stop the hint either: an aliased event may still report a failure
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_aliases\": {\"workerError\": \"abort\"}, &/" hints.json > design/machines/Job.machine.json'
+exec machinery lint --stage machines
+stdout '^  warn   design/machines/Job\.machine\.json: event workerError looks like a failure event and is not in _failure_events$'
+stdout -count=2 '^  warn   '
+stdout '^passed$'
+
+# a dismissal is an object of reasons, for names the machine has, none of them a declared failure
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_not_failures\": [\"workerError\"], &/" hints.json > design/machines/Job.machine.json'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures must be an object that maps an event name or a state path to the reason it is no failure$'
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_not_failures\": {\"workerError\": \" \", \"leaseLost\": \"never sent\", \"jobFailed\": \"routine\", \"Failed\": \"routine\"}, &/" hints.json > design/machines/Job.machine.json'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures\[''workerError''\] must be a non-empty reason$'
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''leaseLost'', which is no event a state handles or ignores and no state; the marker is stale \(remove it, or correct the name\)$'
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''jobFailed'', which is in _failure_events; a declared failure is not dismissed \(keep one\)$'
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''Failed'', which is a state tagged failure; a declared failure is not dismissed \(keep one\)$'
+stdout '^failed: 4 finding\(s\)$'
+
+# a dismissal of a name that is never hinted dismisses nothing: a name that does not look like a
+# failure, or an action of the entity
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_not_failures\": {\"claim\": \"routine\", \"Queued\": \"routine\", \"abort\": \"the operator stops a job\"}, &/" hints.json > design/machines/Job.machine.json'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''claim'', which does not look like a failure \(no fail, error, abort, crash or timeout in the name\), so there is no hint to dismiss \(remove it\)$'
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''Queued'', which does not look like a failure \(no fail, error, abort, crash or timeout in the name\), so there is no hint to dismiss \(remove it\)$'
+stdout '^  ERROR  design/machines/Job\.machine\.json: _not_failures names ''abort'', which is an action of Job and is never hinted, so there is no hint to dismiss \(remove it\)$'
+stdout '^failed: 3 finding\(s\)$'
+
 # without the tag the failure state is hinted too
 cp untagged.json design/machines/Job.machine.json
 exec machinery lint --stage machines

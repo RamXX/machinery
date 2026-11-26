@@ -29,6 +29,9 @@ type Tag struct {
 	Marker bool
 	// Scenario is true for a scenarios marker: IDs holds one scenario name.
 	Scenario bool
+	// Exact is true for a scenarios_exact marker: text that is no scenario
+	// name claims nothing and is no finding.
+	Exact bool
 }
 
 var tokenRe = regexp.MustCompile(`^[A-Za-z0-9_.:*-]+$`)
@@ -92,7 +95,8 @@ func Scan(p *project.Project, files []string) ([]Tag, error) {
 			return nil, err
 		}
 		lists := map[string]bool{} // the marker lists that go on to the next line, by kind
-		all := append(append(append([]string{}, mk.Serves...), mk.Verifies...), mk.Scenarios...)
+		scen := append(append([]string{}, mk.Scenarios...), mk.ScenariosExact...)
+		all := append(append(append([]string{}, mk.Serves...), mk.Verifies...), scen...)
 		for i, line := range strings.Split(string(data), "\n") {
 			_, marked := markerRest(line, all) // a line with a marker starts its own list
 			if code {
@@ -128,9 +132,10 @@ func Scan(p *project.Project, files []string) ([]Tag, error) {
 				}
 			}
 			if test {
-				if rest, ok := markerRest(line, mk.Scenarios); ok {
+				if marker, rest, ok := longest(line, scen); ok {
 					if name := strings.TrimSpace(rest); name != "" {
-						res = append(res, Tag{File: f, Line: i + 1, Kind: Verifies, IDs: []string{name}, Marker: true, Scenario: true})
+						res = append(res, Tag{File: f, Line: i + 1, Kind: Verifies, IDs: []string{name}, Marker: true, Scenario: true,
+							Exact: contains(mk.ScenariosExact, marker)})
 					}
 				}
 			}
@@ -169,7 +174,13 @@ func parse(line, keyword string) []string {
 // markerRest returns the text after the longest marker that follows only
 // whitespace and comment characters on the line.
 func markerRest(line string, markers []string) (rest string, ok bool) {
-	best := ""
+	_, rest, ok = longest(line, markers)
+	return rest, ok
+}
+
+// longest returns the longest marker that follows only whitespace and
+// comment characters on the line, and the text after it.
+func longest(line string, markers []string) (best, rest string, ok bool) {
 	for _, m := range markers {
 		i := strings.Index(line, m)
 		if i < 0 || strings.Trim(line[:i], commentChars) != "" || len(m) <= len(best) {
@@ -177,7 +188,16 @@ func markerRest(line string, markers []string) (rest string, ok bool) {
 		}
 		best, rest, ok = m, line[i+len(m):], true
 	}
-	return rest, ok
+	return best, rest, ok
+}
+
+func contains(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }
 
 // parseList reads the ids of a marker list: separated by commas and spaces,

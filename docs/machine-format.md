@@ -41,6 +41,10 @@ enforces everything below, and an unknown key is an error, never silently skippe
 - **Failure states and events.** No state is tagged both `failure` and `accepting`.
   `_failure_events` names events some state handles or ignores, none of them also in
   `_external_events`.
+- **Aliases.** `_aliases` maps events some state handles or ignores to action names, none of
+  them also in `_external_events` or `_failure_events`.
+- **Dismissed hints.** `_not_failures` maps events and state paths the machine has to reasons,
+  none of them a declared failure.
 - **Callers.** `_requires` is a non-empty list of distinct, non-empty names.
 - **Serves.** `_serves` is a non-empty list of distinct `entity:<Name>` and
   `act:<Entity>.<action>` ids.
@@ -57,7 +61,7 @@ machine file. A file that cannot be parsed is an ERROR.
 
 - **Root keys:** `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, and the
   annotations `_comment`, `_delays`, `_lifecycle_of`, `_aspect`, `_role`, `_serves`, `_oracle_tag`,
-  `_guards`, `_external_events`, `_failure_events`, `_entries`.
+  `_guards`, `_external_events`, `_failure_events`, `_aliases`, `_not_failures`, `_entries`.
 - **State keys:** `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`, `id`,
   `meta`, `description`, `tags`, `onDone`, `output`, and the annotations `_comment`, `_exhaustive`,
   `_ignores`, `_refusal`, `_terminal`.
@@ -181,7 +185,31 @@ once.
 **`_external_events`** (root, optional). An array of event names this machine receives that are not
 model actions, for example events that arrive from a bus or a peer subsystem (`docs/formats.md`
 section 6.4 reads it). Each entry is a non-empty string. An entry that no state handles or ignores
-is a stale marker and an error: remove it, or wire the event.
+is a stale marker and an error: remove it, or wire the event. An action of the model is a caller's
+command and is never listed here: stage `xref-model-machine` reports one that is, for every
+action of the machine's entity, or of every entity behind what an operational machine serves.
+
+**`_aliases`** (root, optional). An object that maps an event name to the name of the model
+action it is: `"_aliases": {"handed_back": "giveBack"}` when the machine calls `handed_back` what
+the model calls `giveBack`. Rules `event-action` and `action-event` then read the event as that
+action (`docs/formats.md` section 6.4), which must be an action of the machine's entity, or of
+what an operational machine serves. Each value is a non-empty string, and each event is one some
+state handles or ignores (a stale entry is an error). An aliased event is a caller's action, so it
+is in neither `_external_events` nor `_failure_events`. An alias hides nothing: an event that is
+itself an action of the model takes no alias, an event that states only ignore takes none (it
+would stand for nothing), an action that has an event of its own name is the
+action of no alias (several events may share an action that has none), the stage prints one line
+for every alias in effect and counts them, and an aliased event whose name looks like a failure
+is still hinted. Prefer one name in the model and the machine; the alias is for a machine whose
+names cannot change.
+
+**`_not_failures`** (root, optional). An object that maps a name to the reason it only looks
+like a failure, which dismisses its name hint ("Failure idioms"):
+`"_not_failures": {"count_aborted": "a stocktake that is called off changes no loan"}`. A key is
+an event some state handles or ignores, or the dotted path of a state (a stale key is an error);
+a reason is a non-empty string. A declared failure is not dismissed: a key that is in
+`_failure_events`, or a state tagged `failure`, is an error. So is a key that dismisses nothing:
+a name with no failure word in it, or an action of the lifecycle entity, which is never hinted.
 
 **`_serves`** (root, required on an operational machine). A non-empty array of the model ids the
 machine exists for, each `entity:<Name>` or `act:<Entity>.<action>`, none twice:
@@ -401,8 +429,11 @@ it.
 
 **Name hints.** The lint warns about a state whose name contains `fail`, `error`, `abort`,
 `crash` or `timeout` (in any case) and is not tagged `failure`, and about an event with such a
-name that is neither in `_failure_events` nor an action of the lifecycle entity. A warning never
-fails the stage; tag the state, list the event, or leave it when the name means something else.
+name that is neither in `_failure_events` nor an action of the lifecycle entity; an event in
+`_external_events` or in `_aliases` is still hinted. When the name means something else, dismiss
+the hint with the reason in the root `_not_failures`, keyed by the event name or the dotted path
+of the state. A warning never fails the stage; tag the state, list the event, or dismiss the hint
+when the name means something else.
 
 A per-state `after` is cancelled when its state exits. A bound that must hold across several
 states needs a timer on each of them.

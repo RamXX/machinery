@@ -14,12 +14,14 @@ import (
 
 // FailureMode is one entry of failure-modes.yaml (section 5.4).
 type FailureMode struct {
-	ID       string `yaml:"id"`
-	Kind     string `yaml:"kind,omitempty"`
-	Subject  string `yaml:"subject"`
-	Failure  string `yaml:"failure"`
-	Required string `yaml:"required"`
-	Behavior string `yaml:"behavior"`
+	ID      string `yaml:"id"`
+	Kind    string `yaml:"kind,omitempty"`
+	Subject string `yaml:"subject"`
+	// NoSubject, when set, is the reason the failure mode names no subject.
+	NoSubject *Reason `yaml:"no_subject,omitempty"`
+	Failure   string  `yaml:"failure"`
+	Required  string  `yaml:"required"`
+	Behavior  string  `yaml:"behavior"`
 
 	// Source is the file the failure mode comes from: the failure-mode file
 	// or the imported catalog (section 5.4.1).
@@ -28,11 +30,40 @@ type FailureMode struct {
 	// gives it a subject and a required value.
 	Imported bool `yaml:"-"`
 	Linked   bool `yaml:"-"`
+	// Cells are the cells of an imported row, as written and trimmed, and
+	// Line the line of the row.
+	Cells []string `yaml:"-"`
+	Line  int      `yaml:"-"`
+}
+
+// Reason is the text of a no_subject key. Only a YAML string is one: a
+// boolean or a number is refused, not read as its spelling.
+type Reason string
+
+// UnmarshalYAML refuses a value that is not a string.
+func (r *Reason) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.ScalarNode || n.Tag != "!!str" {
+		return fmt.Errorf("line %d: no_subject must be a string that gives the reason", n.Line)
+	}
+	*r = Reason(n.Value)
+	return nil
 }
 
 // Unlinked reports an imported row without a link: it names nothing, so it
 // takes part in no subject rule (section 5.4.1).
 func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
+
+// SubjectLess reports a failure mode declared to name no subject: no_subject
+// with a reason, and no subject beside it. Like an unlinked row it takes part
+// in no subject rule.
+func (fm FailureMode) SubjectLess() bool {
+	return fm.NoSubject != nil && strings.TrimSpace(string(*fm.NoSubject)) != "" && fm.Subject == ""
+}
+
+// Named reports a failure mode that names a subject. One that is neither
+// named nor subject-less is unaccounted for: an unlinked row, or a
+// no_subject without a reason or beside a subject.
+func (fm FailureMode) Named() bool { return !fm.Unlinked() && fm.NoSubject == nil }
 
 type failureFile struct {
 	Version      int           `yaml:"version"`
@@ -41,7 +72,7 @@ type failureFile struct {
 
 var (
 	kebabRe   = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
-	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
+	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|system:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
 )
 
 func strictYAML(data []byte, out any) error {
@@ -88,7 +119,7 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 			problems = append(problems, where+": duplicate id")
 		}
 		seen[fm.ID] = true
-		problems = append(problems, checkValues(where, fm)...)
+		problems = append(problems, checkValues(where, fm, false)...)
 		if strings.TrimSpace(fm.Failure) == "" {
 			problems = append(problems, where+": failure is required")
 		}
@@ -99,19 +130,47 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 	return f.FailureModes, problems, true
 }
 
-// checkValues holds kind, subject and required to section 5.4, defaulting
-// kind to fault. where prefixes every problem.
-func checkValues(where string, fm *FailureMode) (problems []string) {
+// WellFormed reports a failure mode that names a subject of one of the
+// forms of section 5.4 and carries a required value: the precondition of
+// being compared with the design. Whether the subject resolves is stage
+// xref-failure's question.
+func (fm FailureMode) WellFormed() bool {
+	if !fm.Named() || !subjectRe.MatchString(fm.Subject) {
+		return false
+	}
+	switch fm.Required {
+	case "fail-closed", "retry-bounded", "surface", "refuse":
+		return true
+	}
+	return false
+}
+
+// checkValues holds kind, subject (or no_subject) and required to section
+// 5.4, defaulting kind to fault. where prefixes every problem. link is true
+// for an entry of the links file, where a no_subject entry may leave
+// required out (section 5.4.1).
+func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
 	if fm.Kind == "" {
 		fm.Kind = "fault"
 	}
 	if fm.Kind != "fault" && fm.Kind != "abuse" {
 		problems = append(problems, fmt.Sprintf("%s: kind must be fault or abuse, got %q", where, fm.Kind))
 	}
-	if !subjectRe.MatchString(fm.Subject) {
-		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>", where, fm.Subject))
+	switch {
+	case fm.NoSubject != nil && fm.Subject != "":
+		problems = append(problems, where+": subject and no_subject are both set; name the subject or say why there is none")
+	case fm.NoSubject != nil:
+		if strings.TrimSpace(string(*fm.NoSubject)) == "" {
+			problems = append(problems, where+": no_subject needs a reason")
+		}
+	case !subjectRe.MatchString(fm.Subject):
+		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>", where, fm.Subject))
 	}
 	switch fm.Required {
+	case "":
+		if !link || fm.NoSubject == nil {
+			problems = append(problems, fmt.Sprintf("%s: required must be fail-closed, retry-bounded, surface or refuse, got %q", where, fm.Required))
+		}
 	case "fail-closed", "retry-bounded", "surface":
 	case "refuse":
 		if fm.Kind != "abuse" {
@@ -330,6 +389,34 @@ type OwedEntry struct {
 	Story  string `yaml:"story,omitempty"`
 }
 
+// The reasons machinery adopt writes (section 17.2). plan and status read
+// the last two back (sections 14 and 15.2).
+const (
+	ReasonUnproven = "unproven at adoption"
+	ReasonClaimed  = "claimed at adoption"
+	ReasonPlanned  = "planned at adoption"
+)
+
+// ClaimedAtAdoption reports an entry adopt wrote for an id a test already
+// claimed.
+func (e OwedEntry) ClaimedAtAdoption() bool { return strings.HasPrefix(e.Reason, ReasonClaimed) }
+
+// PlannedAtAdoption reports an entry adopt wrote for an id the project had
+// marked planned.
+func (e OwedEntry) PlannedAtAdoption() bool { return strings.HasPrefix(e.Reason, ReasonPlanned) }
+
+// Adopted reports whether the list holds an entry adopt wrote.
+func Adopted(entries []OwedEntry) bool {
+	for _, e := range entries {
+		for _, r := range []string{ReasonUnproven, ReasonClaimed, ReasonPlanned} {
+			if strings.HasPrefix(e.Reason, r) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 type owedFile struct {
 	Version int         `yaml:"version"`
 	Owed    []OwedEntry `yaml:"owed"`
@@ -373,28 +460,78 @@ func LoadOwed(p *project.Project) (entries []OwedEntry, problems []string) {
 	return ParseOwed(rel, data)
 }
 
-// MarshalOwed renders the owed file with entries sorted by id.
+// MarshalOwed renders the owed file with entries sorted by id. Every value
+// goes through the YAML encoder, so the file always parses back.
 func MarshalOwed(entries []OwedEntry) []byte {
 	es := append([]OwedEntry(nil), entries...)
 	sort.Slice(es, func(i, j int) bool { return es[i].ID < es[j].ID })
-	var b strings.Builder
-	b.WriteString("version: 1\nowed:")
+	str := func(v string, style yaml.Style) *yaml.Node {
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: v, Style: style}
+	}
+	list := &yaml.Node{Kind: yaml.SequenceNode}
 	if len(es) == 0 {
-		b.WriteString(" []\n")
-		return []byte(b.String())
+		list.Style = yaml.FlowStyle
 	}
-	b.WriteString("\n")
 	for _, e := range es {
-		fmt.Fprintf(&b, "  - id: %s\n    reason: %s\n", e.ID, yamlQuote(e.Reason))
+		m := &yaml.Node{Kind: yaml.MappingNode}
+		m.Content = append(m.Content, str("id", 0), str(e.ID, 0),
+			str("reason", 0), str(strings.ReplaceAll(e.Reason, "\n", " "), yaml.DoubleQuotedStyle))
 		if e.Story != "" {
-			fmt.Fprintf(&b, "    story: %s\n", e.Story)
+			m.Content = append(m.Content, str("story", 0), str(e.Story, 0))
 		}
+		list.Content = append(list.Content, m)
 	}
-	return []byte(b.String())
+	root := &yaml.Node{Kind: yaml.MappingNode, Content: []*yaml.Node{
+		str("version", 0), {Kind: yaml.ScalarNode, Tag: "!!int", Value: "1"}, str("owed", 0), list}}
+	var b bytes.Buffer
+	enc := yaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(root); err != nil {
+		panic(err) // a tree of scalars always encodes
+	}
+	enc.Close()
+	return b.Bytes()
 }
 
-func yamlQuote(s string) string {
-	return "\"" + strings.NewReplacer("\\", "\\\\", "\"", "\\\"", "\n", " ").Replace(s) + "\""
+// OwedRefusal returns why the owed file is not read, one line per problem,
+// or nil: it does not parse, or it parses and has a problem of its own (an
+// id listed twice, an entry without a reason, a wrong version). No command
+// goes on with such a list (section 11.1).
+func OwedRefusal(p *project.Project) []string {
+	if msg := OwedUnreadable(p); msg != "" {
+		return []string{msg}
+	}
+	_, problems := LoadOwed(p)
+	if len(problems) == 0 {
+		return nil
+	}
+	return append(problems, p.Cfg.Design.Owed+": fix the file; an owed list with a problem is not read")
+}
+
+// StoryID is the shape of a story id written by machinery from a project's
+// own text (section 2): letters, digits, dot, dash and underscore.
+var StoryID = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// OwedUnreadable returns why the owed file cannot be read as a list (it
+// cannot be read, or is not the YAML of section 11.1), or "". Such a file
+// has no entries to trust, so nothing may go on as if the list were empty.
+func OwedUnreadable(p *project.Project) string {
+	rel := p.Cfg.Design.Owed
+	if !p.Exists(rel) {
+		return ""
+	}
+	why := ""
+	if data, err := p.Read(rel); err != nil {
+		why = "cannot read: " + shortErr(err)
+	} else if strings.TrimSpace(string(data)) == "" {
+		why = "the file is empty; write \"version: 1\" and \"owed: []\" in it, or delete it (a missing file is an empty list)"
+	} else if err := strictYAML(data, &owedFile{}); err != nil {
+		why = err.Error()
+	}
+	if why == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s: %s; an owed list that does not parse is not read as empty: fix the file", rel, why)
 }
 
 // WriteOwed writes the owed file.

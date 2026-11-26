@@ -9,7 +9,6 @@ import (
 	"github.com/RamXX/machinery/internal/gen"
 	"github.com/RamXX/machinery/internal/modelith"
 	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/tags"
 	"github.com/RamXX/machinery/internal/testpolicy"
 	"github.com/RamXX/machinery/internal/vital"
 )
@@ -45,35 +44,6 @@ func (w *worker) baselines() error {
 		}
 	}
 	return nil
-}
-
-// servedIDs are the act ids some code file serves with a machinery:serves tag.
-func servedIDs(p *project.Project, d *design.Design) map[string]bool {
-	res := map[string]bool{}
-	if p.Cfg.Trace == nil {
-		return res
-	}
-	code, err := tags.CodeFiles(p)
-	if err != nil {
-		return res
-	}
-	found, err := tags.Scan(p, code)
-	if err != nil {
-		return res
-	}
-	ids := d.AllIDs()
-	scenarios := d.ScenarioIDs()
-	for _, t := range found {
-		if t.Kind != tags.Serves {
-			continue
-		}
-		for _, tok := range t.IDs {
-			for _, id := range tags.Resolve(t, tok, ids, scenarios) {
-				res[id] = true
-			}
-		}
-	}
-	return res
 }
 
 // pendingGen lists the generated files machinery gen would write now.

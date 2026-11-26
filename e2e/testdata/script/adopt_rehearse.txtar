@@ -38,7 +38,8 @@ stdout '^out: /.*/out$'
 stdout '^project: proj at [0-9a-f]{7}$'
 stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 16 owed$'
 stdout '^check: machinery check: 9 passed, 1 failed, 0 not demonstrated, 6 not applicable$'
-stdout '^plan: 10 stories, 1 edge\(s\)$'
+stdout '^plan: 3 stories, 1 edge\(s\)$'
+stdout '^wire evidence: 1 story for 14 claimed id\(s\), one per test file$'
 stdout '^blocks adoption: 1 stage\(s\): xref-model-machine$'
 ! stdout 'fix in the project first'
 stdout '^rehearse: rehearsal.md, rehearsal.json$'
@@ -57,7 +58,12 @@ exists out/snapshot/design/owed.yaml
 exists out/stages/adopt.txt
 exists out/stages/check.txt
 exists out/plan.md
-grep '^## Prove order pay$' out/plan.md
+grep '^## Wire evidence e2e/orders.sh$' out/plan.md
+grep '^## Prove fm:payment-provider-down$' out/plan.md
+# an entry the project owed before adoption keeps its own story, though a test claims it
+grep '^## Prove order internal transitions$' out/plan.md
+grep '^machinery:ids tc:ORDE-8bd6e7$' out/plan.md
+! grep '^## Prove order pay$' out/plan.md
 exec git -C out/snapshot log --format=%s
 stdout '^rehearsed adoption\nsnapshot of [0-9a-f]{7}$'
 
@@ -70,9 +76,17 @@ grep '^\| `machinery.yaml` \| [0-9]+ \|$' out/rehearsal.md
 grep '^- design/tests-baseline.yaml: 0 entries$' out/rehearsal.md
 grep '^- tc: 10$' out/rehearsal.md
 grep '^- total: 16$' out/rehearsal.md
+grep '^- claimed by a test, no receipt yet: 15 \(tc 10, sc 2, inv 3\)$' out/rehearsal.md
+grep '^- no test names it: 1 \(fm 1\)$' out/rehearsal.md
+! grep '^- planned: ' out/rehearsal.md
+grep -count=14 'reason: "claimed at adoption \([0-9a-f]{7}\)"' out/snapshot/design/owed.yaml
+! grep 'unproven at adoption' out/snapshot/design/owed.yaml
 grep '^`machinery check: 9 passed, 1 failed, 0 not demonstrated, 6 not applicable`$' out/rehearsal.md
 grep '^\| intake \| not applicable: a rehearsal never reads the backlog \|$' out/rehearsal.md
-grep '^\| tc \| routine \| 4 \|$' out/rehearsal.md
+grep '^- wire evidence: 1 story for 14 claimed id\(s\), one per test file$' out/rehearsal.md
+grep '^\| tc \| routine \| 1 \|$' out/rehearsal.md
+grep '^\| fm \| routine \| 1 \|$' out/rehearsal.md
+grep '^\| wire \| routine \| 1 \|$' out/rehearsal.md
 grep '^### xref-model-machine: failed: 1 finding\(s\)$' out/rehearsal.md
 grep '^- ERROR  action-event: act:Order.place: no on event place in machine order' out/rehearsal.md
 grep '^  - waivable: - \{rule: action-event, id: "act:Order.place", reason: "found at adoption \([0-9a-f]{7}\)"\}$' out/rehearsal.md
@@ -87,6 +101,20 @@ grep '"waiver": "- \{rule: action-event, id: \\"act:Order.place\\", reason: \\"f
 grep '"by_kind": \{\n      "fm": 1,' out/rehearsal.json
 exec sh -c 'grep -o "^  \"[a-z_]*\"" out/rehearsal.json | tr -d " \"" | tr "\n" " "'
 stdout '^backlog baselines blocked blocks check config dirty files fix_first head outside_links owed plan project version waivers $'
+
+# a project whose tests claim nothing yet is planned as before: one story per group of owed ids
+exec sh -c 'grep -v -e "^trace:" -e "^  code: " -e "^  tests: " shop.yaml > noclaims.yaml'
+exec machinery -C proj adopt --rehearse --config noclaims.yaml --out out5 --e2e 'nowhere/**'
+stdout '^plan: 10 stories, 1 edge\(s\)$'
+! stdout '^wire evidence:'
+grep '^## Prove order pay$' out5/plan.md
+! grep 'Wire evidence' out5/plan.md
+grep '^- claimed by a test, no receipt yet: 0$' out5/rehearsal.md
+grep '^- no test names it: 16 \(tc 10, sc 2, inv 3, fm 1\)$' out5/rehearsal.md
+grep '^\| tc \| routine \| 4 \|$' out5/rehearsal.md
+! grep '^\| wire \|' out5/rehearsal.md
+! grep 'claimed at adoption' out5/snapshot/design/owed.yaml
+grep '"wire": \{\n      "by": "file",\n      "ids": 0,\n      "stories": 0\n    \}' out5/rehearsal.json
 
 # deterministic: a second rehearsal writes the same report
 exec machinery -C proj adopt --rehearse --config shop.yaml --out out2

@@ -73,12 +73,28 @@ stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: not produced by m
 
 # the ledger is shared by the worktrees of the repository: a run in a worktree is evidence there
 rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+rm .machinery/receipts
 exec git worktree add -q $WORK/wt -b side
 cd $WORK/wt
 exec machinery run -- sh e2e/orders.sh
 exec machinery verify
 stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
+# the run deleted in the main tree is no finding here: its entry names another receipts directory
+! stdout 'no longer present'
 stdout '^passed$'
+
+# and the run in the worktree did not forget it: the main tree still reports its deleted run
+cd $WORK
+exec mrun 1 verify
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: recorded by machinery run and no longer present; run the tests again through machinery run$'
+
+# a deleted run of a commit that is no longer valid for the current one is no finding
+exec sh -c 'echo "// changed" >> internal/api/handlers.go'
+gitcommit 'change code'
+exec mrun 1 verify
+! stdout 'no longer present'
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
 
 -- typed.jsonl --
 {"v":1,"type":"run","commit":"COMMIT","dirty":false,"command":["true"],"stack":"","started":"2026-01-02T03:04:05Z"}

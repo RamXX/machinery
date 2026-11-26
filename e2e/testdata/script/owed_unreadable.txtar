@@ -1,0 +1,149 @@
+# an owed list that does not parse is never read as an empty one: every command that works in the
+# project refuses with the parse error and exits 1 (section 11.1)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec machinery status
+stdout '^ids: 0 proposed, 2 owed, 18 proven, 0 retired$'
+
+# a story that is not valid YAML, as a careless hand edit leaves it
+cp broken.yaml design/owed.yaml
+exec mrun 1 status
+stderr '^ERROR  design/owed.yaml: line 5: mapping values are not allowed in this context; an owed list that does not parse is not read as empty: fix the file$'
+! stdout .
+exec mrun 1 verify
+stderr '^ERROR  design/owed.yaml: line 5: mapping values are not allowed in this context; '
+! stdout .
+exec mrun 1 check
+stderr '^ERROR  design/owed.yaml: line 5: '
+! stdout .
+exec mrun 1 trace
+stderr '^ERROR  design/owed.yaml: line 5: '
+! stdout .
+exec mrun 1 plan
+stderr '^ERROR  design/owed.yaml: line 5: '
+! stdout .
+exec mrun 1 waves
+stderr '^ERROR  design/owed.yaml: line 5: '
+exec mrun 1 owed list
+stderr '^ERROR  design/owed.yaml: line 5: '
+! stdout .
+exec mrun 1 owed sync
+stderr '^ERROR  design/owed.yaml: line 5: '
+# the parse error comes first, also beside a receipts file that owed sync refuses (section 11.2)
+mkdir .machinery/receipts
+exec sh -c 'printf "{\"v\":1,\"type\":\"run\",\"commit\":\"%s\",\"dirty\":false,\"command\":[\"sh\"],\"stack\":\"\",\"started\":\"2026-01-02T03:04:05Z\"}\n" "$(git rev-parse HEAD)" > .machinery/receipts/20260102T030405.000Z-typed.jsonl'
+exec mrun 1 owed sync --prune-only
+stderr '^ERROR  design/owed.yaml: line 5: '
+! stdout .
+cmp design/owed.yaml broken.yaml
+rm .machinery/receipts
+exec mrun 1 proof
+stderr '^ERROR  design/owed.yaml: line 5: '
+! stdout .
+exec mrun 1 landing --base HEAD
+stderr '^ERROR  design/owed.yaml: line 5: '
+exec mrun 1 check --base HEAD
+stderr '^ERROR  design/owed.yaml: line 5: '
+
+# adopt refuses too, before it writes anything
+exec mrun 1 adopt --write
+stderr '^machinery: design/owed.yaml: line 5: mapping values are not allowed in this context; an owed list that does not parse is not read as empty: fix the file$'
+exec git status --porcelain
+cmp stdout want-status.txt
+
+# the hooks never fail the harness, and they do not let it pass: a commit is refused with the error, the
+# stop hook reports it, and a session starts with it instead of counts
+exec sh -c 'sed "s|@WORK@|$WORK|g" commit.tpl > ../commit.json'
+stdin ../commit.json
+exec machinery hook pre-tool
+stdout '"permissionDecision":"deny"'
+stdout 'machinery: git commit refused: machinery check --base main found 1 finding\(s\)\\nowed: ERROR  design/owed.yaml: line 5: mapping values are not allowed in this context; an owed list that does not parse is not read as empty: fix the file"'
+stdin stop.json
+exec machinery hook stop
+stdout 'machinery check found 1 finding\(s\) in the files changed this session\\nowed: ERROR  design/owed.yaml: line 5: '
+stdin start.json
+exec machinery hook session-start
+stdout '^\{"systemMessage":"machinery hook session-start could not run: ERROR  design/owed.yaml: line 5: '
+! stdout 'ids: '
+
+# an unknown key is the same refusal
+cp unknown-key.yaml design/owed.yaml
+exec mrun 1 status
+stderr '^ERROR  design/owed.yaml: .*field when not found.*; an owed list that does not parse is not read as empty: fix the file$'
+! stdout .
+
+# an empty file says so, and what to write
+cp empty.yaml design/owed.yaml
+exec mrun 1 status
+stderr '^ERROR  design/owed.yaml: the file is empty; write "version: 1" and "owed: \[\]" in it, or delete it \(a missing file is an empty list\); an owed list that does not parse is not read as empty: fix the file$'
+! stdout .
+
+# a file that parses and has a problem (an id twice, an entry without a reason) is refused the same way:
+# every problem on its line, by every command
+cp shape.yaml design/owed.yaml
+exec mrun 1 status
+stderr '^ERROR  design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+stderr '^ERROR  design/owed.yaml: fm:payment-provider-down: reason is required$'
+stderr '^ERROR  design/owed.yaml: fix the file; an owed list with a problem is not read$'
+! stdout .
+exec mrun 1 verify
+stderr '^ERROR  design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+! stdout .
+exec mrun 1 check
+stderr '^ERROR  design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+! stdout .
+exec mrun 1 plan
+stderr '^ERROR  design/owed.yaml: fm:payment-provider-down: reason is required$'
+! stdout .
+exec mrun 1 proof
+stderr '^ERROR  design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+! stdout .
+exec mrun 1 adopt --write
+stderr '^machinery: design/owed.yaml: fm:payment-provider-down: reason is required$'
+stderr '^design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+stdin ../commit.json
+exec machinery hook pre-tool
+stdout '"permissionDecision":"deny"'
+stdout 'owed: ERROR  design/owed.yaml: fm:payment-provider-down: reason is required; design/owed.yaml: duplicate id tc:ORDE-8bd6e7; design/owed.yaml: fix the file; an owed list with a problem is not read"'
+
+# assess reads the committed file in its snapshot, and its design section fails with the error
+cp broken.yaml design/owed.yaml
+gitcommit 'a broken owed list'
+exec machinery assess --out ../assessed
+stdout '^design: failed: '
+grep '^  ERROR  design/owed.yaml: line 5: mapping values are not allowed in this context$' ../assessed/stages/design.txt
+
+-- want-status.txt --
+ M design/owed.yaml
+-- empty.yaml --
+-- shape.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: ""
+  - id: tc:ORDE-8bd6e7
+    reason: "one"
+  - id: tc:ORDE-8bd6e7
+    reason: "two"
+-- broken.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+    story: Note: x # y
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- unknown-key.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+    when: later
+-- commit.tpl --
+{"session_id":"sess-1","cwd":"@WORK@","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -am wip"},"tool_use_id":"toolu_01ABC"}
+-- stop.json --
+{"hook_event_name":"Stop","session_id":"sess-1"}
+-- start.json --
+{"hook_event_name":"SessionStart","session_id":"sess-1"}

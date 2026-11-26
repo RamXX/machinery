@@ -1,0 +1,190 @@
+# a failure mode that names no subject says so, with the reason: no_subject in the failure-mode
+# file or in the links file (docs/formats.md sections 5.4 and 5.4.1)
+fixture shop
+
+# in the failure-mode file no_subject stands in place of subject; the rest stays required
+cp declared.yaml design/failure-modes.yaml
+exec machinery lint --stage failure-modes --stage xref-failure
+stdout '^checked: 2 failure modes, 0 abuse cases$'
+stdout '^checked: 2 failure modes, 1 subject-less, 1 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events$'
+stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
+
+# it is an obligation like any other
+exec machinery gen
+grep '"id": "fm:audit-log-full"' design/gen/obligations.json
+
+# it covers nothing: without the other failure mode the invoke has none
+cp declared-only.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout 'ERROR  invoke-failure-mode: invoke:order.chargePayment: no failure mode names this invoke'
+
+# refusals: both, an empty reason, no required value, an abuse case
+cp both.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout '^  ERROR  design/failure-modes.yaml: both-set: subject and no_subject are both set; name the subject or say why there is none$'
+stdout '^  ERROR  design/failure-modes.yaml: no-reason: no_subject needs a reason$'
+stdout '^  ERROR  design/failure-modes.yaml: no-required: required must be fail-closed, retry-bounded, surface or refuse, got ""$'
+stdout '^  ERROR  design/failure-modes.yaml: abuse-case: kind: abuse needs an act or entity subject$'
+stdout '^  ERROR  design/failure-modes.yaml: neither: subject "" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>$'
+stdout '^failed: 5 finding\(s\)$'
+# a reason is text: a boolean or a number is refused, in either file
+cp not-text.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage failure-modes
+stdout '^  ERROR  design/failure-modes.yaml: .*no_subject must be a string that gives the reason'
+# and xref-failure, run alone, does not pass over them
+cp blank.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 2 failure modes, 1 linked, 1 unlinked, 1 invokes, '
+stdout '^not demonstrated: 1 of 2 failure modes name no subject; give each a subject in design/failure-modes.yaml or declare it there with no_subject and a reason$'
+# nor over a native failure mode whose subject is malformed or missing
+cp garbage.yaml design/failure-modes.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 1 invokes, '
+stdout '^not demonstrated: 2 of 3 failure modes name no subject; give each a subject in design/failure-modes.yaml or declare it there with no_subject and a reason$'
+! stdout '^passed$'
+
+# the links file: no_subject takes no subject; required and kind are optional beside it
+exec sh -c 'cat import.yaml >> machinery.yaml'
+cp one.yaml design/failure-modes.yaml
+mkdir docs
+cp risks.md docs/risks.md
+cp links.yaml design/risk-links.yaml
+exec machinery lint --stage failure-modes --stage xref-failure
+stdout '^checked: 4 failure modes, 1 abuse cases, 3 imported, 0 unlinked$'
+stdout '^checked: 4 failure modes, 2 linked, 0 unlinked, 2 subject-less, 1 invokes, '
+cp not-text-links.yaml design/risk-links.yaml
+exec mrun 1 lint --stage failure-modes
+stdout '^  ERROR  design/risk-links.yaml: .*no_subject must be a string that gives the reason'
+cp links-bad.yaml design/risk-links.yaml
+exec mrun 1 lint --stage failure-modes
+stdout '^  ERROR  design/risk-links.yaml: RISK-1: subject and no_subject are both set; name the subject or say why there is none$'
+stdout '^  ERROR  design/risk-links.yaml: RISK-2: no_subject needs a reason$'
+stdout '^  ERROR  design/risk-links.yaml: RISK-3: kind: abuse needs an act or entity subject$'
+stdout '^failed: 3 finding\(s\)$'
+
+-- declared.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: audit-log-full
+    no_subject: "the audit log is written by the host, which the design does not model"
+    failure: "The audit log cannot take another line."
+    required: fail-closed
+    behavior: "The shop stops taking orders until there is room."
+-- declared-only.yaml --
+version: 1
+failure_modes:
+  - id: audit-log-full
+    no_subject: "the audit log is written by the host, which the design does not model"
+    failure: "The audit log cannot take another line."
+    required: fail-closed
+    behavior: "The shop stops taking orders until there is room."
+-- both.yaml --
+version: 1
+failure_modes:
+  - id: both-set
+    subject: invoke:order.chargePayment
+    no_subject: "x"
+    failure: "x"
+    required: surface
+    behavior: "y"
+  - id: no-reason
+    no_subject: "  "
+    failure: "x"
+    required: surface
+    behavior: "y"
+  - id: no-required
+    no_subject: "x"
+    failure: "x"
+    behavior: "y"
+  - id: abuse-case
+    kind: abuse
+    no_subject: "x"
+    failure: "x"
+    required: refuse
+    behavior: "y"
+  - id: neither
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- not-text.yaml --
+version: 1
+failure_modes:
+  - id: audit-log-full
+    no_subject: true
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- not-text-links.yaml --
+version: 1
+links:
+  - {id: RISK-1, no_subject: 7}
+-- blank.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: no-reason
+    no_subject: "  "
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- garbage.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+  - id: no-such-form
+    subject: whatever
+    failure: "x"
+    required: surface
+    behavior: "y"
+  - id: no-subject-key
+    failure: "x"
+    required: surface
+    behavior: "y"
+-- one.yaml --
+version: 1
+failure_modes:
+  - id: payment-provider-down
+    subject: invoke:order.chargePayment
+    failure: "The payment provider does not answer or answers with an error."
+    required: surface
+    behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+-- import.yaml --
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/risk-links.yaml
+-- risks.md --
+| Risk | Failure | Required behavior |
+|------|---------|-------------------|
+| RISK-1 | The till has no paper. | The receipt is sent by mail. |
+| RISK-2 | The shop sign is dark. | Nothing: the shop sells online. |
+| RISK-3 | A caller who is not a Clerk ships an order. | The request is refused with FORBIDDEN. |
+-- links.yaml --
+version: 1
+links:
+  - {id: RISK-1, no_subject: "the till is not part of the system"}
+  - {id: RISK-2, no_subject: "the sign is not part of the system", required: surface}
+  - {id: RISK-3, kind: abuse, subject: "act:Order.ship", required: refuse}
+-- links-bad.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Order.ship", no_subject: "x", required: surface}
+  - {id: RISK-2, no_subject: ""}
+  - {id: RISK-3, kind: abuse, no_subject: "x"}

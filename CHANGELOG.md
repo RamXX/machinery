@@ -47,6 +47,35 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - `adopt --rehearse`: adoption on a snapshot outside the project, with what it writes and owes,
   the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
   generation.
+- `import.machines.annotate`: for a dialect that has no key for them, the config says which
+  events arrive from outside, which report a failure, which states record one (names and `*`
+  patterns) and which event is a model action under another name. A pattern that matches nothing
+  is an error, and a pattern of `*` only is refused. The native annotation `_aliases` carries
+  the last one, and rules `event-action` and `action-event` read an aliased event as its action.
+  An alias hides nothing: an event that is an action takes none, an action with an event of its
+  own name is the action of none, and stage `xref-model-machine` prints and counts every alias.
+- Rule `event-action` reports an event listed in `_external_events` or `_failure_events` that is
+  an action of the model: an action is a caller's command. For an operational machine every
+  action of the entities behind what it serves counts, for a listed and for an aliased event.
+- The name hint about a failure-looking name is dismissed by name, with a reason, in the root
+  `_not_failures` (`not_failures` in `import.machines.annotate`). Listing an event as external
+  or giving it an alias does not stop it, and a dismissal that dismisses no hint is an error.
+- Claims beside owed: `adopt` owes an id a test already claims as `claimed at adoption` and an
+  id the project marked planned (`import.planned`) as `planned at adoption` with its story;
+  `status`, `assess` and the rehearsal count ids by claim; `plan` gives the claimed ones one
+  `Wire evidence` story per test file (per directory past `plan.wire_max_files`).
+- `trace.markers.scenarios_exact`: a marker that claims only when its text is a scenario name.
+  A serves tag that names an id which is not an action is a warn, counted by stage `trace`.
+- An owed file that does not parse is never read as empty: every command refuses with the
+  parse error, and machinery writes the file through a YAML encoder.
+- Stage `xref-failure` prints how many failure modes are linked and how many are not, and is
+  not demonstrated while one names no subject: one linked row among many no longer passes. A
+  failure mode says it has none with `no_subject: "<reason>"`, in the failure-mode file or the
+  links file.
+- Failure-mode subject `system:<name>` for the system as a whole or a named part of it, with the
+  names declared under `systems` in `machinery.yaml`; no waiver covers an unknown name.
+- Links entries that cover many rows: `ids` takes ids and inclusive ranges
+  (`FM-01..FM-23`); two entries that name the same row are a finding that names both.
 - Evidence cannot be typed by hand: a receipts file counts only when `machinery run` entered it
   in the run ledger of the git directory and nothing changed it since, and a `pass` receipt
   proves only when its `test` names a test file that claims the id (`receipt.Test` in

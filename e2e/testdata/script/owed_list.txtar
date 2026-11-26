@@ -23,6 +23,10 @@ cmp stdout want-none.txt
 cp owed-bad.yaml design/owed.yaml
 exec mrun 1 owed list
 stderr '^ERROR  design/owed.yaml: duplicate id tc:ORDE-8bd6e7$'
+stderr '^ERROR  design/owed.yaml: fix the file; an owed list with a problem is not read$'
+! stdout .
+cp owed-typo.yaml design/owed.yaml
+exec mrun 1 owed list
 stderr '^ERROR  unknown owed id: inv:nope$'
 cp owed-key.yaml design/owed.yaml
 exec mrun 1 owed list
@@ -68,6 +72,11 @@ owed:
     reason: "one"
   - id: tc:ORDE-8bd6e7
     reason: "two"
+  - id: inv:nope
+    reason: "a typo"
+-- owed-typo.yaml --
+version: 1
+owed:
   - id: inv:nope
     reason: "a typo"
 -- owed-key.yaml --

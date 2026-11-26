@@ -53,6 +53,9 @@ never runs the backlog tool:
 machinery adopt --rehearse --config ../depot.machinery.yaml --out ../depot-rehearsal
 ```
 
+A rehearsal reads only what is committed. To try a links file before adopting it, commit it on
+a scratch branch of a clone of the project and rehearse there.
+
 `rehearsal.md` (and `rehearsal.json`) lists the files adoption would write with their sizes, the
 waivers it would add by rule, the baselines, what it would owe by kind, the result of the check,
 the stories `plan` would create by kind and tier, and what blocks adoption: each stage that fails
@@ -62,6 +65,13 @@ themselves, such as a machine that does not lint or a failure catalog with a row
 tables or an id listed twice, is listed under "Fix in the project first": no waiver covers it,
 and `adopt --write` owes nothing until it is fixed. Fix those in the project, commit, and
 rehearse again until nothing you did not choose blocks.
+
+The rehearsal also tells apart what your tests already claim. Under "Owed" it counts the ids a
+test names (`claimed by a test, no receipt yet`), the ids no test names, and the ids your own
+sources mark as planned; the plan has the usual stories for the ids no test names, one `Wire evidence`
+story per test file for the claimed ones and none for an id you had planned, so a project with a thousand claimed ids is not asked
+for a thousand stories. A claim is not evidence: every one of them is still owed until its test
+emits a receipt.
 
 ## 3. Look before you write
 
@@ -112,6 +122,16 @@ The second `adopt --write` finds the new design sources, adds them to `machinery
 adoption`. That list is your baseline of what was never proven. Nothing fails; nothing is
 claimed.
 
+Here no test names an id yet. In a project whose tests already point at the design, an id a
+test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as
+planned (`import.planned`: a sentence that opens an invariant's statement, a cell of a row of
+your failure catalog, each naming its story) is owed with `planned at adoption` and that story.
+`machinery status` then counts the owed ids by what stands behind each: claimed by a test with
+no receipt yet, named by no test, planned, and, once a run has proven some, proven and still
+listed. A story id your mark names is kept as it is: `plan --apply` creates nothing for an id
+whose story is not in this backlog and says so, and a mark that captures more than a story id
+stops `adopt` before it writes.
+
 **Mark the failures.** The code you model already fails somewhere: a status value such as
 `failed`, a worker that reports a crash, a lease that runs out. Tag the state that records it with
 `"tags": "failure"` and list the events that report it in the root `_failure_events`
@@ -132,12 +152,35 @@ lifecycle machine per attribute, each an aspect with its own `_aspect` name
 (`{lifecycle_of, aspect}` in `import.machines.bind`). An operational machine's events are held to what it serves: an action
 it serves, or an event it lists in `_external_events`.
 
+**Link the failure catalog.** A catalog read through `import.failure_modes` owes every row, and
+stage `xref-failure` is not demonstrated while one row names no subject: it prints how many are
+linked and how many are not, and one linked row among hundreds is no pass. The links file
+(`docs/formats.md` section 5.4.1) takes many rows per entry, `ids: [RISK-10..RISK-24, RISK-31]`,
+so a catalog is linked group by group. A row about the system as a whole or a part of it that
+is no entity, dependency or machine (a build, a deployment) takes the subject `system:<name>`,
+with the name declared under `systems` in `machinery.yaml`; a row that names nothing in the
+system at all is declared `no_subject`, with the reason.
+
 **Read your machines as they are.** `import.machines` (`docs/formats.md` section 5.2.1) takes
 globs anywhere in the project, so a lifecycle file kept beside its service is read with the
 rest. `states: pascal` turns `on_hold` into the domain state `OnHold`;
 `terminal: {from_root: <key>}` turns a root note that a machine never ends into `_terminal` on
 the states it is never left in; and a register that lists the transitions your code makes
 (`import.machines.register`) is checked both ways against the machines.
+
+**Say which events are not caller actions.** A dialect of your own rarely has a key for it, and
+you do not have to add one to every file. `import.machines.annotate` says it per glob of files
+or per machine id: `external_events` for what arrives from outside the caller (a timer, a
+callback, another machine), `failure_events` and `failure_states` for what reports and records
+a failure, each a list of names and `*` patterns (`"*_refused"`, `"*_failed"`), and `aliases`
+for an event that is a model action under another name (`handed_back: giveBack`). The
+"not an action" findings stop for the names you declare, and the "looks like a failure" warnings
+for the failures you declare. An external or aliased event whose name looks like a failure is
+still hinted: list it in `failure_events`, or dismiss the hint by name in `not_failures`, with
+the reason. A pattern that matches nothing in a machine it is applied to is an error, a pattern
+of `*` only is refused, and an event that is an action of the model stays a finding whether you
+list it as external or give it an alias: the config cannot hide a command. Every alias in effect
+is a line of `xref-model-machine`, so the list of names you bridged stays in view.
 
 ## 6. Turn what is owed into stories, beside the ones you have
 
@@ -149,7 +192,10 @@ machinery waves
 
 `plan --apply` adds one story per group of owed ids to the same backlog, with dependency edges
 and a tier label. Your existing stories are untouched. To attach ids to a story you already have,
-use `machinery plan --link <story> <id>...`. `waves` shows what can run in parallel.
+use `machinery plan --link <story> <id>...`. `waves` shows what can run in parallel. Ids a test
+claimed at adoption get no story of their own: `plan` adds one `Wire evidence <test file>` story
+per file (per directory past `plan.wire_max_files` files) that lists the ids the file must emit
+receipts for.
 
 Decisions you already keep in a file move into the backlog record by record:
 `machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'` prints one decision
@@ -209,6 +255,8 @@ Each of those can happen later, one story at a time, and the owed list and the b
 exactly how far along you are.
 
 Nor did you have to convert a design you already keep. Machines in a JSON dialect of your own,
-failure modes in Markdown tables and your own trace markers in comments are read as they are,
+failure modes in Markdown tables and your own trace markers in comments are read as they are
+(a marker you also use for other text goes in `trace.markers.scenarios_exact`, which claims only
+when the text is a scenario name),
 through `import` and `trace.markers` in `machinery.yaml` (`docs/formats.md` sections 5.2.1, 5.4.1
 and 8.1); the fixture `e2e/testdata/fixtures/library` is a small example.

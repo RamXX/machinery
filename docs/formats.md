@@ -80,6 +80,13 @@ import:                         # optional: design sources kept in the project's
       "machines/loan*.json": {lifecycle_of: Loan}       # a glob of source files, or
       "machines/loan-fines.json": {lifecycle_of: Loan, aspect: fines}   # one aspect of a lifecycle
       hold_queue: {serves: ["act:Loan.lend"]}            # a machine id
+    annotate:                   # optional: what the dialect has no key for (section 5.2.1)
+      "machines/*.json":        # a glob of source files, or a machine id; every matching entry applies
+        external_events: ["due_*"]         # events that arrive from outside: exact names, or patterns with *
+        failure_events: ["*_failed"]       # events that report a failure
+        failure_states: ["*_failed"]       # states that record one
+        aliases: {handed_back: giveBack}   # an event that is a model action under another name
+        not_failures: {count_aborted: "a stocktake that is called off changes no loan"}   # a name hint dismissed, with the reason
   failure_modes:                # optional: a failure-mode catalog kept as Markdown tables (section 5.4.1)
     file: docs/risks.md         # required
     id: "^RISK-[0-9]+$"         # required: the first cell of a failure-mode row matches it in full
@@ -87,6 +94,9 @@ import:                         # optional: design sources kept in the project's
       failure: ["Failure", "What goes wrong"]
       behavior: ["Required behavior", "Expected"]
     links: design/risk-links.yaml   # optional: the subject and required value of each row
+  planned:                      # optional: the project's own "planned" marks, read by adopt (section 17.2)
+    - {in: model-statement, pattern: '^Planned \(story (?P<story>[a-z0-9-]+)\)\.'}   # an invariant statement
+    - {in: failure-row, pattern: '^planned: (?P<story>[a-z0-9-]+)$'}                  # a cell of a catalog row
 contracts:                      # optional
   - kind: openapi               # openapi | proto
     path: contracts/openapi.yaml
@@ -96,6 +106,9 @@ checkers:                       # optional: external checkers (section 22)
 dependencies:                   # optional: external dependencies of the system
   - name: postgres
     posture: real               # real | sandbox
+systems:                        # optional: the system as a whole and its named parts, for failure-mode subjects (section 5.4)
+  - name: build                 # required: ^[a-z][a-z0-9-]*$, unique
+    about: "how the shop is built and released"   # optional
 trace:                          # optional
   code: ["internal/**/*.go"]    # files that may carry machinery:serves tags; default: scope
   tests: ["e2e/**"]             # files that may carry machinery:verifies tags
@@ -103,6 +116,7 @@ trace:                          # optional
     serves: ["Implements:"]
     verifies: ["Checks:", "Proves:"]
     scenarios: ["Scenario:"]
+    scenarios_exact: ["Objective:"]   # claim only when the text is a scenario name, silent otherwise
 tests:                          # optional: the end-to-end-only policy (section 9.4)
   e2e: ["e2e/**"]               # where tests live; default: trace.tests
   files: []                     # optional: replaces the default test-file patterns
@@ -128,6 +142,8 @@ commands:
 backlog:                        # optional: the backlog bridge (section 15)
   tool: bd                      # only bd
   base: main                    # optional: the branch work is cut from; default main
+plan:                           # optional: machinery plan (section 15.2)
+  wire_max_files: 20            # optional, this is the default: past this many test files, wire-evidence stories are one per directory
 hooks:                          # optional: what machinery hook does (section 21.1); block | warn | off
   commit: block                 # optional, this is the default
   push: block                   # optional, this is the default
@@ -185,11 +201,44 @@ Rules:
   with both or neither (`import.machines.bind.<key>: set lifecycle_of or serves, not both`,
   `import.machines.bind.<key>: set lifecycle_of or serves`) and an empty id in `serves`
   (`import.machines.bind.<key>.serves: an id must not be empty`) are config errors.
+  `import.machines.annotate` maps a glob of source files or a machine id to at least one of
+  `external_events`, `failure_events`, `failure_states` (lists of names and patterns),
+  `aliases` (event name to action name) and `not_failures` (event or state name to a reason).
+  An empty key or one that is not a valid glob
+  (`import.machines.annotate: "<key>" is not a valid glob`), a key that is no path inside the
+  project (`import.machines.annotate: "<key>" must stay inside the project root`), an entry with
+  none of the five
+  (`import.machines.annotate.<key>: set external_events, failure_events, failure_states, aliases or not_failures`),
+  an empty pattern (`import.machines.annotate.<key>.<list>: a pattern must not be empty`), a
+  pattern made of `*` only, which would name everything
+  (`import.machines.annotate.<key>.<list>: pattern "<pattern>" has no literal part; a pattern names the events or states it is for`),
+  an empty event or action in `aliases`
+  (`import.machines.annotate.<key>.aliases: an event and its action must not be empty`) and an
+  empty name or reason in `not_failures`
+  (`import.machines.annotate.<key>.not_failures: a name and its reason must not be empty`) are
+  config errors.
   `import.failure_modes` needs `file` (`import.failure_modes.file is required`), an `id` that is
   a regular expression (`import.failure_modes.id is required`,
   `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
   `columns.failure` and `columns.behavior` (`import.failure_modes.columns.failure is required`).
   It may be set beside `design.failure_modes`.
+  `import.planned` lists where a project already marks an id as planned, with the story that will
+  deliver it. Each entry has `in`, `model-statement` (the statement of every invariant of the
+  models) or `failure-row` (every cell of every row of the imported catalog), and `pattern`, a
+  regular expression searched in that text, trimmed, whose named group `story` is the story id;
+  anchor it with `^` to ask for a statement that begins with the mark. The first entry that
+  matches an id decides, and a match whose `story` is empty is no mark. What `story` captured
+  must be a story id, `^[A-Za-z0-9._-]+$`: anything else is refused by `machinery adopt`, by
+  source line, and never written (section 17.2, step 3). Only `machinery adopt`
+  reads the marks. Config errors, each naming its entry by number, from 1:
+  `import.planned: entry <n>: in must be model-statement or failure-row, got "<value>"`,
+  `import.planned: entry <n>: pattern is required`,
+  `import.planned: entry <n>: pattern is not a regular expression: <error>`,
+  `import.planned: entry <n>: pattern "<pattern>" needs a named group story, as in (?P<story>[a-z0-9-]+)` and,
+  without `import.failure_modes`,
+  `import.planned: entry <n>: in: failure-row needs import.failure_modes; it reads the rows of that catalog`.
+- `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
+  config error (`plan.wire_max_files must not be negative`).
 - `review.backlog` and `review.design` are `required` or `off`
   (`review.backlog must be required or off, got "<value>"`). Each defaults to `required` when
   `backlog.tool` is set and to `off` otherwise. A project being adopted may set them `off`; the
@@ -197,8 +246,16 @@ Rules:
 - `delegate.policy` is the one path that may leave the project root: it is absolute, or relative to
   the root, and names a file the owner keeps (section 15.9). An empty one is a config error
   (`delegate.policy is required`).
+- `systems` names what a failure mode may be about that is not an entity, a dependency or a
+  machine: the system as a whole, or a part of it such as its build or its deployment. A failure
+  mode names one as `system:<name>` (section 5.4). An entry without a name
+  (`systems: name is required`), a name that does not match the pattern
+  (`systems: name "<name>" must match ^[a-z][a-z0-9-]*$`) and a name declared twice
+  (`systems: duplicate name "<name>"`) are config errors.
 - An empty marker in `trace.markers` is a config error
-  (`trace.markers.verifies: a marker must not be empty`).
+  (`trace.markers.verifies: a marker must not be empty`), and so is a marker listed in both
+  `scenarios` and `scenarios_exact`
+  (`trace.markers.scenarios_exact: "<marker>" is also in trace.markers.scenarios; a marker has one mode`).
 - `constraints.cores` needs `max_file_lines` and `max_func_lines`, each a positive number
   (`constraints.cores.max_file_lines is required and must be positive`), and an empty entry of
   `deny_imports` is a config error (`constraints.cores.deny_imports: an entry must not be empty`).
@@ -494,6 +551,13 @@ A machine also declares, with annotations XState ignores and a tag XState carrie
 - **failure states**: a state with the XState tag `failure` records that something went wrong;
 - **failure events**: the root `_failure_events` lists the events that report a failure arriving
   from outside (a dependency failed, a crash was detected, a lease was lost);
+- **external events**: the root `_external_events` lists the events that arrive from outside the
+  caller (a timer, a callback, another machine) and are no model action;
+- **aliases**: the root `_aliases` maps an event to the model action it is under another name
+  (`{"handed_back": "giveBack"}`), so the cross-reference rules of section 6.4 read the event
+  as that action;
+- **dismissed hints**: the root `_not_failures` maps an event name or the dotted path of a state
+  to the reason its name only looks like a failure (section 6.2);
 - **callers**: a transition branch with `_requires` names who may cause it, an actor or role, or
   `system/<name>` for an internal caller.
 
@@ -582,7 +646,71 @@ below, even when a glob matches it:
      keys, in sorted order), and none is applied.
    - An entry that matches no machine is
      `ERROR  import.machines.bind <key>: matches no machine file and no machine id`.
-7. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
+7. **Annotations.** A dialect may have no key that says which events are not caller actions.
+   Every entry of `import.machines.annotate` whose key is the machine id or a glob that matches
+   the source file applies to the machine, in key order, and what the entries say adds up:
+   - `external_events` and `failure_events` hold event names and patterns, in which `*` stands
+     for any run of characters and every other character for itself (`*_refused`, `due_*`). The
+     events of the machine are the ones a state handles under `on` or lists in `_ignores`. Every
+     event a pattern matches is added to the root `_external_events` or `_failure_events`, after
+     the names the source lists there, in sorted order, each once.
+   - `failure_states` holds state names and patterns. A pattern matches a state by its name or
+     by its dotted path, in the names the source writes or in the translated ones (`*_failed`
+     and `ScanFailed` both name the state `scan_failed` under `states: pascal`). Every state it
+     matches, at any depth, gets the tag `failure`, added to the tags it has.
+   - `aliases` maps an event of the machine, by its exact name, to an action name. Each is added
+     to the root `_aliases` (section 5.2), after the ones the source has, in event order.
+   - `not_failures` maps an exact name to a reason: an event of the machine, or a state by its
+     dotted path or by its name, in source or translated names. A dotted path names its state; a
+     bare name names the one state that carries it, and is refused when several do. Each is
+     added to the root `_not_failures` (section 5.2), an event under its name and a state under
+     its translated dotted path, after the ones the source has. A name that is both an event
+     and a state of the machine dismisses both. A name with no failure word in it (section 6.2)
+     has no hint, so dismissing it is refused.
+
+   The translated machine then carries the annotations of a native file, and every rule about
+   them is the native one: an event in both lists, an aliased event in either list (section 6.2),
+   an alias that names no action, and an event listed as external or as a failure that is an
+   action of the model (section 6.4), whose finding names the entry and the pattern that listed
+   it. No entry hides a caller's command: an event that is an action of the model is neither
+   listed nor aliased, every alias in effect is printed and counted by `xref-model-machine`
+   (section 6.4), and neither listing an event as external nor giving it an alias stops its name
+   hint (section 6.2). Nothing is a silent no-op:
+   - A pattern that matches no event of a machine it is applied to is
+     `ERROR  <file>: import.machines.annotate <key>: <list> pattern <pattern> matches no event of the machine; correct the pattern or remove it`
+     (`<list>` is `external_events` or `failure_events`), and one that matches no state is
+     `ERROR  <file>: import.machines.annotate <key>: failure_states pattern <pattern> matches no state of the machine; correct the pattern or remove it`.
+     A glob entry holds its patterns to every machine it matches.
+   - An alias for an event the machine does not have is
+     `ERROR  <file>: import.machines.annotate <key>: aliases names event <event>, which no state of the machine handles or ignores; correct the name or remove the alias`.
+   - Two entries that give one event different actions are
+     `ERROR  <file>: import.machines.annotate <a> and <b> give event <event> different actions (<x>, <y>); keep one`
+     (the first is kept), and an entry that gives an event another action than the source's own
+     `_aliases` is
+     `ERROR  <file>: import.machines.annotate <key> gives event <event> the action <x>, and the source gives it <y>; keep one`
+     (the source's is kept).
+   - A dismissal that names nothing is
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is no event and no state of the machine; correct the name or remove it`;
+     one name dismissed by two entries is
+     `ERROR  <file>: import.machines.annotate <a> and <b> both dismiss <name>; keep one`, and one
+     the source dismisses already is
+     `ERROR  <file>: import.machines.annotate <key> dismisses <name>, which the source dismisses already; keep one`.
+     A bare name that several states carry is
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is the name of several states (<paths>); name one by its dotted path`
+     (translated paths, in document order), and a name that has no hint to dismiss is
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which does not look like a failure (no fail, error, abort, crash or timeout in the name), so there is no hint to dismiss; remove it`.
+     Neither is written to the translated machine.
+     One entry that names one state in two ways is
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <a> and <b>, which are one state (<path>); keep one`
+     (the first is kept).
+   - A declared failure is not dismissed, whether the source or an entry declares it:
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is a failure event of the machine; a declared failure is not dismissed (keep one)`,
+     and for a state
+     `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is the state <path>, tagged failure; a declared failure is not dismissed (keep one)`.
+     Such a dismissal is not written to the translated machine.
+   - An entry that matches no machine is
+     `ERROR  import.machines.annotate <key>: matches no machine file and no machine id; correct the key or remove the entry`.
+8. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
    the machine id, upper-cased, followed by the first four hex digits, upper-cased, of the SHA-256
    of the original id. Dozens of machines whose ids share a prefix get different tags, and a tag
    does not change while the id does not.
@@ -620,9 +748,12 @@ and the observed transitions read:
 `checked: 3 machines, 9 states, 8 transitions, 3 register entries, 7 observed transitions`. The
 register is a design source: it is part of the contract hash (section 15.4).
 
-The keys a binding adds, then an added `_oracle_tag`, come last in the root; every other key
-keeps its place. A key that is still unknown after renaming is a finding of stage `machines`, as
-in a native file: nothing is dropped silently. The runtime table of an imported machine names the source file in `source`, and its
+The keys a binding adds, then an added `_external_events`, `_failure_events`, `_aliases` and
+`_not_failures`, then an added `_oracle_tag`, come last in the root; every other key keeps its
+place, and so does a list the source has and an entry adds to. An added `tags` comes last in its
+state. A key that is still unknown after renaming is a finding of stage `machines`, as in a
+native file: nothing is dropped silently. The runtime table of an imported machine names the
+source file in `source`, and its
 `source_sha256` is the SHA-256 of the source bytes (section 7.3). The translated bytes are what
 `machinery gen` writes under `<gen>/imported/machines/` (section 7) and what stage `xstate`
 loads.
@@ -661,9 +792,36 @@ failure_modes:
 `id`, `subject`, `failure`, `required` and `behavior` are required. Unknown keys are an ERROR.
 
 Subject forms: `invoke:<machine id>.<src>`, `dependency:<name>`, `act:<Entity>.<action>`,
-`entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path)
-and `event:<machine id>.<event>` (a failure event). `required: refuse` is only valid with
-`kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject.
+`entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path),
+`event:<machine id>.<event>` (a failure event) and `system:<name>` (the system as a whole or a
+named part of it, declared under `systems`, section 2). `required: refuse` is only valid with
+`kind: abuse`, and `kind: abuse` needs an `act` or `entity` subject. A subject of another form
+is `ERROR  <file>: <id>: subject "<subject>" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>`.
+
+A `system:` subject is for a failure mode about nothing the model, the machines or the
+dependencies hold: a release built without a signature, clocks that disagree. Its name must be
+declared: an unknown one is the ERROR `unknown-system` of section 6.6, which no waiver covers.
+That is the only check it takes part in: it is compared with no entity, action, state or event,
+and no rule asks for a failure mode per declared system. `required`, `failure` and `behavior` are as mandatory as for
+any failure mode.
+
+A failure mode that names no subject at all says so, with the reason, in place of `subject`:
+
+```yaml
+  - id: audit-log-full
+    no_subject: "the audit log is written by the host, which the design does not model"
+    failure: "The audit log cannot take another line."
+    required: fail-closed
+    behavior: "The shop stops taking orders until there is room."
+```
+
+It is an obligation like any other and takes part in no subject rule of `xref-failure`. Both
+keys together are `ERROR  <file>: <id>: subject and no_subject are both set; name the subject or say why there is none`,
+a blank reason is `ERROR  <file>: <id>: no_subject needs a reason`, a value that is not a YAML
+string (a boolean, a number, a list) is
+`ERROR  <file>: line <n>: no_subject must be a string that gives the reason` and the file is then
+not read, in the links file too, and `kind: abuse` is refused
+as for any failure mode without an `act` or `entity` subject.
 
 #### 5.4.1 Failure modes kept as Markdown tables
 
@@ -706,20 +864,57 @@ version: 1
 links:
   - {id: RISK-3, subject: "invoke:loan_desk.reserveCopy", required: retry-bounded}
   - {id: RISK-7, kind: abuse, subject: "act:Loan.renew", required: refuse}
+  - {ids: [RISK-10..RISK-24, RISK-31], subject: "system:build", required: fail-closed}
+  - {id: RISK-40, no_subject: "the shelf list is kept on paper, outside the system"}
 ```
 
-`id` is the catalog id, compared case-insensitively. `subject` and `required` are required and
-`kind` is optional (default `fault`), with the value rules of section 5.4 and its messages,
-prefixed `<links file>: <id>`. An id that is not an imported row is
-`ERROR  <links file>: <id>: no failure-mode row of <file> has this id`, one listed twice is
-`ERROR  <links file>: <id>: listed twice`, and an unknown key is an ERROR.
+An entry names one row with `id` or many with `ids`, never both
+(`ERROR  <links file>: link <n>: id and ids are both set; keep one`,
+`ERROR  <links file>: link <n>: id or ids is required`; `<n>` counts the entries from 1). An id is
+the catalog id, compared case-insensitively.
 
-- A **linked** row is a failure mode like a native one, and takes part in every rule of stage
-  `xref-failure`.
-- An **unlinked** row is an obligation all the same: `fm:<id>` is owed, claimed and traced like
-  any failure mode. It names nothing, so it takes part in no subject rule of `xref-failure`: it
-  neither resolves nor covers an invoke, a dependency, an action, a failure state or a failure
-  event.
+- **`ids`** is a list of ids and of inclusive ranges `<first>..<last>`. The two ends of a range
+  share everything before their trailing digits, compared case-insensitively, and the range
+  names that prefix followed by every number from the first to the last, each written with at
+  least as many digits as the first end has: `FM-01..FM-23` is `FM-01`, `FM-02` to `FM-23`, and
+  `FM-08..FM-101` is `FM-08` to `FM-99`, then `FM-100` and `FM-101`. A range holds at most 10000
+  ids.
+- **Values.** `subject` and `required` are required and `kind` is optional (default `fault`),
+  with the value rules of section 5.4 and its messages. `no_subject: "<reason>"` in place of
+  `subject` declares the rows subject-less (section 5.4); `required` and `kind` are then
+  optional. Every row an entry names takes its values. The value rules are checked once per
+  entry.
+- **Messages** are prefixed `<links file>: <entry>`, where `<entry>` is the `id`, or the items of
+  `ids` as written, joined by `, ` (the first three and `, ...` when there are more). A
+  malformed item is `<item> is not an id or a range <first>..<last>`,
+  `the ends of the range <item> must end in a number`,
+  `the ends of the range <item> do not share a prefix`, `the range <item> runs backwards` or
+  `the range <item> names <n> ids; a range holds at most 10000`, and the entry is then not read.
+  An id an entry names twice is `<id> is listed twice`.
+- **Every id must be a row.** For `id`:
+  `ERROR  <links file>: <id>: no failure-mode row of <file> has this id`. For `ids`, one finding
+  per entry: `no failure-mode row of <file> has the id <id>`, or
+  `has the ids <id>, <id>` with the first five and `and <n> more`. The rows that do exist take the
+  entry's values.
+- **Overlap.** A row two entries name is one finding per pair of entries, naming both:
+  `ERROR  <links file>: links <n> (<entry>) and <m> (<entry>) overlap: <ids>` (the first five ids
+  as the later entry writes them, and `and <n> more`). The row keeps the values of the first.
+- An unknown key is an ERROR.
+
+Every imported row is then one of three:
+
+- A **linked** row: an entry gives it a subject of one of the forms of section 5.4 and a
+  `required` value, and the subject resolves in the design (section 6.6). It is a failure mode
+  like a native one, and takes part in every rule of stage `xref-failure`.
+- A **subject-less** row (an entry declares it `no_subject`, with the reason) is an obligation
+  like any failure mode and takes part in no subject rule.
+- An **unlinked** row is every other one: no entry names it, or the entry that names it gives
+  no subject, a malformed one, one that resolves to nothing, or no valid `required` value. An
+  entry is never a link by being there. It is an obligation all the same: `fm:<id>` is owed,
+  claimed and traced like any failure mode. It names nothing, so it takes part in no subject
+  rule of `xref-failure`: it neither resolves nor covers an invoke, a dependency, an action, a
+  failure state or a failure event. While one row is unlinked, stage `xref-failure` is not
+  demonstrated (section 6.6).
 
 ### 5.5 Risk file
 
@@ -751,7 +946,12 @@ delays, reachability from the initial state and from every entry state (`_entrie
 absorbing states unless declared `_terminal`, every invoke has `onError` and a timeout, event
 completeness on resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`),
 fail-closed tags, no state tagged both `failure` and `accepting`, and the shape of `_requires`,
-`_entries`, `_terminal`, `_external_events`, `_failure_events`, `_serves` (a non-empty list of
+`_entries`, `_terminal`, `_external_events`, `_failure_events`, `_aliases` (an object that maps
+an event some state handles or ignores to a non-empty action name, no event of it also in
+`_external_events` or `_failure_events`), `_not_failures` (an object that maps an event some
+state handles or ignores, or the dotted path of a state, to a non-empty reason; none of them in
+`_failure_events` or a state tagged `failure`, and none without a hint to dismiss: a name with
+no failure word in it, or an action of the machine's lifecycle entity), `_serves` (a non-empty list of
 distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is section 6.4) and
 `_aspect` (a short name matching `^[A-Za-z][A-Za-z0-9_-]*$`; which machines may declare it is
 section 6.4). Two machines whose id tags
@@ -762,7 +962,14 @@ Name hints are warnings and never fail the stage. A state whose name contains, c
 `warn   <file>: state <S> looks like a failure state and is not tagged failure` (`<S>` is the
 dotted path). An event the machine handles or ignores whose name contains one of those words, and
 that is neither in `_failure_events` nor an action of the machine's lifecycle entity, prints
-`warn   <file>: event <e> looks like a failure event and is not in _failure_events`.
+`warn   <file>: event <e> looks like a failure event and is not in _failure_events`. An event in
+`_external_events` or with an entry in `_aliases` is still hinted: what arrives from outside, or
+under another name, may report a failure. A hint is dismissed by name, with the reason, in the
+root `_not_failures`: the event name, or the dotted path of the state. An entry there that
+dismisses no hint is an ERROR, as a stale marker is:
+`ERROR  <file>: _not_failures names '<name>', which does not look like a failure (no fail, error, abort, crash or timeout in the name), so there is no hint to dismiss (remove it)`
+(for a state, the last segment of its path is its name), and
+`ERROR  <file>: _not_failures names '<name>', which is an action of <E> and is never hinted, so there is no hint to dismiss (remove it)`.
 
 `checked:` counts machines, states and transitions. Not applicable when neither `design.machines`
 nor `import.machines` is configured. With `import.machines` the translation findings of section
@@ -774,7 +981,8 @@ nor `import.machines` is configured. With `import.machines` the translation find
 Parses the file against section 5.4, and the catalog and its links file against section 5.4.1.
 Unique ids, valid `kind` and `required` values, well-formed `subject`. `checked:` counts failure
 modes, native and imported, and, of those, abuse cases. When `import.failure_modes` is configured
-it also counts the imported rows and, of those, the unlinked ones:
+it also counts the imported rows and, of those, the unlinked ones (a row declared subject-less is
+not unlinked, section 5.4.1):
 `checked: 9 failure modes, 1 abuse cases, 7 imported, 4 unlinked`. Not applicable when neither
 `design.failure_modes` nor `import.failure_modes` is configured.
 
@@ -786,8 +994,8 @@ For every machine, and every entity of the models:
 |---|---|
 | `machine-binding` | The machine binds to the model (section 5.2): it is the lifecycle machine of an existing entity, or an operational machine whose `_serves` names only entities and actions of the model. An entity has one lifecycle machine, or several that each declare a different `_aspect`. |
 | `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). When no candidate has a value in D, the finding says that E has no state enum for the machine and names no enum. An entity with no enum-typed attribute at all is one finding for the entity, whatever the number of its lifecycle machines. With aspects, each aspect machine is matched against an enum of its own: an enum that exactly matches one machine is that machine's, and no enum is the state enum of two machines (a machine that matches only an enum another one holds is a finding, and the enums other aspects hold are left out of its candidates). |
-| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. Operational machine that binds to the model (no `machine-binding` finding): every event name under any `on` must be the name of an action of an entity it serves, the action of an `act:` id it serves, or be listed in `_external_events` or `_failure_events`. When it serves only entities that declare no action, the events that are not listed are one finding for the machine: nothing was compared with the model. |
-| `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine, or, with aspects, in at least one of them. |
+| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, be an alias of one (the root `_aliases` maps it to an action of E), or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). An action is a caller's command: an event in either list that is the name of an action of E is a finding, and so is an alias for an event that is itself an action of E. Several events may be aliases of one action, but an action that has an `on` event of its own name in a lifecycle machine of E is the action of no alias: it would absorb any other event. When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. Operational machine that binds to the model (no `machine-binding` finding): every event name under any `on` must be the name of an action of an entity it serves, the action of an `act:` id it serves, an alias of one of those actions, or be listed in `_external_events` or `_failure_events`. An alias names an action the machine serves, one that has no `on` event of its own name in the machine. A listed or aliased event is held to more: it is a finding when it is the name of any action of any entity behind `_serves`, the entity of an `act:` id too, served or not, so no list and no alias hides a command of an entity the machine works for. When it serves only entities that declare no action, the events that are not listed are one finding for the machine: nothing was compared with the model. |
+| `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine, under its own name or under an alias (`_aliases`) that holds, or, with aspects, in at least one of them. |
 | `entity-machine` | Every entity that declares at least one action has a lifecycle machine. An entity that has no state of its own is waived, with the reason. |
 
 The findings of `machine-binding`:
@@ -819,6 +1027,36 @@ The findings of `state-enum` and `event-action` that stand for a whole entity or
 - `event-action: <id>.<event>: event is not an action of what the machine serves (<serves>); serve the action (act:<Entity>.<action>), or list the event in _external_events (or in _failure_events when it reports a failure)`, for an operational machine, `<serves>` its `_serves` as written;
 - `event-action: <id>: serves only entities that declare no actions (<entities>), so none of its <n> event(s) was compared with the model (<events>); add the actions to the model, serve the actions the machine runs (act:<Entity>.<action>), or list the events in _external_events (or in _failure_events when one reports a failure)`.
 
+The findings of `event-action` about an action that is listed or aliased, where `<of>` is `<E>`
+for a lifecycle machine and `what the machine serves (<serves>)` for an operational one:
+
+- `event-action: <id>.<event>: listed in <list> and an action of <E>; an action is a caller's command, not an event from outside: remove it from <list> in <file>`,
+  `<list>` being `_external_events` or `_failure_events` and `<E>` the entity that declares the
+  action. When an entry of `import.machines.annotate` listed the event (section 5.2.1), the
+  finding ends instead with
+  `import.machines.annotate <key> lists it for <file> (<list> pattern <pattern>); narrow the pattern or remove it`,
+  `<list>` there being `external_events` or `failure_events` and the pattern the first that
+  matched;
+- `event-action: <id>.<event>: _aliases gives the event the action <action>, and <event> is itself an action of <E>; an action is not hidden behind another: <where>`;
+- `event-action: <id>.<event>: _aliases names action <action>, which is not an action of <E>; name an action of <E>, or <where>`, and for an operational machine
+  `event-action: <id>.<event>: _aliases names action <action>, which is not an action of what the machine serves (<serves>); serve the action (act:<Entity>.<action>), or <where>`;
+- `event-action: <id>.<event>: _aliases gives the event the action <action>, and no state handles <event> under on; an event that is only ignored stands for no action: <where>`:
+  rule `action-event` asks for an `on` event, so an alias for an event that states only ignore
+  would satisfy nothing, and it is neither printed nor counted;
+- `event-action: <id>.<event>: _aliases gives the event the action <action>, and <action> has an event of its own name in <machine id>; an action has its own event or stands behind aliases, not both: <where>`.
+
+`<where>` is `remove it from _aliases in <file>`, or, when an entry of
+`import.machines.annotate` gave the alias,
+`remove the alias from import.machines.annotate <key> (for <file>)`.
+
+An alias that does not hold makes its event neither an action nor a second finding: the action it
+should have been is then reported by `action-event`. These findings are about every entry of the
+lists and of `_aliases`, whether a state handles the event under `on` or only ignores it.
+
+No alias is silent. Every alias that holds is one line of the stage, a warning that never fails
+it, `warn   alias: <machine id>: <event> stands for <action>`, and the aliases are counted in
+`checked:` (below).
+
 `<states>` and `<events>` are sorted and comma-separated.
 
 A machine is **bound** when it has no `machine-binding` finding, waived or not; a waiver accepts
@@ -831,6 +1069,7 @@ machine file at all), never passed; with findings it is failed (section 3.2).
 domain states, events (of the lifecycle machines and of the operational machines that bind),
 actions (of the entities that have a lifecycle machine, each once) and entities with actions:
 `checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions`.
+With at least one alias in effect it adds their number: `..., 1 entities with actions, 2 aliases`.
 
 ### 6.5 `xref-contract`
 
@@ -859,22 +1098,50 @@ Operations without a binding are counted and are not an error (reads and queries
 
 The stage applies when `design.failure_modes` or `import.failure_modes` is configured, or when
 any machine declares a failure state or a failure event (section 5.2). An imported row that is
-not linked (section 5.4.1) is counted among the failure modes and takes part in no rule. A
+not linked (section 5.4.1) and a failure mode declared subject-less (`no_subject`, section 5.4)
+are counted among the failure modes and take part in no rule. A `system:` subject takes part in none of the rules of the table. Its name must be one of
+`systems` (section 2):
+`ERROR  unknown-system: system:<name>: failure mode <id>: <name> is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)`.
+`unknown-system` is not a rule a waiver may name (section 6.7), and a waiver of
+`subject-resolves` for a `system:` subject matches no finding and is stale. A
 finding that asks for a failure mode says where to declare it: in the file of
 `design.failure_modes` when there is one, else in the links file of `import.failure_modes`
 (`a links file (import.failure_modes.links)` when none is configured). `checked:` counts
 failure modes, invokes,
-dependencies, tiered actions, failure states and failure events. With no failure-mode file
+dependencies, tiered actions, failure states and failure events. When `import.failure_modes` is
+configured, or a failure mode is unaccounted for (below), it counts, right after the failure
+modes, those that are linked (`linked`, native ones included) and those unaccounted for
+(`unlinked`); when at least one failure mode is declared subject-less it counts those next:
+`checked: 48 failure modes, 30 linked, 4 unlinked, 14 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
+With no failure-mode file
 configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
 event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
 states and failure events only. Not applicable when there is neither a failure-mode file nor a
 failure state or failure event.
 
-When there are failure modes and none of them names a subject (every one is an imported row that
-is not linked, section 5.4.1), the stage compared no failure mode with the design, and its result
-is `not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing
-at all to compare), never passed, waivers or not; with findings it is failed (section 3.2). A
-waiver does not link a row.
+A failure mode, native or imported, is **linked** when all of this holds: its subject has one of
+the forms of section 5.4, its `required` value is one of the four, it has no `no_subject` key,
+and the subject resolves: rule `subject-resolves` has no finding for it, waived or not, and a
+`system:` subject names a configured system. It is **subject-less** when `no_subject` gives a
+reason and there is no `subject`. Every other failure mode is **unaccounted for** and counts as
+`unlinked`: an imported row no links entry names (section 5.4.1); a subject that is missing,
+empty or malformed; a subject that resolves to nothing; a missing or invalid `required`; a
+`no_subject` with a blank reason or beside a `subject`. Only a linked failure mode covers an
+invoke, a dependency, an action, a failure state or a failure event. Stage `failure-modes` has
+the ERROR of a malformed entry; this stage counts it as `unlinked` all the same, so that it
+never passes over one, run alone, in `check`, in `assess` or in a rehearsal. While one failure mode is unaccounted for, the stage did
+not compare every failure mode with the design: one linked row among many is no pass. Its result
+is
+`not demonstrated: <n> of <m> failure modes name no subject; link each in <links file> or declare it there with no_subject and a reason`,
+where `<n>` counts those unaccounted for, `<m>` every failure mode, and `<links file>` is
+`a links file (import.failure_modes.links)` when none is configured; when none of them is an
+imported row the middle part is `give each a subject in <failure-mode file>`. When none is
+unaccounted for and
+still no failure mode names a subject (every one is declared subject-less), it compared none:
+`not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing at
+all to compare). Neither is ever passed, waivers or not; with findings the stage is failed
+(section 3.2). A waiver does not link a row: a waived `subject-resolves` finding prints as a
+warning and its failure mode stays unlinked.
 
 ### 6.7 Waivers
 
@@ -1122,6 +1389,11 @@ Stage `trace` rules:
 | `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
 
+A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
+which is not an `act` id is no ERROR and no credit: it prints, once per id and line of a tag,
+`warn   serves: <file>:<line>: <id> is not an action; a serves tag credits only actions`. The id
+still needs what its kind needs, a test that claims it.
+
 A proposed or retired id counts as an id of the design for rule `unknown-id`. A `*` token claims
 only the ids among its matches that yield an obligation, so a pattern that also matches a
 proposed or retired id is not a finding. A `pf:` token is matched against the proof obligations
@@ -1129,7 +1401,8 @@ alone, and a pattern among them (`pf:*`) is a claim of each one it matches; a ba
 is never read as a `pf` id. `unserved` and `unverified` ask only for ids that yield
 an obligation, and the owed list is checked as in section 4.1.
 
-`checked:` counts code files, test files, `act` ids and obligations. Only files inside `scope`
+`checked:` counts code files, test files, `act` ids and obligations and, when a serves tag names
+one, the distinct ids that are served and are not actions (`2 non-action serves`). Only files inside `scope`
 are read. Zero files matched by a configured glob list is an ERROR. Not applicable when `trace:`
 is absent.
 
@@ -1145,8 +1418,8 @@ working beside them, unchanged. A marker claims what the tag of the same kind cl
 tags are read: stage `trace`, `machinery affected` (section 12.1) and the served ids of
 `machinery adopt` (section 17.2).
 
-- **Where.** A `serves` marker is read in the files of `trace.code` inside `scope`, a `verifies`
-  or `scenarios` marker in the files of `trace.tests`. A marker counts only where it follows
+- **Where.** A `serves` marker is read in the files of `trace.code` inside `scope`, a `verifies`,
+  `scenarios` or `scenarios_exact` marker in the files of `trace.tests`. A marker counts only where it follows
   nothing but whitespace and comment characters (`/`, `#`, `*`, `-`, `;`, `%`, `!`, `<`) at the
   start of its line: `// Checks: RISK-3` and ` * Checks: RISK-3` count, `log("Checks: RISK-3")`
   does not. When several markers match one line, the longest wins.
@@ -1165,8 +1438,13 @@ tags are read: stage `trace`, `machinery affected` (section 12.1) and the served
 - **Scenarios.** After a `scenarios` marker the rest of the line, trimmed, is the name of a model
   scenario, and the marker claims (verifies) the `sc` id of the scenario with exactly that name.
   No scenario of that name is `ERROR  unknown-id: <file>:<line>: scenario "<name>"`.
+- **Scenarios, exact.** A `scenarios_exact` marker is for a marker the project also uses for
+  other text, such as the objective of a test. It claims the same way when the rest of the line,
+  trimmed, is exactly the name of a model scenario, upper and lower case included. Any other text
+  claims nothing and is no finding. The longest marker of both lists decides a line, with its own
+  mode.
 
-The rules and the `checked:` line of stage `trace` do not change.
+The rules of stage `trace` do not change.
 
 ## 9. Architecture constraints
 
@@ -1449,6 +1727,9 @@ It does not defend against a party who can run commands as the tool:
   `MACHINERY_RECEIPTS`, and the ledger binds that file like any other. The ledger says that
   machinery ran a command and that the file is what the command left. It does not say that the
   command ran tests, that the test a receipt names ran, or that its assertions held.
+- Deleting the file of a failing run and then running anything through `machinery run` forgets
+  that run: the finding for a deleted file lasts until the next run in that receipts directory,
+  not until the failing test runs again.
 - Whoever can write the git directory can write a ledger entry. The digest is not secret and
   nothing is signed.
 - The claim rule compares two things the emitter chooses: the file name in `test` and the
@@ -1479,6 +1760,34 @@ not owed (section 23.2): an entry that names a `pf` id is
 `ERROR  proof: <id> is in <owed file>; a proof obligation is not owed: it awaits a machine-checked proof, which this version cannot give; remove the entry`
 wherever the file is read. A missing file is an empty list.
 
+**A file with a problem.** An owed file that cannot be read, is not YAML or has an unknown
+key has no entries to trust, and it is never read as an empty list. Every command that works in
+the project then prints, on stderr and with nothing on stdout,
+`ERROR  <owed file>: <error>; an owed list that does not parse is not read as empty: fix the file`
+and exits 1: `status`, `verify`, `check`, `plan`, `landing` and the rest alike. For an empty
+file `<error>` is
+`the file is empty; write "version: 1" and "owed: []" in it, or delete it (a missing file is an empty list)`.
+A file that parses and has a problem of its own (a version other than 1, an entry without an
+id or a reason, an id listed twice) is refused the same way, before any stage runs: one
+`ERROR  <owed file>: <problem>` line per problem, in file order (`duplicate id <id>`,
+`<id>: reason is required`), then
+`ERROR  <owed file>: fix the file; an owed list with a problem is not read`, and exit 1. An
+entry that names an id the design does not have is not such a problem: it is a finding of the
+stages that compare the list with the design, as before. `machinery adopt`
+refuses with the same lines before it writes anything (the first after `machinery: `, exit 1),
+`machinery assess` reports the problems of the snapshot's owed file as ERRORs of its `design`
+section, and the hooks hold the lines, joined by `; `, as their one finding (section 21.1). machinery itself writes
+the file through a YAML encoder, every value included, so what it writes always parses back.
+
+`machinery adopt` writes three reasons (section 17.2, step 3), each followed by
+` (<short sha>)`: `unproven at adoption`, `claimed at adoption` for an id a test already claimed,
+and `planned at adoption` for an id the project had marked planned, with its `story`. The last
+two are read back for as long as the entry keeps them: `machinery plan` wires the evidence of an
+entry whose reason begins `claimed at adoption` instead of giving it a story of its own
+(section 15.2), and `machinery status` counts an entry whose reason begins
+`planned at adoption` as planned (section 14). Rewording the reason of an entry ends that for
+the entry. `owed sync` treats these entries like any other: one that is proven is removed.
+
 The owed list is the single ratchet of the method. In a new project nearly everything is owed
 right after the skeleton; each story proves some ids and removes them. In an existing project the
 owed list is the baseline of what was never proven.
@@ -1498,6 +1807,7 @@ whose test claims nothing proves nothing here either. Otherwise it rewrites `owe
 It prints `owed: <n> kept, <n> added, <n> removed` and exits 0. It refuses with
 `ERROR  no complete run valid for <short sha>: run the tests through machinery run first` (exit 1)
 when there is no complete run valid for the current commit, and when the owed file has problems.
+An owed file that does not parse stops it first, as it stops every command (section 11.1).
 `machinery owed list` prints one line per entry, `<id>  <reason>` followed by two spaces and the
 story when there is one, then `owed: <n> entries` (`1 entry`). Because of section 10.1, the sequence
 `machinery run`, `machinery owed sync`, commit, `machinery verify` works without running the
@@ -1783,6 +2093,11 @@ proofs awaiting: <n>
 vital: <id> proven (by test and model; proof awaited)
 assumed, unproven: <area> <name>: <statement>
 owed without a story: <n>
+owed, claimed by a test, no receipt yet: <n> (<kind> <n>, ...)
+owed, no test names it: <n> (<kind> <n>, ...)
+owed, planned: <n> (<kind> <n>, ...)
+owed, proven by a receipt, still listed: <n> (<kind> <n>, ...)
+owed, actions: <n> served by code, <n> not served
 refused: <receipts file>: <why: the text of section 10.2 before the semicolon, or incomplete run>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
@@ -1796,8 +2111,29 @@ The `tiers` line counts obligations by the tier of their area and is omitted whe
 risk file; its `vital` part, and the three lines after the `proven` line, print only when the
 risk file has a vital area (section 23.2): the number of proof obligations, one `vital` line per
 id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
-whose evidence is owed, each group sorted. One `refused` line prints per receipts file that
-section 10.2 refuses and per incomplete run (section 12). When there is no evidence the line is
+whose evidence is owed, each group sorted.
+
+The `owed,` lines print only in an adopted project: while the owed list holds an entry
+with a reason `machinery adopt` wrote (section 11.1). They count the owed ids the design knows,
+each obligation on the first line that applies:
+
+| Line | Counts |
+|---|---|
+| `planned` | An entry planned at adoption (section 11.1), whatever names or proves it. |
+| `proven by a receipt, still listed` | An id the evidence proves at the current commit (section 12): its entry is stale, and `owed sync` removes it. |
+| `claimed by a test, no receipt yet` | An id a test file names, read statically as stage `trace` reads tags and markers (section 8), that no valid receipt proves. |
+| `no test names it` | Every other one. |
+
+The `claimed` and `no test names it` lines always print, in that order, then `planned`, `proven`
+and `actions`, each only when it counts something. The kinds are listed in the order
+`tc, sc, inv, fm, cx, ck`, only those that occur, and a count of zero prints as `0`. An owed
+`act` id is in none of the four: an action is served, not claimed, and the `actions` line
+counts the owed ones by whether code serves them. An `fv` id is proven by the formal stage
+and is in no line. A claim is not evidence: the `claimed` line says where a receipt is all that
+is missing.
+
+One `refused` line prints per receipts file that section 10.2 refuses and per incomplete run
+(section 12), after the `owed,` lines. When there is no evidence the line is
 `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
@@ -1806,7 +2142,8 @@ id: the summary line of `machinery intake status` (section 15.7),
 `review <design|intake> <intake id>: <verdict> at <12 hex> by <actor>[, <n> issue(s)]` for the latest
 review of that kind on each open intake item, by intake id, the 12 hex being the contract hash
 the review was for; and then, when a question is open (section 15.9),
-`questions: <n> open, <k> held`. Exit 0 unless the config is invalid.
+`questions: <n> open, <k> held`. Exit 0 unless the config is invalid (2) or the owed file does
+not parse (1, section 11.1).
 
 ## 15. Backlog and scheduling
 
@@ -1908,10 +2245,27 @@ Groups:
 - one story per owed `fv` id, titled `Model <area> (<tool>)`;
 - one story `Serve <Entity> actions` per entity with owed `act` ids.
 
+**Wire evidence.** An id a test already claimed when the project was adopted needs no story of
+its own: its test exists, and what is missing is the receipt. An owed entry whose reason begins
+`claimed at adoption` (section 11.1), and whose id a test file still claims (read as stage
+`trace` reads it, section 8), leaves the groups above and joins one story per test file,
+`Wire evidence <file>`, that lists the ids the file must emit receipts for. An id several files
+claim goes to the first of them in path order, and its acceptance line names them all. When
+more test files would get a story than `plan.wire_max_files` (section 2, default 20), the
+stories are one per directory instead, `Wire evidence <directory>/`, each holding the ids of
+the files directly in it. Every other owed id is grouped as above: an id no test names, an id
+owed for any other reason though a test claims it now, an id claimed at adoption whose claim is
+gone, and an id planned at adoption, which already carries the project's story. A project in
+which adopt found nothing claimed is planned exactly as before.
+
 Every story has type `task` and a priority from its tier: 2 routine, 1 consequential, 0
 critical and vital.
 
-A story title is `Prove <machine> <event>` or `Prove <id>` unless given above. Its labels
+A story title is `Prove <machine> <event>` or `Prove <id>` unless given above. A wire-evidence
+story has, under `Excludes`, a second line:
+`- No new test: the tests that claim these ids exist; this story makes them emit receipts.`, and
+each of its acceptance lines starts `- <id>: claimed by <file>[, <file>...]; ` before the text of
+the table below. Its labels
 are `tier:<tier>` and `machinery`. Its acceptance criteria (the backlog's own field) say that
 each listed id is proven by `machinery verify` at the story's commit and removed from
 `owed.yaml`, and for a consequential, critical or vital tier that `machinery story <id>` passes.
@@ -1954,6 +2308,8 @@ and `- none` without one. No line outside the `Ids` section starts a tag (sectio
 | `Prove ck:<checker>:<name>` | `The external checker holds the obligation for this design.` |
 | `Model <area> (<tool>)` | `The formal model of <area> answers its questions and is proven.` |
 | `Serve <Entity> actions` | `Code serves the actions of <Entity> through their operations.` |
+| `Wire evidence <file>` | `The tests of <file> emit a receipt for each id they already claim.` |
+| `Wire evidence <directory>/` | `The tests under <directory>/ emit a receipt for each id they already claim.` |
 
 | Id | Acceptance line |
 |---|---|
@@ -1973,7 +2329,7 @@ Edges. An edge means that one story needs a specific output of another:
 
 | From (blocked) | To (blocker) | The output needed |
 |---|---|---|
-| Every `Prove` story with an id in a critical or vital area | The `Model <area>` story | The formal model the tier requires. |
+| Every `Prove` or `Wire evidence` story with an id in a critical or vital area | The `Model <area>` story | The formal model the tier requires. |
 | `Prove fm:<id>` whose subject is `invoke:<machine>.<src>` | The `internal transitions` story of that machine | The invoke path the failure is induced on. |
 | `Prove cx:<spec>:<run>` | The `Prove` stories of the cases its trace steps name | The transitions the replay drives. |
 
@@ -1983,6 +2339,22 @@ is also blocked by the stories its intake already has (section 15.7).
 `machinery plan --apply [--parent <id>]` creates the stories and edges in the backlog, skips a
 group whose ids all carry a `story` that exists in the backlog, writes the new story ids into the
 `story` field of the owed entries, and prints `plan: <n> created, <n> existing, <n> edge(s)`.
+When the plan has a wire-evidence story a second line follows, counting those of the plan,
+created or not:
+`plan: <n> wire-evidence stories for <n> claimed id(s), one per test <file|directory>`
+(`1 wire-evidence story`).
+
+**A story the project supplied.** An entry planned at adoption carries the story of the
+project's own mark, and plan never replaces it. Such an id is in no group: the plan has no
+story for it, printed, with `--json` or applied, so no count of stories includes one that
+`--apply` would not create for this reason, and the other ids of what would have been its group
+keep their story. When its story is in the backlog nothing is said. When it is not, as when
+the project's ids come from another tracker, `--apply` prints, after the lines above, one line
+per such id: `plan: <id>: external story <story>, not in the backlog; nothing created`. The
+entry keeps its story on every run. `plan --link <story> <id>` to another story is a usage error:
+`<id> carries the story <story> the project planned it under; plan never replaces it: edit <owed file> to change it`.
+Printing the plan does not read the backlog, so a printed plan still shows a group whose ids
+all carry a story that `--apply` may find in the backlog and skip.
 `machinery plan --link <story> <id>...` attaches ids to an existing story instead: it appends a
 `machinery:ids` note to the story, sets the `story` field of those owed entries and prints
 `plan: <n> id(s) linked to <story>`.
@@ -3334,8 +3706,20 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    `owed.yaml` every obligation and every unserved `act` id that is new: neither in the owed
    list nor in the obligation list of the last commit (an id that list already has was owed
    before, or has been proven and pruned since; owing it again would undo the ratchet). Each
-   is added, with the reason `unproven at adoption (<short sha>)`. It never removes an entry
-   and never changes a reason. When a stage fails the config and the baselines are still
+   is added with one of three reasons, the first that applies:
+
+   | Reason | For |
+   |---|---|
+   | `planned at adoption (<short sha>)` | An obligation whose source carries one of the project's own planned marks (`import.planned`, section 2). The entry gets `story: <id>`, the story the mark names. It is owed like any other, also when a test claims it: the project said it is not delivered. |
+   | `claimed at adoption (<short sha>)` | An obligation a test file already claims, by a tag or a marker (section 8). No receipt exists yet, so it is owed; `machinery plan` wires its evidence instead of giving it a story (section 15.2). |
+   | `unproven at adoption (<short sha>)` | Every other obligation, and every unserved `act` id. |
+
+   It never removes an entry and never changes a reason, so an entry owed before adoption keeps
+   the reason it has. A planned mark whose `story` is not a story id (section 2) stops adoption
+   before anything is written, with or without `--write`: one line per mark,
+   `<file>:<line>: <id>: import.planned entry <n> captured the story "<text>"; a story id has only letters, digits, ".", "-" and "_": tighten the pattern`,
+   the first after `machinery: `, and exit 1. The line is that of the invariant's statement or
+   of the catalog row. When a stage fails the config and the baselines are still
    written, no owed entry is written and the exit code is 1. The report then says exactly what
    blocks, and nothing else (warnings do not block and are not printed):
 
@@ -3424,10 +3808,10 @@ timestamp or an absolute path:
 | `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
 | `waivers` | The waivers adopt added, by rule, with counts. |
 | `baselines` | The tests and architecture baselines, each with its number of entries. |
-| `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total. |
+| `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total; then the same ids as the `owed,` lines of `machinery status` count them (section 14), each after `- ` instead of `owed, `: `- claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `- no test names it: <n> (...)` and, when they count something, `- planned: <n> (...)`, `- proven by a receipt, still listed: <n> (...)` and `- actions: <n> served by code, <n> not served`. |
 | `blocked` | When adopt was blocked (section 17.2): the lines of its `blocked` report. |
 | `check` | The summary line of `machinery check` and the outcome line of each stage. |
-| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids) and tier, with counts, their total and the number of edges. |
+| `plan` | The stories `machinery plan` would create, by kind (the kind of their ids, and `wire`, listed last, for a wire-evidence story) and tier, with counts, their total and the number of edges. The total is exact unless every id of a story carries a story already: `--apply` skips such a group when that story is in the backlog, which a rehearsal never reads, so the line then starts `Up to <n> stories` and ends `; <m> may exist already: every id of the group carries a story, and a rehearsal never reads the backlog.` Both groups show: when the plan has a wire-evidence story, `- wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>` (`1 story`), and when ids were planned at adoption, `- already planned in the project: <n> id(s) planned at adoption keep the story the project gave them; no story is planned for them`. |
 | `blocks` | What blocks adoption: each stage of the check that failed or was not demonstrated, with its outcome line and its first 5 findings, and the number of the others. |
 | `fix_first` | Fix in the project first: every ERROR of stage `model`, `machines`, `failure-modes` or `risk`. No waiver covers one (section 6.7); a finding about the form of an imported failure catalog is one of them. |
 
@@ -3436,9 +3820,11 @@ stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6
 `<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
 otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links, files:
-[{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
+[{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total,
+claimed: {by_kind, total}, unnamed: {by_kind, total}, planned: {by_kind, total}, proven: {by_kind, total},
+actions: {served, unserved}},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
-count}], total, edges}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
+count}], total, edges, planned_ids, may_exist, wire: {stories, ids, by}}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
 waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
 
 stdout:
@@ -3452,12 +3838,16 @@ adopt: wrote <n> file(s), <n> waiver(s), <n> owed
 adopt: blocked: machinery gen refuses while <n> finding(s) stand; nothing is owed
 check: machinery check: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
 plan: <n> stories, <n> edge(s)
+plan: up to <n> stories, <n> edge(s); <m> may exist already: a rehearsal never reads the backlog
+wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>
 blocks adoption: <n> stage(s): <stage>, <stage>
 fix in the project first: <n> finding(s)
 rehearse: rehearsal.md, rehearsal.json
 ```
 
-One of the two `adopt:` lines prints; `blocks adoption: nothing` when every stage passed or was
+One of the two `adopt:` lines and one of the two `plan:` lines print (the second when a story's
+ids all carry a story already); the `wire evidence` line only when the plan has such a
+story (`1 story`); `blocks adoption: nothing` when every stage passed or was
 not applicable, and the `fix in the project first` line only when there is one. Exit 0 when the
 rehearsal ran, whatever it found; 1 when the snapshot could not be taken; 2 for a usage or config
 error, nothing written.
@@ -3532,9 +3922,10 @@ each section is saved under `<out>/stages/`.
 | Section | What runs | Saved as |
 |---|---|---|
 | `inventory` | The facts of the adopt report (section 17.2) for the snapshot: scope, languages, code files, test files (under e2e roots, elsewhere, with test doubles), design sources. `checked:` counts the files. | `inventory.txt` |
-| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). When the risk file has a vital area, `proofs awaiting: <n>` follows, then `vital: <id> proven (by test and model; proof awaited)` for every id a property is over that is not owed, and `assumed, unproven: <area> <name>: <statement>` for every assumption whose evidence is owed (section 23.2). Then the candidates of section 23.3, always: `vital candidates: <n>, dismissed: <n>`, and one line `  <id>  <reason>` per candidate. | `<stage>.txt` each |
+| `design` | The stages of `machinery lint` (section 3.1), and one ERROR of the section's own per problem of the owed file (section 11.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). When the risk file has a vital area, `proofs awaiting: <n>` follows, then `vital: <id> proven (by test and model; proof awaited)` for every id a property is over that is not owed, and `assumed, unproven: <area> <name>: <statement>` for every assumption whose evidence is owed (section 23.2). Then the candidates of section 23.3, always: `vital candidates: <n>, dismissed: <n>`, and one line `  <id>  <reason>` per candidate. | `<stage>.txt` each |
 | `generation` | `machinery gen` (section 7). When gen refuses, not demonstrated: `gen refused: <stages> have errors`. | `generation.txt` |
-| `trace`, `tests`, `arch` | The stage of that name. | `<stage>.txt` |
+| `trace` | The stage of that name. With a `trace` block, the `owed,` lines of `machinery status` (section 14) follow, counting the owed ids of the snapshot the same way, whether or not the project is adopted: `owed, claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `owed, no test names it: <n> (...)` and the others when they count something. | `trace.txt` |
+| `tests`, `arch` | The stage of that name. | `<stage>.txt` |
 | `formal` | The sanity run, section 18.5. | `formal.txt` |
 | `history` | Section 18.6. | `history.txt` |
 | `decisions` | Section 18.7. | `decisions.txt` |
@@ -3699,6 +4090,7 @@ A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`
 | `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
 | `design` | `statuses`: `{owed, proposed, proven, retired}`; `bound_machines`, `unbound_machines` (when at least one machine was read); `proofs_awaiting`; `vital_candidates`: `{id, reason}`; `vital_dismissed` |
 | `generation` | `files` (generated files), `written` |
+| `trace` | `claimed`, `unnamed`, `planned`, `proven`: each `{by_kind, total}`; `actions`: `{served, unserved}` (with a `trace` block) |
 | `formal` | `machines`: `{deadlock, distinct, machine, reason, result, states, unreachable}`; `models`: `{model, reason, result}`; `result` is `passed`, `failed` or `incomplete` (`instance found`, `no instance` or `incomplete` for a model), and `reason` says why a run did not complete, else is empty |
 | `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
 | `decisions` | `files`: `{lines, path, records, words}`; `instructions`: `{linked, lines, path, words}`; `backlog`: `{current, decisions}` when the export can be read |
@@ -3890,7 +4282,10 @@ is in the tool; a plugin only wires it. The fields are those of the Claude Code 
 would block. Any internal error (stdin that is not hook JSON, an invalid `machinery.yaml`, a git
 or backlog command that fails, an unknown event) prints
 `{"systemMessage":"machinery hook <event> could not run: <why>"}` and changes nothing. A directory
-that is not in a machinery project prints nothing. Other harnesses call the same command with
+that is not in a machinery project prints nothing. An owed file that does not parse
+(section 11.1) or has a problem of its own is not an internal error: `pre-tool` and `stop` run no stage and hold
+`owed: ERROR  <owed file>: <error>; ...` as their one finding, so a commit or push is refused in
+block mode, and `session-start` prints the `could not run` message with it. Other harnesses call the same command with
 JSON of the same shape.
 
 Config in `machinery.yaml` (section 2), each `block`, `warn` or `off`:

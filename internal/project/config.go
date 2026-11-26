@@ -27,12 +27,14 @@ type Config struct {
 	Contracts    []Contract        `yaml:"contracts,omitempty"`
 	Checkers     []Checker         `yaml:"checkers,omitempty"`
 	Dependencies []Dependency      `yaml:"dependencies,omitempty"`
+	Systems      []System          `yaml:"systems,omitempty"`
 	Trace        *Trace            `yaml:"trace,omitempty"`
 	Tests        *Tests            `yaml:"tests,omitempty"`
 	Constraints  *Constraints      `yaml:"constraints,omitempty"`
 	Receipts     Receipts          `yaml:"receipts"`
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
+	Plan         *PlanConfig       `yaml:"plan,omitempty"`
 	Hooks        *Hooks            `yaml:"hooks,omitempty"`
 	Review       *Review           `yaml:"review,omitempty"`
 	Delegate     *Delegate         `yaml:"delegate,omitempty"`
@@ -73,6 +75,48 @@ type Design struct {
 type Import struct {
 	Machines     *ImportMachines     `yaml:"machines,omitempty"`
 	FailureModes *ImportFailureModes `yaml:"failure_modes,omitempty"`
+	Planned      []Planned           `yaml:"planned,omitempty"`
+}
+
+// Planned reads a project's own "planned" marks (section 2): where the mark
+// is looked for and the expression whose group story names the story.
+type Planned struct {
+	In      string `yaml:"in"`
+	Pattern string `yaml:"pattern"`
+}
+
+// Where a planned mark is looked for.
+const (
+	PlannedInStatement  = "model-statement"
+	PlannedInFailureRow = "failure-row"
+)
+
+// Regexp compiles the pattern of a planned mark.
+func (pl Planned) Regexp() (*regexp.Regexp, error) { return regexp.Compile(pl.Pattern) }
+
+// ImportedPlanned returns the import.planned entries.
+func (c *Config) ImportedPlanned() []Planned {
+	if c.Import == nil {
+		return nil
+	}
+	return c.Import.Planned
+}
+
+// PlanConfig tunes machinery plan (section 15.2).
+type PlanConfig struct {
+	WireMaxFiles int `yaml:"wire_max_files,omitempty"`
+}
+
+// DefaultWireMaxFiles is the number of test files up to which wire-evidence
+// stories are one per file (section 15.2).
+const DefaultWireMaxFiles = 20
+
+// WireMaxFiles returns plan.wire_max_files, or its default.
+func (c *Config) WireMaxFiles() int {
+	if c.Plan == nil || c.Plan.WireMaxFiles == 0 {
+		return DefaultWireMaxFiles
+	}
+	return c.Plan.WireMaxFiles
 }
 
 // ImportFailureModes reads a failure-mode catalog kept as Markdown tables
@@ -110,12 +154,13 @@ func (c *Config) HasFailureModes() bool {
 
 // ImportMachines reads machines written in a JSON dialect (section 5.2.1).
 type ImportMachines struct {
-	Files    []string        `yaml:"files"`
-	States   string          `yaml:"states,omitempty"`
-	Rename   Rename          `yaml:"rename,omitempty"`
-	Terminal *Terminal       `yaml:"terminal,omitempty"`
-	Register *Register       `yaml:"register,omitempty"`
-	Bind     map[string]Bind `yaml:"bind,omitempty"`
+	Files    []string            `yaml:"files"`
+	States   string              `yaml:"states,omitempty"`
+	Rename   Rename              `yaml:"rename,omitempty"`
+	Terminal *Terminal           `yaml:"terminal,omitempty"`
+	Register *Register           `yaml:"register,omitempty"`
+	Bind     map[string]Bind     `yaml:"bind,omitempty"`
+	Annotate map[string]Annotate `yaml:"annotate,omitempty"`
 }
 
 // Register names a register of observed transitions and the keys of its
@@ -154,6 +199,31 @@ type Bind struct {
 	LifecycleOf string   `yaml:"lifecycle_of,omitempty"`
 	Aspect      string   `yaml:"aspect,omitempty"`
 	Serves      []string `yaml:"serves,omitempty"`
+}
+
+// Annotate says about an imported machine what its dialect has no key for
+// (section 5.2.1): the events that arrive from outside, the events that
+// report a failure, the states that record one, and the events that are a
+// model action under another name. The three lists hold exact names and
+// patterns in which "*" stands for any run of characters.
+type Annotate struct {
+	ExternalEvents []string          `yaml:"external_events,omitempty"`
+	FailureEvents  []string          `yaml:"failure_events,omitempty"`
+	FailureStates  []string          `yaml:"failure_states,omitempty"`
+	Aliases        map[string]string `yaml:"aliases,omitempty"`
+	// NotFailures dismisses the name hint of an event or a state, by its
+	// exact name, with the reason it is no failure.
+	NotFailures map[string]string `yaml:"not_failures,omitempty"`
+}
+
+// AnnotateKeys returns the keys of import.machines.annotate, sorted.
+func (im *ImportMachines) AnnotateKeys() []string {
+	keys := make([]string, 0, len(im.Annotate))
+	for k := range im.Annotate {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // BindKeys returns the keys of import.machines.bind, sorted.
@@ -207,6 +277,13 @@ type Dependency struct {
 	Posture string `yaml:"posture"`
 }
 
+// System names the system as a whole, or a part of it that is not an entity,
+// a dependency or a machine, for failure-mode subjects (section 5.4).
+type System struct {
+	Name  string `yaml:"name"`
+	About string `yaml:"about,omitempty"`
+}
+
 type Trace struct {
 	Code    []string `yaml:"code,omitempty"`
 	Tests   []string `yaml:"tests,omitempty"`
@@ -218,6 +295,8 @@ type Markers struct {
 	Serves    []string `yaml:"serves,omitempty"`
 	Verifies  []string `yaml:"verifies,omitempty"`
 	Scenarios []string `yaml:"scenarios,omitempty"`
+	// ScenariosExact claim only when the text is a scenario name (section 8.1).
+	ScenariosExact []string `yaml:"scenarios_exact,omitempty"`
 }
 
 type Tests struct {
@@ -445,7 +524,8 @@ func cleanYAMLError(err error) string {
 }
 
 var (
-	checkerIDRe = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
+	checkerIDRe  = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
+	systemNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 	// WaivableRules are the cross-reference rules a waiver may name (section 6.7).
 	WaivableRules = map[string]bool{
 		"machine-binding": true, "state-enum": true, "event-action": true, "action-event": true,
@@ -525,16 +605,35 @@ func (c *Config) validate() error {
 			return Errf("dependencies: %s: posture must be real or sandbox, got %q", dep.Name, dep.Posture)
 		}
 	}
+	systems := map[string]bool{}
+	for _, sy := range c.Systems {
+		switch {
+		case sy.Name == "":
+			return Errf("systems: name is required")
+		case !systemNameRe.MatchString(sy.Name):
+			return Errf("systems: name %q must match ^[a-z][a-z0-9-]*$", sy.Name)
+		case systems[sy.Name]:
+			return Errf("systems: duplicate name %q", sy.Name)
+		}
+		systems[sy.Name] = true
+	}
 	if c.Trace != nil {
 		steps = append(steps, check("trace.code", c.Trace.Code...), check("trace.tests", c.Trace.Tests...))
 		if m := c.Trace.Markers; m != nil {
 			for _, kind := range []struct {
 				name    string
 				markers []string
-			}{{"serves", m.Serves}, {"verifies", m.Verifies}, {"scenarios", m.Scenarios}} {
+			}{{"serves", m.Serves}, {"verifies", m.Verifies}, {"scenarios", m.Scenarios}, {"scenarios_exact", m.ScenariosExact}} {
 				for _, mk := range kind.markers {
 					if strings.TrimSpace(mk) == "" {
 						return Errf("trace.markers.%s: a marker must not be empty", kind.name)
+					}
+				}
+			}
+			for _, mk := range m.ScenariosExact {
+				for _, other := range m.Scenarios {
+					if mk == other {
+						return Errf("trace.markers.scenarios_exact: %q is also in trace.markers.scenarios; a marker has one mode", mk)
 					}
 				}
 			}
@@ -581,6 +680,9 @@ func (c *Config) validate() error {
 	}
 	if err := c.validateAssess(); err != nil {
 		return err
+	}
+	if c.Plan != nil && c.Plan.WireMaxFiles < 0 {
+		return Errf("plan.wire_max_files must not be negative")
 	}
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
@@ -668,6 +770,28 @@ func (c *Config) validateImport() error {
 	if err := c.validateImportedFailureModes(); err != nil {
 		return err
 	}
+	for n, pl := range c.ImportedPlanned() {
+		at := fmt.Sprintf("import.planned: entry %d", n+1)
+		switch pl.In {
+		case PlannedInStatement:
+		case PlannedInFailureRow:
+			if c.ImportedFailureModes() == nil {
+				return Errf("%s: in: failure-row needs import.failure_modes; it reads the rows of that catalog", at)
+			}
+		default:
+			return Errf("%s: in must be model-statement or failure-row, got %q", at, pl.In)
+		}
+		if strings.TrimSpace(pl.Pattern) == "" {
+			return Errf("%s: pattern is required", at)
+		}
+		re, err := pl.Regexp()
+		if err != nil {
+			return Errf("%s: pattern is not a regular expression: %v", at, err)
+		}
+		if re.SubexpIndex("story") < 0 {
+			return Errf("%s: pattern %q needs a named group story, as in (?P<story>[a-z0-9-]+)", at, pl.Pattern)
+		}
+	}
 	im := c.ImportedMachines()
 	if im == nil {
 		return nil
@@ -739,6 +863,41 @@ func (c *Config) validateImport() error {
 		for _, id := range b.Serves {
 			if strings.TrimSpace(id) == "" {
 				return Errf("import.machines.bind.%s.serves: an id must not be empty", k)
+			}
+		}
+	}
+	for _, k := range im.AnnotateKeys() {
+		a := im.Annotate[k]
+		if strings.TrimSpace(k) == "" || !ValidGlob(k) {
+			return Errf("import.machines.annotate: %q is not a valid glob", k)
+		}
+		if err := CheckPath("import.machines.annotate", k); err != nil {
+			return err
+		}
+		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases)+len(a.NotFailures) == 0 {
+			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states, aliases or not_failures", k)
+		}
+		for _, l := range []struct {
+			name     string
+			patterns []string
+		}{{"external_events", a.ExternalEvents}, {"failure_events", a.FailureEvents}, {"failure_states", a.FailureStates}} {
+			for _, pat := range l.patterns {
+				if strings.TrimSpace(pat) == "" {
+					return Errf("import.machines.annotate.%s.%s: a pattern must not be empty", k, l.name)
+				}
+				if strings.Trim(pat, "*") == "" {
+					return Errf("import.machines.annotate.%s.%s: pattern %q has no literal part; a pattern names the events or states it is for", k, l.name, pat)
+				}
+			}
+		}
+		for ev, act := range a.Aliases {
+			if strings.TrimSpace(ev) == "" || strings.TrimSpace(act) == "" {
+				return Errf("import.machines.annotate.%s.aliases: an event and its action must not be empty", k)
+			}
+		}
+		for name, reason := range a.NotFailures {
+			if strings.TrimSpace(name) == "" || strings.TrimSpace(reason) == "" {
+				return Errf("import.machines.annotate.%s.not_failures: a name and its reason must not be empty", k)
 			}
 		}
 	}

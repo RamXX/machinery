@@ -39,6 +39,9 @@ type Machine struct {
 	// Original is the original id of an imported machine: its root id, or
 	// its file name.
 	Original string
+	// Listed says which entry of import.machines.annotate added an event
+	// to a root list, keyed "<list key> <event>" (dialect.Machine.Listed).
+	Listed map[string]string
 
 	sourceSum string // sha256 of the bytes of the file Path names
 }
@@ -148,6 +151,7 @@ func Load(p *project.Project) (ms []*Machine, problems []string, err error) {
 			continue
 		}
 		m.Original = tm.Original
+		m.Listed = tm.Listed
 		ms = append(ms, m)
 	}
 	return ms, problems, nil
