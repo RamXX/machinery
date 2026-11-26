@@ -30,6 +30,11 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   code; `scope` bounds the static stages.
 - `init`, `checks`, external checkers through a neutral projection and evidence file.
 - A reference project, `examples/crm`, on a real Postgres.
+- Roles for a many-agent run: one prompt each for the planner, the modeler, the builder, the
+  verifier, the checker and an experimental delegate, and `docs/roles.md` (who may write what,
+  what the tool verifies about each, and the judgment rules with the failure each prevents).
+  Default routing by role: design roles on the strongest class of model, builders on a standard
+  class, a verifier at least at its builder's.
 
 ### Carried forward from v1
 

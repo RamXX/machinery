@@ -1,7 +1,9 @@
 # Planning and scheduling
 
-The planner (the PM role) owns the backlog and the risk file. machinery bridges the design to the
-backlog so that planning is data: what is owed becomes stories, the graph becomes waves, and a
+The planner owns the backlog: intake, tiers, waves and landing. It never builds, and it writes no
+design source: it chooses the tiers and the modeler writes them (`docs/roles.md` has every role,
+what the tool verifies about each, and the reason for each rule). machinery bridges the design to
+the backlog so that planning is data: what is owed becomes stories, the graph becomes waves, and a
 story is accepted with the formality of its tier. The backlog tool is `bd`. The contract is
 `docs/formats.md` sections 15 and 23.
 
@@ -98,7 +100,29 @@ machinery waves --thaw         # when the wave has landed
   paths need an edge or a split. Stories declare what they write with a `machinery:scope` line.
 - While a wave is frozen, a change to a design source fails stage `contract`. A contract change
   is its own story and lands alone.
-- A brief is pointers and commands. Route by tier: the brief names the model class.
+- A brief is pointers and commands, and it is all a worker gets: context pasted beside it carries
+  the planner's assumptions to the builder and to the verifier alike.
+- Routing: the `route:` line of a wave and of a brief names the class of model for the story's
+  tier (`routing` in `machinery.yaml`). By default a builder runs on a standard class and a
+  verifier on one at least as strong; planner, modeler, checker and delegate run on the strongest.
+
+## Before a wave is dispatched
+
+The tool checks the graph. It cannot check the plan, so the planner reviews its own backlog and
+then has the checker review it (`agents/machinery-checker.md`), before `machinery waves --freeze`:
+
+- The first wave is a walking skeleton: one thin path through every layer, so integration fails
+  on the first day and not at the landing.
+- Each story is a vertical slice with something to observe through the real interface. A story
+  for one layer has nothing to prove until another story lands.
+- Each intake has its capstone, and each refusal of the intake a story that proves it.
+- A premise several stories share is settled, as a decision or in a formal run, before they start.
+
+The checker answers pass or fail with at most five issues, each with its general rule and scope:
+fix the class, not the instance, and ask again. It is also called after every design change,
+before `machinery intake plan <id> --apply`, to read the change against its requirement for
+omission, invention and contradiction; and periodically for drift, with `machinery assess` on the
+project itself. No command records a review: the planner holds itself to it.
 
 ## Accepting a story
 
@@ -154,6 +178,8 @@ machinery answer <id> --delegate --clause <clause> --option <n>|--hold|--refuse 
   behalf is a vetoable decision; when a clause does not permit it, the only answer left is
   `--hold`. Amounts under a clause add up against its limit.
 - `machinery intake plan` reminds you of the learnings posted since the last plan.
+- The delegate (`agents/machinery-delegate.md`) is called sparingly, for a question that holds up
+  a wave while the owner is away. The policy file is the owner's; no agent writes it.
 
 ## Landing
 
@@ -174,3 +200,11 @@ is red, `machinery accept --close` and a landing at another head refuse: repair 
 `machinery accept <id> ... --close --repair` for the story that repairs it), or revert and run
 `machinery landing --clear-red --reason "<what was reverted>"`. `machinery probe` is the measure of test quality: run it per
 batch and before a release, or as the last step of the landing with `--probe`.
+
+## When every story is closed
+
+Closed stories are not the goal. An intake is delivered when its capstone is accepted and the
+landing is green; `machinery check` then warns until it is closed. When every story is closed and
+the owner's goal is still not observed on the running system, the plan was wrong, not the stories:
+read `machinery learnings`, file the observations, and start a new intake for what is missing.
+Reopening or patching closed stories would change the system without changing the design.
