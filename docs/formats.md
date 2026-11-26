@@ -23,7 +23,8 @@ reads them and:
 4. joins the design to evidence from real end-to-end test runs (`machinery run`,
    `machinery verify`), with one ratchet file for everything not yet proven (`owed.yaml`);
 5. turns what is owed into backlog stories with a dependency graph and schedules them in
-   parallel waves (`machinery plan`, `machinery waves`), and gates each story by its risk tier
+   parallel waves (`machinery plan`, `machinery waves`), writes the stories of a new requirement
+   only from the design it changed (`machinery intake`), and gates each story by its risk tier
    (`machinery story`).
 
 Three rules shape everything below:
@@ -199,7 +200,7 @@ Rules:
 | `machinery arch` | Stage `arch` (section 9). `--write-baseline` rewrites the baseline file. |
 | `machinery tests` | Stage `tests` (section 9.4). `--write-baseline` rewrites the baseline file. |
 | `machinery trace` | Stage `trace` (section 8). |
-| `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`. With `--base <git-ref>` also stage `ratchet` (section 11.3). |
+| `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3). |
 | `machinery checks` | Prints the declaration of applicable checks (section 3.4). A report, never a gate. |
 | `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). |
 | `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`. |
@@ -222,6 +223,9 @@ Rules:
 | `machinery predict <story>` | Records a verifier's prediction (section 15.6). |
 | `machinery accept <story>` | Records a verifier's verdict and runs the story gate (section 15.6). |
 | `machinery story <story>` | Stage `story`: the tier gate of one story (section 15.6). |
+| `machinery intake new "<title>" --intent "<text>"` | Records a requirement as an intake item (section 15.7). `--refuses`, `--parent`. |
+| `machinery intake status <id>` | Prints where a requirement stands, one line per step (section 15.7). `--json`. |
+| `machinery intake plan <id>` | Prints the stories the design change owes; `--apply` creates them in one backlog call (section 15.7). |
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
@@ -310,6 +314,7 @@ configuration file is the versioned declaration; this command renders it.
 | `tests` | Evidence comes from the real system: no unit tests, no test doubles. |
 | `trace` | Every action is served by code and every obligation is claimed by a test or owed. |
 | `contract` | Stories running in parallel build against the same design. |
+| `intake` | A requirement reaches the backlog only through the design it changed, and is closed once delivered. |
 | `ratchet` | What was proven, covered or modeled stays so. |
 | `verify` | Each obligation is observed on the running system at this commit. |
 | `probe` | The tests would notice a wrong transition or a missing effect. |
@@ -1407,8 +1412,10 @@ evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 
 The first count line lists only kinds that occur, in the order `tc, sc, inv, fm, fv, cx, ck`.
 The `tiers` line counts obligations by the tier of their area and is omitted when there is no
-risk file. When there is no evidence the last line is `evidence: none at <short sha>`. Exit 0
-unless the config is invalid.
+risk file. When there is no evidence the line is `evidence: none at <short sha>`. When
+`backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
+id: the summary line of `machinery intake status` (section 15.7),
+`intake <id>: <n> of 7 steps done; next: <step>`. Exit 0 unless the config is invalid.
 
 ## 15. Backlog and scheduling
 
@@ -1433,6 +1440,13 @@ machinery:scope internal/api/** e2e/orders_test.go
 machinery:proof <full sha> <actor>
 machinery:prediction commit=<full sha> actor=<actor> observation="<text>" expect="<text>"
 machinery:verdict <accept|reject> commit=<full sha> actor=<actor> observed="<text>"
+machinery:intake
+machinery:intake <intake id>
+machinery:intake-base <full sha> <contract hash>
+machinery:intake-planned <full sha> <contract hash>
+machinery:no-design-change <reason>
+machinery:capstone
+machinery:demo <command>
 ```
 
 - `machinery:ids` lists the design ids the story delivers. Several lines add up.
@@ -1440,6 +1454,8 @@ machinery:verdict <accept|reject> commit=<full sha> actor=<actor> observed="<tex
 - The tier of a story is the highest tier among its ids (section 23). The label `tier:<tier>` on
   the story mirrors it for people and for routing; when label and ids disagree the ids win.
 - The actor is `--actor`, else the environment variable `BEADS_ACTOR`, else `git config user.name`.
+- `machinery:intake` with nothing after it marks an intake item; `machinery:intake <id>` marks a
+  story of that intake. The other intake lines are described in section 15.7.
 
 ### 15.2 `machinery plan`
 
@@ -1459,13 +1475,65 @@ Groups:
 - one story `Serve <Entity> actions` per entity with owed `act` ids.
 
 Every story has type `task` and a priority from its tier: 2 routine, 1 consequential, 0
-critical. The Markdown form lists a story's edges in its description under `Needs:`.
+critical.
 
-A story title is `Prove <machine> <event>` or `Prove <id>` unless given above. Its description
-lists the owed ids with their titles and effects and carries the `machinery:ids` line. Its labels
-are `tier:<tier>` and `machinery`. Its acceptance criteria say that each listed id is proven by
-`machinery verify` at the story's commit and removed from `owed.yaml`, and for a consequential or
-critical tier that `machinery story <id>` passes.
+A story title is `Prove <machine> <event>` or `Prove <id>` unless given above. Its labels
+are `tier:<tier>` and `machinery`. Its acceptance criteria (the backlog's own field) say that
+each listed id is proven by `machinery verify` at the story's commit and removed from
+`owed.yaml`, and for a consequential or critical tier that `machinery story <id>` passes.
+
+**Story text.** The description of every story a plan creates, here and in section 15.7, has
+five sections in this order, each a header line followed by its lines, one blank line between
+sections:
+
+```
+Intent:
+<what the ids prove, one line>
+Requirement <intake id>: <the intent of the intake>
+
+Acceptance:
+- <id>: <what is observed>
+
+Ids:
+machinery:ids <id> <id>...
+machinery:intake <intake id>
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- <title of the blocking story>: <the output needed>
+```
+
+The `Requirement` and `machinery:intake` lines are written only for a story of an intake.
+`Acceptance` has one line per id, in id order. `Needs` has one line per edge, sorted by title,
+and `- none` without one. No line outside the `Ids` section starts a tag (section 15.1).
+
+| Story | Intent line |
+|---|---|
+| `Prove <machine> <event>` | `Machine <machine> answers <event> on the running system as its table says.` |
+| `Prove <machine> internal transitions` | `Machine <machine> makes its internal transitions on the running system as its table says.` |
+| `Prove sc:<slug>` | `The scenario runs end to end on the running system.` |
+| `Prove inv:<id>` | `The invariant holds on the running system.` |
+| `Prove fm:<id>` | `The failure gets its required behavior on the running system.` |
+| `Prove cx:<spec>:<run>` | `The counterexample of the formal model cannot happen on the running system.` |
+| `Prove ck:<checker>:<name>` | `The external checker holds the obligation for this design.` |
+| `Model <area> (<tool>)` | `The formal model of <area> answers its questions and is proven.` |
+| `Serve <Entity> actions` | `Code serves the actions of <Entity> through their operations.` |
+
+| Id | Acceptance line |
+|---|---|
+| `tc`, transition case | `- <id>: <case title>, effects: <effects, or none>; observed on the running system` |
+| `tc`, ignore case | `- <id>: refused: <event> in <state> changes nothing and has no effect (<reason>)` |
+| `tc`, refusal case | `- <id>: refused: in <state>, with every guard of <handler> false, nothing changes and no effect happens` |
+| `tc`, clause case | `- <id>: refused: with only <clause> of <guard> false, <source> <trigger> does not fire` |
+| `inv` | `- <id>: holds on the running system: <statement>` |
+| `sc` | `- <id>: runs end to end on the running system: <name>` |
+| `fm` | `- <id>: <failure> Required behavior (<required>): <behavior>`; with `required: refuse` it starts `- <id>: refused: ` |
+| `fv` | `- <id>: machinery formal check proves the model: <why>` |
+| `cx` | `- <id>: refused on the running system: the replay of <spec> run <run> keeps <violated property>` |
+| `ck` | `- <id>: the checker's evidence for this design holds it: <title>` |
+| `act` | `- <id>: served by code and reachable through its operation: action <action> of <Entity>` |
 
 Edges. An edge means that one story needs a specific output of another:
 
@@ -1475,7 +1543,8 @@ Edges. An edge means that one story needs a specific output of another:
 | `Prove fm:<id>` whose subject is `invoke:<machine>.<src>` | The `internal transitions` story of that machine | The invoke path the failure is induced on. |
 | `Prove cx:<spec>:<run>` | The `Prove` stories of the cases its trace steps name | The transitions the replay drives. |
 
-Edges are only created between stories of the same plan.
+Edges are only created between stories of the same plan, except that the capstone of an intake
+is also blocked by the stories its intake already has (section 15.7).
 
 `machinery plan --apply [--parent <id>]` creates the stories and edges in the backlog, skips a
 group whose ids all carry a `story` that exists in the backlog, writes the new story ids into the
@@ -1488,8 +1557,8 @@ Output is sorted and deterministic. With nothing owed it prints nothing and exit
 
 ### 15.3 `machinery waves`
 
-Reads every story that is not closed, not deferred and not an epic, with its blocking edges, and
-prints the layers of the graph: wave 1 holds the stories with no open blocker, wave 2 those
+Reads every story that is not closed, not deferred, not an epic and not an intake item (section
+15.7), with its blocking edges, and prints the layers of the graph: wave 1 holds the stories with no open blocker, wave 2 those
 blocked only by wave 1, and so on. Stories of one wave can run in parallel.
 
 ```
@@ -1511,7 +1580,13 @@ Findings:
 - `ERROR  competing writers in wave <n>: <a> and <b> both write <glob>` when two stories of one
   wave declare scopes that overlap (equal globs, or one glob's fixed directory prefix contains
   the other's). Add an edge or split the story;
-- `warn   no scope declared: <story>`.
+- `warn   no scope declared: <story>`;
+- `ERROR  no design ids: <story>: a story proves ids; a requirement starts with machinery intake new`
+  for an open story labelled `machinery`, or belonging to an intake (section 15.7), that has no
+  `machinery:ids` line and is not a capstone. Work in the design's name names the ids it proves;
+  a new requirement goes through `machinery intake` instead;
+- `warn   <n> open stories outside machinery (no design ids)`: the other open stories without a
+  `machinery:ids` line, counted on one line when there is at least one, never listed one by one.
 
 Two scopes overlap when they are equal or when one glob's fixed directory prefix (the path
 before its first wildcard segment) contains the other's. With no open story the stage is
@@ -1540,7 +1615,8 @@ Generated files, the owed list and formal models are not part of it.
 Stage `contract` (part of `machinery check`) is `not applicable: no wave is frozen` without that
 file. With it, a design source whose hash differs from the frozen one is
 `ERROR  contract changed during fan-out: <path>`. A contract change is its own story: land it
-alone, then freeze again. Freezing and thawing are the planner's acts and leave no trace but the wave file.
+alone, then freeze again. For the same reason `machinery intake plan` refuses while a wave is
+frozen (section 15.7): stories against a changed contract must not join a running wave. Freezing and thawing are the planner's acts and leave no trace but the wave file.
 `machinery waves --thaw` removes the file when the wave has landed (`wave: thawed`, or
 `wave: none frozen`). `--freeze` prints `wave: frozen <12 hex> at <short sha>, <n> stories` and
 refuses when stage `gen-drift` or the waves stage itself does not pass. A design source that was
@@ -1607,6 +1683,24 @@ machinery predict before reading the proof`, `ERROR  verifier is the builder: <a
 `ERROR  unproven: <id>`. `checked:` counts ids, proofs, predictions and verdicts. A story without
 a `machinery:ids` line is `not demonstrated: story names no design ids`.
 
+An intake item (section 15.7) is not a unit of build work. The gate refuses it:
+`ERROR  <id> is an intake item: an intake item is planned, not built; run machinery intake status <id>`.
+
+**The capstone.** The capstone of an intake (section 15.7) has no `machinery:ids` line of its own:
+its ids are the ids of the other stories of its intake, and `machinery story`,
+`machinery proof --story` and `machinery brief` read those. Its tier is the highest of their tiers
+and of its `tier:` label, and at least consequential. On top of the gate of its tier it requires:
+
+- at least one `machinery:demo <command>` line:
+  `ERROR  no demo: record each command that shows the intent on its own machinery:demo line`;
+- every other story of the intake closed:
+  `ERROR  open story of the intake: <id> <title>: the capstone closes last`;
+- when it has no id at all (an intake that added none), evidence at the current commit:
+  `ERROR  no evidence at <short sha>: run the tests through machinery run`.
+
+`checked:` then also counts the demo lines and the other stories of the intake. For a capstone
+without ids, `machinery proof --story` prints a block with no criteria.
+
 `machinery predict <story> --observation "<what would disprove the claim>" --expect "<predicted
 outcome>"` appends the prediction line. It refuses when a proof for the current commit was posted
 by the same actor.
@@ -1620,6 +1714,156 @@ predicts, and only then reads the proof. machinery cannot see what an agent read
 name is only as trustworthy as the backlog's own record of who wrote a note. What the gate
 checks is what is recorded: that a prediction exists for this commit, under another name than
 the proof's, before the verdict.
+
+### 15.7 Intake: `machinery intake`
+
+Backlogs are not static: a requirement arrives while work runs. Left alone, agents write the
+stories (or the code) first and patch the design later, or never. Intake makes the order a
+property of the tool: the requirement is recorded; the design changes (model, machines, failure
+modes and tiers, formal models where the tier asks for them, generation); only then are its
+stories written, all at once, from what the design now owes.
+
+```
+machinery intake new "<title>" --intent "<who needs what, and the observable result>" [--refuses "<what must be refused>"]... [--parent <id>]
+machinery intake status <id> [--json]
+machinery intake plan <id> [--apply]
+```
+
+**The intake item.** `intake new` creates one backlog item, the record of one requirement, of
+type `feature` with the label `machinery-intake` (a child of `--parent` when given), and prints
+its id. Its description:
+
+```
+Intent:
+<intent>
+
+Refuses:
+- <refusal>
+
+machinery:intake
+machinery:intake-base <full sha of HEAD> <contract hash>
+```
+
+There is one `- ` line per `--refuses`, in the order given, and `- none` without one; a newline
+inside a value becomes a space. The base is the commit the requirement arrived at and the
+contract hash (section 15.4) there. An empty title or intent is a usage error. `intake new`
+refuses (exit 1) without a commit, and while a design source has uncommitted changes:
+`machinery: uncommitted design change: <path>, ...; a requirement starts from a committed design`.
+
+An item is an intake item when its description or notes carry a `machinery:intake` line with
+nothing after it. It is never a unit of build work: `waves` leaves it out (section 15.3) and
+`machinery story` refuses it (section 15.6). The **stories of an intake** are the items that
+carry `machinery:intake <id>` or are its children; its **capstone** is the story of the intake
+that carries `machinery:capstone`. `intake status` and `intake plan` refuse an item that is not an
+intake item: `usage: <id> is not an intake item: it has no machinery:intake line` (exit 2).
+
+**Steps.** `machinery intake status <id>` prints where the requirement stands at the current
+commit, one line per step, in this order:
+
+```
+intake <id>: <title>
+base: <short sha>, contract <first 12 hex>
+  design changed  done     <reason>
+  design sound    done     <reason>
+  generated       done     <reason>
+  new ids         done     <reason>
+    <id>  <tier>[ (<area>, <area>)]
+  tiers           done     <reason>
+    routine by default: <act id> <act id>
+  formal          done     <reason>
+  planned         missing  <reason>
+intake <id>: 6 of 7 steps done; next: planned
+```
+
+| Step | Done when (reason) | Missing (reason) |
+|---|---|---|
+| `design changed` | The contract hash differs from the base hash and no design source has uncommitted changes (`contract <12 hex>, base <12 hex>`). Or the hash is the base hash, the item carries `machinery:no-design-change <reason>` and no id is new: the requirement is one the design already covers (`no design change: <reason>; the design already covers it`). | `uncommitted design change: <path>, ...; commit it`; `the contract is the base contract: change the design first, or record machinery:no-design-change <reason>`; `machinery:no-design-change needs a plan without new ids: <n> id(s) are new` |
+| `design sound` | Every lint stage (section 3.1) passes or is not applicable (`every lint stage passes or is not applicable`). | `machinery lint: <stage>: <outcome line>; ...`, one part per stage that failed or was not demonstrated |
+| `generated` | Stage `gen-drift` passes or is not applicable and no file of the gen directory has uncommitted changes (`machinery gen --check: no drift`). | `machinery gen --check: <outcome line>; run machinery gen and commit`; `uncommitted generated file: <path>, ...; commit it` |
+| `new ids` | The base commit exists (`<n> new id(s) since <short sha>`, or `none since <short sha>: only the capstone is planned`). | `base commit <short sha> is not in this repository` |
+| `tiers` | Stage `risk` passes or is not applicable (`stage risk passed`, or `no design.risk configured: every new id is routine`). | `stage risk: <outcome line>; run machinery lint --stage risk` |
+| `formal` | Every critical area that holds a new id has its `fv` obligation proven, or for each of its questions a spec of the matching tool that lists the area (section 16.1) (`no critical area holds a new id`, or `modeled: <area>, ...`). | `fv:<area>: no <tool> spec answers <question>; ...; scaffold it with machinery formal new` |
+| `planned` | Every new id is in the `machinery:ids` of a story of the intake, and the intake has its capstone (`every new id has a story; capstone <id>`). | `<n> new id(s) without a story; run machinery intake plan <id> --apply`, or `no capstone; run machinery intake plan <id> --apply` |
+
+`machinery:no-design-change <reason>` is written by the planner on the item's notes
+(`bd update <id> --append-notes "machinery:no-design-change <reason>"`). The **new ids** are the
+`act` and obligation ids now (section 4) that are not in the generated obligation list at the base
+commit, read with `git show <base>:<gen>/obligations.json` (the gen directory of the base's own
+`machinery.yaml`); a base without that file has no ids, so every id is new. They print sorted, each
+with its tier and the areas that give it. Under `tiers`, the new `act` ids that are in no area
+print as `routine by default`, so the planner sees what was left routine; the line is left out
+when there is none.
+
+The last line is the summary: `intake <id>: <n> of 7 steps done`, followed by
+`; next: <first missing step>` when a step is missing. Exit 0 when every step is done, 1
+otherwise, 2 for a usage error. `--json` prints the same data as one document; `next` is empty when
+every step is done:
+
+```json
+{"intake": "<id>", "title": "<title>", "base": {"commit": "<full sha>", "contract": "<sha256>"}, "contract": "<sha256>",
+ "steps": [{"step": "design changed", "done": true, "reason": "<reason>"}],
+ "new_ids": [{"id": "<id>", "tier": "<tier>", "areas": ["<area>"]}], "routine_by_default": ["<act id>"],
+ "done": 6, "next": "planned"}
+```
+
+**Plan.** `machinery intake plan <id> [--apply]` refuses (exit 1) while a wave is frozen
+(section 15.4): `machinery: a wave is frozen: land or thaw it; a contract change lands alone`. It
+refuses unless the steps `design changed`, `design sound`, `generated`, `new ids`, `tiers` and
+`formal` are done, with one line per missing step:
+`machinery: cannot plan intake <id>: <step> is missing: <reason>`.
+
+Then it does what `machinery plan` does (section 15.2) for the new ids that no story of the
+intake lists yet, instead of for the owed list: the same groups, titles, tiers, priorities, edges
+and story text. Every story is a child of the intake and carries `machinery:intake <id>` and the
+intake's intent. One more story, the **capstone**, is added when the intake has none:
+
+- title `Demonstrate: <intake title>`, type `task`, labels `machinery` and `tier:<tier>`, where
+  the tier is the highest tier of the new ids and at least consequential, priority from that tier;
+- blocked by every other story of the intake: the ones created now and the ones it already has;
+- the story text with the intent line `Show the requirement on the running system through its
+  real interface.`; the acceptance lines `- The intent is observed: <intent>` and
+  `- Refused: <refusal>` for each refusal of the intake; `machinery:capstone` and
+  `machinery:intake <id>` in `Ids`, without a `machinery:ids` line; the exclusion
+  `- No new behavior: the capstone shows what the other stories built.` before the design one;
+  and its blockers under `Needs`, each with the output `the behavior shown`;
+- acceptance criteria: the intent is shown on the running system through its real interface,
+  including each refusal the intake lists; the commands that reproduce it are recorded on the
+  story, one `machinery:demo <command>` line each; every other story of the intake is closed;
+  `machinery story` passes for it (section 15.6).
+
+When the capstone exists already, the stories created now are added to its blockers.
+
+Without `--apply` it prints the stories as the Markdown of section 15.2, the capstone last. With
+`--apply`:
+
+1. it creates every story and edge in one `bd create --graph` call; an edge to a story that
+   exists already uses its id. bd creates the graph whole or not at all;
+2. only after that call succeeded it writes `owed.yaml`: each id of a story created now is added
+   when it is not owed yet, with the reason `owed by intake <id>`, and the `story` field of each of
+   those ids names its story. When the call fails nothing is written, so the owed list and the
+   backlog are as they were;
+3. it appends `machinery:intake-planned <full sha> <contract hash>` to the intake's notes, unless a
+   line with the current contract hash is there already.
+
+It prints `plan: <n> created, <n> existing, <n> edge(s)` (existing: the stories the intake had
+before), `owed: <n> added`, and `intake <id>: planned at <short sha>, contract <12 hex>` when step 3
+wrote a line. Both forms first print `intake <id>: no new id: the design change adds none; only
+the capstone is planned` for an intake without new ids (a rewording, a removal, or a
+requirement the design already covers), and `intake <id>: every new id has a story; nothing to
+create` when there is nothing left to create. Running it again therefore creates nothing twice.
+
+**Stage `intake`.** Part of `machinery check`. It reads the backlog with one `bd list`, only when
+`backlog.tool` is set and `bd` is runnable. It is `not applicable: no backlog configured`,
+`not applicable: bd not runnable`, `not applicable: the backlog cannot be read` or
+`not applicable: no open intake item` otherwise. For each open intake item:
+
+- `warn   intake <id>: the design changed and no stories were planned from it; run machinery intake plan <id>`
+  when the contract hash differs from its base and no `machinery:intake-planned` line carries the
+  current contract hash;
+- `warn   intake <id> is delivered and still open; close it` when its capstone and every other
+  story of the intake are closed.
+
+Warnings only: the stage passes. `checked:` counts the open intake items.
 
 ## 16. Formal models
 
@@ -2410,12 +2654,25 @@ no `checked:` part. The out path is the only absolute path assess prints.
 
 ## 19. The order of work this supports
 
-**Plan.** The planner (the PM role) owns the backlog and the risk file. For new work it: changes
-the model and machines first (`machinery lint`, `machinery gen`); assigns tiers in `risk.yaml`;
-runs `machinery owed sync` or `machinery adopt --write` so the new obligations are owed; turns
-them into stories with `machinery plan --apply`; and reads `machinery waves` for the schedule.
-Design changes land before the stories that build on them: `machinery waves --freeze` pins the
-contract for a wave.
+**Intake.** Every new requirement starts as an intake item (section 15.7), before any story and
+before any code. The tool holds the order:
+
+1. `machinery intake new "<title>" --intent "..." --refuses "..."` records it at the current
+   commit.
+2. The design changes first and lands alone: the model and the machines, the failure modes and
+   the tiers in `risk.yaml`, a formal model where a critical area asks for one
+   (`machinery formal new`), then `machinery lint` and `machinery gen`, committed.
+3. `machinery intake status <id>` names the step that is missing and why.
+4. `machinery intake plan <id> --apply` writes every story at once from what the design now owes,
+   owes the new ids, and adds the capstone that will show the requirement on the running system.
+5. `machinery waves` schedules the stories; `machinery waves --freeze` pins the contract for a
+   wave. A design change found later is its own change that lands alone, never an edit inside a
+   running wave, and `machinery intake plan` refuses while a wave is frozen.
+
+**Plan.** The planner (the PM role) owns the backlog and the risk file. Obligations owed without a
+requirement behind them (the skeleton of a new project, an adoption) become stories with
+`machinery plan --apply`. Either way, a story in the design's name names the ids it proves:
+`machinery waves` fails on one that does not, and counts the stories outside machinery.
 
 **Build.** One story, one builder, one worktree, briefed with `machinery brief <story>`:
 
@@ -2426,7 +2683,10 @@ contract for a wave.
 3. `machinery owed sync --prune-only`, commit, `machinery proof --story <id> --post`.
 
 **Accept.** By tier (section 15.6): routine on evidence; consequential and critical through a
-fresh verifier who predicts, reads, then accepts; critical with its formal model current.
+fresh verifier who predicts, reads, then accepts; critical with its formal model current. The
+capstone of an intake closes last: when every other story of the intake is closed, its builder
+records the commands that show the intent (`machinery:demo` lines) and a fresh verifier accepts
+it. Then the intake item is closed; stage `intake` warns while a delivered one stays open.
 
 **Land.** Stories of a wave are integrated; then the whole suite runs once at the head that is
 ready, with `machinery landing --base <base>`, and at most two fix-forwards (section 12.2).
