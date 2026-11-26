@@ -6,11 +6,11 @@ exec machinery gen
 gitinit
 
 exec mrun 2 run --adapter junit -- go test ./e2e/suite
-stderr '^usage: --adapter: unknown adapter "junit"; the only adapter is go-test-json$'
+stderr '^usage: --adapter: unknown adapter "junit": write --adapter go-test-json, the only adapter$'
 exec mrun 2 run --adapter go-test-json -- sh e2e/orders.sh
-stderr '^usage: --adapter go-test-json: the command must be go test, got sh e2e/orders.sh$'
+stderr '^usage: --adapter go-test-json: the command must be go test, got sh e2e/orders\.sh: run go test itself, or add --streams and have the command leave its go test -json output in MACHINERY_GO_TEST_JSON$'
 exec mrun 2 run --adapter go-test-json -- go vet ./...
-stderr '^usage: --adapter go-test-json: the command must be go test, got go vet$'
+stderr '^usage: --adapter go-test-json: the command must be go test, got go vet: run go test itself, or add --streams '
 exec mrun 2 run --adapter go-test-json -- go test -count=2 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -count=2 is refused: write -count=1$'
 exec mrun 2 run --adapter go-test-json -- go test -count 3 ./e2e/suite
@@ -29,7 +29,18 @@ exec mrun 2 run --adapter go-test-json --streams -- sh run-suite.sh
 stderr '^usage: --adapter go-test-json: GOFLAGS has -count=2, which is refused: take it out of GOFLAGS$'
 env GOFLAGS=
 exec mrun 2 run --adapter go-test-json -- go test -json=false -count=1 ./e2e/suite
-stderr '^usage: --adapter go-test-json: -json=false is refused: the adapter reads the event stream$'
+stderr '^usage: --adapter go-test-json: -json=false is refused: the adapter reads the event stream; leave it out$'
+# -overlay builds files that are not on disk, and the adapter reads the files on disk
+exec mrun 2 run --adapter go-test-json -- go test -overlay overlay.json ./e2e/suite
+stderr '^usage: --adapter go-test-json: -overlay is refused: the adapter reads the test files on disk; run without it$'
+exec mrun 2 run --adapter go-test-json -- go test -overlay=overlay.json ./e2e/suite
+stderr '^usage: --adapter go-test-json: -overlay is refused: '
+env GOFLAGS=-overlay=overlay.json
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS$'
+exec mrun 2 run --adapter go-test-json --streams -- sh run-suite.sh
+stderr '^usage: --adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS$'
+env GOFLAGS=
 # nothing ran and nothing was recorded
 ! exists .machinery/receipts
 ! exists .git/machinery/runs

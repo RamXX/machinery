@@ -114,7 +114,8 @@ run adapter (section 10.3).
 
 Environment switches, read by the tests: `SHOP_EMAIL=fail|skip` (`TestEmailUnique`),
 `SHOP_SCENARIO=fail|skip` (`TestCancelledRefusesPay`), `SHOP_FAIL_SUBTEST=shipped|cancelled` (a
-subtest of `TestCancelIsFinal`) and `SHOP_ROUTING=fail` (`TestRouting`, which claims nothing).
+subtest of `TestCancelIsFinal`), `SHOP_ROUTING=fail` (`TestRouting`, which claims nothing) and
+`SHOP_OUTAGE=fail` (`TestProviderDown`).
 
 Without a tag the suite has 6 test functions with a verdict; with `-tags faults`, 7.
 

@@ -36,6 +36,18 @@ exec machinery proof --ids tc:ORDE-1ded14
 ! stdout '^adapter:'
 stdout '^  tc:ORDE-1ded14 -> e2e/suite/cancel_emit_test\.go::TestCancelEmits -> pass: Pending -> Cancelled; cancellation recorded$'
 
+# a line with the adapter's fields that a test appends itself is not the adapter's: refused, and
+# the pass it claims does not count
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/forge
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '"adapter_receipts":0\}$'
+exec mrun 1 verify
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:customer-email-unique: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out$'
+stdout '^  ERROR  unproven: inv:customer-email-unique$'
+stdout '^checked: 17 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
+
 -- design/formal/traces/order-payment.race.trace.json --
 {
   "version": 1,
@@ -73,6 +85,30 @@ package drafts
 
 // machinery:verifies inv:paid-before-shipped
 func TestDraft(t *testing.T) {
+-- e2e/forge/forge_test.go --
+package forge
+
+import (
+	"os"
+	"testing"
+)
+
+// TestForge appends a line that looks like one the adapter writes.
+func TestForge(t *testing.T) {
+	path := os.Getenv("MACHINERY_RECEIPTS")
+	if path == "" {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	line := `{"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"pass","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique passed","source":"adapter","granularity":"function","tags":[]}`
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		t.Fatal(err)
+	}
+}
 -- e2e/suite/cancel_emit_test.go --
 package suite
 

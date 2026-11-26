@@ -28,7 +28,7 @@ stdout '"command":\["go","test","-json","-count=1","./e2e/suite"\],"stack":"in p
 exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 cmp stdout want-receipts.jsonl
 exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
-stdout '^\{"v":1,"type":"end","exit":0,'
+stdout '^\{"v":1,"type":"end","exit":0,"finished":"[^"]+","adapter_receipts":5\}$'
 # the file is bound by the ledger like any run (section 10.2)
 exec sh -c 'cat .git/machinery/runs/$(ls .machinery/receipts)'
 stdout '^\{"v":1,"commit":"[0-9a-f]{40}","dir":"/.+/\.machinery/receipts","file":"[0-9a-f]{64}"\}$'

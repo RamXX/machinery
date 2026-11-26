@@ -140,6 +140,10 @@ exec mrun 1 verify
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:terminal-is-final: source must be adapter or absent, got "manual"$'
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 3: inv:terminal-is-final: granularity must be function or file, got "line"$'
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 4: inv:terminal-is-final: granularity without source: adapter$'
+# a well-formed adapter line, and tags alone, in a run that is no adapter run: refused, not read
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 5: inv:terminal-is-final: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 6: inv:terminal-is-final: source, granularity and tags are written only by the run adapter: '
+stdout '^  ERROR  unproven: inv:terminal-is-final$'
 
 -- k1.txt --
 machinery:ids inv:paid-before-shipped
@@ -166,6 +170,8 @@ areas:
 {"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","source":"manual"}
 {"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","source":"adapter","granularity":"line"}
 {"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","granularity":"file"}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed","source":"adapter","granularity":"function","tags":[]}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","tags":["faults"]}
 -- default.yaml --
 version: 2
 design:

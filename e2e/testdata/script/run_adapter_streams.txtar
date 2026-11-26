@@ -7,7 +7,7 @@ exec machinery gen
 gitinit
 
 exec mrun 2 run --streams -- sh run-suite.sh
-stderr '^usage: --streams needs --adapter go-test-json$'
+stderr '^usage: --streams needs --adapter go-test-json: add it before --streams$'
 
 # two streams of one staged package, joined to the files under trace.tests through the map
 exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
@@ -42,8 +42,8 @@ exec sh -c 'test ! -e "$(cat .machinery/dir.txt)"'
 exec mrun 1 verify
 stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
 
-# machinery cannot add -count=1 to what a wrapper starts: a package answered from the cache
-# counts nothing
+# machinery cannot add -count=1 to what a wrapper starts: a pass replayed from the cache counts
+# nothing
 rm .machinery/receipts
 env SUITE_FLAGS=-short
 exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
@@ -51,7 +51,7 @@ exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
 env SUITE_FLAGS=
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
-stderr '^machinery run: adapter: package example\.test/shop/stage/suite: answered from the cache; nothing in it counts: run with -count=1$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1$'
 exec sh -c '! grep -q "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
 
 # one function with a pass in one stream and a skip in another: its verdicts differ, it failed
@@ -65,13 +65,29 @@ stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","obse
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
 
-# one package answered from the cache in one stream and fresh in another: it counts nothing
+# one package answered from the cache in one stream and run in another: the stream that ran it
+# gives its passes, the cached one none
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh cachedonce.sh
 stdout '^cachedonce: 0 cached in the first stream, 1 in the second$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
-stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; nothing in it counts: run with -count=1$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
+! stderr 'verdict not counted'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1$'
+
+# the verifier's case: a fresh stream where TestProviderDown fails, and a second stream answered
+# from the cache. The fail is never lost: its fail receipt is written and verify fails the id
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh cachedfail.sh
+stdout '^cachedfail: 0 cached in a, 1 in b$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; '
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/outage_test\.go","observed":"go test: TestProviderDown failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: fm:payment-provider-down \(e2e/suite/outage_test\.go\)$'
+exec machinery status
+stdout '  failed: 1  '
 
 # one function with two verdicts in one stream (the wrapper ran it twice): they differ, it failed
 rm .machinery/receipts
@@ -139,8 +155,20 @@ cp named.yaml machinery.yaml
 gitcommit 'a second file defines the function'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh once.sh
-stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous, its verdict counts for none of them$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions$'
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+
+# the narrow entry of the verifier's case: only the claiming file is mapped. The shadow is not
+# among the entry's files, but it is in the directory of one: the name is ambiguous, and the
+# files of the directory that the entry does not name give their verdicts to no file
+cp narrow.yaml machinery.yaml
+gitcommit 'an entry that names only the claiming file'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh once.sh
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous: '
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; '
 exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
 
 # without an entry for its package a verdict finds no file, also in the package's own directory
@@ -149,7 +177,7 @@ cp unmapped.yaml machinery.yaml
 gitcommit 'no map'
 exec machinery run --adapter go-test-json --streams -- sh once.sh
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; a package built from copies, and every package of a --streams run, is mapped to its files in evidence\.adapter\.sources$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
 
 -- once.sh --
 #!/bin/sh
@@ -166,6 +194,18 @@ go test -json ./e2e/suite > "$MACHINERY_GO_TEST_JSON/b.json"
 first=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/a.json" || true)
 second=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/b.json" || true)
 echo "cachedonce: $first cached in the first stream, $second in the second"
+-- cachedfail.sh --
+#!/bin/sh
+# stream a runs the suite with the tests behind faults, and TestProviderDown fails; stream b
+# asks only for TestPayThenShip, which the first command left in the cache
+set -u
+go test -json -run TestPayThenShip ./e2e/suite > /dev/null
+SHOP_OUTAGE=fail go test -json -count=1 -tags faults ./e2e/suite > "$MACHINERY_GO_TEST_JSON/a.json"
+go test -json -run TestPayThenShip ./e2e/suite > "$MACHINERY_GO_TEST_JSON/b.json"
+first=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/a.json")
+second=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/b.json")
+echo "cachedfail: $first cached in a, $second in b"
+exit 0
 -- again.sh --
 #!/bin/sh
 set -eu
@@ -273,6 +313,33 @@ evidence:
     sources:
       - package: "example.test/shop/e2e/suite"
         files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/suite/order_test.go", "e2e/suite/email_test.go", "e2e/suite/scenario_test.go", "e2e/suite/outage_test.go"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/suite"
+        files: ["e2e/suite/outage_test.go"]
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}

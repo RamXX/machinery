@@ -1,0 +1,224 @@
+# a verdict goes to a file only when no other Go file of the package's directory could have given
+# it: a same-named function under any build constraint makes the name ambiguous, and the build
+# tags, -race and the files a build compiled play no part (section 10.3)
+fixture shop
+fixture shop-gotests
+cp named.yaml machinery.yaml
+cp shadow_test.go e2e/suite/shadow_test.go
+exec machinery gen
+gitinit
+
+# outage_test.go is behind the build tag faults and is not built. A file of the same directory,
+# outside trace.tests, defines a function of the same name under !faults, and it passes: the
+# name is ambiguous, and the claim gets nothing
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr 'adapter go-test-json: 1 package\(s\), 7 test function\(s\) with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 1 id\(s\)$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions$'
+stderr -count=1 ambiguous
+! stderr 'in no file under'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout ', 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, '
+! stdout 'stale owed entry'
+exec machinery owed sync --prune-only
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+
+# with the tag the claiming file is the one that is built, and the name is ambiguous all the
+# same: which files a build compiled is never asked
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+
+# a fail is never lost: the claiming file fails, and the ambiguous name fails its claim
+rm .machinery/receipts
+env SHOP_OUTAGE=fail
+exec mrun 1 run --adapter go-test-json -- go test -tags faults ./e2e/suite
+env SHOP_OUTAGE=
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/outage_test\.go","observed":"go test: TestProviderDown failed"'
+
+# the other file under trace.tests too: two candidates define the name
+rm .machinery/receipts
+cp globbed.yaml machinery.yaml
+gitcommit 'every file of the suite is under trace.tests'
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+
+# a Go file that is no test file counts the same: it is in the directory
+rm .machinery/receipts
+rm e2e/suite/shadow_test.go
+cp shadow_test.go e2e/suite/shadow.go
+gitcommit 'the shadow in a file that is no test file'
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow\.go: ambiguous'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
+# renamed, each function has a name of its own: without the tag the claiming file's function did
+# not run, with it the pass is the claiming file's own
+rm .machinery/receipts
+rm e2e/suite/shadow.go
+cp renamed_test.go e2e/suite/shadow_test.go
+gitcommit 'the shadow renamed'
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
+! stderr ambiguous
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+! stderr ambiguous
+exec sh -c 'grep -h fm:payment-provider-down "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+stdout '"outcome":"pass","test":"e2e/suite/outage_test\.go"'
+
+# the verifier's case: the claiming file is behind !race and its test fails; a file behind race,
+# outside trace.tests, defines an empty function of the same name. Without -race the fail is
+# written; with -race the claiming file is not built and nothing is credited to it
+rm .machinery/receipts
+cp named.yaml machinery.yaml
+cp outage_norace_test.go e2e/suite/outage_test.go
+cp shadow_race_test.go e2e/suite/shadow_test.go
+gitcommit 'the claim behind !race, the shadow behind race'
+env SHOP_OUTAGE=fail
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec mrun 1 verify
+stdout '^  ERROR  failed: fm:payment-provider-down \(e2e/suite/outage_test\.go\)$'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -race ./e2e/suite
+env SHOP_OUTAGE=
+stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+! stdout 'fm:payment-provider-down is proven'
+exec machinery owed sync --prune-only
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+
+# a Go file of the directory that does not parse may define any name: every name of the package
+# is ambiguous, and nothing of it counts but its fails
+rm .machinery/receipts
+rm e2e/suite/shadow_test.go
+cp outage_faults_test.go e2e/suite/outage_test.go
+cp wip.go e2e/suite/wip.go
+gitcommit 'a file that does not parse'
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestShipNeedsPayment: defined in e2e/suite/order_test\.go, e2e/suite/wip\.go \(does not parse\): ambiguous'
+stderr -count=6 'wip\.go \(does not parse\): ambiguous'
+
+# go test from another directory (-C): the package and its files are still found
+rm .machinery/receipts
+rm e2e/suite/wip.go
+gitcommit 'no file that does not parse'
+exec machinery run --adapter go-test-json -- go test -C e2e -tags faults ./suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+
+-- shadow_test.go --
+//go:build !faults
+
+package suite
+
+import "testing"
+
+func TestProviderDown(t *testing.T) {}
+-- renamed_test.go --
+//go:build !faults
+
+package suite
+
+import "testing"
+
+func TestProviderDownElsewhere(t *testing.T) {}
+-- shadow_race_test.go --
+//go:build race
+
+package suite
+
+import "testing"
+
+func TestProviderDown(t *testing.T) {}
+-- outage_norace_test.go --
+//go:build !race
+
+package suite
+
+// machinery:verifies fm:payment-provider-down
+
+import (
+	"os"
+	"testing"
+)
+
+func TestProviderDown(t *testing.T) {
+	if os.Getenv("SHOP_OUTAGE") == "fail" {
+		t.Fatal("the order was charged while the provider was down")
+	}
+}
+-- outage_faults_test.go --
+//go:build faults
+
+package suite
+
+// machinery:verifies fm:payment-provider-down
+
+import "testing"
+
+func TestProviderDown(t *testing.T) {}
+-- wip.go --
+//go:build ignore
+
+package suite
+
+func half(
+-- named.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/suite/order_test.go", "e2e/suite/email_test.go", "e2e/suite/scenario_test.go", "e2e/suite/outage_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- globbed.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
