@@ -60,6 +60,9 @@ func runPlan(e *Env, args []string) int {
 			return e.Fail(err)
 		}
 		fmt.Fprintf(e.Stdout, "plan: %d created, %d existing, %d edge(s)\n", res.Created, res.Existing, res.Edges)
+		if line := plan.WireLine("wire-evidence story", "wire-evidence stories"); line != "" {
+			fmt.Fprintf(e.Stdout, "plan: %s\n", line)
+		}
 		return 0
 	}
 	if len(plan.Stories) == 0 {

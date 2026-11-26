@@ -1,0 +1,42 @@
+# a serves tag or marker that names an id which is not an action credits nothing: a warn, counted (section 8)
+fixture shop
+
+# nothing to warn about: the checked line is the one every project has
+exec machinery trace
+stdout '^checked: 2 code files, 1 test files, 4 act ids, 16 obligations$'
+! stdout 'warn'
+
+cp markers.yaml m.tmp
+exec sh -c 'sed "/^  tests: /r m.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+cp order.go.in internal/domain/order.go
+exec machinery trace
+stdout '^  warn   serves: inv:paid-before-shipped is not an action; a serves tag credits only actions$'
+stdout '^  warn   serves: inv:terminal-is-final is not an action; a serves tag credits only actions$'
+stdout '^  warn   serves: sc:customer-pays-and-the-order-ships is not an action; a serves tag credits only actions$'
+stdout -count=3 'warn   serves: '
+stdout '^checked: 2 code files, 1 test files, 4 act ids, 16 obligations, 3 non-action serves$'
+stdout '^passed$'
+
+# a served invariant is credited nothing: it still needs a test that claims it
+exec sh -c 'sed "s/ inv:terminal-is-final//" e2e/orders.sh > o.tmp && mv o.tmp e2e/orders.sh'
+exec mrun 1 trace
+stdout 'ERROR  unverified: inv:terminal-is-final'
+stdout '  warn   serves: inv:terminal-is-final is not an action; a serves tag credits only actions'
+stdout '^failed: 1 finding\(s\)$'
+
+-- markers.yaml --
+  markers:
+    serves: ["Implements:"]
+-- order.go.in --
+// Package domain holds the order rules of the fixture project.
+package domain
+
+// Apply is a placeholder for the order behavior.
+//
+// machinery:serves act:Order.place act:Order.pay act:Order.ship act:Order.cancel
+// Implements: paid-before-shipped, Order.pay
+// Implements: paid-before-shipped
+// machinery:serves inv:terminal-is-final sc:customer-pays-*
+func Apply(event string) string {
+	return event
+}

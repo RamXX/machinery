@@ -13,6 +13,7 @@ import (
 	"github.com/RamXX/machinery/internal/gen"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/internal/tags"
 	"github.com/RamXX/machinery/internal/vital"
 )
 
@@ -90,6 +91,24 @@ func (a *assessment) vitalLines(s *section) {
 	s.facts["proofs_awaiting"] = len(proofs)
 	s.facts["vital_candidates"] = list
 	s.facts["vital_dismissed"] = dismissed
+}
+
+// trace: the stage, and every id by whether something names it. A snapshot
+// holds no receipt, so a claim here is a claim and no more (section 18.3).
+func (a *assessment) trace(s *section) {
+	s.stages = stages.Run(a.ctx, []string{"trace"})
+	if a.p.Cfg.Trace == nil {
+		return
+	}
+	d := a.ctx.Design()
+	claims, err := tags.Read(a.p, d)
+	if err != nil {
+		s.own.Errorf("cannot read tags: %v", err)
+		return
+	}
+	split := claims.SplitIDs(d.AllIDs())
+	s.lines = split.Lines("", "claimed by a test")
+	s.facts = map[string]any{"claimed": split.Claimed.Doc(), "unnamed": split.Unnamed.Doc()}
 }
 
 func stageSection(name string) func(a *assessment, s *section) {

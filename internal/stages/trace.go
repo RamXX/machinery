@@ -52,7 +52,8 @@ func Trace(ctx *Context) *report.Stage {
 	// a proposed or retired id is an id of the design, which nothing may claim
 	ids := d.DeclaredIDs()
 	scenarios := d.ScenarioIDs()
-	served, verified := map[string]bool{}, map[string]bool{}
+	claims := tags.ClaimsOf(d, found)
+	nonAction := map[string]bool{}
 	claimedHeld := map[string]bool{}
 	proofs := d.ProofIDs()
 	for _, t := range found {
@@ -73,6 +74,9 @@ func Trace(ctx *Context) *report.Stage {
 			}
 			hits := tags.Resolve(t, tok, ids, scenarios)
 			if len(hits) == 0 {
+				if t.Exact {
+					continue // text that is no scenario name claims nothing (section 8.1)
+				}
 				if t.Scenario {
 					s.Errorf("unknown-id: %s:%d: scenario %q", t.File, t.Line, tok)
 				} else {
@@ -93,27 +97,29 @@ func Trace(ctx *Context) *report.Stage {
 					}
 					continue
 				}
-				if t.Kind == tags.Serves {
-					served[id] = true
-				} else {
-					verified[id] = true
+				if t.Kind == tags.Serves && !d.IsAct(id) && !nonAction[id] {
+					nonAction[id] = true
+					s.Warnf("serves: %s is not an action; a serves tag credits only actions", id)
 				}
 			}
 		}
 	}
 	for _, a := range d.Served {
-		if _, isOwed := owed[a.ID]; !served[a.ID] && !isOwed {
+		if _, isOwed := owed[a.ID]; !claims.Served[a.ID] && !isOwed {
 			s.Errorf("unserved: %s", a.ID)
 		}
 	}
 	for _, o := range d.Obligations {
-		if _, isOwed := owed[o.ID]; claimed[o.Kind] && !verified[o.ID] && !isOwed {
+		if _, isOwed := owed[o.ID]; claimed[o.Kind] && len(claims.Tests[o.ID]) == 0 && !isOwed {
 			s.Errorf("unverified: %s", o.ID)
 		}
 	}
 
 	s.Count(len(code), "code files").Count(len(tests), "test files").
 		Count(len(d.Served), "act ids").Count(len(d.Obligations), "obligations")
+	if len(nonAction) > 0 {
+		s.Count(len(nonAction), "non-action serves")
+	}
 	if len(d.Served)+len(d.Obligations) == 0 && s.Blocking() == 0 {
 		s.NotDemonstrated("nothing to check")
 	}

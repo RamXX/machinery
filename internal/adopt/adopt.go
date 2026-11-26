@@ -16,6 +16,7 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/internal/tags"
 )
 
 // Options are the arguments of machinery adopt.
@@ -440,17 +441,31 @@ func (w *worker) owed() error {
 
 func (w *worker) addOwed(d *design.Design) error {
 	have := d.OwedSet()
-	reason := "unproven at adoption (" + w.reasonSha() + ")"
+	at := " (" + w.reasonSha() + ")"
+	reason := design.ReasonUnproven + at
 	entries := append([]design.OwedEntry(nil), d.Owed...)
 	added := 0
-	served := servedIDs(w.p, d)
+	claims, err := tags.Read(w.p, d)
+	if err != nil {
+		return err
+	}
+	served := claims.Served
+	planned := d.PlannedMarks()
 	// Only what is new is owed: an id the committed obligation list already
 	// has was owed, or proven and pruned, before. Owing it again would undo
 	// the ratchet.
 	known := committedIDs(w.p)
 	for _, o := range d.Obligations {
 		if _, ok := have[o.ID]; !ok && !known[o.ID] {
-			entries = append(entries, design.OwedEntry{ID: o.ID, Reason: reason})
+			// what the project planned, what a test already claims, what no test names
+			e := design.OwedEntry{ID: o.ID, Reason: reason}
+			switch {
+			case planned[o.ID] != "":
+				e.Reason, e.Story = design.ReasonPlanned+at, planned[o.ID]
+			case claims.Claimed(o.ID):
+				e.Reason = design.ReasonClaimed + at
+			}
+			entries = append(entries, e)
 			added++
 		}
 	}

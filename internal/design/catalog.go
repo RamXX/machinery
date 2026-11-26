@@ -51,7 +51,7 @@ func LoadImportedFailureModes(p *project.Project, native []FailureMode) (fms []F
 			continue
 		}
 		byID[r.ID] = len(fms)
-		fms = append(fms, FailureMode{ID: r.ID, Kind: "fault", Failure: r.Failure, Behavior: r.Behavior, Source: c.File, Imported: true})
+		fms = append(fms, FailureMode{ID: r.ID, Kind: "fault", Failure: r.Failure, Behavior: r.Behavior, Source: c.File, Imported: true, Cells: r.Cells})
 	}
 	if c.Links == "" {
 		return fms, problems, true

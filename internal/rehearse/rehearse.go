@@ -22,6 +22,7 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/internal/tags"
 	"github.com/RamXX/machinery/internal/testpolicy"
 )
 
@@ -38,6 +39,10 @@ var fixFirstStages = map[string]bool{"model": true, "machines": true, "failure-m
 
 // owedKinds orders the kinds of the owed list.
 var owedKinds = []string{"tc", "sc", "inv", "fm", "fv", "cx", "ck", "act"}
+
+// wireKind is the kind the plan table gives a wire-evidence story, after
+// the kinds of ids (section 15.2).
+const wireKind = "wire"
 
 // Options are the arguments of machinery adopt --rehearse.
 type Options struct {
@@ -78,6 +83,11 @@ type rehearsal struct {
 	baselines            []count
 	owed                 []count
 	owedTotal            int
+	claims               tags.Split // the owed ids by claim (section 14)
+	planWire             string     // how many stories wire evidence, or ""
+	wireStories, wireIDs int
+	wireBy               string
+	plannedStories       int // stories for ids planned at adoption
 	blocked              []string
 	checkLine            string
 	stageOutcomes        []count // Key: stage, outcome in waiverOf
@@ -162,6 +172,9 @@ func Run(o Options) error {
 	} else {
 		fmt.Fprintf(w, "plan: %d stories, %d edge(s)\n", r.planTotal, r.planEdges)
 	}
+	if r.planWire != "" {
+		fmt.Fprintf(w, "wire evidence: %s\n", r.planWire)
+	}
 	if len(r.blocks) == 0 {
 		fmt.Fprintln(w, "blocks adoption: nothing")
 	} else {
@@ -240,6 +253,11 @@ func (r *rehearsal) rehearse(o Options, root, out, snap string) error {
 	d := ctx.Design()
 	r.findings(sts)
 	r.counts(p, d)
+	claims, err := tags.Read(p, d)
+	if err != nil {
+		return err
+	}
+	r.claims = claims.SplitOwed(d)
 	if len(r.blocked) > 0 {
 		r.adoptLine = fmt.Sprintf("adopt: blocked: machinery gen refuses while %d finding(s) stand; nothing is owed", blockedCount(r.blocked))
 	} else {
@@ -364,17 +382,30 @@ func (r *rehearsal) plan(out string, d *design.Design) error {
 		return err
 	}
 	counts := map[[2]string]int{}
+	planned := map[string]bool{}
+	for _, o := range d.Owed {
+		planned[o.ID] = o.PlannedAtAdoption()
+	}
 	for _, s := range plan.Stories {
 		kind := ""
 		if len(s.IDs) > 0 {
 			kind, _, _ = strings.Cut(s.IDs[0], ":")
+			if planned[s.IDs[0]] {
+				r.plannedStories++
+			}
+		}
+		if s.Wire() {
+			kind = wireKind
 		}
 		counts[[2]string{kind, s.Tier}]++
 	}
+	r.planWire = plan.WireLine("story", "stories")
+	r.wireStories, r.wireIDs = plan.WireCounts()
+	r.wireBy = plan.WireBy
 	for k, n := range counts {
 		r.planStories = append(r.planStories, planCount{k[0], k[1], n})
 	}
-	rank := map[string]int{}
+	rank := map[string]int{wireKind: len(owedKinds)}
 	for i, k := range owedKinds {
 		rank[k] = i
 	}

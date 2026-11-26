@@ -9,6 +9,7 @@ import (
 	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/landing"
+	"github.com/RamXX/machinery/internal/tags"
 )
 
 func init() {
@@ -82,6 +83,15 @@ func runStatus(e *Env, args []string) int {
 		}
 	}
 	fmt.Fprintf(w, "owed without a story: %d\n", noStory)
+	if design.Adopted(d.Owed) { // section 14: an adopted project sees its owed ids by claim
+		claims, err := tags.Read(p, d)
+		if err != nil {
+			return e.Fail(err)
+		}
+		for _, l := range claims.SplitOwed(d).Lines("owed, ", "claimed by a test, no receipt yet") {
+			fmt.Fprintln(w, l)
+		}
+	}
 	if !ev.HasEvidence {
 		fmt.Fprintf(w, "evidence: none at %s\n", gitx.Short(ev.Head))
 	} else {

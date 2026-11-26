@@ -59,6 +59,9 @@ func (r *rehearsal) markdown() string {
 			p("- %s: %d", c.Key, c.Count)
 		}
 		p("- total: %d", r.owedTotal)
+		for _, l := range r.claims.Lines("- ", "claimed by a test, no receipt yet") {
+			p("%s", l)
+		}
 	}
 	if len(r.blocked) > 0 {
 		p("")
@@ -87,6 +90,15 @@ func (r *rehearsal) markdown() string {
 		p("%s", r.planError)
 	} else {
 		p("%d stories, %d edge(s), as `machinery plan` would create them (`plan.md`; never applied).", r.planTotal, r.planEdges)
+		if r.planWire != "" || r.plannedStories > 0 {
+			p("")
+		}
+		if r.planWire != "" {
+			p("- wire evidence: %s", r.planWire)
+		}
+		if r.plannedStories > 0 {
+			p("- already planned in the project: %d story(ies) are for ids planned at adoption; `plan --apply` skips each whose story is in the backlog", r.plannedStories)
+		}
 		if len(r.planStories) > 0 {
 			p("")
 			p("| Kind | Tier | Stories |")
@@ -169,7 +181,8 @@ func (r *rehearsal) doc() map[string]any {
 	for _, s := range r.planStories {
 		stories = append(stories, map[string]any{"kind": s.Kind, "tier": s.Tier, "count": s.Count})
 	}
-	plan := map[string]any{"stories": stories, "total": r.planTotal, "edges": r.planEdges}
+	plan := map[string]any{"stories": stories, "total": r.planTotal, "edges": r.planEdges, "planned_stories": r.plannedStories,
+		"wire": map[string]any{"stories": r.wireStories, "ids": r.wireIDs, "by": r.wireBy}}
 	if r.planError != "" {
 		plan["error"] = r.planError
 	}
@@ -192,7 +205,8 @@ func (r *rehearsal) doc() map[string]any {
 		"version": 1, "project": r.name, "head": r.head, "config": r.cfgLabel, "backlog": r.backlogLine,
 		"dirty":         map[string]any{"changed": r.changed, "untracked": r.untracked},
 		"outside_links": outside, "files": files, "waivers": waivers, "baselines": baselines,
-		"owed":    map[string]any{"by_kind": byKind, "total": r.owedTotal},
+		"owed": map[string]any{"by_kind": byKind, "total": r.owedTotal, "claimed": r.claims.Claimed.Doc(),
+			"unnamed": r.claims.Unnamed.Doc(), "planned": r.claims.Planned.Doc()},
 		"blocked": blocked, "check": map[string]any{"result": r.checkLine, "stages": stageList},
 		"plan": plan, "blocks": blocks, "fix_first": fixFirst,
 	}

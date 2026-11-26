@@ -28,6 +28,8 @@ type FailureMode struct {
 	// gives it a subject and a required value.
 	Imported bool `yaml:"-"`
 	Linked   bool `yaml:"-"`
+	// Cells are the cells of an imported row, as written and trimmed.
+	Cells []string `yaml:"-"`
 }
 
 // Unlinked reports an imported row without a link: it names nothing, so it
@@ -328,6 +330,34 @@ type OwedEntry struct {
 	ID     string `yaml:"id"`
 	Reason string `yaml:"reason"`
 	Story  string `yaml:"story,omitempty"`
+}
+
+// The reasons machinery adopt writes (section 17.2). plan and status read
+// the last two back (sections 14 and 15.2).
+const (
+	ReasonUnproven = "unproven at adoption"
+	ReasonClaimed  = "claimed at adoption"
+	ReasonPlanned  = "planned at adoption"
+)
+
+// ClaimedAtAdoption reports an entry adopt wrote for an id a test already
+// claimed.
+func (e OwedEntry) ClaimedAtAdoption() bool { return strings.HasPrefix(e.Reason, ReasonClaimed) }
+
+// PlannedAtAdoption reports an entry adopt wrote for an id the project had
+// marked planned.
+func (e OwedEntry) PlannedAtAdoption() bool { return strings.HasPrefix(e.Reason, ReasonPlanned) }
+
+// Adopted reports whether the list holds an entry adopt wrote.
+func Adopted(entries []OwedEntry) bool {
+	for _, e := range entries {
+		for _, r := range []string{ReasonUnproven, ReasonClaimed, ReasonPlanned} {
+			if strings.HasPrefix(e.Reason, r) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type owedFile struct {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/RamXX/machinery/internal/backlog"
 	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/machine"
+	"github.com/RamXX/machinery/internal/tags"
 )
 
 // Story is one story of a plan (section 15.2).
@@ -26,7 +28,15 @@ type Story struct {
 	needs       []need
 	capstone    bool
 	design      bool // the design story of an intake (section 15.7)
+	// wire is the test file or directory of a wire-evidence story, wireDir
+	// says which, and claimedBy the test files that claim each of its ids.
+	wire      string
+	wireDir   bool
+	claimedBy map[string][]string
 }
+
+// Wire reports a wire-evidence story (section 15.2).
+func (s *Story) Wire() bool { return s.wire != "" }
 
 type need struct {
 	key, title, output string
@@ -36,6 +46,32 @@ type need struct {
 type Plan struct {
 	Stories []*Story // sorted by title
 	Edges   []backlog.Edge
+	// WireBy is how the wire-evidence stories are cut: "file" or "directory".
+	WireBy string
+}
+
+// WireCounts returns the number of wire-evidence stories and of their ids.
+func (plan *Plan) WireCounts() (stories, ids int) {
+	for _, s := range plan.Stories {
+		if s.Wire() {
+			stories++
+			ids += len(s.IDs)
+		}
+	}
+	return
+}
+
+// WireLine says how many stories wire evidence, for how many claimed ids
+// and how they are cut, or "" without one.
+func (plan *Plan) WireLine(noun, plural string) string {
+	stories, ids := plan.WireCounts()
+	if stories == 0 {
+		return ""
+	}
+	if stories > 1 {
+		noun = plural
+	}
+	return fmt.Sprintf("%d %s for %d claimed id(s), one per test %s", stories, noun, ids, plan.WireBy)
 }
 
 // Edge outputs (section 15.2).
@@ -45,6 +81,7 @@ const (
 	needReplay  = "the transitions the replay drives"
 	storyType   = "task"
 	internalEvt = "internal transitions"
+	wireTitle   = "Wire evidence "
 )
 
 // BuildPlan groups the owed ids into stories and derives the edges.
@@ -52,32 +89,68 @@ func BuildPlan(d *design.Design) (*Plan, error) {
 	if len(d.OwedProblems) > 0 {
 		return nil, fmt.Errorf("%s", d.OwedProblems[0])
 	}
+	claims, err := tags.Read(d.P, d)
+	if err != nil {
+		return nil, err
+	}
 	var ids []string
+	// an id a test claimed at adoption, and still claims, gets no story of
+	// its own: its test file gets one that wires the evidence
+	wired := map[string][]string{}
 	for _, o := range d.Owed {
-		if d.Known(o.ID) {
-			ids = append(ids, o.ID)
+		if !d.Known(o.ID) {
+			continue
+		}
+		ids = append(ids, o.ID)
+		if files := claims.Tests[o.ID]; o.ClaimedAtAdoption() && len(files) > 0 {
+			wired[o.ID] = files
 		}
 	}
-	return BuildPlanFor(d, ids, nil), nil
+	return buildPlan(d, ids, nil, wired), nil
 }
 
 // BuildPlanFor groups the given ids into stories and derives the edges. For
 // an intake every story also carries the intake's intent and tag (section
 // 15.7).
 func BuildPlanFor(d *design.Design, ids []string, in *Intake) *Plan {
+	return buildPlan(d, ids, in, nil)
+}
+
+// buildPlan groups the ids into stories. wired maps an id whose evidence is
+// only to be wired to the test files that claim it, sorted: it goes to the
+// story of the first, or of that file's directory when more test files would
+// get a story than plan.wire_max_files (section 15.2).
+func buildPlan(d *design.Design, ids []string, in *Intake, wired map[string][]string) *Plan {
 	byTitle := map[string]*Story{}
 	ids = append([]string(nil), ids...)
 	sort.Strings(ids)
+	plan := &Plan{WireBy: "file"}
+	files := map[string]bool{}
+	for _, fs := range wired {
+		files[fs[0]] = true
+	}
+	if len(files) > d.P.Cfg.WireMaxFiles() {
+		plan.WireBy = "directory"
+	}
 	for _, id := range ids {
-		title := groupTitle(d, id)
+		title, wire := groupTitle(d, id), ""
+		if fs := wired[id]; len(fs) > 0 {
+			wire = fs[0]
+			if plan.WireBy == "directory" {
+				wire = path.Dir(wire) + "/"
+			}
+			title = wireTitle + wire
+		}
 		s := byTitle[title]
 		if s == nil {
-			s = &Story{Title: title}
+			s = &Story{Title: title, wire: wire, wireDir: wire != "" && plan.WireBy == "directory", claimedBy: map[string][]string{}}
 			byTitle[title] = s
 		}
 		s.IDs = append(s.IDs, id)
+		if wire != "" {
+			s.claimedBy[id] = wired[id]
+		}
 	}
-	plan := &Plan{}
 	keys := map[string]bool{}
 	for _, s := range byTitle {
 		plan.Stories = append(plan.Stories, s)
@@ -205,7 +278,7 @@ func (plan *Plan) edges(d *design.Design) {
 		plan.Edges = append(plan.Edges, backlog.Edge{FromKey: from.Key, ToKey: to.Key, Type: "blocks"})
 	}
 	for _, s := range plan.Stories {
-		if !strings.HasPrefix(s.Title, "Prove ") {
+		if !strings.HasPrefix(s.Title, "Prove ") && !s.Wire() {
 			continue
 		}
 		for _, area := range CriticalAreas(d, s.IDs) {
@@ -300,17 +373,29 @@ func IDTitle(d *design.Design, id string) string {
 	return "(unknown id)"
 }
 
-// excludeDesign is the exclusion every story carries (section 15.2).
-const excludeDesign = "- No design change: a design change is its own story."
+// excludeDesign is the exclusion every story carries (section 15.2), and
+// excludeTest the one a wire-evidence story adds.
+const (
+	excludeDesign = "- No design change: a design change is its own story."
+	excludeTest   = "- No new test: the tests that claim these ids exist; this story makes them emit receipts."
+)
 
 // description renders the story text of section 15.2.
 func description(d *design.Design, s *Story, in *Intake) string {
 	var acc []string
+	excludes := []string{excludeDesign}
 	for _, id := range s.IDs {
-		acc = append(acc, "- "+id+": "+observed(d, id))
+		line := observed(d, id)
+		if s.Wire() {
+			line = "claimed by " + strings.Join(s.claimedBy[id], ", ") + "; " + line
+		}
+		acc = append(acc, "- "+id+": "+line)
 	}
-	tags := []string{"machinery:ids " + strings.Join(s.IDs, " ")}
-	return storyText(storyIntent(d, s), acc, tags, []string{excludeDesign}, s.needs, in)
+	if s.Wire() {
+		excludes = append(excludes, excludeTest)
+	}
+	idTags := []string{"machinery:ids " + strings.Join(s.IDs, " ")}
+	return storyText(storyIntent(d, s), acc, idTags, excludes, s.needs, in)
 }
 
 // storyText writes the five sections of a story description.
@@ -349,6 +434,10 @@ func storyText(intent string, acceptance, tags, excludes []string, needs []need,
 func storyIntent(d *design.Design, s *Story) string {
 	title := s.Title
 	switch {
+	case s.wireDir:
+		return "The tests under " + s.wire + " emit a receipt for each id they already claim."
+	case s.Wire():
+		return "The tests of " + s.wire + " emit a receipt for each id they already claim."
 	case strings.HasPrefix(title, "Model "):
 		area, _, _ := strings.Cut(strings.TrimPrefix(title, "Model "), " ")
 		return "The formal model of " + area + " answers its questions and is proven."
