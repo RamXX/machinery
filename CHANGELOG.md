@@ -91,6 +91,10 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `status`, `verify` and `proof` count adapter evidence apart, by granularity. The policy
   `evidence.adapter` (kinds, tiers, minimum granularity, a map for test packages built from
   copies) decides what it proves; by default never an id of a critical or vital area.
+  A pass counts for a claiming file only when `go list` shows the run built that file; with
+  `--streams` (a wrapper that starts `go test` itself and leaves the streams in
+  `MACHINERY_GO_TEST_JSON`) only through `evidence.adapter.sources`. The ratchet names a widened
+  adapter policy (`adapter-widened`), an error for a critical or vital tier.
 
 ### Carried forward from v1
 
