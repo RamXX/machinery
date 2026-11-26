@@ -610,7 +610,7 @@ For every machine, and every entity of the models:
 |---|---|
 | `machine-binding` | The machine binds to the model (section 5.2): it is the lifecycle machine of an existing entity, or an operational machine whose `_serves` names only entities and actions of the model. An entity has one lifecycle machine, or several that each declare a different `_aspect`. |
 | `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). When no candidate has a value in D, the finding says that E has no state enum for the machine and names no enum. An entity with no enum-typed attribute at all is one finding for the entity, whatever the number of its lifecycle machines. With aspects, each aspect machine is matched against an enum of its own: an enum that exactly matches one machine is that machine's, and no enum is the state enum of two machines (a machine that matches only an enum another one holds is a finding, and the enums other aspects hold are left out of its candidates). |
-| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. |
+| `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). When E declares no action, the events that are not listed are one finding for the entity, not one per event: the one missing declaration causes them all. Operational machine that binds to the model (no `machine-binding` finding): every event name under any `on` must be the name of an action of an entity it serves, the action of an `act:` id it serves, or be listed in `_external_events` or `_failure_events`. When it serves only entities that declare no action, the events that are not listed are one finding for the machine: nothing was compared with the model. |
 | `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine, or, with aspects, in at least one of them. |
 | `entity-machine` | Every entity that declares at least one action has a lifecycle machine. An entity that has no state of its own is waived, with the reason. |
 
@@ -639,7 +639,9 @@ The findings of `state-enum` and `event-action` that stand for a whole entity or
 - `state-enum: <id>: entity <E> has no state enum for this machine: no enum of its attributes (<enums>) has a value among the domain states (<states>); add an enum attribute with these values`;
 - `state-enum: <id>: enum <X> is already the state enum of <other>; each aspect of <E> needs an enum attribute of its own`, and
   `state-enum: <id>: entity <E> has no state enum for this machine: every enum of its attributes is the state enum of another aspect; add an enum attribute with the domain states (<states>)`;
-- `event-action: entity:<E>: declares no actions, so none of the <n> event(s) of <id> is one of its actions (<events>); add the actions to the model, or list the events in _external_events (or in _failure_events when one reports a failure)`.
+- `event-action: entity:<E>: declares no actions, so none of the <n> event(s) of <id> is one of its actions (<events>); add the actions to the model, or list the events in _external_events (or in _failure_events when one reports a failure)`;
+- `event-action: <id>.<event>: event is not an action of what the machine serves (<serves>); serve the action (act:<Entity>.<action>), or list the event in _external_events (or in _failure_events when it reports a failure)`, for an operational machine, `<serves>` its `_serves` as written;
+- `event-action: <id>: serves only entities that declare no actions (<entities>), so none of its <n> event(s) was compared with the model (<events>); add the actions to the model, serve the actions the machine runs (act:<Entity>.<action>), or list the events in _external_events (or in _failure_events when one reports a failure)`.
 
 `<states>` and `<events>` are sorted and comma-separated.
 
@@ -650,8 +652,8 @@ entity, the stage compared no state, event or action, and its result is
 machine file at all), never passed; with findings it is failed (section 3.2).
 
 `checked:` counts machines, lifecycle machines (of an existing entity), operational machines,
-domain states, events, actions (of the entities that have a lifecycle machine, each once) and
-entities with actions:
+domain states, events (of the lifecycle machines and of the operational machines that bind),
+actions (of the entities that have a lifecycle machine, each once) and entities with actions:
 `checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions`.
 
 ### 6.5 `xref-contract`
@@ -709,7 +711,7 @@ waivers:
 
 `rule` is a rule name from the tables above. `id` is the subject the finding names: an `act:` id;
 `<machine id>.<event>` for `event-action` (`entity:<Name>` for an entity that declares no
-action); the machine id for `machine-binding` and `state-enum` (`entity:<Name>` for an entity
+action, the machine id for an operational machine that serves only such entities); the machine id for `machine-binding` and `state-enum` (`entity:<Name>` for an entity
 with no enum-typed attribute); `entity:<Name>` for `entity-machine`;
 `<METHOD> <path>` or `RPC <Service>/<Rpc>` for `operation-id`; the failure-mode subject for
 `subject-resolves`; `invoke:<machine id>.<src>`, `dependency:<name>`, `state:<machine id>.<State>`

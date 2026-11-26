@@ -2,6 +2,7 @@
   "id": "hold-queue",
   "notes": "tells members that a reserved copy is waiting",
   "initial": "idle",
+  "from_outside": ["notify"],
   "_delays": {"noticeTimeout": "30000 ms - upper bound on the notice service"},
   "states": {
     "idle": {

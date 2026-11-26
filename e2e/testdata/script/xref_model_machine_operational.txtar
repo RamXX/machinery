@@ -1,0 +1,165 @@
+# rule event-action holds an operational machine to what it serves: each event is an action of a
+# served entity, the action of a served act id, or listed in _external_events or _failure_events
+# (docs/formats.md section 6.4)
+exec machinery lint --stage xref-model-machine
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions$'
+stdout '^passed$'
+
+# an event the served act id does not name, though it is an action of the same entity
+cp envelope-cancel.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope.cancel: event is not an action of what the machine serves \(act:Order.pay\); serve the action \(act:<Entity>.<action>\), or list the event in _external_events \(or in _failure_events when it reports a failure\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# serving the entity serves every action of it; an event that is none is a finding, waived by
+# <machine id>.<event>
+cp envelope-entity.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+! stdout 'envelope.cancel'
+stdout '^  ERROR  event-action: envelope.audit: event is not an action of what the machine serves \(entity:Order\); '
+cp waive-audit.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: event-action: envelope.audit: '
+stdout '^passed$'
+cp base.yaml machinery.yaml
+
+# an event listed in _external_events or _failure_events is fine
+cp envelope-external.json design/machines/Envelope.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^passed$'
+
+# a machine that serves only entities that declare no action compared nothing: one finding for
+# the machine, not one per event, waived by the machine id
+cp shelf-watch.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: shelf_watch: serves only entities that declare no actions \(Shelf\), so none of its 2 event\(s\) was compared with the model \(emptied, filled\); add the actions to the model, serve the actions the machine runs \(act:<Entity>.<action>\), or list the events in _external_events \(or in _failure_events when one reports a failure\)$'
+! stdout 'shelf_watch\.'
+stdout '^failed: 1 finding\(s\)$'
+cp waive-watch.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: event-action: shelf_watch: serves only entities'
+stdout '^passed$'
+cp base.yaml machinery.yaml
+
+# with every event listed, nothing is left to report
+cp shelf-watch-external.json design/machines/Envelope.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^passed$'
+
+# a machine whose _serves does not resolve is a binding finding; its events are not compared
+cp envelope-ghost.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: envelope: _serves names act:Order.refund, which is not an entity or an action of the model$'
+! stdout 'event-action'
+stdout '^failed: 1 finding\(s\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- waive-audit.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: event-action, id: "envelope.audit", reason: "the audit tick is modeled with the ledger"}
+-- waive-watch.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: event-action, id: "shelf_watch", reason: "the shelf actions are modeled next"}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+  Shelf:
+    definition: "A shelf."
+    attributes:
+      - {name: label, type: string}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- design/machines/Envelope.machine.json --
+{
+  "id": "envelope", "_role": "operational", "_serves": ["act:Order.pay"],
+  "initial": "Idle",
+  "states": { "Idle": { "on": { "pay": { "target": "Idle" } } } }
+}
+-- envelope-cancel.json --
+{
+  "id": "envelope", "_role": "operational", "_serves": ["act:Order.pay"],
+  "initial": "Idle",
+  "states": { "Idle": { "on": { "pay": { "target": "Idle" }, "cancel": { "target": "Idle" } } } }
+}
+-- envelope-entity.json --
+{
+  "id": "envelope", "_role": "operational", "_serves": ["entity:Order"],
+  "initial": "Idle",
+  "states": { "Idle": { "on": { "pay": { "target": "Idle" }, "cancel": { "target": "Idle" }, "audit": { "target": "Idle" } } } }
+}
+-- envelope-external.json --
+{
+  "id": "envelope", "_role": "operational", "_serves": ["act:Order.pay"],
+  "_external_events": ["audit"], "_failure_events": ["providerDown"],
+  "initial": "Idle",
+  "states": { "Idle": { "on": { "pay": { "target": "Idle" }, "audit": { "target": "Idle" }, "providerDown": { "target": "Idle" } } } }
+}
+-- envelope-ghost.json --
+{
+  "id": "envelope", "_role": "operational", "_serves": ["act:Order.refund"],
+  "initial": "Idle",
+  "states": { "Idle": { "on": { "refund": { "target": "Idle" } } } }
+}
+-- shelf-watch.json --
+{
+  "id": "shelf_watch", "_role": "operational", "_serves": ["entity:Shelf"],
+  "initial": "Full",
+  "states": {
+    "Full": { "on": { "emptied": { "target": "Empty" } } },
+    "Empty": { "on": { "filled": { "target": "Full" } } }
+  }
+}
+-- shelf-watch-external.json --
+{
+  "id": "shelf_watch", "_role": "operational", "_serves": ["entity:Shelf"],
+  "_external_events": ["emptied", "filled"],
+  "initial": "Full",
+  "states": {
+    "Full": { "on": { "emptied": { "target": "Empty" } } },
+    "Empty": { "on": { "filled": { "target": "Full" } } }
+  }
+}

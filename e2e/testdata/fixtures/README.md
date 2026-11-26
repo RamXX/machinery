@@ -95,7 +95,8 @@ without converting anything. Generated files are not part of the fixture.
   transitions, 3 ignores, 1 refusal, entry state `Lent`.
 - `machines/hold-queue.json`: machine `hold_queue`, 2 states, 4 transitions, one invoke
   (`sendNotice`). It says nothing of its binding: `import.machines.bind` makes it operational,
-  serving `entity:Loan`.
+  serving `entity:Loan`. Its event `notify` comes from the scheduler, listed in `from_outside`
+  (renamed to `_external_events`).
 - `design/model/library.modelith.yaml`: entity `Loan` (statuses Reserved, Lent, Returned, Lost),
   3 actions, 2 invariants, 2 scenarios.
 - `docs/risks.md`: 4 failure modes `RISK-1` to `RISK-4` in two table layouts, beside a table that

@@ -8,7 +8,7 @@ import:
     files: ["machines/*.json"]
     states: capitalize
     rename:
-      root: {notes: _comment, entity: _lifecycle_of, startable: _entries}
+      root: {notes: _comment, entity: _lifecycle_of, startable: _entries, from_outside: _external_events}
       state: {skip: _ignores}
       transition: {allowed: _requires, denied: _refusal}
     bind:

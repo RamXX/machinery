@@ -20,7 +20,7 @@ rm design/machines/Other.machine.json
 # an operational machine that names what it serves
 cp ops.json design/machines/Ops.machine.json
 exec machinery lint --stage xref-model-machine
-stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions$'
 stdout '^passed$'
 
 # _role: operational alone binds nothing: the machine serves nothing in the model
@@ -135,7 +135,7 @@ entities:
 -- ghost.json --
 { "id": "other", "_lifecycle_of": "Ghost", "initial": "A", "states": { "A": { "type": "final" } } }
 -- ops.json --
-{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order"], "initial": "idle", "states": { "idle": { "on": { "pay": { "target": "idle" } } } } }
 -- ops-bare.json --
 { "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
 -- ops-empty.json --

@@ -3,7 +3,7 @@
 
 # only an operational machine, every finding waived: still nothing compared
 exec mrun 1 lint --stage xref-model-machine
-stdout '^checked: 1 machines, 0 lifecycle machines, 1 operational machines, 0 domain states, 0 events, 0 actions, 1 entities with actions$'
+stdout '^checked: 1 machines, 0 lifecycle machines, 1 operational machines, 0 domain states, 1 events, 0 actions, 1 entities with actions$'
 stdout '^  warn   waived: entity-machine: entity:Order: '
 stdout '^not demonstrated: no machine is bound to a model entity$'
 stdout 'machinery lint: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
@@ -33,7 +33,7 @@ rm design/machines/Stray.machine.json
 cp ops.json design/machines/Ops.machine.json
 cp order.json design/machines/Order.machine.json
 exec machinery lint --stage xref-model-machine
-stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions$'
 stdout '^passed$'
 
 -- machinery.yaml --
@@ -71,9 +71,9 @@ entities:
       - {name: pay, actor: Customer}
       - {name: cancel, actor: Customer}
 -- design/machines/Ops.machine.json --
-{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay"], "initial": "idle", "states": { "idle": { "on": { "pay": { "target": "idle" } } } } }
 -- ops.json --
-{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay"], "initial": "idle", "states": { "idle": { "on": { "pay": { "target": "idle" } } } } }
 -- ops-bare.json --
 { "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
 -- stray.json --

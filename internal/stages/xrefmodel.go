@@ -163,6 +163,9 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 		}
 		if b.operational {
 			c.operational++
+			if len(b.problems) == 0 {
+				c.events += checkOperationalEvents(&fs, d, m)
+			}
 			continue
 		}
 		e := b.entity
@@ -216,6 +219,59 @@ func externalEvents(fs *xfindings, m *machine.Machine) map[string]bool {
 		external[ev] = true
 	}
 	return external
+}
+
+// checkOperationalEvents applies event-action to an operational machine
+// that binds to the model and returns how many events it has: each event is
+// an action of an entity it serves, the action of an act id it serves, or
+// declared external. A machine that serves only entities with no action
+// compared nothing, and that is one finding, not one per event.
+func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine) int {
+	serves, _ := m.Serves()
+	allowed := map[string]bool{}
+	anyAction := false
+	var bare []string
+	for _, id := range serves {
+		kind, name, _ := strings.Cut(id, ":")
+		switch kind {
+		case "entity":
+			e, _ := design.FindEntity(d.Models, name)
+			if e == nil {
+				continue
+			}
+			if len(e.Actions) == 0 {
+				bare = append(bare, e.Name)
+			}
+			for _, a := range e.Actions {
+				allowed[a.Name] = true
+				anyAction = true
+			}
+		case "act":
+			_, act, _ := strings.Cut(name, ".")
+			allowed[act] = true
+			anyAction = true
+		}
+	}
+	external := externalEvents(fs, m)
+	evs := m.Table.Events()
+	var unmatched []string
+	for _, ev := range evs {
+		if !allowed[ev] && !external[ev] {
+			unmatched = append(unmatched, ev)
+		}
+	}
+	switch {
+	case len(unmatched) == 0:
+	case !anyAction:
+		sort.Strings(bare)
+		fs.add("event-action", m.ID, "serves only entities that declare no actions (%s), so none of its %d event(s) was compared with the model (%s); add the actions to the model, serve the actions the machine runs (act:<Entity>.<action>), or list the events in _external_events (or in _failure_events when one reports a failure)",
+			strings.Join(bare, ", "), len(unmatched), strings.Join(unmatched, ", "))
+	default:
+		for _, ev := range unmatched {
+			fs.add("event-action", m.ID+"."+ev, "event is not an action of what the machine serves (%s); serve the action (act:<Entity>.<action>), or list the event in _external_events (or in _failure_events when it reports a failure)", strings.Join(serves, ", "))
+		}
+	}
+	return len(evs)
 }
 
 // checkLifecycleEvents applies event-action and action-event to the
