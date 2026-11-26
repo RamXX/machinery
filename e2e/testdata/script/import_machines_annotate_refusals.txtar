@@ -188,7 +188,7 @@ stdout '^failed: 1 finding\(s\)$'
 # malformed entries are config errors
 exec sh -c 'cat head.yaml empty.part > machinery.yaml'
 exec mrun 2 lint
-stderr '^config: import.machines.annotate.loan_desk: set external_events, failure_events, failure_states, aliases or not_failures$'
+stderr '^config: import.machines.annotate.loan_desk: set external_events, failure_events, failure_states, aliases, refusal_events or not_failures$'
 exec sh -c 'cat head.yaml empty-pattern.part > machinery.yaml'
 exec mrun 2 lint
 stderr '^config: import.machines.annotate.loan_desk.failure_states: a pattern must not be empty$'

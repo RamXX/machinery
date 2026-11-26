@@ -65,7 +65,18 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `status`, `assess` and the rehearsal count ids by claim; `plan` gives the claimed ones one
   `Wire evidence` story per test file (per directory past `plan.wire_max_files`).
 - `trace.markers.scenarios_exact`: a marker that claims only when its text is a scenario name.
-  A serves tag that names an id which is not an action is a warn, counted by stage `trace`.
+  Serves tags that name ids which are not actions are one counted warn of stage `trace` for the
+  whole run; `machinery trace --non-action-serves` lists them.
+- Failure modes: a subject `machine:<id>` for a machine as a whole; `columns.required` in
+  `import.failure_modes` for a catalog that has the column; and stage `xref-failure` counts on
+  its own the failure modes that name a subject and no required value (still unlinked).
+- `import.planned` reads scenario descriptions (`in: scenario-description`).
+- `_refusal_events` (`refusal_events` in `import.machines.annotate`) declares the event by which
+  a machine writes that it refused a caller's command, with the action and a reason; rule
+  `event-action` accepts it unless the event enters a failure state, the stage prints it with
+  its reason and counts it, and it is neither hinted nor asked for a failure mode.
+- An aliased event may be listed in `_failure_events` when the action it stands for is itself
+  the failing outcome.
 - An owed file that does not parse is never read as empty: every command refuses with the
   parse error, and machinery writes the file through a YAML encoder.
 - Stage `xref-failure` prints how many failure modes are linked and how many are not, and is

@@ -118,7 +118,7 @@ cp keep.yaml machinery.yaml
 # the marks are config: what an entry needs, and what it may read
 exec sh -c 'sed "s/in: failure-row/in: scenario/" keep.yaml > machinery.yaml'
 exec mrun 2 status
-stderr '^config: import.planned: entry 2: in must be model-statement or failure-row, got "scenario"$'
+stderr '^config: import.planned: entry 2: in must be model-statement, scenario-description or failure-row, got "scenario"$'
 exec sh -c 'sed "s/(?P<story>/(?P<ticket>/" keep.yaml > machinery.yaml'
 exec mrun 2 status
 stderr '^config: import.planned: entry 1: pattern ".*" needs a named group story, as in \(\?P<story>\[a-z0-9-\]\+\)$'

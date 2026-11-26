@@ -115,6 +115,8 @@ type translator struct {
 	// sourceOf maps the dotted path of a translated state to its path in
 	// source names
 	sourceOf map[string]string
+	// aliasFrom says which entry of import.machines.annotate gave an event its alias
+	aliasFrom map[string]string
 	// listed is Machine.Listed
 	listed   map[string]string
 	origID   string

@@ -25,7 +25,7 @@ stdout '^  ERROR  design/failure-modes.yaml: both-set: subject and no_subject ar
 stdout '^  ERROR  design/failure-modes.yaml: no-reason: no_subject needs a reason$'
 stdout '^  ERROR  design/failure-modes.yaml: no-required: required must be fail-closed, retry-bounded, surface or refuse, got ""$'
 stdout '^  ERROR  design/failure-modes.yaml: abuse-case: kind: abuse needs an act or entity subject$'
-stdout '^  ERROR  design/failure-modes.yaml: neither: subject "" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>$'
+stdout '^  ERROR  design/failure-modes.yaml: neither: subject "" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event>, machine:<id> or system:<name>$'
 stdout '^failed: 5 finding\(s\)$'
 # a reason is text: a boolean or a number is refused, in either file
 cp not-text.yaml design/failure-modes.yaml

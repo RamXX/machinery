@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/internal/project"
 )
 
 // tagFailure marks a state that records that something went wrong
@@ -90,24 +91,146 @@ func lintEventList(base string, ro *ir.Object, states []ir.StateEntry, key, purp
 // Aliases returns the root _aliases: the events that are a model action
 // under another name, each with the name of its action. Entries that are not
 // a non-empty string are left out; their shape is lintAliases's.
-func (m *Machine) Aliases() map[string]string {
-	res := map[string]string{}
+func (m *Machine) Aliases() map[string]string { return eventMap(m.Root.AsObject(), "_aliases") }
+
+// RefusalEvents returns the root _refusal_events: the events by which the
+// machine writes that it refused a caller's command, each with the name of
+// the action it refuses. Entries of another shape are left out; their shape
+// is lintRefusalEvents's.
+func (m *Machine) RefusalEvents() map[string]RefusalEvent {
+	res := map[string]RefusalEvent{}
 	o := m.Root.AsObject()
 	if o == nil {
 		return res
 	}
-	al := o.GetObject("_aliases")
+	rv := o.GetObject("_refusal_events")
+	for _, ev := range rv.Keys() {
+		d := rv.Get2(ev).AsObject()
+		if d == nil {
+			continue
+		}
+		// an action or a reason that is not one line is the lint's
+		// finding, and is never printed
+		act, reason := d.Get2("action"), d.Get2("reason")
+		if stringOf(act) != "" && project.OneLine(act.AsString()) && (stringOf(reason) == "" || project.OneLine(reason.AsString())) {
+			res[ev] = RefusalEvent{Action: stringOf(act), Reason: stringOf(reason)}
+		}
+	}
+	return res
+}
+
+// RefusalEvent is one entry of _refusal_events: the action the event
+// refuses, and the reason the event is a refusal and no failure.
+type RefusalEvent struct{ Action, Reason string }
+
+// stringOf returns a string value, trimmed, or "".
+func stringOf(v *ir.Value) string {
+	if v == nil || v.Kind != ir.KindString {
+		return ""
+	}
+	return strings.TrimSpace(v.AsString())
+}
+
+// eventMap reads a root object that maps an event to an action name,
+// keeping the entries whose value is a non-empty string, trimmed.
+func eventMap(o *ir.Object, key string) map[string]string {
+	res := map[string]string{}
+	if o == nil {
+		return res
+	}
+	al := o.GetObject(key)
 	for _, ev := range al.Keys() {
-		if v := al.Get2(ev); v != nil && v.Kind == ir.KindString && strings.TrimSpace(v.AsString()) != "" {
+		// a value that is not one line is the lint's finding, and is never printed
+		if v := al.Get2(ev); v != nil && v.Kind == ir.KindString && strings.TrimSpace(v.AsString()) != "" && project.OneLine(v.AsString()) {
 			res[ev] = strings.TrimSpace(v.AsString())
 		}
 	}
 	return res
 }
 
+// handledEvents returns the events some state handles under on or ignores.
+func handledEvents(states []ir.StateEntry) map[string]bool {
+	handled := map[string]bool{}
+	for _, s := range states {
+		if o := s.Node.AsObject(); o != nil {
+			for _, k := range o.GetObject("on").Keys() {
+				handled[k] = true
+			}
+			for _, k := range o.GetObject("_ignores").Keys() {
+				handled[k] = true
+			}
+		}
+	}
+	return handled
+}
+
+// lintRefusalEvents holds the root _refusal_events: an object that maps an
+// event some state handles or ignores to a non-empty action name. The
+// machine writes a refusal itself, in answer to a caller, so the event is
+// not external; it is declared and no failure, so it is no failure event;
+// and it refuses an action, so it is not that action under another name.
+func lintRefusalEvents(base string, ro *ir.Object, states []ir.StateEntry) (errs []string) {
+	rv := ro.Get2("_refusal_events")
+	if rv == nil {
+		return nil
+	}
+	if rv.Kind != ir.KindObject {
+		return []string{base + ": _refusal_events must be an object that maps an event name to {action, reason}: the model action it refuses and why it is a refusal and no failure"}
+	}
+	handled := handledEvents(states)
+	other := map[string]string{}
+	for _, e := range eventList(ro, "_external_events") {
+		other[e] = "_external_events; the machine writes a refusal itself, so it does not arrive from outside"
+	}
+	for _, e := range eventList(ro, "_failure_events") {
+		other[e] = "_failure_events; a refusal is declared, not a failure"
+	}
+	for _, e := range ro.GetObject("_aliases").Keys() {
+		if other[e] == "" {
+			other[e] = "_aliases; an event refuses an action or is one under another name"
+		}
+	}
+	for _, ev := range rv.AsObject().Keys() {
+		// a declaration takes a finding away from review, so it says why
+		d := rv.AsObject().Get2(ev).AsObject()
+		shaped := d != nil
+		if shaped {
+			for _, k := range d.Keys() {
+				shaped = shaped && (k == "action" || k == "reason")
+			}
+		}
+		switch {
+		case !shaped:
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s] must be an object with action and reason, and nothing else", base, ir.Repr(ev)))
+			continue
+		case stringOf(d.Get2("action")) == "":
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].action must be a non-empty action name", base, ir.Repr(ev)))
+			continue
+		case stringOf(d.Get2("reason")) == "":
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].reason must be a non-empty reason: say why the event is a refusal and no failure", base, ir.Repr(ev)))
+			continue
+		case !project.OneLine(d.Get2("action").AsString()):
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].action must be one line without control characters", base, ir.Repr(ev)))
+			continue
+		case !project.OneLine(d.Get2("reason").AsString()):
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].reason must be one line without control characters", base, ir.Repr(ev)))
+			continue
+		}
+		if !handled[ev] {
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events names %s but no state handles or ignores it; the marker is stale (remove it, or wire the event)", base, ir.Repr(ev)))
+			continue
+		}
+		if why := other[ev]; why != "" {
+			errs = append(errs, fmt.Sprintf("%s: event %s is in both _refusal_events and %s (keep one)", base, ir.Repr(ev), why))
+		}
+	}
+	return errs
+}
+
 // lintAliases holds the root _aliases: an object that maps an event some
 // state handles or ignores to a non-empty action name. An aliased event is
-// a caller's action, so it is in neither list of events from outside.
+// a caller's action, so it is not in _external_events. It may be a failure
+// event: the action it stands for is then itself the failing outcome.
 func lintAliases(base string, ro *ir.Object, states []ir.StateEntry) (errs []string) {
 	av := ro.Get2("_aliases")
 	if av == nil {
@@ -128,14 +251,15 @@ func lintAliases(base string, ro *ir.Object, states []ir.StateEntry) (errs []str
 		}
 	}
 	outside := map[string]string{}
-	for _, key := range []string{"_failure_events", "_external_events"} {
-		for _, e := range eventList(ro, key) {
-			outside[e] = key
-		}
+	for _, e := range eventList(ro, "_external_events") {
+		outside[e] = "_external_events"
 	}
 	for _, ev := range av.AsObject().Keys() {
 		if v := av.AsObject().Get2(ev); v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
 			errs = append(errs, fmt.Sprintf("%s: _aliases[%s] must be a non-empty action name", base, ir.Repr(ev)))
+			continue
+		} else if !project.OneLine(v.AsString()) {
+			errs = append(errs, fmt.Sprintf("%s: _aliases[%s] must be one line without control characters", base, ir.Repr(ev)))
 			continue
 		}
 		if !handled[ev] {
@@ -192,16 +316,21 @@ func lintNotFailures(base string, ro *ir.Object, states []ir.StateEntry) (errs [
 	for _, e := range eventList(ro, "_failure_events") {
 		failure[e] = true
 	}
+	refusal := ro.GetObject("_refusal_events")
 	for _, n := range nv.AsObject().Keys() {
 		v := nv.AsObject().Get2(n)
 		switch {
 		case v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "":
 			errs = append(errs, fmt.Sprintf("%s: _not_failures[%s] must be a non-empty reason", base, ir.Repr(n)))
+		case !project.OneLine(v.AsString()):
+			errs = append(errs, fmt.Sprintf("%s: _not_failures[%s] must be one line without control characters", base, ir.Repr(n)))
 		case !handled[n] && !isState[n]:
 			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is no event a state handles or ignores and no state; the marker is stale (remove it, or correct the name)", base, ir.Repr(n)))
 		case !looksLikeFailure(n[strings.LastIndex(n, ".")+1:]):
 			// no hint is printed for the name, so the entry dismisses nothing
 			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which does not look like a failure (%s), so there is no hint to dismiss (remove it)", base, ir.Repr(n), ir.NoFailureWord))
+		case handled[n] && !isState[n] && refusal.Has(n):
+			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is in _refusal_events and is never hinted, so there is no hint to dismiss (remove it)", base, ir.Repr(n)))
 		default:
 			if handled[n] && failure[n] {
 				errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is in _failure_events; a declared failure is not dismissed (keep one)", base, ir.Repr(n)))
@@ -292,6 +421,9 @@ func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 	}
 	for e := range dismissed {
 		declared[e] = true
+	}
+	for e := range m.RefusalEvents() {
+		declared[e] = true // a declared refusal, not a failure
 	}
 	for _, ev := range sortedSet(events) {
 		if looksLikeFailure(ev) && !declared[ev] && !actions[ev] {

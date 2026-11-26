@@ -125,8 +125,9 @@ claimed.
 
 Here no test names an id yet. In a project whose tests already point at the design, an id a
 test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as
-planned (`import.planned`: a sentence that opens an invariant's statement, a cell of a row of
-your failure catalog, each naming its story) is owed with `planned at adoption` and that story.
+planned (`import.planned`: a sentence that opens an invariant's statement or a scenario's
+description, a cell of a row of your failure catalog, each naming its story) is owed with `planned
+at adoption` and that story.
 `machinery status` then counts the owed ids by what stands behind each: claimed by a test with
 no receipt yet, named by no test, planned, and, once a run has proven some, proven and still
 listed. A story id your mark names is kept as it is: `plan --apply` creates nothing for an id
@@ -159,8 +160,14 @@ linked and how many are not, and one linked row among hundreds is no pass. The l
 (`docs/formats.md` section 5.4.1) takes many rows per entry, `ids: [RISK-10..RISK-24, RISK-31]`,
 so a catalog is linked group by group. A row about the system as a whole or a part of it that
 is no entity, dependency or machine (a build, a deployment) takes the subject `system:<name>`,
-with the name declared under `systems` in `machinery.yaml`; a row that names nothing in the
-system at all is declared `no_subject`, with the reason.
+with the name declared under `systems` in `machinery.yaml`; a row about a machine as a whole (a
+queue that stalls) takes `machine:<id>`, which covers none of the machine's failure states,
+failure events and invokes; a row that names nothing in the system at all is declared
+`no_subject`, with the reason. A catalog that has a column for the required behavior names it
+in `columns.required`, and an entry may then leave `required` out. A row whose entry names a
+subject and gives no required value is counted on its own (`name a subject and no required
+value`), so the rows that only wait for that value are told apart from the rows nobody linked;
+it is unlinked all the same.
 
 **Read your machines as they are.** `import.machines` (`docs/formats.md` section 5.2.1) takes
 globs anywhere in the project, so a lifecycle file kept beside its service is read with the
@@ -178,9 +185,18 @@ for an event that is a model action under another name (`handed_back: giveBack`)
 "not an action" findings stop for the names you declare, and the "looks like a failure" warnings
 for the failures you declare. An external or aliased event whose name looks like a failure is
 still hinted: list it in `failure_events`, or dismiss the hint by name in `not_failures`, with
-the reason. A pattern that matches nothing in a machine it is applied to is an error, a pattern
+the reason. An alias and `failure_events` go together when the action is itself the failing
+outcome (the model action `fail`, the events `send_failed` and `verify_failed`). A machine that
+writes the refusal of a command as an event of its own (`cancel` and `cancel_refused`) declares
+it in `refusal_events`, with the action and the reason
+(`cancel_refused: {action: cancel, reason: "a paid order is not cancelled"}`): it is no event
+from outside and no alias, and a declared refusal is neither hinted nor asked for a failure
+mode. That holds only for a refusal, where nothing failed: an event on which the machine
+enters a failure state is refused as one, and every declaration is printed with its reason. A
+pattern that matches nothing in a machine it is applied to is an error, a pattern
 of `*` only is refused, and an event that is an action of the model stays a finding whether you
-list it as external or give it an alias: the config cannot hide a command. Every alias in effect
+list it as external or give it an alias: the config cannot hide a command. Every alias and every
+refusal event in effect
 is a line of `xref-model-machine`, so the list of names you bridged stays in view.
 
 ## 6. Turn what is owed into stories, beside the ones you have

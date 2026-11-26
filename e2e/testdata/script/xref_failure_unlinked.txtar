@@ -42,10 +42,12 @@ stdout '^not demonstrated: 2 of 2 failure modes name no subject; link each in de
 exec mrun 1 check --stage xref-failure
 stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
 ! stdout '^passed$'
-# a subject without a required value, or with one that is none, is no link either
+# a subject without a required value, or with one that is none, is no link either: both rows are
+# counted as naming a subject, and neither is linked
 cp garbage-6.yaml design/links.yaml
 exec mrun 1 lint --stage xref-failure
-stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 0 invokes, '
+stdout '^checked: 2 failure modes, 0 linked, 2 unlinked, 2 name a subject and no required value, 0 invokes, '
+! stdout '^passed$'
 # a subject that parses and names nothing in the design is not linked: with the finding the
 # stage fails, and with the finding waived it is still not demonstrated
 cp links-bad.yaml design/links.yaml
@@ -107,7 +109,7 @@ stdout '^failed: 1 finding\(s\)$'
 # value is unlinked, and the invoke still has no failure mode
 cp links-invoke-bogus.yaml design/links.yaml
 exec mrun 1 lint --stage xref-failure
-stdout '^checked: 2 failure modes, 1 linked, 1 unlinked, 1 invokes, '
+stdout '^checked: 2 failure modes, 1 linked, 1 unlinked, 1 name a subject and no required value, 1 invokes, '
 stdout '^  ERROR  invoke-failure-mode: invoke:desk.checkCard: no failure mode names this invoke; '
 cp links-empty.yaml design/links.yaml
 

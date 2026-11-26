@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -89,6 +90,7 @@ type Planned struct {
 // Where a planned mark is looked for.
 const (
 	PlannedInStatement  = "model-statement"
+	PlannedInScenario   = "scenario-description"
 	PlannedInFailureRow = "failure-row"
 )
 
@@ -133,6 +135,9 @@ type ImportFailureModes struct {
 type FMColumns struct {
 	Failure  []string `yaml:"failure"`
 	Behavior []string `yaml:"behavior"`
+	// Required names the column that holds the required value, for a
+	// catalog that has one; optional.
+	Required []string `yaml:"required,omitempty"`
 }
 
 // IDPattern compiles the id expression so that it matches a cell in full.
@@ -212,9 +217,52 @@ type Annotate struct {
 	FailureEvents  []string          `yaml:"failure_events,omitempty"`
 	FailureStates  []string          `yaml:"failure_states,omitempty"`
 	Aliases        map[string]string `yaml:"aliases,omitempty"`
+	// RefusalEvents maps an event by which the machine writes that it
+	// refused a caller's command to the action it refuses.
+	// Each carries the reason the event is a refusal and no failure.
+	RefusalEvents map[string]Refusal `yaml:"refusal_events,omitempty"`
 	// NotFailures dismisses the name hint of an event or a state, by its
 	// exact name, with the reason it is no failure.
 	NotFailures map[string]string `yaml:"not_failures,omitempty"`
+}
+
+// Refusal is one entry of refusal_events: the action the event refuses and
+// the reason it is a refusal and no failure.
+type Refusal struct {
+	Action string `yaml:"action"`
+	Reason string `yaml:"reason"`
+}
+
+// UnmarshalYAML reads {action, reason} and says what an entry is when it is
+// something else, such as a bare action name.
+func (r *Refusal) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.MappingNode {
+		got := n.Value
+		if n.Kind != yaml.ScalarNode {
+			got = "a list"
+		}
+		return fmt.Errorf("line %d: a refusal_events entry must be {action: <action>, reason: \"<why the event is a refusal and no failure>\"}, got %s", n.Line, got)
+	}
+	type plain Refusal
+	var p plain
+	if err := n.Decode(&p); err != nil {
+		return err
+	}
+	*r = Refusal(p)
+	return nil
+}
+
+// OneLine reports text that prints on one line: no line break and no other
+// control character. What the tool prints from a config or an annotation
+// (an action, a reason) is held to it, so that no declaration can put text
+// of its author's choice at the start of an output line.
+func OneLine(s string) bool {
+	for _, c := range s {
+		if unicode.IsControl(c) {
+			return false
+		}
+	}
+	return true
 }
 
 // AnnotateKeys returns the keys of import.machines.annotate, sorted.
@@ -948,13 +996,13 @@ func (c *Config) validateImport() error {
 	for n, pl := range c.ImportedPlanned() {
 		at := fmt.Sprintf("import.planned: entry %d", n+1)
 		switch pl.In {
-		case PlannedInStatement:
+		case PlannedInStatement, PlannedInScenario:
 		case PlannedInFailureRow:
 			if c.ImportedFailureModes() == nil {
 				return Errf("%s: in: failure-row needs import.failure_modes; it reads the rows of that catalog", at)
 			}
 		default:
-			return Errf("%s: in must be model-statement or failure-row, got %q", at, pl.In)
+			return Errf("%s: in must be model-statement, scenario-description or failure-row, got %q", at, pl.In)
 		}
 		if strings.TrimSpace(pl.Pattern) == "" {
 			return Errf("%s: pattern is required", at)
@@ -1049,8 +1097,8 @@ func (c *Config) validateImport() error {
 		if err := CheckPath("import.machines.annotate", k); err != nil {
 			return err
 		}
-		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases)+len(a.NotFailures) == 0 {
-			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states, aliases or not_failures", k)
+		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases)+len(a.RefusalEvents)+len(a.NotFailures) == 0 {
+			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states, aliases, refusal_events or not_failures", k)
 		}
 		for _, l := range []struct {
 			name     string
@@ -1070,9 +1118,42 @@ func (c *Config) validateImport() error {
 				return Errf("import.machines.annotate.%s.aliases: an event and its action must not be empty", k)
 			}
 		}
+		refused := make([]string, 0, len(a.RefusalEvents))
+		for ev := range a.RefusalEvents {
+			refused = append(refused, ev)
+		}
+		sort.Strings(refused)
+		for _, ev := range refused {
+			rf := a.RefusalEvents[ev]
+			if strings.TrimSpace(ev) == "" || strings.TrimSpace(rf.Action) == "" {
+				return Errf("import.machines.annotate.%s.refusal_events: an event and its action must not be empty", k)
+			}
+			if strings.TrimSpace(rf.Reason) == "" {
+				return Errf("import.machines.annotate.%s.refusal_events.%s: reason is required: say why the event is a refusal and no failure", k, ev)
+			}
+		}
 		for name, reason := range a.NotFailures {
 			if strings.TrimSpace(name) == "" || strings.TrimSpace(reason) == "" {
 				return Errf("import.machines.annotate.%s.not_failures: a name and its reason must not be empty", k)
+			}
+		}
+		// a name, an action and a reason are printed: each is one line
+		texts := map[string][]string{}
+		for ev, act := range a.Aliases {
+			texts["aliases"] = append(texts["aliases"], ev, act)
+		}
+		for ev, rf := range a.RefusalEvents {
+			texts["refusal_events"] = append(texts["refusal_events"], ev, rf.Action, rf.Reason)
+		}
+		for name, reason := range a.NotFailures {
+			texts["not_failures"] = append(texts["not_failures"], name, reason)
+		}
+		for _, list := range []string{"aliases", "refusal_events", "not_failures"} {
+			sort.Strings(texts[list])
+			for _, text := range texts[list] {
+				if !OneLine(text) {
+					return Errf("import.machines.annotate.%s.%s: %q has a line break or a control character; a name, an action and a reason are one line", k, list, text)
+				}
 			}
 		}
 	}
@@ -1094,10 +1175,11 @@ func (c *Config) validateImportedFailureModes() error {
 		return Errf("import.failure_modes.id is not a regular expression: %v", err)
 	}
 	for _, col := range []struct {
-		name  string
-		names []string
-	}{{"failure", f.Columns.Failure}, {"behavior", f.Columns.Behavior}} {
-		if len(col.names) == 0 {
+		name     string
+		names    []string
+		optional bool
+	}{{"failure", f.Columns.Failure, false}, {"behavior", f.Columns.Behavior, false}, {"required", f.Columns.Required, true}} {
+		if len(col.names) == 0 && !col.optional {
 			return Errf("import.failure_modes.columns.%s is required", col.name)
 		}
 		for _, n := range col.names {

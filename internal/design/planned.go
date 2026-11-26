@@ -51,6 +51,14 @@ func (d *Design) PlannedMarks() (marks map[string]string, problems []string) {
 					}
 				}
 			}
+		case project.PlannedInScenario:
+			for _, m := range d.Models {
+				for _, sc := range m.Scenarios {
+					if sc.Description != "" {
+						mark("sc:"+Slug(sc.Name), m.Path, sc.Line, sc.Description)
+					}
+				}
+			}
 		case project.PlannedInFailureRow:
 			for _, fm := range d.FailureModes {
 				if fm.Imported {
