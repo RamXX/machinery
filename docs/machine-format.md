@@ -223,8 +223,9 @@ non-empty `action` and a non-empty `reason` and no other key, each event is one 
 handles or ignores (a stale entry is an error), and none is also in `_external_events`,
 `_failure_events` or `_aliases`. A refusal is declared, not a failure: its name is never
 hinted, no failure mode is asked for it, and one may name it (`event:<machine id>.<event>`).
-That is sound only for a refusal (the command was refused, nothing failed), so an event on
-which the machine enters a state tagged `failure` is not accepted as one, and the stage prints
+That is sound only for a refusal (the command was refused, nothing failed), so an event that
+brings the machine to a state tagged `failure`, directly or through `always` and `onDone`,
+is not accepted as one, an action and a reason are each one line, and the stage prints
 one line for every refusal event in effect, with its reason, and counts them: the lines are
 what a reviewer reads to see that no failure was renamed a refusal.
 

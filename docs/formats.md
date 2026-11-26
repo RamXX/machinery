@@ -223,8 +223,14 @@ Rules:
   same in `refusal_events`
   (`import.machines.annotate.<key>.refusal_events: an event and its action must not be empty`), a
   refusal without a reason
-  (`import.machines.annotate.<key>.refusal_events.<event>: reason is required: say why the event is a refusal and no failure`)
-  and an
+  (`import.machines.annotate.<key>.refusal_events.<event>: reason is required: say why the event is a refusal and no failure`),
+  a refusal entry that is no `{action, reason}`, such as a bare action name
+  (`machinery.yaml: line <n>: a refusal_events entry must be {action: <action>, reason: "<why the event is a refusal and no failure>"}, got <value>`),
+  a name, an action or a reason of `aliases`, `refusal_events` or `not_failures` that is not one
+  line, since the tool prints them and a line break would put text of the author's choice at
+  the start of an output line
+  (`import.machines.annotate.<key>.<list>: "<text>" has a line break or a control character; a name, an action and a reason are one line`,
+  the text quoted with its escapes), and an
   empty name or reason in `not_failures`
   (`import.machines.annotate.<key>.not_failures: a name and its reason must not be empty`) are
   config errors.
@@ -733,7 +739,8 @@ below, even when a glob matches it:
      `<by>` is `import.machines.annotate <key> lists it for <file> (<list> pattern <pattern>)`
      or `the source lists it`, and for an alias `import.machines.annotate <key> gives it` or
      `the source gives it`. Such a refusal is not written to the translated machine, so it is
-     the only finding. A refusal the source itself declares is held by the native rule
+     the only finding. A source entry that is no `{action, reason}` is the finding of the
+     lint alone (section 6.2), whatever the config says about the event. A refusal the source itself declares is held by the native rule
      (section 6.2), which names the source file.
    - A dismissal that names nothing is
      `ERROR  <file>: import.machines.annotate <key>: not_failures names <name>, which is no event and no state of the machine; correct the name or remove it`;
@@ -1039,11 +1046,20 @@ distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is 
 section 6.4). Two machines whose id tags
 collide (section 7.2), or that share a machine `id`, are an ERROR.
 
+What the tool prints from an annotation is one line. An action of `_aliases`, an action or a
+reason of `_refusal_events` and a reason of `_not_failures` that holds a line break or another
+control character is
+`ERROR  <file>: _aliases['<event>'] must be one line without control characters` (and
+`_refusal_events['<event>'].action`, `.reason`, `_not_failures['<name>']`), and such an entry is
+in effect nowhere: no stage prints it.
+
 The findings of `_refusal_events`:
 `ERROR  <file>: _refusal_events must be an object that maps an event name to {action, reason}: the model action it refuses and why it is a refusal and no failure`,
 `ERROR  <file>: _refusal_events['<event>'] must be an object with action and reason, and nothing else`,
 `ERROR  <file>: _refusal_events['<event>'].action must be a non-empty action name`,
 `ERROR  <file>: _refusal_events['<event>'].reason must be a non-empty reason: say why the event is a refusal and no failure`,
+`ERROR  <file>: _refusal_events['<event>'].action must be one line without control characters`
+(and the same for `.reason`),
 `ERROR  <file>: _refusal_events names '<event>' but no state handles or ignores it; the marker is stale (remove it, or wire the event)`,
 and, for an event another annotation also holds,
 `ERROR  <file>: event '<event>' is in both _refusal_events and <other> (keep one)`, where `<other>` is
@@ -1157,16 +1173,23 @@ command: the machine handles `cancel` and, where it does not accept it, records
 has its own event, so the event is no alias. `_refusal_events` declares it, and a declaration
 holds when the event is no action, the action it names is one of the machine's entity (for an
 operational machine, of an entity behind what it serves), that action has an `on` event of its
-own name in the same machine, and no transition on the event enters a state tagged `failure`.
+own name in the same machine, and no transition on the event brings the machine to a state
+tagged `failure`.
 The findings of `event-action` about one that does not hold:
 
 - `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <event> is itself an action of <E>; an action is a caller's command, not the refusal of one: <where>`;
 - `event-action: <id>.<event>: _refusal_events names action <action>, which is not an action of <E>; name an action of <E>, or <where>`, and for an operational machine
   `event-action: <id>.<event>: _refusal_events names action <action>, which is not an action of an entity behind what the machine serves (<serves>); name one, or <where>`;
 - `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <action> has no event of its own name in <machine id>; a refusal is of a command the machine handles: <where>`;
-- `event-action: <id>.<event>: _refusal_events declares the event, and on it the machine enters <state>, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or <where>`:
-  `<state>` is the first state tagged `failure`, in document order, that is the target of an
-  `on` transition of the event, contains that target or is inside it.
+- `event-action: <id>.<event>: _refusal_events declares the event, and on it the machine can come to <state>, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or <where>`:
+  `<state>` is the first state tagged `failure`, in document order, among the states the
+  machine enters on an `on` transition of the event until it comes to rest: the target and the
+  states the target is inside; for a compound target, its initial child, and that child's, down
+  to a leaf (a failure state beside the initial child is not entered and is no ground); and
+  from the leaf reached, the target of every `always` branch of it or of a state it is inside,
+  and of the `onDone` of its parent when the leaf is final, each followed the same way, guarded
+  or not. A delay (`after`), an invoke's outcome and a later event are not followed: they are
+  another cause.
 
 `<where>` is `remove it from _refusal_events in <file>`, or
 `remove the refusal from import.machines.annotate <key> (for <file>)`. As for an alias, a
@@ -1185,8 +1208,10 @@ be checked and is otherwise put in front of a reviewer:
 - it carries a reason, non-blank, for every event (section 6.2);
 - the event is in neither `_failure_events` nor `_external_events` and has no alias, so a
   declared failure is never declared away (section 6.2);
-- the event enters no state tagged `failure` (the finding above), so an event the machine
-  itself records as a failure stays one, whatever it is called;
+- the event brings the machine to no state tagged `failure`, directly or through eventless
+  transitions (the finding above), so an event the machine itself records as a failure stays
+  one, whatever it is called;
+- the reason is one line, so the printed line is one declaration and nothing else;
 - every declaration that holds is printed with its reason and counted, on every run.
 
 These lines and the reasons in them are the guard against a failure renamed a refusal: no rule
