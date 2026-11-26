@@ -15,7 +15,7 @@ exec machinery proof --story shop-p1
 stdout '^tier:     critical \(order-payment\)$'
 stdout '^  inv:terminal-is-final -> orders.sh -> pass: no event changes a Shipped or Cancelled order$'
 stdout '^  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying$'
-stdout '^not proven:\n  assumption order-payment A1: A transition is applied as one compare-and-set on the stored order status.\n  assumption order-payment A2: The payment provider answers, fails or times out; it never answers twice.\nlearnings:$'
+stdout '^not proven:\n  assumption order-payment A1: A transition is applied as one compare-and-set on the stored order status.\n  assumption order-payment A2: The payment provider answers, fails or times out; it never answers twice.\nlimits:\n  none\nlearnings:\n  none\nobservations:\n  none$'
 stdout '^result:   2 passed / 0 failed / 0 skipped$'
 ! stdout 'act:Order.pay'
 ! stdout 'assumption order-ownership'
@@ -29,7 +29,7 @@ exec machinery proof --story shop-p1 --post
 exec bd show shop-p1 --json
 stdout '"notes": "machinery:proof [0-9a-f]{40} builder\\nPROOF\\ncommit:   [0-9a-f]{40}\\ntier:     critical \(order-payment\)\\n'
 stdout 'assumption order-payment A2: The payment provider answers'
-stdout 'learnings:",'
+stdout 'learnings:\\n  none\\nobservations:\\n  none",'
 exec sh -c 'bd show shop-p1 --json | grep -c "machinery:proof $(git rev-parse HEAD) builder"'
 stdout '^1$'
 exec machinery proof --story shop-p1 --post --actor alice

@@ -1,0 +1,85 @@
+# observations: listed until filed; --file makes one backlog item of each, linked to the story it
+# was seen in, and marks the line so a second run files nothing (section 15.8)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-s1 --title 'Prove order pay' --body-file s1.txt --silent
+exec bd create --id shop-s2 --title 'Prove the charge' --body-file s2.txt --silent
+exec machinery run -- sh e2e/orders.sh
+
+# nothing observed yet
+exec machinery observations
+stdout '^observations: 0 not filed$'
+
+# observations of an open and of a closed story; the same one twice counts once
+exec machinery proof --story shop-s1 --post --observation 'bug: a cancelled order still shows Paid' --observation 'perf: the list query scans every order'
+exec mrun 1 proof --story shop-s2 --post --observation 'security: the card token is logged' --observation 'debt: the status switch is repeated' --observation 'debt: the status switch is repeated'
+exec bd close shop-s2 --reason 'returned to the backlog'
+exec machinery observations
+cmp stdout want-list.txt
+
+# --file: one item each, typed and labelled by its kind, linked to its story
+exec machinery observations --file
+stdout '^filed: shop-[a-z0-9]+  bug: a cancelled order still shows Paid \(from shop-s1\)$'
+stdout '^filed: shop-[a-z0-9]+  perf: the list query scans every order \(from shop-s1\)$'
+stdout '^filed: shop-[a-z0-9]+  security: the card token is logged \(from shop-s2\)$'
+stdout '^filed: shop-[a-z0-9]+  debt: the status switch is repeated \(from shop-s2\)$'
+stdout '^observations: 4 filed$'
+exec sh -c '. ./lib.sh; bd show $(sid "a cancelled order still shows Paid") --json'
+stdout '"issue_type": "bug"'
+stdout '"observation:bug"'
+stdout '"description": "Observed in shop-s1 \(Prove order pay\): bug: a cancelled order still shows Paid"'
+stdout '"dependency_type": "discovered-from"'
+stdout '"id": "shop-s1"'
+exec sh -c '. ./lib.sh; bd show $(sid "the card token is logged") --json'
+stdout '"issue_type": "bug"'
+stdout '"observation:security"'
+stdout '"id": "shop-s2"'
+exec sh -c '. ./lib.sh; bd show $(sid "the status switch is repeated") --json'
+stdout '"issue_type": "task"'
+stdout '"observation:debt"'
+exec sh -c '. ./lib.sh; bd show $(sid "the list query scans every order") --json'
+stdout '"issue_type": "task"'
+stdout '"observation:perf"'
+
+# each line is marked as filed: a second run files nothing
+exec sh -c '. ./lib.sh; bd show shop-s1 --json | grep -c "machinery:observation-filed $(sid "a cancelled order still shows Paid") bug a cancelled order still shows Paid"'
+stdout '^1$'
+exec machinery observations
+stdout '^observations: 0 not filed$'
+exec machinery observations --file
+stdout '^observations: 0 filed$'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"observation:"'
+stdout '^4$'
+
+# a new observation is listed again
+exec bd update shop-s1 --append-notes 'machinery:observation doc the API guide misses the refusal codes'
+exec machinery observations
+stdout '^shop-s1  doc: the API guide misses the refusal codes$'
+stdout '^observations: 1 not filed$'
+
+# refusals
+exec mrun 2 observations extra
+stderr '^usage: machinery observations takes no arguments$'
+cp machinery.yaml with-backlog.yaml
+exec sh -c 'grep -v -e "^backlog:" -e "^  tool: bd" with-backlog.yaml > machinery.yaml'
+exec mrun 2 observations
+stderr '^config: no backlog configured'
+
+-- s1.txt --
+machinery:ids tc:ORDE-2e883d
+-- s2.txt --
+machinery:ids tc:ORDE-8bd6e7
+-- want-list.txt --
+shop-s1  bug: a cancelled order still shows Paid
+shop-s1  perf: the list query scans every order
+shop-s2  security: the card token is logged
+shop-s2  debt: the status switch is repeated
+observations: 4 not filed
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}

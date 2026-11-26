@@ -80,7 +80,12 @@ criteria:
   inv:terminal-is-final -> orders.sh -> pass: no event changes a Shipped or Cancelled order
   tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying
 not proven:
+limits:
+  none
 learnings:
+  none
+observations:
+  none
 -- machinery-risk.yaml --
 version: 2
 design:

@@ -160,6 +160,12 @@ func (c *Client) Note(id, text string) error {
 	return err
 }
 
+// Supersede closes an issue as superseded by a newer one, with bd's link.
+func (c *Client) Supersede(old, by string) error {
+	_, err := c.run("supersede", old, "--with", by)
+	return err
+}
+
 // Close closes an issue with a reason.
 func (c *Client) Close(id, reason string) error {
 	_, err := c.run("close", id, "--reason", reason)
@@ -225,12 +231,27 @@ func (c *Client) CreateGraph(g Graph) (map[string]string, error) {
 
 // Create creates one issue and returns its id.
 func (c *Client) Create(title, typ, description, parent string, labels []string) (string, error) {
-	args := []string{"create", "--title", title, "--type", typ, "--description", description, "--silent"}
-	if len(labels) > 0 {
-		args = append(args, "--labels", strings.Join(labels, ","))
+	return c.CreateItem(Item{Title: title, Type: typ, Description: description, Parent: parent, Labels: labels})
+}
+
+// Item is one issue to create.
+type Item struct {
+	Title, Type, Description, Parent string
+	Labels                           []string
+	Deps                             []string // "<type>:<id>", as bd create --deps takes them
+}
+
+// CreateItem creates one issue and returns its id.
+func (c *Client) CreateItem(it Item) (string, error) {
+	args := []string{"create", "--title", it.Title, "--type", it.Type, "--description", it.Description, "--silent"}
+	if len(it.Labels) > 0 {
+		args = append(args, "--labels", strings.Join(it.Labels, ","))
 	}
-	if parent != "" {
-		args = append(args, "--parent", parent)
+	if it.Parent != "" {
+		args = append(args, "--parent", it.Parent)
+	}
+	if len(it.Deps) > 0 {
+		args = append(args, "--deps", strings.Join(it.Deps, ","))
 	}
 	out, err := c.run(args...)
 	if err != nil {
@@ -259,6 +280,25 @@ type Tags struct {
 	NoDesignChange string   // machinery:no-design-change <reason>
 	Capstone       bool     // machinery:capstone
 	Demos          []string // machinery:demo <command>
+
+	// the records of the work (section 15.8)
+	Learnings    []string      // machinery:learning <text>
+	Observations []Observation // machinery:observation <kind> <text>
+	Filed        []Observation // machinery:observation-filed <item id> <kind> <text>
+	Repairs      []string      // machinery:repair <short sha>
+	Decision     bool          // a machinery:decision line: the item is a decision
+	DecidedBy    string        // the actor of the machinery:decision line
+	Supersedes   []string      // machinery:supersedes <decision id>
+	Vetoable     bool          // machinery:vetoable
+	Confirmed    []string      // machinery:confirmed <actor>
+}
+
+// Observation is a machinery:observation line, or with Item set a
+// machinery:observation-filed line.
+type Observation struct {
+	Item string // the item it was filed as
+	Kind string
+	Text string
 }
 
 // Mark is a commit and a contract hash (machinery:intake-base and
@@ -336,6 +376,34 @@ func ParseTags(is *Issue) Tags {
 			if cmd := strings.TrimSpace(args); cmd != "" {
 				t.Demos = append(t.Demos, cmd)
 			}
+		case "learning":
+			if l := strings.TrimSpace(args); l != "" {
+				t.Learnings = append(t.Learnings, l)
+			}
+		case "observation":
+			kind, text, _ := strings.Cut(strings.TrimSpace(args), " ")
+			if text = strings.TrimSpace(text); kind != "" && text != "" {
+				t.Observations = append(t.Observations, Observation{Kind: kind, Text: text})
+			}
+		case "observation-filed":
+			f := strings.Fields(args)
+			if len(f) >= 3 {
+				t.Filed = append(t.Filed, Observation{Item: f[0], Kind: f[1], Text: strings.Join(f[2:], " ")})
+			}
+		case "repair":
+			if f := strings.Fields(args); len(f) > 0 {
+				t.Repairs = append(t.Repairs, f[0])
+			}
+		case "decision":
+			if !t.Decision {
+				t.Decision, t.DecidedBy = true, strings.TrimSpace(args)
+			}
+		case "supersedes":
+			t.Supersedes = append(t.Supersedes, strings.Fields(args)...)
+		case "vetoable":
+			t.Vetoable = true
+		case "confirmed":
+			t.Confirmed = append(t.Confirmed, strings.TrimSpace(args))
 		case "proof":
 			f := strings.Fields(args)
 			if len(f) >= 2 {

@@ -101,22 +101,19 @@ func HighestTier(d *design.Design, ids []string) (string, []string) {
 	return best, res
 }
 
-// Proof writes the proof block of section 13 for the given obligation ids and
-// returns 0 when every one is proven, 1 otherwise.
-func Proof(w io.Writer, d *design.Design, ev *Evaluation, ids []string) int {
-	return ProofWith(w, d, ev, ids, nil)
+// Notes are the parts of a proof block its author writes (section 13).
+type Notes struct {
+	Limits       []string
+	Learnings    []string
+	Observations []string // "<kind>: <text>"
 }
 
-// ProofWith is Proof with extra lines under not proven (the unproven
-// assumptions of the formal models covering the ids).
-func ProofWith(w io.Writer, d *design.Design, ev *Evaluation, ids, extra []string) int {
-	return ProofFor(w, d, ev, ids, ids, extra)
-}
-
-// ProofFor is ProofWith with the tier line computed over tierIDs: the ids of
-// a story include the actions it serves, which are not obligations but do
-// carry a tier.
-func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra []string) int {
+// ProofFor writes the proof block of section 13 for the given obligation ids
+// and returns 0 when every one is proven, 1 otherwise. The tier line is
+// computed over tierIDs: the ids of a story include the actions it serves,
+// which are not obligations but do carry a tier. extra are more lines under
+// not proven (the unproven assumptions of the formal models covering the ids).
+func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra []string, notes Notes) int {
 	fmt.Fprintln(w, "PROOF")
 	fmt.Fprintf(w, "commit:   %s\n", ev.Head)
 	tier, areas := HighestTier(d, tierIDs)
@@ -171,7 +168,18 @@ func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra
 	for _, l := range append(notProven, extra...) {
 		fmt.Fprintf(w, "  %s\n", l)
 	}
-	fmt.Fprintln(w, "learnings:")
+	for _, part := range []struct {
+		name  string
+		lines []string
+	}{{"limits", notes.Limits}, {"learnings", notes.Learnings}, {"observations", notes.Observations}} {
+		fmt.Fprintf(w, "%s:\n", part.name)
+		if len(part.lines) == 0 {
+			fmt.Fprintln(w, "  none")
+		}
+		for _, l := range part.lines {
+			fmt.Fprintf(w, "  %s\n", l)
+		}
+	}
 	return exit
 }
 

@@ -126,6 +126,9 @@ func runIntakePlan(e *Env, args []string) int {
 		return e.Fail(fmt.Errorf("%s", probs[0]))
 	}
 	plan := st.Plan(ds.D)
+	if line := pm.LearningsReminder(p.Root, issues); line != "" {
+		fmt.Fprintln(e.Stdout, line)
+	}
 	if len(st.NewIDs) == 0 {
 		fmt.Fprintf(e.Stdout, "intake %s: no new id: the design change adds none; only the capstone is planned\n", in.ID)
 	}

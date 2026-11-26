@@ -192,6 +192,22 @@ func IsAncestor(root, a, b string) bool {
 	return err == nil
 }
 
+// Newest returns the newest of the commits by commit date, as git rev-list
+// --no-walk orders them, or "" for none.
+func Newest(root string, shas []string) string {
+	if len(shas) == 0 {
+		return ""
+	}
+	out, err := run(root, append([]string{"rev-list", "--no-walk"}, shas...)...)
+	if err != nil {
+		return ""
+	}
+	if ls := lines(out); len(ls) > 0 {
+		return ls[0]
+	}
+	return ""
+}
+
 // Exists reports whether a commit exists.
 func Exists(root, sha string) bool {
 	_, err := run(root, "cat-file", "-e", sha+"^{commit}")

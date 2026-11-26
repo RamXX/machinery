@@ -1,0 +1,76 @@
+# learnings: the learning lines of closed stories, grouped by intake, since a commit; intake plan
+# reminds the planner of the ones posted since the last plan (sections 15.7, 15.8)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec machinery intake new 'Refund a paid order' --intent 'A Clerk refunds a paid order'
+cp stdout iid.txt
+exec sh -c 'printf "machinery:ids tc:ORDE-2e883d\nmachinery:intake %s\n" $(cat iid.txt) > a1.txt'
+exec sh -c 'printf "machinery:ids tc:ORDE-e6d28f\nmachinery:intake %s\n" $(cat iid.txt) > a2.txt'
+exec bd create --id shop-a1 --title 'Prove order pay' --body-file a1.txt --silent
+exec bd create --id shop-a2 --title 'Prove shipping' --body-file a2.txt --silent
+exec bd create --id shop-b1 --title 'Prove the terminal invariant' --body-file b1.txt --silent
+gitcommit 'story bodies'
+exec machinery run -- sh e2e/orders.sh
+
+# nothing closed yet
+exec machinery learnings
+stdout '^learnings: 0 from 0 closed stories$'
+
+# two stories closed; the open one does not count yet
+exec machinery proof --story shop-a1 --post --learning 'pay stamps the attempt before it calls the provider'
+exec machinery proof --story shop-b1 --post --learning 'a terminal state refuses every event' --learning 'the list hides cancelled orders'
+exec machinery proof --story shop-a2 --post --learning 'ship checks paid first'
+exec bd close shop-a1 shop-b1 --reason done
+exec sh -c 'machinery learnings | sed "s/$(cat iid.txt)/INTAKE/g"'
+cmp stdout want-all.txt
+exec git branch first
+
+# intake plan reminds the planner; nothing was planned yet
+exec sh -c 'bd update $(cat iid.txt) --append-notes "machinery:no-design-change the design covers refunds"'
+exec sh -c 'machinery intake plan $(cat iid.txt) | head -n 1'
+stdout '^learnings: 3 unread; machinery learnings$'
+exec sh -c 'machinery intake plan $(cat iid.txt) --apply'
+stdout '^learnings: 3 unread; machinery learnings$'
+stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
+
+# after the plan, the learnings proven at the planned commit are read
+exec sh -c 'machinery intake plan $(cat iid.txt)'
+! stdout '^learnings:'
+stdout 'nothing to create'
+
+# --since: only the stories with a proof after the ref
+exec machinery learnings --since first
+stdout '^learnings: 0 from 0 closed stories since [0-9a-f]{7}$'
+exec git -c user.name=t -c user.email=t@t commit -q --allow-empty -m 'ship: the paid check'
+exec machinery run -- sh e2e/orders.sh
+exec machinery proof --story shop-a2 --post --learning 'the paid check comes before the carrier call'
+exec bd close shop-a2 --reason done
+exec sh -c 'machinery learnings --since first | sed "s/$(cat iid.txt)/INTAKE/g"'
+stdout '^intake INTAKE: Refund a paid order\n  shop-a2  ship checks paid first\n  shop-a2  the paid check comes before the carrier call\nlearnings: 2 from 1 closed stories since [0-9a-f]{7}$'
+! stdout 'shop-a1'
+exec sh -c 'machinery learnings --since first | grep "since $(git rev-parse --short=7 first)$"'
+
+# the reminder names the last planned commit
+exec sh -c 'machinery intake plan $(cat iid.txt) | head -n 1'
+stdout '^learnings: 2 unread since [0-9a-f]{7}; machinery learnings --since [0-9a-f]{7}$'
+exec sh -c 'machinery intake plan $(cat iid.txt) | head -n 1 | grep -c "since $(git rev-parse --short=7 first);"'
+stdout '^1$'
+
+# an unknown ref is a usage error
+exec mrun 2 learnings --since no-such-ref
+stderr '^usage: --since no-such-ref: not a commit of the project$'
+exec mrun 2 learnings extra
+stderr '^usage: machinery learnings takes no arguments$'
+
+-- b1.txt --
+machinery:ids inv:terminal-is-final
+-- want-all.txt --
+intake INTAKE: Refund a paid order
+  shop-a1  pay stamps the attempt before it calls the provider
+outside an intake
+  shop-b1  a terminal state refuses every event
+  shop-b1  the list hides cancelled orders
+learnings: 3 from 2 closed stories

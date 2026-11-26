@@ -1,0 +1,70 @@
+# proof: limits, learnings and observations from repeatable flags; posted, the learnings and the
+# observations are also tag lines on the story (sections 13, 15.8)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-p1 --title 'Prove order pay' --body-file p1.txt --silent
+exec machinery run -- sh e2e/orders.sh
+
+# without the flags every part prints none
+exec sh -c 'machinery proof --ids tc:ORDE-2e883d | sed 2d'
+cmp stdout want-none.txt
+
+# each flag repeats and keeps its order; a newline inside a value becomes a space
+exec sh -c 'machinery proof --ids tc:ORDE-2e883d --limit "the provider timeout is not induced" --limit "refunds are not covered" --learning "$(printf "a charge record\nneeds its own receipt")" --observation "debt: handlers.go repeats the status switch" --observation "security: the pay endpoint logs the card token" | sed 2d'
+cmp stdout want-all.txt
+
+# posted: the block, then one tag line per learning and per observation, in one note
+exec machinery proof --story shop-p1 --post --limit 'the timeout path is not induced' --learning 'pay stamps the attempt before it calls the provider' --observation 'bug: a cancelled order still shows Paid in the list' --observation 'doc: the API guide misses the refusal codes'
+exec bd show shop-p1 --json
+stdout 'limits:\\n  the timeout path is not induced\\nlearnings:\\n  pay stamps the attempt before it calls the provider\\nobservations:\\n  bug: a cancelled order still shows Paid in the list\\n  doc: the API guide misses the refusal codes\\nmachinery:learning pay stamps the attempt before it calls the provider\\nmachinery:observation bug a cancelled order still shows Paid in the list\\nmachinery:observation doc the API guide misses the refusal codes"'
+! stdout 'machinery:limit'
+exec machinery story shop-p1
+stdout '^passed$'
+
+# refusals: an observation needs a known kind and a text; no value may be empty
+exec mrun 2 proof --observation 'idea: a nicer list'
+stderr '^usage: --observation "idea: a nicer list": write <kind>: <text>, the kind one of bug, security, debt, perf, doc$'
+exec mrun 2 proof --observation 'bug'
+stderr '^usage: --observation "bug": write <kind>: <text>'
+exec mrun 2 proof --observation 'perf:   '
+stderr '^usage: --observation "perf:   ": write <kind>: <text>'
+exec mrun 2 proof --learning ''
+stderr '^usage: --learning: a value must not be empty$'
+exec mrun 2 proof --limit '  '
+stderr '^usage: --limit: a value must not be empty$'
+
+-- p1.txt --
+machinery:ids tc:ORDE-2e883d
+-- want-none.txt --
+PROOF
+tier:     routine
+command:  sh e2e/orders.sh
+result:   1 passed / 0 failed / 0 skipped
+criteria:
+  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying
+not proven:
+limits:
+  none
+learnings:
+  none
+observations:
+  none
+-- want-all.txt --
+PROOF
+tier:     routine
+command:  sh e2e/orders.sh
+result:   1 passed / 0 failed / 0 skipped
+criteria:
+  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying
+not proven:
+limits:
+  the provider timeout is not induced
+  refunds are not covered
+learnings:
+  a charge record needs its own receipt
+observations:
+  debt: handlers.go repeats the status switch
+  security: the pay endpoint logs the card token

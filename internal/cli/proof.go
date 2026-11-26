@@ -26,8 +26,16 @@ func runProof(e *Env, args []string) int {
 	story := fs.String("story", "", "select the ids of a backlog story")
 	post := fs.Bool("post", false, "append the block to the story's notes (with --story)")
 	actor := fs.String("actor", "", "who posts (default BEADS_ACTOR, else git user.name)")
+	var limits, learnings, observations StringList
+	fs.Var(&limits, "limit", "a claim still unproven (repeatable)")
+	fs.Var(&learnings, "learning", "a rule the next story or the planner should know (repeatable)")
+	fs.Var(&observations, "observation", "<kind>: <text>, something seen outside the story's scope (repeatable)")
 	if !e.Parse(fs, args) {
 		return 2
+	}
+	notes, msg := proofNotes(limits, learnings, observations)
+	if msg != "" {
+		return e.Usage("%s", msg)
 	}
 	switch {
 	case fs.NArg() > 0:
@@ -78,17 +86,51 @@ func runProof(e *Env, args []string) int {
 	if tierIDs == nil {
 		tierIDs = sel
 	}
-	code := evidence.ProofFor(io.MultiWriter(e.Stdout, &block), d, ev, sel, tierIDs, assumptionLines(d, sel))
+	code := evidence.ProofFor(io.MultiWriter(e.Stdout, &block), d, ev, sel, tierIDs, assumptionLines(d, sel), notes)
 	if *post {
 		if c.Actor == "" {
 			return e.Usage("no actor: pass --actor or set BEADS_ACTOR")
 		}
 		note := fmt.Sprintf("machinery:proof %s %s\n%s", ev.Head, c.Actor, strings.TrimRight(block.String(), "\n"))
+		for _, l := range notes.Learnings {
+			note += "\nmachinery:learning " + l
+		}
+		for _, o := range notes.Observations {
+			kind, text, _ := pm.ParseObservation(o)
+			note += "\nmachinery:observation " + kind + " " + text
+		}
 		if err := c.Note(*story, note); err != nil {
 			return e.Fail(err)
 		}
 	}
 	return code
+}
+
+// proofNotes checks the author's parts of the block (section 13) and makes
+// each value one line. msg is the usage error.
+func proofNotes(limits, learnings, observations []string) (evidence.Notes, string) {
+	var n evidence.Notes
+	for _, part := range []struct {
+		flag string
+		in   []string
+		out  *[]string
+	}{{"limit", limits, &n.Limits}, {"learning", learnings, &n.Learnings}, {"observation", observations, &n.Observations}} {
+		for _, v := range part.in {
+			line := pm.OneLine(v)
+			if line == "" {
+				return n, fmt.Sprintf("--%s: a value must not be empty", part.flag)
+			}
+			if part.flag == "observation" {
+				kind, text, ok := pm.ParseObservation(line)
+				if !ok {
+					return n, fmt.Sprintf("--observation %q: write <kind>: <text>, the kind one of %s", v, strings.Join(pm.ObservationKinds, ", "))
+				}
+				line = kind + ": " + text
+			}
+			*part.out = append(*part.out, line)
+		}
+	}
+	return n, ""
 }
 
 // assumptionLines lists the unproven assumptions of every formal model whose
