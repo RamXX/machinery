@@ -42,7 +42,7 @@ func LoadImportedFailureModes(p *project.Project, native []FailureMode) (fms []F
 	if err != nil {
 		return nil, []string{fmt.Sprintf("import.failure_modes.id: %v", err)}, true
 	}
-	rows, problems := dialect.Catalog(c.File, data, re, dialect.Columns{Failure: c.Columns.Failure, Behavior: c.Columns.Behavior})
+	rows, problems := dialect.Catalog(c.File, data, re, dialect.Columns{Failure: c.Columns.Failure, Behavior: c.Columns.Behavior, Required: c.Columns.Required})
 	nativeIDs := map[string]bool{}
 	for _, fm := range native {
 		nativeIDs[fm.ID] = true
@@ -54,7 +54,7 @@ func LoadImportedFailureModes(p *project.Project, native []FailureMode) (fms []F
 			continue
 		}
 		byID[r.ID] = len(fms)
-		fms = append(fms, FailureMode{ID: r.ID, Kind: "fault", Failure: r.Failure, Behavior: r.Behavior, Source: c.File, Imported: true, Cells: r.Cells, Line: r.Line})
+		fms = append(fms, FailureMode{ID: r.ID, Kind: "fault", Failure: r.Failure, Behavior: r.Behavior, Required: r.Required, Source: c.File, Imported: true, Cells: r.Cells, Line: r.Line})
 	}
 	if c.Links == "" {
 		return fms, problems, true
@@ -70,7 +70,7 @@ func LoadImportedFailureModes(p *project.Project, native []FailureMode) (fms []F
 	if lf.Version != 1 {
 		problems = append(problems, fmt.Sprintf("%s: version must be 1", c.Links))
 	}
-	problems = append(problems, applyLinks(c.Links, c.File, lf.Links, fms, byID)...)
+	problems = append(problems, applyLinks(c.Links, c.File, lf.Links, fms, byID, len(c.Columns.Required) > 0)...)
 	return fms, problems, true
 }
 
@@ -82,8 +82,10 @@ const listed = 5
 
 // applyLinks gives the rows the values of the links entries that name them.
 // byID maps a machinery id to its row in fms. A row two entries name keeps
-// the values of the first.
-func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[string]int) (problems []string) {
+// the values of the first. With cells (the catalog has a column for the
+// required value) an entry may leave required out: a row keeps the value of
+// its own cell, and an entry that gives another one is a problem.
+func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[string]int, cells bool) (problems []string) {
 	owner := map[string]int{} // machinery id -> index of the entry that holds it
 	labels := make([]string, len(links))
 	for i, l := range links {
@@ -109,9 +111,9 @@ func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[s
 			continue
 		}
 		values := FailureMode{Kind: l.Kind, Subject: l.Subject, NoSubject: l.NoSubject, Required: l.Required}
-		problems = append(problems, checkValues(where, &values, true)...)
+		problems = append(problems, checkValues(where, &values, l.NoSubject != nil || cells)...)
 		seen := map[string]bool{}
-		var missing []string
+		var missing, empty, differ, refused []string
 		overlaps := map[int][]string{}
 		for _, written := range ids {
 			id := strings.ToLower(written)
@@ -131,7 +133,31 @@ func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[s
 			}
 			owner[id] = i
 			fm := &fms[at]
-			fm.Kind, fm.Subject, fm.NoSubject, fm.Required, fm.Linked = values.Kind, values.Subject, values.NoSubject, values.Required, true
+			required := values.Required
+			if cell := fm.Required; cell != "" || required == "" {
+				switch {
+				case required != "" && required != cell:
+					differ = append(differ, written)
+				case cell == "" && l.NoSubject == nil && cells:
+					empty = append(empty, written)
+				}
+				if required = cell; cell == "refuse" && values.Kind != "abuse" {
+					refused = append(refused, written)
+				}
+			}
+			fm.Kind, fm.Subject, fm.NoSubject, fm.Required, fm.Linked = values.Kind, values.Subject, values.NoSubject, required, true
+		}
+		if len(differ) > 0 {
+			problems = append(problems, fmt.Sprintf("%s: required %s differs from the required cell of %s; keep one", where, values.Required, firstOf(differ)))
+		}
+		switch {
+		case len(empty) == 1:
+			problems = append(problems, fmt.Sprintf("%s: required is not set and the required cell of %s is empty; set required in the entry or fill the cell", where, empty[0]))
+		case len(empty) > 1:
+			problems = append(problems, fmt.Sprintf("%s: required is not set and the required cells of %s are empty; set required in the entry or fill the cells", where, firstOf(empty)))
+		}
+		if len(refused) > 0 {
+			problems = append(problems, fmt.Sprintf("%s: required: refuse (the required cell of %s) is only valid with kind: abuse", where, firstOf(refused)))
 		}
 		switch {
 		case len(missing) > 0 && l.ID != "":

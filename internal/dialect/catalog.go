@@ -13,6 +13,10 @@ type Row struct {
 	Line     int    // 1-based
 	Failure  string
 	Behavior string
+	// Required is the required value of the row's own cell, lower-cased,
+	// when the catalog has a column for it and the cell holds one of the
+	// four values; "" otherwise.
+	Required string
 	Cells    []string // every cell of the row, trimmed
 }
 
@@ -21,6 +25,20 @@ type Row struct {
 type Columns struct {
 	Failure  []string
 	Behavior []string
+	Required []string // optional: the column of the required value
+}
+
+// RequiredValues are the values of required (section 5.4).
+var RequiredValues = []string{"fail-closed", "retry-bounded", "surface", "refuse"}
+
+// ValidRequired reports one of the four required values.
+func ValidRequired(v string) bool {
+	for _, r := range RequiredValues {
+		if v == r {
+			return true
+		}
+	}
+	return false
 }
 
 var (
@@ -73,7 +91,7 @@ func Catalog(rel string, data []byte, id *regexp.Regexp, cols Columns) (rows []R
 			continue
 		}
 		header := splitRow(lines[i])
-		failure, behavior := column(header, cols.Failure), column(header, cols.Behavior)
+		failure, behavior, required := column(header, cols.Failure), column(header, cols.Behavior), column(header, cols.Required)
 		j := i + 2
 		for ; j < len(lines) && isRow(lines[j]); j++ {
 			cells := splitRow(lines[j])
@@ -102,6 +120,15 @@ func Catalog(rel string, data []byte, id *regexp.Regexp, cols Columns) (rows []R
 					problems = append(problems, fmt.Sprintf("%s: the table header has no %s column (%s)", where, c.name, strings.Join(c.names, ", ")))
 				case c.value == "":
 					problems = append(problems, fmt.Sprintf("%s: the %s cell is empty", where, c.name))
+				}
+			}
+			// a table without the column gives no value; a cell that
+			// holds something else than a value is refused, never read
+			if v := cellAt(cells, required); v != "" {
+				if ValidRequired(strings.ToLower(v)) {
+					r.Required = strings.ToLower(v)
+				} else {
+					problems = append(problems, fmt.Sprintf("%s: the required cell %q must be fail-closed, retry-bounded, surface or refuse", where, v))
 				}
 			}
 			rows = append(rows, r)

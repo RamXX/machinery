@@ -88,6 +88,7 @@ type Planned struct {
 // Where a planned mark is looked for.
 const (
 	PlannedInStatement  = "model-statement"
+	PlannedInScenario   = "scenario-description"
 	PlannedInFailureRow = "failure-row"
 )
 
@@ -132,6 +133,9 @@ type ImportFailureModes struct {
 type FMColumns struct {
 	Failure  []string `yaml:"failure"`
 	Behavior []string `yaml:"behavior"`
+	// Required names the column that holds the required value, for a
+	// catalog that has one; optional.
+	Required []string `yaml:"required,omitempty"`
 }
 
 // IDPattern compiles the id expression so that it matches a cell in full.
@@ -773,13 +777,13 @@ func (c *Config) validateImport() error {
 	for n, pl := range c.ImportedPlanned() {
 		at := fmt.Sprintf("import.planned: entry %d", n+1)
 		switch pl.In {
-		case PlannedInStatement:
+		case PlannedInStatement, PlannedInScenario:
 		case PlannedInFailureRow:
 			if c.ImportedFailureModes() == nil {
 				return Errf("%s: in: failure-row needs import.failure_modes; it reads the rows of that catalog", at)
 			}
 		default:
-			return Errf("%s: in must be model-statement or failure-row, got %q", at, pl.In)
+			return Errf("%s: in must be model-statement, scenario-description or failure-row, got %q", at, pl.In)
 		}
 		if strings.TrimSpace(pl.Pattern) == "" {
 			return Errf("%s: pattern is required", at)
@@ -919,10 +923,11 @@ func (c *Config) validateImportedFailureModes() error {
 		return Errf("import.failure_modes.id is not a regular expression: %v", err)
 	}
 	for _, col := range []struct {
-		name  string
-		names []string
-	}{{"failure", f.Columns.Failure}, {"behavior", f.Columns.Behavior}} {
-		if len(col.names) == 0 {
+		name     string
+		names    []string
+		optional bool
+	}{{"failure", f.Columns.Failure, false}, {"behavior", f.Columns.Behavior, false}, {"required", f.Columns.Required, true}} {
+		if len(col.names) == 0 && !col.optional {
 			return Errf("import.failure_modes.columns.%s is required", col.name)
 		}
 		for _, n := range col.names {

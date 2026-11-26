@@ -9,6 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/RamXX/machinery/internal/dialect"
 	"github.com/RamXX/machinery/internal/project"
 )
 
@@ -72,7 +73,7 @@ type failureFile struct {
 
 var (
 	kebabRe   = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
-	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|system:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
+	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|system:[^\s]+|machine:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
 )
 
 func strictYAML(data []byte, out any) error {
@@ -135,21 +136,19 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 // being compared with the design. Whether the subject resolves is stage
 // xref-failure's question.
 func (fm FailureMode) WellFormed() bool {
-	if !fm.Named() || !subjectRe.MatchString(fm.Subject) {
-		return false
-	}
-	switch fm.Required {
-	case "fail-closed", "retry-bounded", "surface", "refuse":
-		return true
-	}
-	return false
+	return fm.NamesSubject() && dialect.ValidRequired(fm.Required)
 }
 
+// NamesSubject reports a failure mode whose subject has one of the forms of
+// section 5.4, with a required value or without.
+func (fm FailureMode) NamesSubject() bool { return fm.Named() && subjectRe.MatchString(fm.Subject) }
+
 // checkValues holds kind, subject (or no_subject) and required to section
-// 5.4, defaulting kind to fault. where prefixes every problem. link is true
-// for an entry of the links file, where a no_subject entry may leave
-// required out (section 5.4.1).
-func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
+// 5.4, defaulting kind to fault. where prefixes every problem. optional is
+// true where required may be left out: an entry of the links file that
+// declares no_subject, or whose rows may have the value in a cell of their
+// own (section 5.4.1).
+func checkValues(where string, fm *FailureMode, optional bool) (problems []string) {
 	if fm.Kind == "" {
 		fm.Kind = "fault"
 	}
@@ -164,11 +163,11 @@ func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
 			problems = append(problems, where+": no_subject needs a reason")
 		}
 	case !subjectRe.MatchString(fm.Subject):
-		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>", where, fm.Subject))
+		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event>, machine:<id> or system:<name>", where, fm.Subject))
 	}
 	switch fm.Required {
 	case "":
-		if !link || fm.NoSubject == nil {
+		if !optional {
 			problems = append(problems, fmt.Sprintf("%s: required must be fail-closed, retry-bounded, surface or refuse, got %q", where, fm.Required))
 		}
 	case "fail-closed", "retry-bounded", "surface":

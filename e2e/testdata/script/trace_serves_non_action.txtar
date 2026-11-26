@@ -1,31 +1,49 @@
-# a serves tag or marker that names an id which is not an action credits nothing: a warn at its file and
-# line, and the ids counted (section 8)
+# a serves tag or marker that names an id which is not an action credits nothing: one counted warn
+# for the whole run, the ids counted, and the list behind machinery trace --non-action-serves (section 8)
 fixture shop
 
 # nothing to warn about: the checked line is the one every project has
 exec machinery trace
 stdout '^checked: 2 code files, 1 test files, 4 act ids, 16 obligations$'
 ! stdout 'warn'
+exec machinery trace --non-action-serves
+! stdout .
 
 cp markers.yaml m.tmp
 exec sh -c 'sed "/^  tests: /r m.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
 cp order.go.in internal/domain/order.go
 exec machinery trace
-stdout '^  warn   serves: internal/domain/order.go:7: inv:paid-before-shipped is not an action; a serves tag credits only actions$'
-stdout '^  warn   serves: internal/domain/order.go:8: inv:paid-before-shipped is not an action; a serves tag credits only actions$'
-stdout '^  warn   serves: internal/domain/order.go:9: inv:terminal-is-final is not an action; a serves tag credits only actions$'
-stdout '^  warn   serves: internal/domain/order.go:9: sc:customer-pays-and-the-order-ships is not an action; a serves tag credits only actions$'
-stdout -count=4 'warn   serves: '
+stdout '^  warn   serves: 3 tag\(s\) name 3 id\(s\) that are not actions; machinery trace --non-action-serves lists them$'
+stdout -count=1 'warn   serves: '
 stdout '^checked: 2 code files, 1 test files, 4 act ids, 16 obligations, 3 non-action serves$'
 stdout '^passed$'
+
+# the list: one line per tag and id, by file and line, and nothing else
+exec machinery trace --non-action-serves
+cmp stdout list.txt
+exec mrun 2 trace --non-action-serves extra
+stderr '^usage: machinery trace takes no arguments$'
 
 # a served invariant is credited nothing: it still needs a test that claims it
 exec sh -c 'sed "s/ inv:terminal-is-final//" e2e/orders.sh > o.tmp && mv o.tmp e2e/orders.sh'
 exec mrun 1 trace
 stdout 'ERROR  unverified: inv:terminal-is-final'
-stdout '  warn   serves: internal/domain/order.go:9: inv:terminal-is-final is not an action; a serves tag credits only actions'
+stdout '^  warn   serves: 3 tag\(s\) name 3 id\(s\) that are not actions; machinery trace --non-action-serves lists them$'
 stdout '^failed: 1 finding\(s\)$'
+# the list is a report, never a gate
+exec machinery trace --non-action-serves
+cmp stdout list.txt
 
+# without trace there are no tags to list
+exec sh -c 'printf "version: 2\n" > machinery.yaml'
+exec mrun 2 trace --non-action-serves
+stderr '^config: no trace configured: machinery trace --non-action-serves lists serves tags, and trace says where they are$'
+
+-- list.txt --
+internal/domain/order.go:7: inv:paid-before-shipped
+internal/domain/order.go:8: inv:paid-before-shipped
+internal/domain/order.go:9: inv:terminal-is-final
+internal/domain/order.go:9: sc:customer-pays-and-the-order-ships
 -- markers.yaml --
   markers:
     serves: ["Implements:"]

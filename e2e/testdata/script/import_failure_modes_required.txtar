@@ -1,0 +1,120 @@
+# a catalog that has a column for the required value names it in columns.required: the cell is the
+# row's required value, validated, and a links entry may then leave required out
+# (docs/formats.md sections 2 and 5.4.1)
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^checked: 5 failure modes, 1 abuse cases, 5 imported, 0 unlinked$'
+stdout '^  ERROR  design/links.yaml: RISK-3: required is not set and the required cell of RISK-3 is empty; set required in the entry or fill the cell$'
+stdout -count=1 'ERROR'
+stdout '^checked: 5 failure modes, 4 linked, 1 unlinked, 1 name a subject and no required value, 0 invokes, '
+
+# the cell filled: every row is linked, by the cell (in any case), by the entry, or by both when they agree;
+# a table without the column gives no value and asks for none
+exec sh -c 'sed "s/| RISK-3 | The shelf list is out of date. |  |/| RISK-3 | The shelf list is out of date. | fail-closed |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
+exec machinery lint --stage failure-modes --stage xref-failure
+stdout '^checked: 5 failure modes, 5 linked, 0 unlinked, 0 invokes, '
+stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
+exec machinery gen
+grep '"id": "fm:risk-1"' design/gen/obligations.json
+
+# a cell that holds none of the four values is refused, and gives the row no value
+exec sh -c 'sed "s/| retry-bounded |/| sometimes |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^  ERROR  docs/risks.md:5: RISK-1: the required cell "sometimes" must be fail-closed, retry-bounded, surface or refuse$'
+stdout '^  ERROR  design/links.yaml: RISK-1: required is not set and the required cell of RISK-1 is empty; set required in the entry or fill the cell$'
+stdout '^checked: 5 failure modes, 4 linked, 1 unlinked, 1 name a subject and no required value, 0 invokes, '
+exec sh -c 'sed "s/| sometimes |/| retry-bounded |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
+
+# an entry that gives another value than the cell: one finding, and the cell is kept
+cp links-differ.yaml design/links.yaml
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^  ERROR  design/links.yaml: RISK-1\.\.RISK-3: required surface differs from the required cell of RISK-1, RISK-3; keep one$'
+stdout -count=1 'ERROR'
+stdout '^checked: 5 failure modes, 5 linked, 0 unlinked, 0 invokes, '
+
+# refuse is only for abuse, from a cell as from an entry
+cp links-fault.yaml design/links.yaml
+exec mrun 1 lint --stage failure-modes
+stdout '^  ERROR  design/links.yaml: RISK-4: required: refuse \(the required cell of RISK-4\) is only valid with kind: abuse$'
+stdout -count=1 'ERROR'
+
+# an entry for several rows says which of them have no value
+cp links-range.yaml design/links.yaml
+exec sh -c 'sed "s/| RISK-3 | The shelf list is out of date. | fail-closed |/| RISK-3 | The shelf list is out of date. |  |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
+exec mrun 1 lint --stage failure-modes
+stdout '^  ERROR  design/links.yaml: RISK-1\.\.RISK-3, RISK-5: required is not set and the required cells of RISK-3, RISK-5 are empty; set required in the entry or fill the cells$'
+
+# the column list is config
+exec sh -c 'sed "s/required: \[\"Required\", \"Class\"\]/required: [\" \"]/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec mrun 2 lint --stage failure-modes
+stderr '^config: import.failure_modes.columns.required: a header name must not be empty$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+      required: ["Required", "Class"]
+    links: design/links.yaml
+-- design/links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend"}
+  - {id: RISK-2, subject: "entity:Loan", required: surface}
+  - {id: RISK-3, subject: "entity:Loan"}
+  - {id: RISK-4, kind: abuse, subject: "act:Loan.lend"}
+  - {id: RISK-5, subject: "entity:Loan", required: surface}
+-- links-differ.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-3], subject: "entity:Loan", required: surface}
+  - {id: RISK-4, kind: abuse, subject: "act:Loan.lend"}
+  - {id: RISK-5, subject: "entity:Loan", required: surface}
+-- links-fault.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-3], subject: "entity:Loan"}
+  - {id: RISK-4, subject: "act:Loan.lend"}
+  - {id: RISK-5, subject: "entity:Loan", required: surface}
+-- links-range.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-3, RISK-5], subject: "entity:Loan"}
+  - {id: RISK-4, kind: abuse, subject: "act:Loan.lend"}
+-- docs/risks.md --
+# Risks
+
+| Risk | Failure | Class | Required behavior |
+|------|---------|-------|-------------------|
+| RISK-1 | The card reader is down. | retry-bounded | The desk tries again, three times. |
+| RISK-2 | A loan is recorded twice. | Surface | The second record is refused. |
+| RISK-3 | The shelf list is out of date. |  | The desk recounts the shelf. |
+| RISK-4 | A member lends a copy to herself. | refuse | The request is refused with FORBIDDEN. |
+
+## Stock
+
+| Risk | Failure | Required behavior |
+|------|---------|-------------------|
+| RISK-5 | A copy is shelved in the wrong aisle. | The desk says where it was found. |
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  LoanStatus:
+    values:
+      - {name: Shelved, definition: "On the shelf."}
+      - {name: Lent, definition: "With a member."}
+entities:
+  Loan:
+    definition: "One copy lent to one member."
+    attributes:
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian}

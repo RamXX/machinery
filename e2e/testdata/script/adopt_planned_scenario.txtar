@@ -1,0 +1,40 @@
+# a project that marks a scenario as planned in its description says so with
+# import.planned in: scenario-description: adoption owes the scenario as planned, with the story the
+# mark names, also when a test claims it (docs/formats.md sections 2 and 17.2)
+fixture library
+exec sh -c 'sed "/^  - name: Blocked member is refused a loan$/r desc.tmp" design/model/library.modelith.yaml > m.tmp && mv m.tmp design/model/library.modelith.yaml'
+grep '    description: "Planned \(story lib-20\)\. The desk refuses\."' design/model/library.modelith.yaml
+cp machinery.yaml plain.yaml
+exec sh -c 'sed "/^import:/r p.tmp" plain.yaml > machinery.yaml'
+rm desc.tmp p.tmp
+gitinit
+
+cp machinery.yaml keep.yaml
+
+exec machinery adopt --rehearse --out ../reh-planned-scenario
+grep '^- planned: 1 \(sc 1\)$' ../reh-planned-scenario/rehearsal.md
+exec machinery adopt --write
+grep '  - id: sc:blocked-member-is-refused-a-loan\n    reason: "planned at adoption \([0-9a-f]{7}\)"\n    story: lib-20\n' design/owed.yaml
+grep '  - id: sc:member-borrows-and-returns-a-copy\n    reason: "claimed at adoption \([0-9a-f]{7}\)"\n' design/owed.yaml
+grep -count=1 '^    reason: "planned at adoption' design/owed.yaml
+exec machinery status
+stdout '^owed, planned: 1 \(sc 1\)$'
+
+# what the pattern captured must be a story id: refused by the line of the description
+exec git checkout -q design/owed.yaml
+exec sh -c 'sed "s/pattern: .^Planned.*$/pattern: \"(?P<story>.+)\"}/" keep.yaml > machinery.yaml'
+exec mrun 1 adopt --write
+stderr '^machinery: design/model/library.modelith.yaml:47: sc:blocked-member-is-refused-a-loan: import.planned entry 1 captured the story "Planned \(story lib-20\)\. The desk refuses\."; a story id has only letters, digits, "\.", "-" and "_": tighten the pattern$'
+! stderr 'member-borrows'
+cp keep.yaml machinery.yaml
+
+# the value of in is config
+exec sh -c 'sed "s/in: scenario-description/in: scenario/" keep.yaml > machinery.yaml'
+exec mrun 2 status
+stderr '^config: import.planned: entry 1: in must be model-statement, scenario-description or failure-row, got "scenario"$'
+
+-- desc.tmp --
+    description: "Planned (story lib-20). The desk refuses."
+-- p.tmp --
+  planned:
+    - {in: scenario-description, pattern: '^Planned \(story (?P<story>[a-z0-9-]+)\)\.'}

@@ -1,0 +1,145 @@
+# a failure mode that names a subject which resolves and has no valid required value is counted on
+# its own, in the stage and in assess; it stays unlinked for the verdict (docs/formats.md section 6.6)
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^  ERROR  design/links.yaml: RISK-1: required must be fail-closed, retry-bounded, surface or refuse, got ""$'
+stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events$'
+stdout '^not demonstrated: 2 of 3 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason; 1 of them name a subject and no required value: add required to each$'
+! stdout '^passed$'
+
+# a required value that is none of the four is no value
+cp links-bogus.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 2 name a subject and no required value, 0 invokes, '
+stdout '; 2 of them name a subject and no required value: add required to each$'
+
+# a subject that names nothing in the design is not counted, and a row no entry names is not
+cp links-nothing.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 0 invokes, '
+stdout '^not demonstrated: 2 of 3 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+! stdout 'no required value'
+
+# with the value the row is linked, and the count is gone
+cp links-full.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 3 failure modes, 2 linked, 1 unlinked, 0 invokes, '
+! stdout 'no required value'
+
+# a native failure mode is counted the same way
+cp native.yaml design/failure-modes.yaml
+cp with-native.yaml machinery.yaml
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^  ERROR  design/failure-modes.yaml: reader-down: required must be fail-closed, retry-bounded, surface or refuse, got ""$'
+stdout '^checked: 4 failure modes, 2 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, '
+
+# assess carries the count: in the stage output and in the report
+mkdir proj/design/model proj/docs
+cp machinery.orig proj/machinery.yaml
+cp links.yaml proj/design/links.yaml
+cp docs/risks.md proj/docs/risks.md
+cp design/model/desk.modelith.yaml proj/design/model/desk.modelith.yaml
+cd proj
+gitinit
+cd $WORK
+exec machinery -C proj assess --out out
+grep '^checked: 3 failure modes, 1 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, ' out/stages/xref-failure.txt
+grep '^\| xref-failure \| not demonstrated: 2 of 3 failure modes name no subject; .*; 1 of them name a subject and no required value: add required to each \| 3 failure modes, 1 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, ' out/report.md
+grep '"noun": "name a subject and no required value"' out/report.json
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+-- machinery.orig --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+-- with-native.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  failure_modes: design/failure-modes.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+-- native.yaml --
+version: 1
+failure_modes:
+  - id: reader-down
+    subject: entity:Loan
+    failure: "The reader is down."
+    behavior: "The desk says so."
+-- design/links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend"}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend"}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- links-bogus.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend"}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+  - {id: RISK-3, subject: "entity:Loan", required: sometimes}
+-- links-nothing.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.burn"}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- links-full.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend", required: fail-closed}
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- docs/risks.md --
+# Risks
+
+| Risk | Failure | Required behavior |
+|------|---------|-------------------|
+| RISK-1 | The card reader is down. | The desk refuses the loan with READER_DOWN. |
+| RISK-2 | A loan is recorded twice. | The second record is refused. |
+| RISK-3 | The shelf list is out of date. | The desk recounts the shelf. |
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  LoanStatus:
+    values:
+      - {name: Shelved, definition: "On the shelf."}
+      - {name: Lent, definition: "With a member."}
+entities:
+  Loan:
+    definition: "One copy lent to one member."
+    attributes:
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian}
