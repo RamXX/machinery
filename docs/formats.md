@@ -134,11 +134,11 @@ hooks:                          # optional: what machinery hook does (section 21
   stop: warn                    # optional, this is the default
 delegate:                       # optional, experimental: answers on the owner's behalf (section 15.9)
   policy: ../owner/delegate.yaml   # required: the owner's policy file; may lie outside the project
-routing:                        # optional: model routing guidance printed in briefs (section 15.5)
-  routine: "small model"
-  consequential: "standard model; fresh verifier"
-  critical: "strongest model for the formal model; standard model for code; fresh verifier"
-  vital: "strongest model for the formal model and the core; standard model elsewhere; fresh verifier"
+routing:                        # optional: model routing by tier, printed in briefs and waves (section 21); these are the defaults
+  routine: "standard model"
+  consequential: "standard model; fresh verifier of at least the builder's class"
+  critical: "strongest model for the formal model; standard model for code; fresh verifier of at least the builder's class"
+  vital: "strongest model for the formal model and the core; standard model elsewhere; fresh verifier of at least the builder's class"
 vital:                          # optional: the word lists of machinery vital candidates (section 23.3)
   names: [pay, charge]          # optional: replaces the default list for action, entity and event names
   failure: [lost, twice]        # optional: replaces the default list for failure-mode text
@@ -198,7 +198,8 @@ Rules:
 - An empty word in `vital.names`, `vital.failure` or `vital.effects` is a config error
   (`vital.names: a word must not be empty`). A list that is set replaces its default; words are
   compared lower-cased.
-- `routing` keys are tier names: `routine`, `consequential`, `critical` and `vital`.
+- `routing` keys are tier names: `routine`, `consequential`, `critical` and `vital`. A tier that is
+  not set keeps its default text. The texts name classes of model, never a vendor's model.
 - `assess.decisions` needs a non-empty `files` list of valid globs
   (`assess.decisions.files is required`) and a `record` that is a regular expression
   (`assess.decisions.record is required`,
@@ -3372,8 +3373,9 @@ which command to run and reads its findings, and is never asked to remember a ru
 
 | Surface | Where | Holds |
 |---|---|---|
-| Skill | `skills/machinery/SKILL.md` | When to use machinery and the command for each step. Under 120 lines; details are in `docs/` and are opened only when needed. |
-| Agent prompts | `agents/machinery-pm.md`, `agents/machinery-verifier.md`, `agents/machinery-modeler.md` | One role each, under 60 lines, built on `machinery brief`. |
+| Skill | `skills/machinery/SKILL.md` | The entry point: which role a context is in and the command whose output says what to do next. At most 120 lines; details are in `docs/` and are opened only when needed. |
+| Agent prompts | `agents/machinery-pm.md` (the planner), `agents/machinery-modeler.md`, `agents/machinery-builder.md`, `agents/machinery-verifier.md`, `agents/machinery-checker.md`, `agents/machinery-delegate.md` (experimental, section 15.9) | One role each, at most 60 lines: the role's goal, what it may and may not write, the gates the tool holds on it, and the rules that are judgment, each with the failure it prevents. |
+| Roles | `docs/roles.md` | Who may write what, what the tool verifies about each role, when the checker and the delegate are called, and the judgment rules with the failure each prevents. At most 120 lines. |
 | Plugin manifests | `.claude-plugin/plugin.json`, `.codex-plugin/plugin.json` | Name, version, and the paths above. |
 | Hooks | `hooks/hooks.json` (the Claude Code plugin) | Three hook events, each running `machinery hook <event>` (section 21.1). |
 
@@ -3485,10 +3487,18 @@ In block mode it prints `{"decision":"block","reason":"<text>"}`, so the turn go
 findings in front of the model, except while `stop_hook_active` is true: then, as in warn mode, it
 prints `{"systemMessage":"<text>"}`, so a stop chain is blocked at most once.
 
-Routing. A brief names the model class for the tier (`routing` in `machinery.yaml`): the smallest
-model that fits routine stories, a stronger one where a wrong result costs more, and the strongest
-only for formal models. A brief gives pointers and commands; context is read from the files it
-names, in the worker's own session.
+A surface names a command only as the tool has it: every `machinery <command>` in the skill and the
+agent prompts exists, with the flags shown. A surface states a rule the tool enforces as a pointer
+to the command that enforces it, and keeps its own sentences for what the tool cannot see.
+
+Routing. Model classes follow the role first and the tier second. The design roles (planner,
+modeler, checker, delegate) run on the strongest class whatever the tier: a wrong design or plan
+is repeated by every story built on it. A builder runs on a standard class, and a verifier on a
+class at least as strong as its builder's: a weaker one cannot disprove what the builder claims.
+A brief and `machinery waves` print the text for the tier (`routing` in `machinery.yaml`, section
+2), whose defaults say this per tier; a vital core is built on the strongest class. The texts name
+classes, never a vendor's model, and the agent prompts carry no model id. A brief gives pointers
+and commands; context is read from the files it names, in the worker's own session.
 
 ## 22. External checkers
 
