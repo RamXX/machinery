@@ -52,12 +52,14 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   patterns) and which event is a model action under another name. A pattern that matches nothing
   is an error, and a pattern of `*` only is refused. The native annotation `_aliases` carries
   the last one, and rules `event-action` and `action-event` read an aliased event as its action.
+  An alias hides nothing: an event that is an action takes none, an action with an event of its
+  own name is the action of none, and stage `xref-model-machine` prints and counts every alias.
 - Rule `event-action` reports an event listed in `_external_events` or `_failure_events` that is
   an action of the model: an action is a caller's command. For an operational machine every
-  action of the entities behind what it serves counts.
+  action of the entities behind what it serves counts, for a listed and for an aliased event.
 - The name hint about a failure-looking name is dismissed by name, with a reason, in the root
-  `_not_failures` (`not_failures` in `import.machines.annotate`); it no longer warns about an
-  event that has an alias. Listing an event as external does not stop it.
+  `_not_failures` (`not_failures` in `import.machines.annotate`). Listing an event as external
+  or giving it an alias does not stop it.
 
 ### Carried forward from v1
 

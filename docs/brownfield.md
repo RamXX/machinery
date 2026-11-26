@@ -146,11 +146,12 @@ callback, another machine), `failure_events` and `failure_states` for what repor
 a failure, each a list of names and `*` patterns (`"*_refused"`, `"*_failed"`), and `aliases`
 for an event that is a model action under another name (`handed_back: giveBack`). The
 "not an action" findings stop for the names you declare, and the "looks like a failure" warnings
-for the failures you declare. An external event whose name looks like a failure is still hinted:
-list it in `failure_events`, or dismiss the hint by name in `not_failures`, with the reason.
-A pattern that matches nothing in a machine it is applied to is an error, a pattern of `*` only
-is refused, and an event you list as external that is an action of the model stays a finding:
-the config cannot hide a command.
+for the failures you declare. An external or aliased event whose name looks like a failure is
+still hinted: list it in `failure_events`, or dismiss the hint by name in `not_failures`, with
+the reason. A pattern that matches nothing in a machine it is applied to is an error, a pattern
+of `*` only is refused, and an event that is an action of the model stays a finding whether you
+list it as external or give it an alias: the config cannot hide a command. Every alias in effect
+is a line of `xref-model-machine`, so the list of names you bridged stays in view.
 
 ## 6. Turn what is owed into stories, beside the ones you have
 
