@@ -6,6 +6,7 @@ cd proj
 exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
 gitinit
 exec bd init --stealth --non-interactive -p shop
+env MACHINERY_AGENT=owner-delegate
 exec bd create --id shop-r1 --title 'Refund order 1?' --body-file ../r1.txt --silent
 exec bd create --id shop-r2 --title 'Refund order 2?' --body-file ../r2.txt --silent
 exec bd create --id shop-r3 --title 'Refund order 3?' --body-file ../r3.txt --silent
@@ -85,7 +86,7 @@ stdout '^held: shop-r3 \(clause small-refunds\): over the limit$'
 exec machinery answer shop-d1 --delegate --clause wait-for-me --hold --reason 'a new dependency'
 exec bd show shop-r3 --json
 stdout '"status": "open"'
-stdout 'machinery:answer hold actor=builder clause=small-refunds reason=\\"over the limit\\"'
+stdout 'machinery:answer hold actor=builder clause=small-refunds agent=owner-delegate reason=\\"over the limit\\"'
 ! stdout 'machinery:decision'
 
 # a reserved topic the clause names; confirm: true leaves the item open for the owner
@@ -95,7 +96,7 @@ exec machinery answer shop-u1 --delegate --clause no-publishing --refuse --reaso
 stdout '^answered: shop-u1 refuse \(on the owner.s behalf, clause no-publishing\)$'
 exec machinery answer shop-n1 --delegate --clause naming --option 2 --reason 'shorter'
 exec bd show shop-p1 --json
-stdout 'machinery:answer 1 actor=builder clause=refunds-confirmed reason=\\"the provider charged twice\\"\\nmachinery:decision builder\\nmachinery:vetoable'
+stdout 'machinery:answer 1 actor=builder clause=refunds-confirmed agent=owner-delegate reason=\\"the provider charged twice\\"\\nmachinery:decision builder\\nmachinery:vetoable'
 
 exec machinery questions
 stdout '^shop-c1  Refund and ship again\?$'

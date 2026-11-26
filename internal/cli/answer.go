@@ -85,6 +85,11 @@ func runAnswer(e *Env, args []string) int {
 	if d := pm.DelegateDecision(t); d != nil {
 		return e.Usage("%s is answered already by %s", is.ID, d.Actor)
 	}
+	who, err := backlog.WhoFromEnv()
+	if err != nil {
+		return e.Usage("%v", err)
+	}
+	a.who = who
 	kind := "option"
 	switch {
 	case *hold:
@@ -102,6 +107,7 @@ type answer struct {
 	is     *backlog.Issue
 	t      backlog.Tags
 	reason string
+	who    backlog.Who // the session and agent of an answer on the owner's behalf
 }
 
 func (a answer) refused(format string, args ...any) int {
@@ -138,6 +144,15 @@ func (a answer) owner(pol *delegate.Policy, option int) int {
 
 // onBehalf records an answer on the owner's behalf when the clause permits it.
 func (a answer) onBehalf(pol *delegate.Policy, clause, kind string, option int) int {
+	// the answer comes from the delegate, never from the context that asked
+	switch asked := a.t.AskedIn; {
+	case a.who.Agent == "":
+		return a.refused("MACHINERY_AGENT is not set: an answer on the owner's behalf comes from the delegate, whose agent ends in -delegate")
+	case !strings.HasSuffix(a.who.Agent, "-delegate"):
+		return a.refused("MACHINERY_AGENT %s does not end in -delegate: an answer on the owner's behalf comes from the delegate", a.who.Agent)
+	case asked.Session != "" && asked.Agent != "" && asked == a.who:
+		return a.refused("%s was asked in session %s by agent %s: the asker does not answer its own question", a.is.ID, asked.Session, asked.Agent)
+	}
 	if pol == nil {
 		return a.refused("no delegate policy: delegate.policy is not set in machinery.yaml; only the owner answers %s", a.is.ID)
 	}
@@ -145,7 +160,7 @@ func (a answer) onBehalf(pol *delegate.Policy, clause, kind string, option int) 
 	if cl == nil {
 		return a.refused("clause %s is not in the delegate policy", clause)
 	}
-	head := fmt.Sprintf("machinery:answer %s actor=%s clause=%s reason=%s", "%s", backlog.Value(a.c.Actor), backlog.Value(clause), backlog.Quote(a.reason))
+	head := fmt.Sprintf("machinery:answer %s actor=%s clause=%s%s reason=%s", "%s", backlog.Value(a.c.Actor), backlog.Value(clause), a.who.Part(), backlog.Quote(a.reason))
 	if kind == delegate.Hold {
 		if err := a.c.Note(a.is.ID, fmt.Sprintf(head, delegate.Hold)); err != nil {
 			return a.e.Fail(err)

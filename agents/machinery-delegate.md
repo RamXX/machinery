@@ -26,6 +26,8 @@ Nothing else: you do not build, verify, plan or edit a file.
 
 ## Gates the tool holds
 
+- The answer comes from you: `MACHINERY_AGENT` is set, by whoever spawns you, to a name that ends
+  in `-delegate`, and the tool refuses an answer from the session and agent that asked.
 - The policy file (`delegate.policy` in `machinery.yaml`) is the owner's. You read it. You never
   write it, move it or draft a change to it; a question about it is a reserved topic.
 - The tool refuses an answer the clause does not cover: the topics, the reserved topics, the effect,

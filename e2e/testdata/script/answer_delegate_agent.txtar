@@ -1,0 +1,53 @@
+# answer --delegate: the answer comes from the delegate, never from the context that asked (section 15.9, experimental)
+fixture shop proj
+cd proj
+exec sh -c 'printf "backlog:\n  tool: bd\ndelegate:\n  policy: ../policy.yaml\n" >> machinery.yaml'
+gitinit
+exec bd init --stealth --non-interactive -p shop
+
+# ask records the session and the agent of the asker
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=shop-a-builder
+exec machinery ask 'Refund order 1?' --option 'refund it' --option 'keep it' --recommend 1 --default 'kept' --about refund
+stdout '^question: shop-[a-z0-9]+$'
+cp stdout ../q1.txt
+exec sh -c 'bd show $(sed "s/^question: //" ../q1.txt) --json'
+stdout '"description": "machinery:question builder session=s1 agent=shop-a-builder\\nmachinery:option 1 refund it'
+
+# without MACHINERY_AGENT, or with one that is not a delegate's, the answer is refused, a hold too
+env MACHINERY_AGENT=
+exec sh -c 'mrun 1 answer $(sed "s/^question: //" ../q1.txt) --delegate --clause refunds --hold --reason "wait"'
+stderr '^machinery: refused: MACHINERY_AGENT is not set: an answer on the owner.s behalf comes from the delegate, whose agent ends in -delegate$'
+env MACHINERY_AGENT=shop-a-builder
+exec sh -c 'mrun 1 answer $(sed "s/^question: //" ../q1.txt) --delegate --clause refunds --option 1 --reason "small"'
+stderr '^machinery: refused: MACHINERY_AGENT shop-a-builder does not end in -delegate: an answer on the owner.s behalf comes from the delegate$'
+env MACHINERY_AGENT='two words'
+exec sh -c 'mrun 2 answer $(sed "s/^question: //" ../q1.txt) --delegate --clause refunds --option 1 --reason "small"'
+stderr '^usage: MACHINERY_AGENT must be one word, got "two words"$'
+exec bd list --all --json --limit 0
+! stdout 'machinery:answer'
+
+# a delegate that asked the question does not answer it
+env MACHINERY_AGENT=q-delegate
+exec machinery ask 'Refund order 2?' --option 'refund it' --option 'keep it' --recommend 1 --default 'kept' --about refund
+cp stdout ../q2.txt
+exec sh -c 'mrun 1 answer $(sed "s/^question: //" ../q2.txt) --delegate --clause refunds --option 1 --reason "small"'
+stderr '^machinery: refused: shop-[a-z0-9]+ was asked in session s1 by agent q-delegate: the asker does not answer its own question$'
+
+# another session, or another delegate agent, answers; the line records both
+env MACHINERY_SESSION=s2
+exec sh -c 'machinery answer $(sed "s/^question: //" ../q2.txt) --delegate --clause refunds --option 1 --reason "small"'
+stdout '^answered: shop-[a-z0-9]+ option 1: refund it \(on the owner.s behalf, clause refunds\)$'
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=refund-delegate
+exec sh -c 'machinery answer $(sed "s/^question: //" ../q1.txt) --delegate --clause refunds --option 1 --reason "small"'
+stdout '^answered: '
+exec sh -c 'bd show $(sed "s/^question: //" ../q1.txt) --json'
+stdout 'machinery:answer 1 actor=builder clause=refunds session=s1 agent=refund-delegate reason=\\"small\\"'
+
+-- policy.yaml --
+version: 1
+owner: owner
+clauses:
+  - id: refunds
+    about: [refund]
+    effect: allow
+    note: "refunds while I am away"

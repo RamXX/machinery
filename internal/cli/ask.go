@@ -71,6 +71,10 @@ func runAsk(e *Env, args []string) int {
 	case *unit != "" && len(strings.Fields(*unit)) != 1:
 		return e.Usage("--unit %q is not one word", *unit)
 	}
+	who, err := backlog.WhoFromEnv()
+	if err != nil {
+		return e.Usage("%v", err)
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2
@@ -87,7 +91,7 @@ func runAsk(e *Env, args []string) int {
 			return code
 		}
 	}
-	desc := pm.QuestionDescription(c.Actor, options, *recommend, *def, topics, *amount, strings.TrimSpace(*unit), *story)
+	desc := pm.QuestionDescription(c.Actor+who.Part(), options, *recommend, *def, topics, *amount, strings.TrimSpace(*unit), *story)
 	id, err := c.CreateItem(backlog.Item{Title: pm.OneLine(pos[0]), Type: "task", Description: desc})
 	if err != nil {
 		return e.Fail(err)
