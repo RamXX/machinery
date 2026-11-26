@@ -101,6 +101,13 @@ failure mode in `design.failure_modes`. The next `adopt --write` waives the ones
 with the reason `unmodeled at adoption`, so the check still passes; when you write a failure mode
 for one, its waiver becomes a `stale waiver` ERROR and you delete it. The list only shrinks.
 
+**Bind every machine.** Each machine says what in the model it is for: a lifecycle machine names
+its entity, and an operational machine lists in `_serves` the entities and actions it exists for
+(`docs/formats.md` section 5.2). Machines read through `import` get their binding from
+`import.machines.bind` when the source does not say. `adopt --write` waives the machines that
+bind to nothing yet and the entities that have actions and no lifecycle machine, with the reason
+`unbound at adoption`; a waiver goes stale when its machine is bound or its lifecycle written.
+
 ## 5. Turn what is owed into stories, beside the ones you have
 
 ```sh

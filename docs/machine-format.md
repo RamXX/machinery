@@ -42,6 +42,8 @@ enforces everything below, and an unknown key is an error, never silently skippe
   `_failure_events` names events some state handles or ignores, none of them also in
   `_external_events`.
 - **Callers.** `_requires` is a non-empty list of distinct, non-empty names.
+- **Serves.** `_serves` is a non-empty list of distinct `entity:<Name>` and
+  `act:<Entity>.<action>` ids.
 - **Collisions.** Two machines may not share a case-id tag or a machine id.
 
 Name hints print as `warn   <file>: <message>` and never fail the stage (see "Failure idioms").
@@ -53,8 +55,8 @@ machine file. A file that cannot be parsed is an ERROR.
 ## The subset
 
 - **Root keys:** `id`, `initial`, `context`, `states`, `description`, `meta`, `version`, and the
-  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_oracle_tag`, `_guards`, `_external_events`,
-  `_failure_events`, `_entries`.
+  annotations `_comment`, `_delays`, `_lifecycle_of`, `_role`, `_serves`, `_oracle_tag`, `_guards`,
+  `_external_events`, `_failure_events`, `_entries`.
 - **State keys:** `on`, `after`, `always`, `invoke`, `entry`, `exit`, `states`, `initial`, `type`, `id`,
   `meta`, `description`, `tags`, `onDone`, `output`, and the annotations `_comment`, `_exhaustive`,
   `_ignores`, `_refusal`, `_terminal`.
@@ -131,12 +133,17 @@ Resolution is strict, with no fallbacks.
 
 ## Lifecycle and operational machines
 
-Every machine is one of two kinds (`docs/formats.md` section 5.2):
+Every machine binds to the model, as one of two kinds (`docs/formats.md` section 5.2):
 
 - a **lifecycle machine** of a model entity: the root key `_lifecycle_of: "<Entity>"`, or a file
   base name equal to the entity name. Top-level states whose name starts with an uppercase letter
   are the **domain states**; lowercase-first states are transient overlay states.
-- an **operational machine**: `_role: "operational"`, for example a command-execution envelope.
+- an **operational machine**: `_role: "operational"`, for example a command-execution envelope,
+  with `_serves` naming what it exists for.
+
+`machinery lint` reports a machine that binds to nothing (rule `machine-binding`), and an entity
+that declares actions and has no lifecycle machine (rule `entity-machine`; an entity with no
+state of its own is waived, with the reason).
 
 ## Annotations
 
@@ -168,6 +175,12 @@ once.
 model actions, for example events that arrive from a bus or a peer subsystem (`docs/formats.md`
 section 6.4 reads it). Each entry is a non-empty string. An entry that no state handles or ignores
 is a stale marker and an error: remove it, or wire the event.
+
+**`_serves`** (root, required on an operational machine). A non-empty array of the model ids the
+machine exists for, each `entity:<Name>` or `act:<Entity>.<action>`, none twice:
+`"_serves": ["act:Order.pay", "act:Order.ship"]` for an envelope that runs those commands. Stage
+`machines` holds the shape; stage `xref-model-machine` holds that each id is in the model. It is
+an error on a lifecycle machine, which serves its entity.
 
 **`_failure_events`** (root, optional). An array of event names that report a failure arriving
 from outside: a dependency failed, a crash was detected, a lease was lost. The shape and the
@@ -332,6 +345,7 @@ those events in `_failure_events` and tag the state they lead to `failure`:
 {
   "id": "job",
   "_role": "operational",
+  "_serves": ["act:Report.generate"],
   "initial": "Queued",
   "_failure_events": ["jobFailed"],
   "states": {

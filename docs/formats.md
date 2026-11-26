@@ -66,6 +66,9 @@ import:                         # optional: design sources kept in the project's
       root: {notes: _comment, startable: _entries}
       state: {skip: _ignores}
       transition: {allowed: _requires, denied: _refusal}
+    bind:                       # optional: what a machine binds to in the model (section 5.2.1)
+      "machines/loan*.json": {lifecycle_of: Loan}       # a glob of source files, or
+      hold_queue: {serves: ["act:Loan.lend"]}            # a machine id
   failure_modes:                # optional: a failure-mode catalog kept as Markdown tables (section 5.4.1)
     file: docs/risks.md         # required
     id: "^RISK-[0-9]+$"         # required: the first cell of a failure-mode row matches it in full
@@ -139,6 +142,12 @@ Rules:
   (`import.machines: design.machines is also set; read the machines from one of them`), and so
   are an empty `import.machines.files` (`import.machines.files is required`), a `states` value
   other than `capitalize` or `keep`, and an empty key or name in `rename`.
+  `import.machines.bind` maps a glob of source files or a machine id to exactly one of
+  `lifecycle_of` (an entity name) and `serves` (a non-empty list of model ids): an empty key or
+  one that is not a valid glob (`import.machines.bind: "<key>" is not a valid glob`), an entry
+  with both or neither (`import.machines.bind.<key>: set lifecycle_of or serves, not both`,
+  `import.machines.bind.<key>: set lifecycle_of or serves`) and an empty id in `serves`
+  (`import.machines.bind.<key>.serves: an id must not be empty`) are config errors.
   `import.failure_modes` needs `file` (`import.failure_modes.file is required`), an `id` that is
   a regular expression (`import.failure_modes.id is required`,
   `import.failure_modes.id is not a regular expression: <error>`) and a non-empty list for each of
@@ -335,11 +344,16 @@ One file per machine, `<Name>.machine.json`, in the machines directory. The form
 v5 JSON-serializable subset documented in `docs/machine-format.md`: guards, actions and actors are
 named by string and implemented in code.
 
-Every machine is one of:
+Every machine binds to the model, as one of:
 
 - a **lifecycle machine** of a model entity: the root key `_lifecycle_of: "<Entity>"`, or a file
   base name equal to an entity name (`Order.machine.json` for entity `Order`);
-- an **operational machine**: the root key `_role: "operational"`.
+- an **operational machine**: the root key `_role: "operational"` and the root `_serves`, a
+  non-empty list of the model ids it exists for, each `entity:<Name>` or `act:<Entity>.<action>`
+  (a command-execution envelope serves the actions it runs, a notifier the entity it reports on).
+
+A machine that binds to nothing is a finding of stage `xref-model-machine` (section 6.4): no
+cross-check is skipped because nothing says what a machine is for.
 
 In a lifecycle machine, top-level states whose name starts with an uppercase letter are **domain
 states**. States whose name starts with a lowercase letter are transient overlay states.
@@ -403,16 +417,27 @@ is generated, never a source, and is not read):
    Two files that translate to the same id are
    `ERROR  <second file>: translates to machine id <id>, as <first file> does; give one of them another id`,
    and the second is not read.
-5. **Role.** `_role: "operational"` is added when the result has neither `_lifecycle_of` nor
-   `_role`.
+5. **Binding.** The translation never invents a binding. A result that has `_lifecycle_of`,
+   `_role` or `_serves` binds itself and is kept as it is. Any other is bound by the entry of
+   `import.machines.bind` whose key is its machine id or a glob that matches its source file:
+   `lifecycle_of: <Entity>` adds `_lifecycle_of`, and `serves: [<ids>]` adds
+   `_role: "operational"` and `_serves`. A machine with no binding, from its source or from
+   `bind`, is reported by `machine-binding` like any other (section 6.4). Then:
+   - A machine that binds itself and is matched by an entry is
+     `ERROR  <file>: bound in the source and by import.machines.bind <key>; keep one`.
+   - A machine matched by two entries is
+     `ERROR  <file>: import.machines.bind <a> and <b> both match; keep one` (the first two
+     keys, in sorted order), and none is applied.
+   - An entry that matches no machine is
+     `ERROR  import.machines.bind <key>: matches no machine file and no machine id`.
 6. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
    the machine id, upper-cased, followed by the first four hex digits, upper-cased, of the SHA-256
    of the original id. Dozens of machines whose ids share a prefix get different tags, and a tag
    does not change while the id does not.
 
-An added `_role` or `_oracle_tag` comes last in the root; every other key keeps its place. A
-key that is still unknown after renaming is a finding of stage `machines`, as in a native file:
-nothing is dropped silently. The runtime table of an imported machine names the source file in `source`, and its
+The keys a binding adds, then an added `_oracle_tag`, come last in the root; every other key
+keeps its place. A key that is still unknown after renaming is a finding of stage `machines`, as
+in a native file: nothing is dropped silently. The runtime table of an imported machine names the source file in `source`, and its
 `source_sha256` is the SHA-256 of the source bytes (section 7.3). The translated bytes are what
 `machinery gen` writes under `<gen>/imported/machines/` (section 7) and what stage `xstate`
 loads.
@@ -539,7 +564,8 @@ delays, reachability from the initial state and from every entry state (`_entrie
 absorbing states unless declared `_terminal`, every invoke has `onError` and a timeout, event
 completeness on resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`),
 fail-closed tags, no state tagged both `failure` and `accepting`, and the shape of `_requires`,
-`_entries`, `_terminal`, `_external_events` and `_failure_events`. Two machines whose id tags
+`_entries`, `_terminal`, `_external_events`, `_failure_events` and `_serves` (a non-empty list of
+distinct `entity:<Name>` and `act:<Entity>.<action>` ids; whether they exist is section 6.4). Two machines whose id tags
 collide (section 7.2), or that share a machine `id`, are an ERROR.
 
 Name hints are warnings and never fail the stage. A state whose name contains, case-insensitively,
@@ -564,16 +590,39 @@ it also counts the imported rows and, of those, the unlinked ones:
 
 ### 6.4 `xref-model-machine`
 
-For every machine:
+For every machine, and every entity of the models:
 
 | Rule | Check |
 |---|---|
-| `machine-binding` | The machine is a lifecycle machine of an existing entity, or operational (section 5.2). |
+| `machine-binding` | The machine binds to the model (section 5.2): it is the lifecycle machine of an existing entity, or an operational machine whose `_serves` names only entities and actions of the model. |
 | `state-enum` | Lifecycle machine of entity E: let D be its domain states. Among the enums used as the `type` of an attribute of E, exactly one must have a value-name set equal to D. Otherwise ERROR, naming the missing and extra names against the candidate enum with the largest overlap (ties broken by enum name). |
 | `event-action` | Lifecycle machine of E: every event name under any `on` must be the name of an action of E, or be listed in the root `_external_events` or `_failure_events` (a failure event arrives from outside). |
 | `action-event` | Every action of an entity that has a lifecycle machine must appear as an `on` event somewhere in that machine. |
+| `entity-machine` | Every entity that declares at least one action has a lifecycle machine. An entity that has no state of its own is waived, with the reason. |
 
-`checked:` counts machines, domain states, events and actions.
+The findings of `machine-binding`:
+
+- `machine-binding: <id>: not a lifecycle machine of a model entity and not operational; set _lifecycle_of or name the file after an entity, or set _role: operational and name what it serves in _serves`
+- `machine-binding: <id>: _lifecycle_of names entity <E>, which is not in the model`
+- `machine-binding: <id>: _lifecycle_of and _role: operational are both set; a machine is one or the other`
+- `machine-binding: <id>: operational and serves nothing in the model; bind it to an entity as its lifecycle (_lifecycle_of), or name what it serves in _serves (entity:<Name> or act:<Entity>.<action>)`:
+  `_serves` is absent, empty or not a list.
+- `machine-binding: <id>: _serves names <x>, which is not an entity or an action of the model`, once
+  per such entry.
+- `machine-binding: <id>: _serves is set on the lifecycle machine of <E>; a lifecycle machine serves its entity: remove _serves, or set _role: operational`
+
+and of `entity-machine`:
+`entity-machine: entity:<E>: declares <n> action(s) and no machine is its lifecycle; write its lifecycle machine (_lifecycle_of: <E>), or waive the rule with the reason it has no state`.
+
+A machine is **bound** when it has no `machine-binding` finding, waived or not; a waiver accepts
+an unbound machine, it does not bind it. When no machine is the lifecycle machine of an existing
+entity, the stage compared no state, event or action, and its result is
+`not demonstrated: no machine is bound to a model entity` (`nothing to check` when there is no
+machine file at all), never passed; with findings it is failed (section 3.2).
+
+`checked:` counts machines, lifecycle machines (of an existing entity), operational machines,
+domain states, events, actions and entities with actions:
+`checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions`.
 
 ### 6.5 `xref-contract`
 
@@ -624,6 +673,7 @@ waivers:
 
 `rule` is a rule name from the tables above. `id` is the subject the finding names: an `act:` id;
 `<machine id>.<event>` for `event-action`; the machine id for `machine-binding` and `state-enum`;
+`entity:<Name>` for `entity-machine`;
 `<METHOD> <path>` or `RPC <Service>/<Rpc>` for `operation-id`; the failure-mode subject for
 `subject-resolves`; `invoke:<machine id>.<src>`, `dependency:<name>`, `state:<machine id>.<State>`
 or `event:<machine id>.<event>` for the failure rules. A
@@ -1927,6 +1977,16 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    a waiver whose finding is gone is an ERROR `stale waiver` (section 6.7). While the
    failure-mode file has an ERROR it adds none, since what the file names is then unknown.
    Without `--write`, the `machinery.yaml` line under `would write:` says `new waivers: <n>`.
+5. **Unbound waivers.** Findings of `machine-binding` and `entity-machine` (section 6.4) must not
+   block day one either: a machine the design already has that binds to nothing, or an entity
+   with actions and no lifecycle machine yet, is unbound, not new. For each such finding no
+   waiver covers, it adds a waiver with the reason `unbound at adoption (<short sha>)`, one per
+   rule and subject. It never removes or rewrites one, so the list only shrinks as machines are
+   bound and lifecycles written. While a model or a machine cannot be loaded (a file that cannot
+   be read or parsed, or a translation finding of section 5.2.1) it adds none, since what binds
+   to what is then unknown. Without `--write`, the `machinery.yaml` line says
+   `unbound waivers: <n>`. A waived machine is still unbound: while no machine is the lifecycle
+   machine of a model entity, stage `xref-model-machine` is not demonstrated (section 6.4).
 
 `adopt` never creates, changes or deletes a file outside `machinery.yaml` and the design
 directory. That includes `.gitignore`: when the receipts directory is not ignored it prints
@@ -1934,7 +1994,9 @@ directory. That includes `.gitignore`: when the receipts directory is not ignore
 arguments writes nothing the second time.
 
 After `adopt --write`, `machinery check` passes: what exists is baselined, owed or waived, and
-anything new in scope is held to the rules. From there:
+anything new in scope is held to the rules. The one exception is a design in which no machine is
+the lifecycle machine of a model entity: nothing about the machines has been compared with the
+model yet, so `xref-model-machine` is not demonstrated until the first one is bound. From there:
 
 - the area's design is written or extended a piece at a time (the riskiest stateful resource
   first), and each `machinery gen` plus `machinery adopt --write` owes the new obligations;
@@ -2016,7 +2078,7 @@ each section is saved under `<out>/stages/`.
 | Section | What runs | Saved as |
 |---|---|---|
 | `inventory` | The facts of the adopt report (section 17.2) for the snapshot: scope, languages, code files, test files (under e2e roots, elsewhere, with test doubles), design sources. `checked:` counts the files. | `inventory.txt` |
-| `design` | The stages of `machinery lint` (section 3.1). | `<stage>.txt` each |
+| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. | `<stage>.txt` each |
 | `generation` | `machinery gen` (section 7). When gen refuses, not demonstrated: `gen refused: <stages> have errors`. | `generation.txt` |
 | `trace`, `tests`, `arch` | The stage of that name. | `<stage>.txt` |
 | `formal` | The sanity run, section 18.5. | `formal.txt` |
@@ -2146,6 +2208,7 @@ A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`
 | Section | Keys of `facts` |
 |---|---|
 | `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
+| `design` | `bound_machines`, `unbound_machines` (when at least one machine was read) |
 | `generation` | `files` (generated files), `written` |
 | `formal` | `machines`: `{deadlock, distinct, machine, result, states, unreachable}`; `models`: `{model, result}` |
 | `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
