@@ -39,7 +39,7 @@ type Receipt struct {
 	// (section 10.3); "" for a receipt a test emitted.
 	Source      string
 	Granularity string
-	Tags        []string
+	Tags        any    // a list of build tags, or "unknown"
 	File        string // project-relative receipts file
 }
 
@@ -70,9 +70,9 @@ type line struct {
 	Replay   string   `json:"replay"`
 	Exit     *int     `json:"exit"`
 
-	Source      string   `json:"source"`
-	Granularity string   `json:"granularity"`
-	Tags        []string `json:"tags"`
+	Source      string `json:"source"`
+	Granularity string `json:"granularity"`
+	Tags        any    `json:"tags"`
 }
 
 // fileData is a parsed receipts file.

@@ -4,9 +4,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
-	"path"
-	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -19,7 +16,6 @@ import (
 // (section 10.3). It is parsed, never compiled.
 type goTestFile struct {
 	Path   string            // project-relative
-	Pkg    string            // import path by its go.mod; "" without one inside the project
 	Funcs  []string          // the test functions, sorted
 	doc    map[string][2]int // test function -> first and last line of its doc comment
 	Broken bool              // not Go source that parses
@@ -45,7 +41,6 @@ func (f *goTestFile) owner(line int) string {
 // readGoTests parses the Go test files among files.
 func readGoTests(p *project.Project, files []string) (map[string]*goTestFile, error) {
 	res := map[string]*goTestFile{}
-	modules := map[string]string{}
 	for _, rel := range files {
 		if !strings.HasSuffix(rel, "_test.go") {
 			continue
@@ -54,27 +49,32 @@ func readGoTests(p *project.Project, files []string) (map[string]*goTestFile, er
 		if err != nil {
 			return nil, err
 		}
-		f := &goTestFile{Path: rel, Pkg: importPath(p, path.Dir(rel), modules), doc: map[string][2]int{}}
-		res[rel] = f
-		fset := token.NewFileSet()
-		tree, err := parser.ParseFile(fset, rel, data, parser.ParseComments|parser.SkipObjectResolution)
-		if err != nil {
-			f.Broken = true
-			continue
-		}
-		for _, decl := range tree.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || !isTestFunc(fn) {
-				continue
-			}
-			f.Funcs = append(f.Funcs, fn.Name.Name)
-			if fn.Doc != nil {
-				f.doc[fn.Name.Name] = [2]int{fset.Position(fn.Doc.Pos()).Line, fset.Position(fn.Doc.End()).Line}
-			}
-		}
-		sort.Strings(f.Funcs)
+		res[rel] = parseGoTest(rel, data)
 	}
 	return res, nil
+}
+
+// parseGoTest reads the test functions of one file and the comment above each.
+func parseGoTest(name string, data []byte) *goTestFile {
+	f := &goTestFile{Path: name, doc: map[string][2]int{}}
+	fset := token.NewFileSet()
+	tree, err := parser.ParseFile(fset, name, data, parser.ParseComments|parser.SkipObjectResolution)
+	if err != nil {
+		f.Broken = true
+		return f
+	}
+	for _, decl := range tree.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || !isTestFunc(fn) {
+			continue
+		}
+		f.Funcs = append(f.Funcs, fn.Name.Name)
+		if fn.Doc != nil {
+			f.doc[fn.Name.Name] = [2]int{fset.Position(fn.Doc.Pos()).Line, fset.Position(fn.Doc.End()).Line}
+		}
+	}
+	sort.Strings(f.Funcs)
+	return f
 }
 
 // isTestFunc reports a top-level test function: no receiver, no type
@@ -102,35 +102,4 @@ func isTestName(name string) bool {
 	}
 	r, _ := utf8.DecodeRuneInString(rest)
 	return rest == "" || !unicode.IsLower(r)
-}
-
-var moduleRe = regexp.MustCompile(`(?m)^module\s+"?([^\s"]+)"?`)
-
-// importPath returns the import path of a project directory: the module of
-// the nearest go.mod at or above it inside the project, plus the directory
-// below that go.mod. "" when there is none.
-func importPath(p *project.Project, dir string, modules map[string]string) string {
-	for at := dir; ; at = path.Dir(at) {
-		mod, seen := modules[at]
-		if !seen {
-			if data, err := os.ReadFile(p.Abs(path.Join(at, "go.mod"))); err == nil {
-				if m := moduleRe.FindSubmatch(data); m != nil {
-					mod = string(m[1])
-				}
-			}
-			modules[at] = mod
-		}
-		if mod != "" {
-			if at == dir {
-				return mod
-			}
-			if at == "." {
-				return mod + "/" + dir
-			}
-			return mod + "/" + strings.TrimPrefix(dir, at+"/")
-		}
-		if at == "." || at == "/" {
-			return ""
-		}
-	}
 }

@@ -97,6 +97,8 @@ func Ratchet(ctx *Context) *report.Stage {
 		}
 	}
 
+	ratchetAdapter(s, bcfg, &p.Cfg)
+
 	// scope-narrowed
 	nowScope := set(p.Cfg.Scope)
 	for _, g := range bcfg.Scope {
@@ -385,4 +387,51 @@ func removedSpec(change string) (spec, what string) {
 		}
 	}
 	return "-", change
+}
+
+// ratchetAdapter is rule adapter-widened (section 11.3): the policy
+// evidence.adapter lets adapter evidence prove more than at the base. A
+// critical or vital tier added is an error; every other widening is named.
+func ratchetAdapter(s *report.Stage, base, now *project.Config) {
+	bKinds, bTiers, bMin := base.AdapterPolicy()
+	nKinds, nTiers, nMin := now.AdapterPolicy()
+	had := set(bTiers)
+	for _, t := range nTiers {
+		switch {
+		case had[t]:
+		case t == design.Critical || t == design.Vital:
+			s.Errorf("ratchet: adapter widened: evidence.adapter.tiers now lists %s; an id of such an area needs a receipt its test emits after its own assertions", t)
+		default:
+			s.Warnf("ratchet: adapter widened: evidence.adapter.tiers now lists %s", t)
+		}
+	}
+	had = set(bKinds)
+	for _, k := range nKinds {
+		if !had[k] {
+			s.Warnf("ratchet: adapter widened: evidence.adapter.allow now lists %s", k)
+		}
+	}
+	if bMin.Default == project.GranularityFunction && nMin.Default != project.GranularityFunction {
+		s.Warnf("ratchet: adapter widened: evidence.adapter.min_granularity.default: function -> file")
+	}
+	keys := make([]string, 0, len(bMin.By))
+	for k := range bMin.By {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if bMin.By[k] == project.GranularityFunction && nMin.By[k] != project.GranularityFunction {
+			s.Warnf("ratchet: adapter widened: evidence.adapter.min_granularity.%s: function -> file", k)
+		}
+	}
+	entry := func(e project.AdapterSource) string { return e.Package + " <- " + strings.Join(e.Files, ", ") }
+	had = map[string]bool{}
+	for _, e := range base.AdapterSources() {
+		had[entry(e)] = true
+	}
+	for _, e := range now.AdapterSources() {
+		if !had[entry(e)] {
+			s.Warnf("ratchet: adapter widened: evidence.adapter.sources: %s added", entry(e))
+		}
+	}
 }
