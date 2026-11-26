@@ -90,7 +90,9 @@ machinery checks
 
 - Something you cannot prove yet goes into `design/owed.yaml` with a reason
   (`machinery owed sync` writes it from the evidence). The owed list only shrinks.
-- Risk tiers, backlog stories and parallel waves: `docs/pm.md`.
+- Risk tiers, backlog stories and parallel waves: `docs/pm.md`. A new requirement starts with
+  `machinery intake new`, changes the design, and only then becomes stories, all at once, with
+  `machinery intake plan --apply`.
 - A formal model for a critical area: `docs/formal.md`.
 - An existing project: `docs/brownfield.md`.
 - Every format, output line and exit code: `docs/formats.md`.

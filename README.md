@@ -17,6 +17,7 @@ failure modes and a risk file. One command-line tool does the rest:
 | Generate what follows from it | `machinery gen` | Runtime transition tables and a list of obligations with stable ids. |
 | Check the code against it | `machinery check` | Static stages: trace, layering, tests policy, drift, ratchet. |
 | Prove it on the real system | `machinery run`, `machinery verify` | Receipts from real end-to-end runs, joined to the obligations at one commit. |
+| Take in a new requirement | `machinery intake` | The design changes first; then every story of the change is written at once, with a capstone that shows it on the running system. |
 | Plan what is unproven | `machinery plan`, `machinery waves` | Backlog stories with a dependency graph, scheduled in parallel waves. |
 | Accept by risk | `machinery story`, `machinery landing` | A tier gate per story; one full verification at the head that is ready. |
 

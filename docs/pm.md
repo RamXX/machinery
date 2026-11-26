@@ -18,7 +18,36 @@ story is accepted with the formality of its tier. The backlog tool is `bd`. The 
 Choose the tier at planning. When unsure, the higher one. Lowering a tier later fails the
 ratchet unless the risk file records it under `lowered:` with a reason.
 
+## A new requirement: intake
+
+A requirement that arrives while work runs changes the design before any story exists, and its
+stories are then written all at once from what the design owes. machinery holds that order
+(`docs/formats.md` section 15.7):
+
+```
+machinery intake new "<title>" --intent "<who needs what, and what is observed>" --refuses "<what must be refused>"
+# change the design: model, machines, failure modes, tiers, a formal spec for a critical area
+machinery lint                      # then machinery gen, and commit the design change
+machinery intake status <id>        # each step done or missing, with the reason
+machinery intake plan <id>          # the stories it would create
+machinery intake plan <id> --apply  # all of them in one backlog call, owed, with the capstone
+```
+
+- `intake plan` refuses until the design changed, lints, is generated and committed, has its
+  tiers, and every critical area it touches has a formal spec. It refuses while a wave is
+  frozen: a contract change lands alone.
+- The capstone, `Demonstrate: <title>`, closes last. It shows the intent and each refusal on
+  the running system through its real interface, records the commands as `machinery:demo`
+  lines, and is accepted by a fresh verifier.
+- A requirement the design already covers: append `machinery:no-design-change <reason>` to the
+  item's notes; only the capstone is planned.
+- `machinery check` warns about an intake whose design changed with nothing planned, and about a
+  delivered intake left open. `machinery waves` fails on a story labelled `machinery` that
+  names no ids.
+
 ## From owed to stories
+
+Obligations owed without a requirement behind them (a new project's skeleton, an adoption):
 
 ```
 machinery owed list            # what is unproven
