@@ -34,7 +34,7 @@ stdout '^run:\n  export MACHINERY_AGENT=shop-r1-builder\n  machinery check --bas
 exec machinery brief shop-k1
 stdout '^BRIEF shop-k1 \(builder\)$'
 stdout '^tier: critical \(order-payment: money moves; a double charge cannot be undone\)$'
-stdout '^route: strongest model for the formal model; standard model for code; fresh verifier$'
+stdout '^route: strongest model for the formal model; standard model for code; fresh verifier of at least the builder''s class$'
 stdout '^  tc:ORDE-2e883d  Pending on:pay \[hasPaymentMethod\] -> paying$'
 stdout '^  design/machines/Order.machine.json$'
 stdout '^  design/gen/tables/order.table.json$'
@@ -51,7 +51,7 @@ stdout 'machinery:proof [0-9a-f]{40} builder'
 exec machinery brief shop-c1 --role verifier
 stdout '^BRIEF shop-c1 \(verifier\)$'
 stdout '^tier: consequential \(shipping-permission: authorization: only a Clerk ships\)$'
-stdout '^route: standard model; fresh verifier$'
+stdout '^route: standard model; fresh verifier of at least the builder''s class$'
 stdout '^  act:Order.ship  action ship of Order$'
 stdout '^read:\n  design/failure-modes.yaml\n  design/model/shop.modelith.yaml\n  docs/formats.md\n'
 stdout '^agent: shop-c1-verifier$'
@@ -137,7 +137,7 @@ machinery:ids fv:order-payment
 BRIEF shop-r1 (builder)
 title: Prove the terminal invariant and the happy path
 tier: routine
-route: small model
+route: standard model
 agent: shop-r1-builder
 contract: X
 ids:
@@ -162,7 +162,7 @@ done when: machinery story shop-r1 passes
 BRIEF shop-k1 (modeler)
 title: Prove order pay
 tier: critical (order-payment: money moves; a double charge cannot be undone)
-route: strongest model for the formal model; standard model for code; fresh verifier
+route: strongest model for the formal model; standard model for code; fresh verifier of at least the builder's class
 contract: X
 ids:
   fm:payment-provider-down  The payment provider does not answer or answers with an error.

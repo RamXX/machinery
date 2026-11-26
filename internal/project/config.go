@@ -741,10 +741,10 @@ func (c *Config) validateImportedFailureModes() error {
 
 // Default routing texts (section 2).
 var DefaultRouting = map[string]string{
-	"routine":       "small model",
-	"consequential": "standard model; fresh verifier",
-	"critical":      "strongest model for the formal model; standard model for code; fresh verifier",
-	"vital":         "strongest model for the formal model and the core; standard model elsewhere; fresh verifier",
+	"routine":       "standard model",
+	"consequential": "standard model; fresh verifier of at least the builder's class",
+	"critical":      "strongest model for the formal model; standard model for code; fresh verifier of at least the builder's class",
+	"vital":         "strongest model for the formal model and the core; standard model elsewhere; fresh verifier of at least the builder's class",
 }
 
 func (c *Config) applyDefaults() {

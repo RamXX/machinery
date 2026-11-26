@@ -118,7 +118,7 @@ machinery:scope NOTES.md
 -- want.txt --
 wave 1
   shop-a  critical  Prove order pay
-    route: strongest model for the formal model; standard model for code; fresh verifier
+    route: strongest model for the formal model; standard model for code; fresh verifier of at least the builder's class
     scope: internal/domain/**
   shop-c  routine  Prove the terminal invariant
     route: small model, one pass
@@ -128,11 +128,11 @@ wave 1
     scope: NOTES.md
 wave 2
   shop-b  consequential  Prove order ship
-    route: standard model; fresh verifier
+    route: standard model; fresh verifier of at least the builder's class
     scope: internal/api/**
 wave 3
   shop-d  consequential  Document shipping
-    route: standard model; fresh verifier
+    route: standard model; fresh verifier of at least the builder's class
     scope: docs/**
 == waves ==
 checked: 5 stories, 2 edges, 3 waves
