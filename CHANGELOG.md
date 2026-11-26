@@ -48,8 +48,9 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
   generation.
 - Evidence cannot be typed by hand: a receipts file counts only when `machinery run` entered it
-  in the run ledger of the git directory and nothing changed it since, and a receipt counts only
-  when its test lies in a test file that claims the id. A receipt needs a `test`. This guards
+  in the run ledger of the git directory and nothing changed it since, and a `pass` receipt
+  proves only when its `test` names a test file that claims the id (`receipt.Test` in
+  `pkg/receipt` builds it); a `fail` always fails. A receipt needs a `test`. This guards
   against mistakes and casual edits, not against a party who can run commands as the tool
   (`docs/formats.md` section 10.2).
 

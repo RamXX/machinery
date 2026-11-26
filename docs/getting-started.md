@@ -50,10 +50,10 @@ system, or listed in `design/owed.yaml`.
 
 The system is `bin/tickets`. The test is `e2e/tickets_test.sh`: it runs the real script, asserts
 what it does, and only then appends one receipt per obligation to the file machinery names in
-`MACHINERY_RECEIPTS`. A receipt counts only from a run made by `machinery run`, and only when the
-test it names lies in a file that claims the id, as `tickets_test.sh` does in the comment below.
-There are no unit tests and no mocks, here or in any project that uses machinery. Code says which actions it serves and tests say which obligations they verify, in a
-comment:
+`MACHINERY_RECEIPTS`. A receipt proves only from a run made by `machinery run`, and only when it
+names a test file that claims the id, as `tickets_test.sh` does in the comment below. There are
+no unit tests and no mocks, here or in any project that uses machinery. Code says which actions
+it serves and tests say which obligations they verify, in a comment:
 
 ```
 # machinery:serves act:Ticket.open act:Ticket.close act:Ticket.reopen
