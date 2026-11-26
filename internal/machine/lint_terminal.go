@@ -6,6 +6,24 @@ import (
 	"github.com/RamXX/machinery/internal/ir"
 )
 
+// TerminalStates returns the dotted paths of the states that declare
+// _terminal, in document order.
+func (m *Machine) TerminalStates() []string {
+	ro := m.Root.AsObject()
+	if ro == nil {
+		return nil
+	}
+	var res []string
+	for _, s := range ir.WalkStates(ro.Get2("states"), "") {
+		if o := s.Node.AsObject(); o != nil {
+			if _, ok := o.Get("_terminal"); ok {
+				res = append(res, s.Path)
+			}
+		}
+	}
+	return res
+}
+
 // lintTerminal holds the shape and the placement of a state's _terminal: a
 // non-empty reason string on a non-final leaf state. Whether the state is
 // left at all is the dead-end rule's question (Lint).

@@ -135,27 +135,38 @@ func (t *tlcRunner) run(dir, module, cfg string, deadlock bool, timeout time.Dur
 	if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
 		return tlcOutcome{Outcome: "error", Violated: err.Error()}
 	}
+	var extra []string
+	if !deadlock {
+		extra = append(extra, "-deadlock")
+	}
+	out, runErr, failure := t.exec(dir, module, "run.cfg", extra, timeout)
+	if failure != "" {
+		return tlcOutcome{Outcome: "error", Violated: failure}
+	}
+	return parseTLC(out, runErr)
+}
+
+// exec runs TLC on a module in dir with a config file already there, and
+// returns its output. failure is set when TLC could not run to its end.
+func (t *tlcRunner) exec(dir, module, cfgName string, extra []string, timeout time.Duration) (out string, runErr error, failure string) {
 	meta, err := os.MkdirTemp(dir, "meta-")
 	if err != nil {
-		return tlcOutcome{Outcome: "error", Violated: err.Error()}
+		return "", nil, err.Error()
 	}
 	defer os.RemoveAll(meta)
-	args := []string{"-XX:+UseParallelGC", "-cp", t.jar, "tlc2.TLC", "-workers", strconv.Itoa(t.workers), "-metadir", meta, "-config", "run.cfg"}
-	if !deadlock {
-		args = append(args, "-deadlock")
-	}
-	args = append(args, module)
+	args := []string{"-XX:+UseParallelGC", "-cp", t.jar, "tlc2.TLC", "-workers", strconv.Itoa(t.workers), "-metadir", meta, "-config", cfgName}
+	args = append(append(args, extra...), module)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, t.java, args...)
 	cmd.Dir = dir
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-	runErr := cmd.Run()
+	var buf bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &buf, &buf
+	runErr = cmd.Run()
 	if ctx.Err() == context.DeadlineExceeded {
-		return tlcOutcome{Outcome: "error", Violated: fmt.Sprintf("timed out after %s", timeout)}
+		return buf.String(), runErr, fmt.Sprintf("timed out after %s", timeout)
 	}
-	return parseTLC(out.String(), runErr)
+	return buf.String(), runErr, ""
 }
 
 func parseTLC(out string, runErr error) tlcOutcome {
