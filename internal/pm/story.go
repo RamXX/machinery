@@ -10,9 +10,12 @@ import (
 )
 
 // StoryTier returns the tier of a story: the highest tier among its ids,
-// else its tier label, else routine (section 15.1). areas are the areas
-// giving the tier.
+// else its tier label, else routine (section 15.1); a capstone is at least
+// consequential (section 15.6). areas are the areas giving the tier.
 func StoryTier(d *design.Design, is *backlog.Issue, ids []string) (tier string, areas []string) {
+	if backlog.ParseTags(is).Capstone {
+		return capstoneTier(d, is, ids)
+	}
 	if len(ids) > 0 {
 		return evidence.HighestTier(d, ids)
 	}
@@ -20,6 +23,22 @@ func StoryTier(d *design.Design, is *backlog.Issue, ids []string) (tier string, 
 		return l, nil
 	}
 	return design.Routine, nil
+}
+
+// capstoneTier is the tier of a capstone: the highest of its ids and its
+// label, and at least consequential (section 15.6).
+func capstoneTier(d *design.Design, is *backlog.Issue, ids []string) (string, []string) {
+	tier, areas := design.Routine, []string(nil)
+	if len(ids) > 0 {
+		tier, areas = evidence.HighestTier(d, ids)
+	}
+	if l := LabelTier(is); design.TierRank(l) > design.TierRank(tier) {
+		tier, areas = l, nil
+	}
+	if design.TierRank(tier) < design.TierRank(design.Consequential) {
+		tier, areas = design.Consequential, nil
+	}
+	return tier, areas
 }
 
 // LabelTier returns the tier of the story's tier:<tier> label, or "".

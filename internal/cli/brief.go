@@ -37,7 +37,11 @@ func runBrief(e *Env, args []string) int {
 	if is == nil {
 		return code
 	}
-	if err := pm.Brief(e.Stdout, design.Load(p), is, *role); err != nil {
+	ids, _, err := storyIDs(c, is)
+	if err != nil {
+		return e.Fail(err)
+	}
+	if err := pm.Brief(e.Stdout, design.Load(p), is, *role, ids); err != nil {
 		return e.Fail(err)
 	}
 	return 0

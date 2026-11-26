@@ -29,21 +29,28 @@ type Waves struct {
 	Stage    *report.Stage
 }
 
-// BuildWaves layers the stories that are not closed, not deferred and not
-// epics by their blocking edges.
+// BuildWaves layers the stories that are not closed, not deferred, not
+// epics and not intake items by their blocking edges.
 func BuildWaves(d *design.Design, issues []backlog.Issue) *Waves {
 	w := &Waves{Contract: ContractOf(d), Stage: report.New("waves")}
 	s := w.Stage
+	intakes := map[string]bool{}
+	for i := range issues {
+		if backlog.ParseTags(&issues[i]).Intake {
+			intakes[issues[i].ID] = true
+		}
+	}
 	open := map[string]*backlog.Issue{}
 	var ids []string
 	for i := range issues {
 		is := &issues[i]
-		if is.Open() && is.Type != "epic" {
+		if is.Open() && is.Type != "epic" && !intakes[is.ID] {
 			open[is.ID] = is
 			ids = append(ids, is.ID)
 		}
 	}
 	sort.Strings(ids)
+	designIDs(s, ids, open, intakes)
 	blockers := map[string][]string{}
 	edges := 0
 	for _, id := range ids {
@@ -91,6 +98,28 @@ func BuildWaves(d *design.Design, issues []backlog.Issue) *Waves {
 		s.NotDemonstrated("nothing to check")
 	}
 	return w
+}
+
+// designIDs holds every story in the design's name to its ids: one labelled
+// machinery or belonging to an intake names the ids it proves, unless it is a
+// capstone. The other stories without ids are only counted (section 15.3).
+func designIDs(s *report.Stage, ids []string, open map[string]*backlog.Issue, intakes map[string]bool) {
+	outside := 0
+	for _, id := range ids {
+		is := open[id]
+		t := backlog.ParseTags(is)
+		if len(t.IDs) > 0 || t.Capstone {
+			continue
+		}
+		if is.HasLabel("machinery") || t.IntakeOf != "" || intakes[is.Parent] {
+			s.Errorf("no design ids: %s: a story proves ids; a requirement starts with machinery intake new", id)
+			continue
+		}
+		outside++
+	}
+	if outside > 0 {
+		s.Warnf("%d open stories outside machinery (no design ids)", outside)
+	}
 }
 
 func waveStory(d *design.Design, is *backlog.Issue, s *report.Stage) WaveStory {

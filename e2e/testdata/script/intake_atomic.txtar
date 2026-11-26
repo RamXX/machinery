@@ -1,0 +1,224 @@
+# intake plan --apply is whole or nothing: when the backlog call fails, owed.yaml and the backlog are unchanged (section 15.7)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec machinery intake new 'Refund a paid order' --intent 'A Clerk refunds a paid order' --refuses 'a refund of an unpaid order'
+cp refund/shop.modelith.yaml design/model/shop.modelith.yaml
+cp refund/Order.machine.json design/machines/Order.machine.json
+cp refund/openapi.yaml contracts/openapi.yaml
+exec machinery gen
+gitcommit 'design: refund a paid order'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^intake shop-[a-z0-9]+: 6 of 7 steps done; next: planned$'
+
+# the real bd in its read-only mode: it reads the backlog and refuses every write
+exec sh -c 'printf "tools:\n  bd: %s/bd-readonly.sh\n" "$PWD" >> machinery.yaml'
+chmod 755 bd-readonly.sh
+cp design/owed.yaml owed-before.yaml
+exec sh -c 'bd list --all --json --limit 0 > backlog-before.json'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(iid) --apply'
+stderr '^machinery: bd create: .*read-only mode'
+! stdout .
+cmp design/owed.yaml owed-before.yaml
+exec sh -c 'bd list --all --json --limit 0 > backlog-after.json'
+cmp backlog-after.json backlog-before.json
+exec sh -c '. ./lib.sh; bd show $(iid) --json'
+! stdout 'intake-planned'
+exec git status --short
+! stdout 'design/'
+
+# with a writable backlog the same plan goes through whole
+cp machinery-bd.yaml machinery.yaml
+exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
+stdout '^plan: 3 created, 0 existing, 2 edge\(s\)$'
+stdout '^owed: 3 added$'
+
+-- bd-readonly.sh --
+#!/bin/sh
+exec bd --readonly "$@"
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
+# iid: the id of the intake item of this script
+iid() {
+  sid 'Refund a paid order'
+}
+-- refund/shop.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Shop
+description: >
+  A minimal order desk used as the shared test fixture. A Customer places an
+  Order, pays for it, and a Clerk ships it. An Order can be cancelled until it
+  ships.
+
+glossary:
+  Clerk: "A staff member who ships a paid `Order`."
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Placed, not yet paid."}
+      - {name: Paid, definition: "Payment captured."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Cancelled, definition: "Abandoned before shipping; terminal."}
+
+entities:
+  Customer:
+    definition: >
+      A person who places and pays for an `Order`.
+    attributes:
+      - {name: email, type: string}
+    relationships:
+      - {entity: Order, cardinality: "1:n", ownership: owned}
+    invariants:
+      - {id: customer-email-unique, statement: "No two `Customer` records share an email."}
+  Order:
+    definition: >
+      A request by one `Customer` to buy goods. Its status follows the order
+      lifecycle from pending to shipped or cancelled.
+    attributes:
+      - {name: status, type: OrderStatus}
+      - {name: totalCents, type: integer}
+    relationships:
+      - {entity: Customer, cardinality: "n:1", ownership: referenced}
+    actions:
+      - {name: place, actor: Customer, description: "Create the `Order` in the pending status."}
+      - {name: pay, actor: Customer, preserves: [paid-before-shipped]}
+      - {name: ship, actor: Clerk, preserves: [paid-before-shipped]}
+      - {name: cancel, actor: Customer, preserves: [terminal-is-final]}
+      - {name: refund, actor: Clerk, description: "Return the payment of a paid `Order` and cancel it."}
+    invariants:
+      - {id: paid-before-shipped, statement: "An `Order` reaches the shipped status only from the paid status."}
+
+invariants:
+  - {id: terminal-is-final, statement: "A shipped or cancelled `Order` never changes status again."}
+
+scenarios:
+  - name: Customer pays and the order ships
+    actors: [Customer, Clerk]
+    steps:
+      - "Customer places an `Order`; it is pending."
+      - "Customer pays; the `Order` becomes paid."
+      - "Clerk ships; the `Order` becomes shipped."
+    invariants_touched: [paid-before-shipped]
+  - name: Cancelled order refuses payment
+    actors: [Customer]
+    steps:
+      - "Customer places an `Order` and cancels it."
+      - "Customer tries to pay; the request is refused and the `Order` stays cancelled."
+    invariants_touched: [terminal-is-final]
+-- refund/Order.machine.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": { "orderId": null, "lastError": null },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          { "target": "paying", "guard": "hasPaymentMethod", "actions": "stampAttempt" },
+          { "actions": "recordPayRefused" }
+        ],
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID",
+        "refund": "an unpaid order has nothing to refund; the API refuses with ORDER_NOT_PAID"
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid", "actions": "recordCharge" },
+        "onError": { "target": "Pending", "actions": "recordPaymentFailure" }
+      },
+      "after": {
+        "payTimeout": { "target": "Pending", "actions": "recordPaymentTimeout" }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": { "target": "Shipped", "actions": "recordShipment" },
+        "cancel": { "target": "Cancelled", "actions": ["refundPayment", "recordCancellation"] },
+        "refund": { "target": "Cancelled", "actions": ["refundPayment", "recordRefund"] }
+      },
+      "_ignores": { "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID" }
+    },
+    "Shipped": { "type": "final", "entry": "notifyCustomer" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- refund/openapi.yaml --
+openapi: 3.1.0
+info:
+  title: Shop API
+  version: 0.1.0
+paths:
+  /orders:
+    post:
+      operationId: placeOrder
+      x-machinery-action: Order.place
+      responses:
+        "201": {description: Created}
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses:
+        "200": {description: The order}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses:
+        "200": {description: Paid or refused with a code}
+  /orders/{id}/ship:
+    post:
+      operationId: shipOrder
+      x-machinery-action: Order.ship
+      responses:
+        "200": {description: Shipped or refused with a code}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses:
+        "200": {description: Cancelled or refused with a code}
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      x-machinery-action: Order.refund
+      responses:
+        "200": {description: Refunded or refused with a code}

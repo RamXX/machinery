@@ -40,11 +40,34 @@ func storyGate(e *Env, p *project.Project, c *backlog.Client, id string) int {
 	if is == nil {
 		return code
 	}
-	s, err := pm.StoryGate(design.Load(p), is)
+	issues, err := capstoneBacklog(c, is)
+	if err != nil {
+		return e.Fail(err)
+	}
+	s, err := pm.StoryGate(design.Load(p), is, issues)
 	if err != nil {
 		return e.Fail(err)
 	}
 	return report.PrintAll(e.Stdout, "story", []*report.Stage{s})
+}
+
+// capstoneBacklog reads the backlog when a story is a capstone, whose ids and
+// siblings are the other stories of its intake (section 15.6); nil otherwise.
+func capstoneBacklog(c *backlog.Client, is *backlog.Issue) ([]backlog.Issue, error) {
+	if !backlog.ParseTags(is).Capstone {
+		return nil, nil
+	}
+	return c.List()
+}
+
+// storyIDs returns the design ids of a story: its machinery:ids, or for a
+// capstone the ids of the other stories of its intake.
+func storyIDs(c *backlog.Client, is *backlog.Issue) ([]string, bool, error) {
+	issues, err := capstoneBacklog(c, is)
+	if err != nil || issues == nil {
+		return backlog.ParseTags(is).IDs, false, err
+	}
+	return pm.CapstoneIDs(is, issues), true, nil
 }
 
 // showStory reads one story; a story bd cannot show is a usage error.

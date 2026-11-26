@@ -34,7 +34,7 @@ grep '"title": "Model order-payment \(tla\)",$' plan.json
 grep '"title": "Model order-ownership \(alloy\)",$' plan.json
 grep '"title": "Serve Order actions",$' plan.json
 grep '"acceptance_criteria": "- Each listed obligation is proven' plan.json
-grep '"description": "Owed ids:\\n- tc:ORDE-2e883d: Pending on:pay \[hasPaymentMethod\] -> paying \(effects: stampAttempt\)' plan.json
+grep '"description": "Intent:\\nMachine order answers pay on the running system as its table says.\\n\\nAcceptance:\\n- tc:ORDE-2e883d: Pending on:pay \[hasPaymentMethod\] -> paying, effects: stampAttempt; observed on the running system\\n' plan.json
 exec sh -c 'tr -d " \n" < plan.json | grep -o "\"edges\":.*"'
 stdout '"from_key":"prove-cx-order-payment-race","to_key":"model-order-payment-tla","type":"blocks"'
 stdout '"from_key":"prove-cx-order-payment-race","to_key":"prove-order-pay","type":"blocks"'
@@ -194,10 +194,20 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- fv:order-ownership: Formal model of order-ownership: an order belongs to exactly one customer, whatever the data looks like
+Intent:
+The formal model of order-ownership answers its questions and is proven.
 
+Acceptance:
+- fv:order-ownership: machinery formal check proves the model: an order belongs to exactly one customer, whatever the data looks like
+
+Ids:
 machinery:ids fv:order-ownership
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -215,10 +225,20 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- fv:order-payment: Formal model of order-payment: money moves; a double charge cannot be undone
+Intent:
+The formal model of order-payment answers its questions and is proven.
 
+Acceptance:
+- fv:order-payment: machinery formal check proves the model: money moves; a double charge cannot be undone
+
+Ids:
 machinery:ids fv:order-payment
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -236,14 +256,21 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- cx:order-payment:race: Replay ChargedOnce (order-payment run race)
+Intent:
+The counterexample of the formal model cannot happen on the running system.
+
+Acceptance:
+- cx:order-payment:race: refused on the running system: the replay of order-payment run race keeps ChargedOnce
+
+Ids:
+machinery:ids cx:order-payment:race
+
+Excludes:
+- No design change: a design change is its own story.
 
 Needs:
 - Model order-payment (tla): the formal model the tier requires
 - Prove order pay: the transitions the replay drives
-
-machinery:ids cx:order-payment:race
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -261,13 +288,20 @@ task
 machinery, tier:routine
 
 ### Description
-Owed ids:
-- fm:payment-provider-down: The payment provider does not answer or answers with an error.
+Intent:
+The failure gets its required behavior on the running system.
+
+Acceptance:
+- fm:payment-provider-down: The payment provider does not answer or answers with an error. Required behavior (surface): The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE.
+
+Ids:
+machinery:ids fm:payment-provider-down
+
+Excludes:
+- No design change: a design change is its own story.
 
 Needs:
 - Prove order internal transitions: the invoke path the failure is induced on
-
-machinery:ids fm:payment-provider-down
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -284,10 +318,20 @@ task
 machinery, tier:routine
 
 ### Description
-Owed ids:
-- fm:ship-by-non-clerk: A caller who is not a Clerk asks to ship an order.
+Intent:
+The failure gets its required behavior on the running system.
 
+Acceptance:
+- fm:ship-by-non-clerk: refused: A caller who is not a Clerk asks to ship an order. Required behavior: The request is refused with FORBIDDEN and the order does not change.
+
+Ids:
 machinery:ids fm:ship-by-non-clerk
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -304,10 +348,20 @@ task
 machinery, tier:routine
 
 ### Description
-Owed ids:
-- inv:terminal-is-final: A shipped or cancelled Order never changes status again.
+Intent:
+The invariant holds on the running system.
 
+Acceptance:
+- inv:terminal-is-final: holds on the running system: A shipped or cancelled Order never changes status again.
+
+Ids:
 machinery:ids inv:terminal-is-final
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -324,14 +378,21 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- tc:ORDE-1ded14: Pending on:cancel -> Cancelled (effects: recordCancellation)
-- tc:ORDE-507e4f: Paid on:cancel -> Cancelled (effects: refundPayment, recordCancellation)
+Intent:
+Machine order answers cancel on the running system as its table says.
+
+Acceptance:
+- tc:ORDE-1ded14: Pending on:cancel -> Cancelled, effects: recordCancellation; observed on the running system
+- tc:ORDE-507e4f: Paid on:cancel -> Cancelled, effects: refundPayment, recordCancellation; observed on the running system
+
+Ids:
+machinery:ids tc:ORDE-1ded14 tc:ORDE-507e4f
+
+Excludes:
+- No design change: a design change is its own story.
 
 Needs:
 - Model order-payment (tla): the formal model the tier requires
-
-machinery:ids tc:ORDE-1ded14 tc:ORDE-507e4f
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -349,15 +410,22 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- tc:ORDE-267d12: paying onError:chargePayment -> Pending (effects: recordPaymentFailure)
-- tc:ORDE-8bd6e7: paying onDone:chargePayment -> Paid (effects: recordCharge)
-- tc:ORDE-ad945c: paying after:payTimeout -> Pending (effects: recordPaymentTimeout)
+Intent:
+Machine order makes its internal transitions on the running system as its table says.
+
+Acceptance:
+- tc:ORDE-267d12: paying onError:chargePayment -> Pending, effects: recordPaymentFailure; observed on the running system
+- tc:ORDE-8bd6e7: paying onDone:chargePayment -> Paid, effects: recordCharge; observed on the running system
+- tc:ORDE-ad945c: paying after:payTimeout -> Pending, effects: recordPaymentTimeout; observed on the running system
+
+Ids:
+machinery:ids tc:ORDE-267d12 tc:ORDE-8bd6e7 tc:ORDE-ad945c
+
+Excludes:
+- No design change: a design change is its own story.
 
 Needs:
 - Model order-payment (tla): the formal model the tier requires
-
-machinery:ids tc:ORDE-267d12 tc:ORDE-8bd6e7 tc:ORDE-ad945c
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -375,15 +443,22 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- tc:ORDE-2e883d: Pending on:pay [hasPaymentMethod] -> paying (effects: stampAttempt)
-- tc:ORDE-70d94f: Pending on:pay -> (internal) (effects: recordPayRefused)
-- tc:ORDE-8799a1: Paid ignore:pay -> (unchanged) (effects: none)
+Intent:
+Machine order answers pay on the running system as its table says.
+
+Acceptance:
+- tc:ORDE-2e883d: Pending on:pay [hasPaymentMethod] -> paying, effects: stampAttempt; observed on the running system
+- tc:ORDE-70d94f: Pending on:pay -> (internal), effects: recordPayRefused; observed on the running system
+- tc:ORDE-8799a1: refused: pay in Paid changes nothing and has no effect (already paid; a repeated pay is refused with ORDER_ALREADY_PAID)
+
+Ids:
+machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f tc:ORDE-8799a1
+
+Excludes:
+- No design change: a design change is its own story.
 
 Needs:
 - Model order-payment (tla): the formal model the tier requires
-
-machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f tc:ORDE-8799a1
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -401,14 +476,21 @@ task
 machinery, tier:critical
 
 ### Description
-Owed ids:
-- tc:ORDE-2fa2af: Pending ignore:ship -> (unchanged) (effects: none)
-- tc:ORDE-e6d28f: Paid on:ship -> Shipped (effects: recordShipment, notifyCustomer)
+Intent:
+Machine order answers ship on the running system as its table says.
+
+Acceptance:
+- tc:ORDE-2fa2af: refused: ship in Pending changes nothing and has no effect (an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID)
+- tc:ORDE-e6d28f: Paid on:ship -> Shipped, effects: recordShipment, notifyCustomer; observed on the running system
+
+Ids:
+machinery:ids tc:ORDE-2fa2af tc:ORDE-e6d28f
+
+Excludes:
+- No design change: a design change is its own story.
 
 Needs:
 - Model order-payment (tla): the formal model the tier requires
-
-machinery:ids tc:ORDE-2fa2af tc:ORDE-e6d28f
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -426,10 +508,20 @@ task
 machinery, tier:routine
 
 ### Description
-Owed ids:
-- sc:customer-pays-and-the-order-ships: Customer pays and the order ships
+Intent:
+The scenario runs end to end on the running system.
 
+Acceptance:
+- sc:customer-pays-and-the-order-ships: runs end to end on the running system: Customer pays and the order ships
+
+Ids:
 machinery:ids sc:customer-pays-and-the-order-ships
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -446,11 +538,21 @@ task
 machinery, tier:consequential
 
 ### Description
-Owed ids:
-- act:Order.cancel: action cancel of Order
-- act:Order.ship: action ship of Order
+Intent:
+Code serves the actions of Order through their operations.
 
+Acceptance:
+- act:Order.cancel: served by code and reachable through its operation: action cancel of Order
+- act:Order.ship: served by code and reachable through its operation: action ship of Order
+
+Ids:
 machinery:ids act:Order.cancel act:Order.ship
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
 
 ### Acceptance Criteria
 - Each listed action is served by code (stage trace) and removed from owed.yaml.

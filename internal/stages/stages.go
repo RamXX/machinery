@@ -50,6 +50,7 @@ var Defs = []Def{
 	{"tests", "Evidence comes from the real system: no unit tests, no test doubles."},
 	{"trace", "Every action is served by code and every obligation is claimed by a test or owed."},
 	{"contract", "Stories running in parallel build against the same design."},
+	{"intake", "A requirement reaches the backlog only through the design it changed, and is closed once delivered."},
 	{"ratchet", "What was proven, covered or modeled stays so."},
 	{"verify", "Each obligation is observed on the running system at this commit."},
 	{"probe", "The tests would notice a wrong transition or a missing effect."},
@@ -60,7 +61,7 @@ var Defs = []Def{
 var LintStages = []string{"model", "machines", "failure-modes", "risk", "xref-model-machine", "xref-contract", "xref-failure", "xstate"}
 
 // CheckStages are the stages of machinery check without --base, in order.
-var CheckStages = append(append([]string{}, LintStages...), "gen-drift", "formal", "checkers", "arch", "tests", "trace", "contract")
+var CheckStages = append(append([]string{}, LintStages...), "gen-drift", "formal", "checkers", "arch", "tests", "trace", "contract", "intake")
 
 var bound = map[string]func(*Context) *report.Stage{}
 

@@ -13,11 +13,21 @@ import (
 )
 
 // StoryGate is stage story (section 15.6): the tier gate of one story at the
-// current commit.
-func StoryGate(d *design.Design, is *backlog.Issue) (*report.Stage, error) {
+// current commit. issues is the backlog, read for a capstone (its ids and
+// its siblings are the other stories of its intake); nil otherwise.
+func StoryGate(d *design.Design, is *backlog.Issue, issues []backlog.Issue) (*report.Stage, error) {
 	s := report.New("story")
 	t := backlog.ParseTags(is)
-	if len(t.IDs) == 0 {
+	if t.Intake {
+		s.Errorf("%s is an intake item: an intake item is planned, not built; run machinery intake status %s", is.ID, is.ID)
+		return s, nil
+	}
+	ids := t.IDs
+	var siblings []backlog.Issue
+	if t.Capstone {
+		siblings = CapstoneSiblings(is, issues)
+		ids = CapstoneIDs(is, issues)
+	} else if len(ids) == 0 {
 		return s.NotDemonstrated("story names no design ids"), nil
 	}
 	p := d.P
@@ -25,19 +35,22 @@ func StoryGate(d *design.Design, is *backlog.Issue) (*report.Stage, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.Count(len(t.IDs), "ids").Count(len(t.Proofs), "proofs").Count(len(t.Predictions), "predictions").Count(len(t.Verdicts), "verdicts")
+	s.Count(len(ids), "ids").Count(len(t.Proofs), "proofs").Count(len(t.Predictions), "predictions").Count(len(t.Verdicts), "verdicts")
 	valid := func(commit string) bool { return commit != "" && evidence.ValidFor(p, ev.Head, commit) }
 	short := gitx.Short(ev.Head)
 	if ev.Dirty {
 		s.Errorf("working tree has uncommitted changes")
 	}
-	tier, _ := StoryTier(d, is, t.IDs)
+	tier, _ := StoryTier(d, is, ids)
 	if l := LabelTier(is); l != "" && l != tier {
 		s.Warnf("label tier:%s disagrees with the ids: the story is %s", l, tier)
 	}
 	owed := d.OwedSet()
-	for _, id := range t.IDs {
+	for _, id := range ids {
 		judgeID(s, d, ev, owed, id)
+	}
+	if t.Capstone {
+		judgeCapstone(s, t, siblings, ids, ev.HasEvidence, short)
 	}
 
 	// routine: a proof for a commit the evidence is valid for
@@ -85,7 +98,7 @@ func StoryGate(d *design.Design, is *backlog.Issue) (*report.Stage, error) {
 	}
 
 	// critical: the formal models of the story's areas and their replays
-	areas := CriticalAreas(d, t.IDs)
+	areas := CriticalAreas(d, ids)
 	proven := formal.ProvenAreas(d)
 	specs, err := formal.Load(p)
 	if err != nil {
@@ -116,6 +129,23 @@ func StoryGate(d *design.Design, is *backlog.Issue) (*report.Stage, error) {
 		}
 	}
 	return s, nil
+}
+
+// judgeCapstone adds what a capstone needs on top of its tier (section
+// 15.6): demo lines, closed siblings, and evidence when it has no id.
+func judgeCapstone(s *report.Stage, t backlog.Tags, siblings []backlog.Issue, ids []string, hasEvidence bool, short string) {
+	s.Count(len(t.Demos), "demos").Count(len(siblings), "stories")
+	if len(t.Demos) == 0 {
+		s.Errorf("no demo: record each command that shows the intent on its own machinery:demo line")
+	}
+	for _, sib := range siblings {
+		if sib.Status != "closed" {
+			s.Errorf("open story of the intake: %s %s: the capstone closes last", sib.ID, sib.Title)
+		}
+	}
+	if len(ids) == 0 && !hasEvidence {
+		s.Errorf("no evidence at %s: run the tests through machinery run", short)
+	}
 }
 
 func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed map[string]design.OwedEntry, id string) {

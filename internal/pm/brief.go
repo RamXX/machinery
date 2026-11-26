@@ -23,11 +23,12 @@ const (
 
 const formatsDoc = "docs/formats.md"
 
-// Brief writes the brief of a story for a role, as pointers.
-func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string) error {
+// Brief writes the brief of a story for a role, as pointers. ids are the
+// story's design ids (for a capstone, those of its intake's other stories).
+func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []string) error {
 	p := d.P
 	t := backlog.ParseTags(is)
-	tier, areas := StoryTier(d, is, t.IDs)
+	tier, areas := StoryTier(d, is, ids)
 	specs, err := formal.Load(p)
 	if err != nil {
 		return err
@@ -36,7 +37,7 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string) error 
 	if p.Cfg.Backlog != nil {
 		base = p.Cfg.Backlog.Base
 	}
-	if role == Modeler && len(CriticalAreas(d, t.IDs)) == 0 {
+	if role == Modeler && len(CriticalAreas(d, ids)) == 0 {
 		return project.Errf("story %s has no id in a critical area: the modeler role is for a story that needs a formal model", is.ID)
 	}
 	fmt.Fprintf(w, "BRIEF %s (%s)\n", is.ID, role)
@@ -49,11 +50,11 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string) error 
 	}
 	fmt.Fprintf(w, "contract: %s at %s\n", ContractOf(d).Short(), head)
 	fmt.Fprintln(w, "ids:")
-	for _, id := range t.IDs {
+	for _, id := range ids {
 		fmt.Fprintf(w, "  %s  %s\n", id, IDTitle(d, id))
 	}
-	critical := CriticalAreas(d, t.IDs)
-	mine := specsOf(specs, critical, t.IDs)
+	critical := CriticalAreas(d, ids)
+	mine := specsOf(specs, critical, ids)
 	var read, run []string
 	switch role {
 	case Modeler:
@@ -65,14 +66,14 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string) error 
 		}
 		run = append(run, "machinery formal baseline")
 	case Verifier:
-		read = idRead(d, mine, t.IDs)
+		read = idRead(d, mine, ids)
 		run = []string{
 			fmt.Sprintf("machinery predict %s --observation \"...\" --expect \"...\"", is.ID),
 			"machinery proof --story " + is.ID,
 			fmt.Sprintf("machinery accept %s --verdict accept|reject --observed \"...\"", is.ID),
 		}
 	default:
-		read = idRead(d, mine, t.IDs)
+		read = idRead(d, mine, ids)
 		e2e := "<the end-to-end command>"
 		if len(p.Cfg.Commands.E2E) > 0 {
 			e2e = strings.Join(p.Cfg.Commands.E2E, " ")

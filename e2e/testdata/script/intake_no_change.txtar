@@ -1,0 +1,137 @@
+# intake without a design change: a requirement the design covers, a rewording; only the capstone is planned (section 15.7)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+
+# a requirement the design already covers closes on machinery:no-design-change
+exec machinery intake new 'Ship a paid order' --intent 'A Clerk ships a paid order; it ends Shipped and the customer is told' --refuses 'shipping an unpaid order'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Ship a paid order")'
+stdout '^  design changed  missing  the contract is the base contract: change the design first, or record machinery:no-design-change <reason>$'
+exec sh -c '. ./lib.sh; bd update $(sid "Ship a paid order") --append-notes "machinery:no-design-change the order lifecycle already ships a paid order"'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Ship a paid order")'
+stdout '^  design changed  done     no design change: the order lifecycle already ships a paid order; the design already covers it$'
+stdout '^  new ids         done     none since [0-9a-f]{7}: only the capstone is planned$'
+stdout '^intake shop-[a-z0-9]+: 6 of 7 steps done; next: planned$'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Ship a paid order") | sed "s/$(sid "Ship a paid order")/INTAKE/g"'
+cmp stdout want-capstone.md
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Ship a paid order") --apply'
+stdout '^intake shop-[a-z0-9]+: no new id: the design change adds none; only the capstone is planned$'
+stdout '^plan: 1 created, 0 existing, 0 edge\(s\)$'
+stdout '^owed: 0 added$'
+stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
+exec sh -c '. ./lib.sh; mrun 0 intake status $(sid "Ship a paid order")'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+$'
+exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Ship a paid order") --json'
+stdout '"tier:consequential"'
+exec git status --short
+! stdout .
+
+# a capstone without ids: its proof has no criteria, its gate needs evidence at the commit
+exec sh -c '. ./lib.sh; machinery proof --story $(sid "Demonstrate: Ship a paid order")'
+stdout '^result:   no evidence at [0-9a-f]{7}$'
+stdout '^criteria:$'
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Demonstrate: Ship a paid order")'
+stdout '^checked: 0 ids, 0 proofs, 0 predictions, 0 verdicts, 0 demos, 0 stories$'
+stdout '^  ERROR  no evidence at [0-9a-f]{7}: run the tests through machinery run$'
+stdout '^  ERROR  no demo: record each command that shows the intent on its own machinery:demo line$'
+
+# machinery:no-design-change is refused while ids are new: a counterexample trace adds one
+exec machinery intake new 'Replay the payment race' --intent 'The payment race never charges twice'
+exec sh -c '. ./lib.sh; bd update $(sid "Replay the payment race") --append-notes "machinery:no-design-change covered by the payment model"'
+mkdir design/formal/traces
+cp race.trace.json design/formal/traces/order-payment.race.trace.json
+exec machinery gen
+gitcommit 'a counterexample trace'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Replay the payment race")'
+stdout '^  design changed  missing  machinery:no-design-change needs a plan without new ids: 1 id\(s\) are new$'
+stdout '^    cx:order-payment:race  routine$'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(sid "Replay the payment race")'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: design changed is missing: machinery:no-design-change needs a plan without new ids: 1 id\(s\) are new$'
+
+# a rewording changes the design and adds no id: the capstone alone
+exec machinery intake new 'Explain the order lifecycle' --intent 'A reader of the machine learns why paying is transient'
+exec sed -i.bak 's/Order lifecycle\./The order lifecycle./' design/machines/Order.machine.json
+exec machinery gen
+gitcommit 'machine: reword the comment'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Explain the order lifecycle")'
+stdout '^  design changed  done     contract [0-9a-f]{12}, base [0-9a-f]{12}$'
+stdout '^  new ids         done     none since [0-9a-f]{7}: only the capstone is planned$'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Explain the order lifecycle") --apply'
+stdout '^intake shop-[a-z0-9]+: no new id: the design change adds none; only the capstone is planned$'
+stdout '^plan: 1 created, 0 existing, 0 edge\(s\)$'
+
+-- race.trace.json --
+{
+  "version": 1,
+  "id": "cx:order-payment:race",
+  "spec": "order-payment",
+  "run": "race",
+  "tool": "tla",
+  "violates": "ChargedOnce",
+  "expect": "refuted",
+  "machine": "order",
+  "steps": [
+    {
+      "n": 1,
+      "case": "tc:ORDE-2e883d",
+      "instance": "i1",
+      "caller": "c2",
+      "step": "begin",
+      "state": {
+        "i1": "Pending"
+      }
+    }
+  ],
+  "loop": 0,
+  "instance": {}
+}
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
+# iid: the id of the intake item of this script
+iid() {
+  sid 'Refund a paid order'
+}
+-- want-capstone.md --
+intake INTAKE: no new id: the design change adds none; only the capstone is planned
+## Demonstrate: Ship a paid order
+
+### Type
+task
+
+### Priority
+1
+
+### Labels
+machinery, tier:consequential
+
+### Description
+Intent:
+Show the requirement on the running system through its real interface.
+Requirement INTAKE: A Clerk ships a paid order; it ends Shipped and the customer is told
+
+Acceptance:
+- The intent is observed: A Clerk ships a paid order; it ends Shipped and the customer is told
+- Refused: shipping an unpaid order
+
+Ids:
+machinery:capstone
+machinery:intake INTAKE
+
+Excludes:
+- No new behavior: the capstone shows what the other stories built.
+- No design change: a design change is its own story.
+
+Needs:
+- none
+
+### Acceptance Criteria
+- The intent is shown on the running system through its real interface: A Clerk ships a paid order; it ends Shipped and the customer is told
+- Refused on the running system: shipping an unpaid order
+- The commands that show it are recorded on this story, one machinery:demo <command> line each.
+- Every other story of the intake is closed.
+- machinery story passes for this story.

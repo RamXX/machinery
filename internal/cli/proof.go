@@ -53,9 +53,16 @@ func runProof(e *Env, args []string) int {
 		if is == nil {
 			return code
 		}
-		tierIDs = backlog.ParseTags(is).IDs
-		if sel = pm.ObligationIDs(d, tierIDs); len(sel) == 0 {
+		ids, capstone, err := storyIDs(c, is)
+		if err != nil {
+			return e.Fail(err)
+		}
+		tierIDs = ids
+		if sel = pm.ObligationIDs(d, tierIDs); len(sel) == 0 && !capstone {
 			return e.Usage("story %s names no obligation id", *story)
+		}
+		if tierIDs == nil {
+			tierIDs = []string{}
 		}
 	} else {
 		var err error

@@ -64,7 +64,11 @@ func runAccept(e *Env, args []string) int {
 	if is, code = showStory(e, c, is.ID); is == nil {
 		return code
 	}
-	s, err := pm.StoryGate(design.Load(p), is)
+	issues, err := capstoneBacklog(c, is)
+	if err != nil {
+		return e.Fail(err)
+	}
+	s, err := pm.StoryGate(design.Load(p), is, issues)
 	if err != nil {
 		return e.Fail(err)
 	}

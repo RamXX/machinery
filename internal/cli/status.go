@@ -68,17 +68,18 @@ func runStatus(e *Env, args []string) int {
 	fmt.Fprintf(w, "owed without a story: %d\n", noStory)
 	if !ev.HasEvidence {
 		fmt.Fprintf(w, "evidence: none at %s\n", gitx.Short(ev.Head))
-		return 0
-	}
-	state := "clean"
-	for _, r := range ev.Runs {
-		if r.Dirty {
+	} else {
+		state := "clean"
+		for _, r := range ev.Runs {
+			if r.Dirty {
+				state = "dirty"
+			}
+		}
+		if ev.Dirty {
 			state = "dirty"
 		}
+		fmt.Fprintf(w, "evidence: %s %s, %d run(s), %d receipt(s)\n", gitx.Short(ev.Head), state, len(ev.Runs), ev.NReceipts)
 	}
-	if ev.Dirty {
-		state = "dirty"
-	}
-	fmt.Fprintf(w, "evidence: %s %s, %d run(s), %d receipt(s)\n", gitx.Short(ev.Head), state, len(ev.Runs), ev.NReceipts)
+	statusIntakes(e, p)
 	return 0
 }

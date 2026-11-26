@@ -27,7 +27,7 @@ stdout 'checked: 1 code files, 1 test files, 3 act ids, 19 obligations'
 stdout '^passed$'
 
 exec machinery check
-stdout 'machinery check: 9 passed, 0 failed, 0 not demonstrated, 6 not applicable'
+stdout 'machinery check: 9 passed, 0 failed, 0 not demonstrated, 7 not applicable'
 
 # the sources are read and never written
 cmp machines/loan.json loan.orig

@@ -24,6 +24,7 @@ type Story struct {
 	Description string
 	Acceptance  string
 	needs       []need
+	capstone    bool
 }
 
 type need struct {
@@ -50,13 +51,21 @@ func BuildPlan(d *design.Design) (*Plan, error) {
 	if len(d.OwedProblems) > 0 {
 		return nil, fmt.Errorf("%s", d.OwedProblems[0])
 	}
-	byTitle := map[string]*Story{}
 	var ids []string
 	for _, o := range d.Owed {
 		if d.Known(o.ID) {
 			ids = append(ids, o.ID)
 		}
 	}
+	return BuildPlanFor(d, ids, nil), nil
+}
+
+// BuildPlanFor groups the given ids into stories and derives the edges. For
+// an intake every story also carries the intake's intent and tag (section
+// 15.7).
+func BuildPlanFor(d *design.Design, ids []string, in *Intake) *Plan {
+	byTitle := map[string]*Story{}
+	ids = append([]string(nil), ids...)
 	sort.Strings(ids)
 	for _, id := range ids {
 		title := groupTitle(d, id)
@@ -81,10 +90,10 @@ func BuildPlan(d *design.Design) (*Plan, error) {
 	}
 	plan.edges(d)
 	for _, s := range plan.Stories {
-		s.Description = description(d, s)
+		s.Description = description(d, s, in)
 		s.Acceptance = acceptance(d, s)
 	}
-	return plan, nil
+	return plan
 }
 
 // groupTitle is the title of the story an owed id belongs to.
@@ -214,16 +223,25 @@ func (plan *Plan) edges(d *design.Design) {
 			}
 		}
 	}
-	sort.Slice(plan.Edges, func(i, j int) bool {
-		a, b := plan.Edges[i], plan.Edges[j]
-		if a.FromKey != b.FromKey {
-			return a.FromKey < b.FromKey
-		}
-		return a.ToKey < b.ToKey
-	})
+	sortEdges(plan.Edges)
 	for _, s := range plan.Stories {
 		sort.Slice(s.needs, func(i, j int) bool { return s.needs[i].title < s.needs[j].title })
 	}
+}
+
+// sortEdges orders edges by their ends, keys before ids.
+func sortEdges(es []backlog.Edge) {
+	sort.Slice(es, func(i, j int) bool {
+		a, b := es[i], es[j]
+		ka := []string{a.FromKey, a.FromID, a.ToKey, a.ToID}
+		kb := []string{b.FromKey, b.FromID, b.ToKey, b.ToID}
+		for n := range ka {
+			if ka[n] != kb[n] {
+				return ka[n] < kb[n]
+			}
+		}
+		return false
+	})
 }
 
 // invokeMachine returns the machine id of a failure mode with an invoke
@@ -281,28 +299,157 @@ func IDTitle(d *design.Design, id string) string {
 	return "(unknown id)"
 }
 
-func description(d *design.Design, s *Story) string {
-	var b strings.Builder
-	b.WriteString("Owed ids:\n")
+// excludeDesign is the exclusion every story carries (section 15.2).
+const excludeDesign = "- No design change: a design change is its own story."
+
+// description renders the story text of section 15.2.
+func description(d *design.Design, s *Story, in *Intake) string {
+	var acc []string
 	for _, id := range s.IDs {
-		fmt.Fprintf(&b, "- %s: %s", id, IDTitle(d, id))
-		if o := d.Obligation(id); o != nil && o.HasEffects {
-			effects := "none"
-			if len(o.Effects) > 0 {
-				effects = strings.Join(o.Effects, ", ")
-			}
-			fmt.Fprintf(&b, " (effects: %s)", effects)
-		}
-		b.WriteString("\n")
+		acc = append(acc, "- "+id+": "+observed(d, id))
 	}
-	if len(s.needs) > 0 {
-		b.WriteString("\nNeeds:\n")
-		for _, n := range s.needs {
-			fmt.Fprintf(&b, "- %s: %s\n", n.title, n.output)
-		}
+	tags := []string{"machinery:ids " + strings.Join(s.IDs, " ")}
+	return storyText(storyIntent(d, s), acc, tags, []string{excludeDesign}, s.needs, in)
+}
+
+// storyText writes the five sections of a story description.
+func storyText(intent string, acceptance, tags, excludes []string, needs []need, in *Intake) string {
+	var b strings.Builder
+	b.WriteString("Intent:\n" + intent + "\n")
+	if in != nil {
+		fmt.Fprintf(&b, "Requirement %s: %s\n", in.ID, in.Intent)
 	}
-	fmt.Fprintf(&b, "\nmachinery:ids %s\n", strings.Join(s.IDs, " "))
+	b.WriteString("\nAcceptance:\n")
+	for _, l := range acceptance {
+		b.WriteString(l + "\n")
+	}
+	b.WriteString("\nIds:\n")
+	for _, t := range tags {
+		b.WriteString(t + "\n")
+	}
+	if in != nil {
+		b.WriteString("machinery:intake " + in.ID + "\n")
+	}
+	b.WriteString("\nExcludes:\n")
+	for _, x := range excludes {
+		b.WriteString(x + "\n")
+	}
+	b.WriteString("\nNeeds:\n")
+	if len(needs) == 0 {
+		b.WriteString("- none\n")
+	}
+	for _, n := range needs {
+		fmt.Fprintf(&b, "- %s: %s\n", n.title, n.output)
+	}
 	return b.String()
+}
+
+// storyIntent is the intent line of a generated story (section 15.2).
+func storyIntent(d *design.Design, s *Story) string {
+	title := s.Title
+	switch {
+	case strings.HasPrefix(title, "Model "):
+		area, _, _ := strings.Cut(strings.TrimPrefix(title, "Model "), " ")
+		return "The formal model of " + area + " answers its questions and is proven."
+	case strings.HasPrefix(title, "Serve "):
+		entity := strings.TrimSuffix(strings.TrimPrefix(title, "Serve "), " actions")
+		return "Code serves the actions of " + entity + " through their operations."
+	case strings.HasSuffix(title, " "+internalEvt):
+		m := strings.TrimSuffix(strings.TrimPrefix(title, "Prove "), " "+internalEvt)
+		return "Machine " + m + " makes its internal transitions on the running system as its table says."
+	}
+	id := strings.TrimPrefix(title, "Prove ")
+	switch kind, _, _ := strings.Cut(id, ":"); kind {
+	case "sc":
+		return "The scenario runs end to end on the running system."
+	case "inv":
+		return "The invariant holds on the running system."
+	case "fm":
+		return "The failure gets its required behavior on the running system."
+	case "cx":
+		return "The counterexample of the formal model cannot happen on the running system."
+	case "ck":
+		return "The external checker holds the obligation for this design."
+	case "tc":
+		return "The transition case holds on the running system."
+	}
+	m, event, _ := strings.Cut(id, " ")
+	return "Machine " + m + " answers " + event + " on the running system as its table says."
+}
+
+// observed is the acceptance line of one id: what is observed, and for a
+// refusal case what is refused (section 15.2).
+func observed(d *design.Design, id string) string {
+	kind, name, _ := strings.Cut(id, ":")
+	switch kind {
+	case "tc":
+		return caseObserved(d, id)
+	case "inv":
+		return "holds on the running system: " + IDTitle(d, id)
+	case "sc":
+		return "runs end to end on the running system: " + IDTitle(d, id)
+	case "fm":
+		for _, fm := range d.FailureModes {
+			if fm.ID == name {
+				if fm.Required == "refuse" {
+					return fmt.Sprintf("refused: %s Required behavior: %s", fm.Failure, fm.Behavior)
+				}
+				return fmt.Sprintf("%s Required behavior (%s): %s", fm.Failure, fm.Required, fm.Behavior)
+			}
+		}
+	case "fv":
+		for _, a := range d.Areas {
+			if a.Name == name {
+				return "machinery formal check proves the model: " + a.Why
+			}
+		}
+	case "cx":
+		for _, t := range d.Traces {
+			if t.ID == id {
+				return fmt.Sprintf("refused on the running system: the replay of %s run %s keeps %s", t.Spec, t.Run, t.Violates)
+			}
+		}
+	case "ck":
+		return "the checker's evidence for this design holds it: " + IDTitle(d, id)
+	case "act":
+		entity, action, _ := strings.Cut(name, ".")
+		return fmt.Sprintf("served by code and reachable through its operation: action %s of %s", action, entity)
+	}
+	return IDTitle(d, id)
+}
+
+// caseObserved is the acceptance line of a transition case.
+func caseObserved(d *design.Design, id string) string {
+	m := d.MachineOfCase(id)
+	if m == nil {
+		return IDTitle(d, id)
+	}
+	t := m.Table
+	byID := map[string]machine.Transition{}
+	for _, tr := range t.Transitions {
+		byID[tr.ID] = tr
+	}
+	for _, ig := range t.Ignores {
+		if ig.ID == id {
+			return fmt.Sprintf("refused: %s in %s changes nothing and has no effect (%s)", ig.Event, ig.State, ig.Reason)
+		}
+	}
+	for _, rf := range t.Refusals {
+		if rf.ID == id {
+			return fmt.Sprintf("refused: in %s, with every guard of %s false, nothing changes and no effect happens", rf.State, rf.Handler)
+		}
+	}
+	for _, cl := range t.Clauses {
+		if cl.ID == id {
+			tr := byID[cl.Transition]
+			return fmt.Sprintf("refused: with only %s of %s false, %s %s does not fire", cl.Clause, cl.Guard, tr.Source, machine.Trigger(tr.Kind, tr.Event))
+		}
+	}
+	effects := "none"
+	if o := d.Obligation(id); o != nil && len(o.Effects) > 0 {
+		effects = strings.Join(o.Effects, ", ")
+	}
+	return fmt.Sprintf("%s, effects: %s; observed on the running system", IDTitle(d, id), effects)
 }
 
 func acceptance(d *design.Design, s *Story) string {
@@ -349,8 +496,9 @@ func (plan *Plan) Graph(keep map[string]bool, parent string) backlog.Graph {
 		g.Nodes = append(g.Nodes, backlog.Node{Key: s.Key, Title: s.Title, Type: storyType, Priority: s.Priority,
 			Labels: s.Labels, Description: s.Description, Acceptance: s.Acceptance, ParentID: parent})
 	}
+	kept := func(key string) bool { return key == "" || keep[key] }
 	for _, e := range plan.Edges {
-		if keep == nil || (keep[e.FromKey] && keep[e.ToKey]) {
+		if keep == nil || (kept(e.FromKey) && kept(e.ToKey)) {
 			g.Edges = append(g.Edges, e)
 		}
 	}

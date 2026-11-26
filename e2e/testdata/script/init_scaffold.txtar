@@ -20,7 +20,7 @@ exec machinery config
 stdout 'owed: design/owed.yaml'
 exec machinery check
 stdout 'not applicable: no design.models configured'
-stdout 'machinery check: 0 passed, 0 failed, 0 not demonstrated, 15 not applicable'
+stdout 'machinery check: 0 passed, 0 failed, 0 not demonstrated, 16 not applicable'
 
 # never overwrites
 exec mrun 2 init

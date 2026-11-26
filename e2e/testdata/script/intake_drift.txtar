@@ -1,0 +1,292 @@
+# drift guards: waves fails on a story in the design's name without ids; stage intake warns; status lists intakes (sections 15.3, 15.7, 14)
+fixture shop
+exec machinery gen
+
+# stage intake applies only with a readable backlog
+exec machinery check --stage intake
+stdout '^not applicable: no backlog configured$'
+cp machinery-nobd.yaml machinery.yaml
+exec machinery check --stage intake
+stdout '^not applicable: bd not runnable$'
+cp machinery-bd.yaml machinery.yaml
+gitinit
+exec machinery check --stage intake
+stdout '^not applicable: the backlog cannot be read$'
+exec bd init --stealth --non-interactive -p shop
+exec machinery check --stage intake
+stdout '^not applicable: no open intake item$'
+exec machinery checks
+stdout '^intake +not applicable: no open intake item$'
+
+# an intake whose design changed and that planned nothing is a warning
+exec machinery intake new 'Refund a paid order' --intent 'A Clerk refunds a paid order'
+exec machinery check --stage intake
+stdout '^checked: 1 intake items$'
+! stdout 'warn'
+stdout '^passed$'
+cp refund/shop.modelith.yaml design/model/shop.modelith.yaml
+cp refund/Order.machine.json design/machines/Order.machine.json
+cp refund/openapi.yaml contracts/openapi.yaml
+exec machinery gen
+gitcommit 'design: refund a paid order'
+exec machinery check --stage intake
+stdout '^  warn   intake shop-[a-z0-9]+: the design changed and no stories were planned from it; run machinery intake plan shop-[a-z0-9]+$'
+stdout '^passed$'
+exec mrun 1 check
+stdout '^== intake ==$'
+stdout 'warn   intake shop-[a-z0-9]+: the design changed and no stories were planned'
+exec machinery status
+stdout '^intake shop-[a-z0-9]+: 6 of 7 steps done; next: planned$'
+
+# planned: the warning is gone; waves leaves the intake out
+exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
+exec machinery check --stage intake
+! stdout 'warn'
+exec machinery waves
+stdout '^checked: 3 stories, 2 edges, 2 waves$'
+! stdout 'no design ids'
+! stdout 'outside machinery'
+
+# stories in the design's name name their ids; the others are only counted
+exec bd create --id shop-m1 --title 'Tidy the handlers' --labels machinery --body-file scope-api.txt --silent
+exec sh -c '. ./lib.sh; bd create --title "Polish the refund page" --parent $(iid) --body-file scope-web.txt --silent'
+exec bd create --id shop-p1 --title 'Update the wiki' --body-file scope-docs.txt --silent
+exec bd create --id shop-p2 --title 'Rename the repository' --silent
+exec mrun 1 waves
+stdout '^  ERROR  no design ids: shop-m1: a story proves ids; a requirement starts with machinery intake new$'
+stdout '^  warn   2 open stories outside machinery \(no design ids\)$'
+stdout '^failed: 2 finding\(s\)$'
+! stdout 'no design ids: shop-p[12]:'
+exec sh -c '. ./lib.sh; machinery waves | grep -c "^  ERROR  no design ids: $(sid "Polish the refund page"): a story proves ids"'
+stdout '^1$'
+exec sh -c '. ./lib.sh; machinery waves | grep -c "no design ids: $(sid "Demonstrate: Refund a paid order")" || true'
+stdout '^0$'
+exec mrun 1 waves --freeze
+stderr '^machinery: cannot freeze: stage waves does not pass$'
+
+# delivered and still open: a warning to close it
+exec sh -c '. ./lib.sh; bd close shop-m1 shop-p1 shop-p2 $(sid "Polish the refund page") --reason dropped'
+exec sh -c '. ./lib.sh; bd close $(sid "Prove order refund") $(sid "Serve Order actions") --reason done'
+exec machinery check --stage intake
+! stdout 'is delivered'
+exec sh -c '. ./lib.sh; bd close $(sid "Demonstrate: Refund a paid order") --reason done'
+exec machinery check --stage intake
+stdout '^  warn   intake shop-[a-z0-9]+ is delivered and still open; close it$'
+stdout '^passed$'
+
+-- scope-api.txt --
+machinery:scope internal/api/**
+-- scope-docs.txt --
+machinery:scope docs/**
+-- scope-web.txt --
+machinery:scope web/**
+-- machinery-nobd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+tools:
+  bd: no-such-bd
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
+# iid: the id of the intake item of this script
+iid() {
+  sid 'Refund a paid order'
+}
+-- refund/shop.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Shop
+description: >
+  A minimal order desk used as the shared test fixture. A Customer places an
+  Order, pays for it, and a Clerk ships it. An Order can be cancelled until it
+  ships.
+
+glossary:
+  Clerk: "A staff member who ships a paid `Order`."
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Placed, not yet paid."}
+      - {name: Paid, definition: "Payment captured."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Cancelled, definition: "Abandoned before shipping; terminal."}
+
+entities:
+  Customer:
+    definition: >
+      A person who places and pays for an `Order`.
+    attributes:
+      - {name: email, type: string}
+    relationships:
+      - {entity: Order, cardinality: "1:n", ownership: owned}
+    invariants:
+      - {id: customer-email-unique, statement: "No two `Customer` records share an email."}
+  Order:
+    definition: >
+      A request by one `Customer` to buy goods. Its status follows the order
+      lifecycle from pending to shipped or cancelled.
+    attributes:
+      - {name: status, type: OrderStatus}
+      - {name: totalCents, type: integer}
+    relationships:
+      - {entity: Customer, cardinality: "n:1", ownership: referenced}
+    actions:
+      - {name: place, actor: Customer, description: "Create the `Order` in the pending status."}
+      - {name: pay, actor: Customer, preserves: [paid-before-shipped]}
+      - {name: ship, actor: Clerk, preserves: [paid-before-shipped]}
+      - {name: cancel, actor: Customer, preserves: [terminal-is-final]}
+      - {name: refund, actor: Clerk, description: "Return the payment of a paid `Order` and cancel it."}
+    invariants:
+      - {id: paid-before-shipped, statement: "An `Order` reaches the shipped status only from the paid status."}
+
+invariants:
+  - {id: terminal-is-final, statement: "A shipped or cancelled `Order` never changes status again."}
+
+scenarios:
+  - name: Customer pays and the order ships
+    actors: [Customer, Clerk]
+    steps:
+      - "Customer places an `Order`; it is pending."
+      - "Customer pays; the `Order` becomes paid."
+      - "Clerk ships; the `Order` becomes shipped."
+    invariants_touched: [paid-before-shipped]
+  - name: Cancelled order refuses payment
+    actors: [Customer]
+    steps:
+      - "Customer places an `Order` and cancels it."
+      - "Customer tries to pay; the request is refused and the `Order` stays cancelled."
+    invariants_touched: [terminal-is-final]
+-- refund/Order.machine.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": { "orderId": null, "lastError": null },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          { "target": "paying", "guard": "hasPaymentMethod", "actions": "stampAttempt" },
+          { "actions": "recordPayRefused" }
+        ],
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID",
+        "refund": "an unpaid order has nothing to refund; the API refuses with ORDER_NOT_PAID"
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid", "actions": "recordCharge" },
+        "onError": { "target": "Pending", "actions": "recordPaymentFailure" }
+      },
+      "after": {
+        "payTimeout": { "target": "Pending", "actions": "recordPaymentTimeout" }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": { "target": "Shipped", "actions": "recordShipment" },
+        "cancel": { "target": "Cancelled", "actions": ["refundPayment", "recordCancellation"] },
+        "refund": { "target": "Cancelled", "actions": ["refundPayment", "recordRefund"] }
+      },
+      "_ignores": { "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID" }
+    },
+    "Shipped": { "type": "final", "entry": "notifyCustomer" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- refund/openapi.yaml --
+openapi: 3.1.0
+info:
+  title: Shop API
+  version: 0.1.0
+paths:
+  /orders:
+    post:
+      operationId: placeOrder
+      x-machinery-action: Order.place
+      responses:
+        "201": {description: Created}
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses:
+        "200": {description: The order}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses:
+        "200": {description: Paid or refused with a code}
+  /orders/{id}/ship:
+    post:
+      operationId: shipOrder
+      x-machinery-action: Order.ship
+      responses:
+        "200": {description: Shipped or refused with a code}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses:
+        "200": {description: Cancelled or refused with a code}
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      x-machinery-action: Order.refund
+      responses:
+        "200": {description: Refunded or refused with a code}

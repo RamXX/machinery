@@ -9,7 +9,7 @@ exec mrun 0 landing --base base --stack 'shell fixture' -- sh e2e/orders.sh
 stdout '== model =='
 stdout '== ratchet =='
 stdout 'checked: 16 obligations, 1 scope globs, 0 tiered ids, 0 baseline entries'
-stdout 'machinery check: 11 passed, 0 failed, 0 not demonstrated, 5 not applicable'
+stdout 'machinery check: 11 passed, 0 failed, 0 not demonstrated, 6 not applicable'
 stderr 'machinery run: .machinery/receipts/.*\.jsonl \(exit 0\)'
 stdout '== verify =='
 stdout 'checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts'

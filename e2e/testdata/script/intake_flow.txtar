@@ -1,0 +1,482 @@
+# intake: a requirement changes the design before any story exists, and its stories are written at once (section 15.7)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+
+# the requirement is recorded first, against the design as it is
+exec machinery intake new 'Refund a paid order' --intent 'A Clerk refunds a paid order: it ends Cancelled and the payment is returned' --refuses 'a refund of an order that is not paid'
+stdout '^shop-[a-z0-9]+$'
+! stderr .
+exec sh -c '. ./lib.sh; bd show $(iid) --json'
+stdout '"issue_type": "feature"'
+stdout '"machinery-intake"'
+stdout '"description": "Intent:\\nA Clerk refunds a paid order: it ends Cancelled and the payment is returned\\n\\nRefuses:\\n- a refund of an order that is not paid\\n\\nmachinery:intake\\nmachinery:intake-base [0-9a-f]{40} [0-9a-f]{64}\\n"'
+exec sh -c '. ./lib.sh; bd show $(iid) --json | grep -c "intake-base $(git rev-parse HEAD) "'
+stdout '^1$'
+
+# nothing changed yet: no story can be planned
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^intake shop-[a-z0-9]+: Refund a paid order$'
+stdout '^base: [0-9a-f]{7}, contract [0-9a-f]{12}$'
+stdout '^  design changed  missing  the contract is the base contract: change the design first, or record machinery:no-design-change <reason>$'
+stdout '^  design sound    done     every lint stage passes or is not applicable$'
+stdout '^  generated       done     machinery gen --check: no drift$'
+stdout '^  new ids         done     none since [0-9a-f]{7}: only the capstone is planned$'
+stdout '^  tiers           done     no design.risk configured: every new id is routine$'
+stdout '^  formal          done     no critical area holds a new id$'
+stdout '^  planned         missing  no capstone; run machinery intake plan shop-[a-z0-9]+ --apply$'
+stdout '^intake shop-[a-z0-9]+: 5 of 7 steps done; next: design changed$'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(iid)'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: design changed is missing: the contract is the base contract: change the design first, or record machinery:no-design-change <reason>$'
+! stdout .
+
+# the design changes: a new action and its machine event, not yet generated or committed
+cp refund/shop.modelith.yaml design/model/shop.modelith.yaml
+cp refund/Order.machine.json design/machines/Order.machine.json
+cp refund/openapi.yaml contracts/openapi.yaml
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^  design changed  missing  uncommitted design change: contracts/openapi.yaml, design/machines/Order.machine.json, design/model/shop.modelith.yaml; commit it$'
+stdout '^  design sound    missing  machinery lint: model: failed: 1 finding\(s\)$'
+stdout '^  generated       missing  machinery gen --check: failed: 3 finding\(s\); run machinery gen and commit$'
+stdout '^  new ids         done     3 new id\(s\) since [0-9a-f]{7}$'
+stdout '^    act:Order.refund  routine$'
+stdout '^    tc:ORDE-10c92a  routine$'
+stdout '^    tc:ORDE-28f78c  routine$'
+stdout '^    routine by default: act:Order.refund$'
+stdout '^  planned         missing  3 new id\(s\) without a story; run machinery intake plan shop-[a-z0-9]+ --apply$'
+stdout '^intake shop-[a-z0-9]+: 3 of 7 steps done; next: design changed$'
+
+# committed without generating: the design changed, it is not generated yet
+gitcommit 'design: refund a paid order'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^  design changed  done     contract [0-9a-f]{12}, base [0-9a-f]{12}$'
+stdout '^  design sound    missing  machinery lint: model: failed: 1 finding\(s\)$'
+stdout '^intake shop-[a-z0-9]+: 4 of 7 steps done; next: design sound$'
+exec sh -c '. ./lib.sh; mrun 1 intake plan $(iid) --apply'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: design sound is missing: machinery lint: model: failed: 1 finding\(s\)$'
+stderr '^machinery: cannot plan intake shop-[a-z0-9]+: generated is missing: machinery gen --check: failed: 3 finding\(s\); run machinery gen and commit$'
+! stdout .
+
+# generated, not committed; then committed
+exec machinery gen
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^  design sound    done     every lint stage passes or is not applicable$'
+stdout '^  generated       missing  uncommitted generated file: design/gen/obligations.json, design/gen/tables/order.table.json, design/gen/tables/order.table.md; commit it$'
+gitcommit 'gen: refund'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
+stdout '^  generated       done     machinery gen --check: no drift$'
+stdout '^  tiers           done     no design.risk configured: every new id is routine$'
+stdout '^  formal          done     no critical area holds a new id$'
+stdout '^intake shop-[a-z0-9]+: 6 of 7 steps done; next: planned$'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(iid) --json'
+stdout '"step": "planned",'
+stdout '"done": false,'
+stdout '"id": "tc:ORDE-10c92a",'
+stdout '"routine_by_default": \['
+stdout '"done": 6,'
+stdout '"next": "planned"'
+
+# the plan: one story per group of new ids, and the capstone, in the story form
+exec sh -c '. ./lib.sh; machinery intake plan $(iid) | sed "s/$(iid)/INTAKE/g"'
+cmp stdout want-plan.md
+exec git status --short
+! stdout .
+
+# --apply: every story and edge in one backlog call, under the intake; then the owed list
+exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
+stdout '^plan: 3 created, 0 existing, 2 edge\(s\)$'
+stdout '^owed: 3 added$'
+stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
+stdout '^4$'
+exec sh -c '. ./lib.sh; bd list --all --json --limit 0 | grep -c "\"parent\": \"$(iid)\""'
+stdout '^3$'
+exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Refund a paid order") --json'
+stdout '"title": "Prove order refund"'
+stdout '"title": "Serve Order actions"'
+stdout '"dependency_type": "blocks"'
+stdout '"tier:consequential"'
+stdout 'machinery:capstone'
+stdout '"acceptance_criteria": "- The intent is shown on the running system through its real interface: A Clerk refunds'
+stdout 'one machinery:demo .*command.* line each'
+exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Refund a paid order") --json | grep -c "^    \"description\": .*machinery:ids" || true'
+stdout '^0$'
+exec sh -c '. ./lib.sh; bd show $(sid "Prove order refund") --json'
+stdout 'machinery:ids tc:ORDE-10c92a tc:ORDE-28f78c'
+stdout '"tier:routine"'
+exec sh -c '. ./lib.sh; bd show $(sid "Prove order refund") --json | grep -c "machinery:intake $(iid)"'
+stdout '^1$'
+exec sh -c '. ./lib.sh; bd show $(iid) --json | grep -c "machinery:intake-planned $(git rev-parse HEAD) "'
+stdout '^1$'
+exec sh -c '. ./lib.sh; grep -c "reason: \"owed by intake $(iid)\"" design/owed.yaml'
+stdout '^3$'
+exec sh -c '. ./lib.sh; grep -A2 "id: tc:ORDE-10c92a$" design/owed.yaml | grep -c "story: $(sid "Prove order refund")$"'
+stdout '^1$'
+exec sh -c '. ./lib.sh; grep -A2 "id: act:Order.refund$" design/owed.yaml | grep -c "story: $(sid "Serve Order actions")$"'
+stdout '^1$'
+exec git status --short
+stdout '^ M design/owed.yaml$'
+gitcommit 'owe the refund'
+
+# every step is done
+exec sh -c '. ./lib.sh; mrun 0 intake status $(iid)'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+$'
+stdout '^intake shop-[a-z0-9]+: 7 of 7 steps done$'
+exec machinery status
+stdout '^intake shop-[a-z0-9]+: 7 of 7 steps done$'
+
+# again: nothing is created twice
+cp design/owed.yaml owed-planned.yaml
+exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
+stdout '^intake shop-[a-z0-9]+: every new id has a story; nothing to create$'
+stdout '^plan: 0 created, 3 existing, 0 edge\(s\)$'
+stdout '^owed: 0 added$'
+! stdout 'planned at'
+cmp design/owed.yaml owed-planned.yaml
+exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
+stdout '^4$'
+exec sh -c '. ./lib.sh; bd show $(iid) --json | grep -o "machinery:intake-planned" | wc -l | tr -d " "'
+stdout '^1$'
+exec sh -c '. ./lib.sh; machinery intake plan $(iid)'
+stdout '^intake shop-[a-z0-9]+: every new id has a story; nothing to create$'
+! stdout '##'
+
+# the intake is planned, not built: waves leaves it out, the capstone waits for the others
+exec machinery check --stage intake
+stdout '^checked: 1 intake items$'
+! stdout 'warn'
+stdout '^passed$'
+exec machinery waves
+stdout '^checked: 3 stories, 2 edges, 2 waves$'
+stdout '^  shop-[a-z0-9]+  consequential  Demonstrate: Refund a paid order$'
+! stdout '  [a-z]+  Refund a paid order$'
+! stdout 'no design ids'
+
+# the capstone gate: a demo and closed siblings on top of its tier
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Demonstrate: Refund a paid order")'
+stdout '^checked: 3 ids, 0 proofs, 0 predictions, 0 verdicts, 0 demos, 2 stories$'
+stdout '^  ERROR  no demo: record each command that shows the intent on its own machinery:demo line$'
+stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Prove order refund: the capstone closes last$'
+stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Serve Order actions: the capstone closes last$'
+stdout '^  ERROR  owed: act:Order.refund$'
+stdout '^  ERROR  unproven: tc:ORDE-10c92a$'
+
+# the stories are built: the refund is served and observed; they close
+exec sh -c 'sed -i.bak "s/act:Order.cancel$/act:Order.cancel act:Order.refund/" internal/domain/order.go && rm internal/domain/order.go.bak'
+exec sh -c 'cat refund-receipts.sh >> e2e/orders.sh'
+cp owed-built.yaml design/owed.yaml
+gitcommit 'build the refund'
+exec machinery run -- sh e2e/orders.sh
+exec sh -c '. ./lib.sh; bd close $(sid "Prove order refund") --reason done'
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Demonstrate: Refund a paid order")'
+stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Serve Order actions: the capstone closes last$'
+! stdout 'Prove order refund: the capstone closes last'
+! stdout 'unproven'
+! stdout 'owed: '
+exec sh -c '. ./lib.sh; bd close $(sid "Serve Order actions") --reason done'
+
+# the builder records the demo and the proof; a fresh verifier predicts and accepts
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Demonstrate: Refund a paid order")'
+stdout '^  ERROR  no demo: record each command that shows the intent on its own machinery:demo line$'
+! stdout 'open story of the intake'
+exec sh -c '. ./lib.sh; bd update $(sid "Demonstrate: Refund a paid order") --append-notes "machinery:demo sh e2e/orders.sh"'
+exec sh -c '. ./lib.sh; machinery proof --story $(sid "Demonstrate: Refund a paid order") --post'
+stdout '^  tc:ORDE-10c92a -> orders.sh -> pass: Paid -> Cancelled, payment refunded$'
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Demonstrate: Refund a paid order")'
+! stdout 'no demo'
+stdout '^  ERROR  no prediction for [0-9a-f]{7}: a verifier runs machinery predict before reading the proof$'
+env BEADS_ACTOR=verifier
+exec sh -c '. ./lib.sh; machinery predict $(sid "Demonstrate: Refund a paid order") --observation "a refund of a Pending order" --expect "ORDER_NOT_PAID, still Pending"'
+exec sh -c '. ./lib.sh; machinery accept $(sid "Demonstrate: Refund a paid order") --verdict accept --observed "refunded once; a Pending order refused" --close'
+stdout '^checked: 3 ids, 1 proofs, 1 predictions, 1 verdicts, 1 demos, 2 stories$'
+stdout '^passed$'
+stdout '^closed: shop-[a-z0-9]+$'
+env BEADS_ACTOR=builder
+
+# delivered: every step done, every story closed; the intake stage says to close it
+exec sh -c '. ./lib.sh; mrun 0 intake status $(iid)'
+exec machinery check --stage intake
+stdout '^  warn   intake shop-[a-z0-9]+ is delivered and still open; close it$'
+stdout '^passed$'
+exec sh -c '. ./lib.sh; bd close $(iid) --reason delivered'
+exec machinery check --stage intake
+stdout '^not applicable: no open intake item$'
+exec machinery status
+! stdout '^intake '
+
+-- owed-built.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- refund-receipts.sh --
+pass tc:ORDE-10c92a '["refundPayment","recordRefund"]' 'Paid -> Cancelled, payment refunded'
+pass tc:ORDE-28f78c '[]' 'refund refused with ORDER_NOT_PAID, still Pending'
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
+# iid: the id of the intake item of this script
+iid() {
+  sid 'Refund a paid order'
+}
+-- refund/shop.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Shop
+description: >
+  A minimal order desk used as the shared test fixture. A Customer places an
+  Order, pays for it, and a Clerk ships it. An Order can be cancelled until it
+  ships.
+
+glossary:
+  Clerk: "A staff member who ships a paid `Order`."
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Placed, not yet paid."}
+      - {name: Paid, definition: "Payment captured."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Cancelled, definition: "Abandoned before shipping; terminal."}
+
+entities:
+  Customer:
+    definition: >
+      A person who places and pays for an `Order`.
+    attributes:
+      - {name: email, type: string}
+    relationships:
+      - {entity: Order, cardinality: "1:n", ownership: owned}
+    invariants:
+      - {id: customer-email-unique, statement: "No two `Customer` records share an email."}
+  Order:
+    definition: >
+      A request by one `Customer` to buy goods. Its status follows the order
+      lifecycle from pending to shipped or cancelled.
+    attributes:
+      - {name: status, type: OrderStatus}
+      - {name: totalCents, type: integer}
+    relationships:
+      - {entity: Customer, cardinality: "n:1", ownership: referenced}
+    actions:
+      - {name: place, actor: Customer, description: "Create the `Order` in the pending status."}
+      - {name: pay, actor: Customer, preserves: [paid-before-shipped]}
+      - {name: ship, actor: Clerk, preserves: [paid-before-shipped]}
+      - {name: cancel, actor: Customer, preserves: [terminal-is-final]}
+      - {name: refund, actor: Clerk, description: "Return the payment of a paid `Order` and cancel it."}
+    invariants:
+      - {id: paid-before-shipped, statement: "An `Order` reaches the shipped status only from the paid status."}
+
+invariants:
+  - {id: terminal-is-final, statement: "A shipped or cancelled `Order` never changes status again."}
+
+scenarios:
+  - name: Customer pays and the order ships
+    actors: [Customer, Clerk]
+    steps:
+      - "Customer places an `Order`; it is pending."
+      - "Customer pays; the `Order` becomes paid."
+      - "Clerk ships; the `Order` becomes shipped."
+    invariants_touched: [paid-before-shipped]
+  - name: Cancelled order refuses payment
+    actors: [Customer]
+    steps:
+      - "Customer places an `Order` and cancels it."
+      - "Customer tries to pay; the request is refused and the `Order` stays cancelled."
+    invariants_touched: [terminal-is-final]
+-- refund/Order.machine.json --
+{
+  "_comment": "Order lifecycle. Domain states mirror the OrderStatus enum; `paying` is the transient overlay around the payment call.",
+  "_delays": {
+    "payTimeout": "5000 ms - upper bound on the payment provider call"
+  },
+  "id": "order",
+  "initial": "Pending",
+  "context": { "orderId": null, "lastError": null },
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": [
+          { "target": "paying", "guard": "hasPaymentMethod", "actions": "stampAttempt" },
+          { "actions": "recordPayRefused" }
+        ],
+        "cancel": { "target": "Cancelled", "actions": "recordCancellation" }
+      },
+      "_ignores": {
+        "ship": "an unpaid order cannot ship; the API refuses with ORDER_NOT_PAID",
+        "refund": "an unpaid order has nothing to refund; the API refuses with ORDER_NOT_PAID"
+      }
+    },
+    "paying": {
+      "invoke": {
+        "src": "chargePayment",
+        "onDone": { "target": "Paid", "actions": "recordCharge" },
+        "onError": { "target": "Pending", "actions": "recordPaymentFailure" }
+      },
+      "after": {
+        "payTimeout": { "target": "Pending", "actions": "recordPaymentTimeout" }
+      }
+    },
+    "Paid": {
+      "on": {
+        "ship": { "target": "Shipped", "actions": "recordShipment" },
+        "cancel": { "target": "Cancelled", "actions": ["refundPayment", "recordCancellation"] },
+        "refund": { "target": "Cancelled", "actions": ["refundPayment", "recordRefund"] }
+      },
+      "_ignores": { "pay": "already paid; a repeated pay is refused with ORDER_ALREADY_PAID" }
+    },
+    "Shipped": { "type": "final", "entry": "notifyCustomer" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- refund/openapi.yaml --
+openapi: 3.1.0
+info:
+  title: Shop API
+  version: 0.1.0
+paths:
+  /orders:
+    post:
+      operationId: placeOrder
+      x-machinery-action: Order.place
+      responses:
+        "201": {description: Created}
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      responses:
+        "200": {description: The order}
+  /orders/{id}/pay:
+    post:
+      operationId: payOrder
+      x-machinery-action: Order.pay
+      responses:
+        "200": {description: Paid or refused with a code}
+  /orders/{id}/ship:
+    post:
+      operationId: shipOrder
+      x-machinery-action: Order.ship
+      responses:
+        "200": {description: Shipped or refused with a code}
+  /orders/{id}/cancel:
+    post:
+      operationId: cancelOrder
+      x-machinery-action: Order.cancel
+      responses:
+        "200": {description: Cancelled or refused with a code}
+  /orders/{id}/refund:
+    post:
+      operationId: refundOrder
+      x-machinery-action: Order.refund
+      responses:
+        "200": {description: Refunded or refused with a code}
+-- want-plan.md --
+## Prove order refund
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Intent:
+Machine order answers refund on the running system as its table says.
+Requirement INTAKE: A Clerk refunds a paid order: it ends Cancelled and the payment is returned
+
+Acceptance:
+- tc:ORDE-10c92a: Paid on:refund -> Cancelled, effects: refundPayment, recordRefund; observed on the running system
+- tc:ORDE-28f78c: refused: refund in Pending changes nothing and has no effect (an unpaid order has nothing to refund; the API refuses with ORDER_NOT_PAID)
+
+Ids:
+machinery:ids tc:ORDE-10c92a tc:ORDE-28f78c
+machinery:intake INTAKE
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
+
+### Acceptance Criteria
+- Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
+
+## Serve Order actions
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Intent:
+Code serves the actions of Order through their operations.
+Requirement INTAKE: A Clerk refunds a paid order: it ends Cancelled and the payment is returned
+
+Acceptance:
+- act:Order.refund: served by code and reachable through its operation: action refund of Order
+
+Ids:
+machinery:ids act:Order.refund
+machinery:intake INTAKE
+
+Excludes:
+- No design change: a design change is its own story.
+
+Needs:
+- none
+
+### Acceptance Criteria
+- Each listed action is served by code (stage trace) and removed from owed.yaml.
+
+## Demonstrate: Refund a paid order
+
+### Type
+task
+
+### Priority
+1
+
+### Labels
+machinery, tier:consequential
+
+### Description
+Intent:
+Show the requirement on the running system through its real interface.
+Requirement INTAKE: A Clerk refunds a paid order: it ends Cancelled and the payment is returned
+
+Acceptance:
+- The intent is observed: A Clerk refunds a paid order: it ends Cancelled and the payment is returned
+- Refused: a refund of an order that is not paid
+
+Ids:
+machinery:capstone
+machinery:intake INTAKE
+
+Excludes:
+- No new behavior: the capstone shows what the other stories built.
+- No design change: a design change is its own story.
+
+Needs:
+- Prove order refund: the behavior shown
+- Serve Order actions: the behavior shown
+
+### Acceptance Criteria
+- The intent is shown on the running system through its real interface: A Clerk refunds a paid order: it ends Cancelled and the payment is returned
+- Refused on the running system: a refund of an order that is not paid
+- The commands that show it are recorded on this story, one machinery:demo <command> line each.
+- Every other story of the intake is closed.
+- machinery story passes for this story.

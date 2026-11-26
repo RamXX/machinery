@@ -136,5 +136,6 @@ wave 3
     scope: docs/**
 == waves ==
 checked: 5 stories, 2 edges, 3 waves
+  warn   2 open stories outside machinery (no design ids)
 passed
 machinery waves: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable
