@@ -44,6 +44,10 @@ grep '^loan: 4 states, 4 distinct states found, passed$' out/report.md
 grep '^hold_queue: 2 states, 2 distinct states found, passed$' out/report.md
 grep '^design/model/library.modelith.yaml: instance found$' out/report.md
 grep '^  act: 0 added, 0 reworded, 0 removed$' out/report.md
+grep '^## Findings per machine$' out/report.md
+grep '^No finding names a machine\.$' out/report.md
+grep '^## Findings per entity$' out/report.md
+grep '^No finding names an entity\.$' out/report.md
 
 # report.json, for tools: sorted keys, no absolute path, no timestamp
 grep '^  "config": "machinery.yaml",$' out/report.json
@@ -57,6 +61,8 @@ grep '"unbound_machines": 0' out/report.json
 grep '"distinct": 4,' out/report.json
 grep '^    "sections": 10$' out/report.json
 grep '^  "version": 1$' out/report.json
+grep '^  "machines": \[\],$' out/report.json
+grep '^  "entities": \[\],$' out/report.json
 ! grep $WORK out/report.json
 ! grep $WORK out/report.md
 
@@ -86,3 +92,20 @@ exec machinery -C proj assess --config unbound.yaml --out out3
 stdout '^design: failed: 2 finding\(s\); checked: 8 stages, 1 bound machines, 1 unbound machines$'
 grep '"unbound_machines": 1' out3/report.json
 grep '^- 1 error: xref-model-machine: machine-binding$' out3/report.md
+grep -count=1 '^- hold_queue \(machines/hold-queue.json\): 1 error\(s\), 0 drift, 0 warn\(s\)$' out3/report.md
+grep '^  - 1 error: xref-model-machine: machine-binding$' out3/report.md
+grep '"machine": "hold_queue",' out3/report.json
+grep '"source": "machines/hold-queue.json",' out3/report.json
+
+# the findings of every section, grouped by the machine and the entity they name: a case id
+# names its machine by its tag, an act id its entity
+exec sh -c 'grep -v -e "serves: \[\"Implements:\"\]" -e "verifies: \[\"Checks:\", \"Proves:\"\]" proj/machinery.yaml > nomarks.yaml'
+exec machinery -C proj assess --config nomarks.yaml --out out4
+stdout '^trace: failed: 19 finding\(s\); '
+grep '^- hold_queue \(machines/hold-queue.json\): 4 error\(s\), 0 drift, 0 warn\(s\)$' out4/report.md
+grep '^- loan \(machines/loan.json\): 7 error\(s\), 0 drift, 0 warn\(s\)$' out4/report.md
+grep '^  - 7 error: trace: unverified$' out4/report.md
+grep '^- Loan: 3 error\(s\), 0 drift, 0 warn\(s\)$' out4/report.md
+grep '^  - 3 error: trace: unserved$' out4/report.md
+grep '"entity": "Loan",' out4/report.json
+grep '"machine": "loan",' out4/report.json

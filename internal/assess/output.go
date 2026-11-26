@@ -59,15 +59,44 @@ type jsonSummary struct {
 	Sections        int `json:"sections"`
 }
 
+// jsonMachine is the findings that name one machine.
+type jsonMachine struct {
+	Drift    int        `json:"drift"`
+	Errors   int        `json:"errors"`
+	Machine  string     `json:"machine"`
+	Rules    []jsonRule `json:"rules"`
+	Source   string     `json:"source"`
+	Warnings int        `json:"warnings"`
+}
+
+// jsonEntity is the findings that name one entity.
+type jsonEntity struct {
+	Drift    int        `json:"drift"`
+	Entity   string     `json:"entity"`
+	Errors   int        `json:"errors"`
+	Rules    []jsonRule `json:"rules"`
+	Warnings int        `json:"warnings"`
+}
+
 type jsonReport struct {
 	Config   string        `json:"config"`
 	Dirty    jsonDirty     `json:"dirty"`
+	Entities []jsonEntity  `json:"entities"`
 	Head     string        `json:"head"`
+	Machines []jsonMachine `json:"machines"`
 	Outside  []string      `json:"outside_links"`
 	Project  string        `json:"project"`
 	Sections []jsonSection `json:"sections"`
 	Summary  jsonSummary   `json:"summary"`
 	Version  int           `json:"version"`
+}
+
+func jsonRules(rs []rule) []jsonRule {
+	res := []jsonRule{}
+	for _, ru := range rs {
+		res = append(res, jsonRule{ru.count, ru.key, sevWord(ru.sev)})
+	}
+	return res
 }
 
 func counts(cs []report.Count) []jsonCount {
@@ -94,7 +123,15 @@ func stageResult(st *report.Stage) (string, string) {
 
 func (a *assessment) build() jsonReport {
 	r := jsonReport{Config: a.cfgLabel, Dirty: jsonDirty{a.changed, a.untrack}, Head: a.head,
-		Outside: append([]string{}, a.outside...), Project: a.name, Sections: []jsonSection{}, Version: 1}
+		Outside: append([]string{}, a.outside...), Project: a.name, Sections: []jsonSection{}, Version: 1,
+		Machines: []jsonMachine{}, Entities: []jsonEntity{}}
+	machines, entities := a.groups()
+	for _, g := range machines {
+		r.Machines = append(r.Machines, jsonMachine{g.drift, g.errors, g.name, jsonRules(g.rules()), g.source, g.warns})
+	}
+	for _, g := range entities {
+		r.Entities = append(r.Entities, jsonEntity{g.drift, g.name, g.errors, jsonRules(g.rules()), g.warns})
+	}
 	for _, s := range a.sections {
 		o, reason := s.outcome()
 		js := jsonSection{Checked: counts(s.checked()), Facts: s.facts, Findings: s.findings(), Lines: s.lines,
@@ -193,7 +230,40 @@ func (a *assessment) markdown(r jsonReport) string {
 			}
 		}
 	}
+	group := func(title, none string, heads []string, rules [][]jsonRule) {
+		w("")
+		w("## %s", title)
+		w("")
+		if len(heads) == 0 {
+			w("%s", none)
+			return
+		}
+		for i, h := range heads {
+			w("- %s", h)
+			for _, ru := range rules[i] {
+				w("  - %d %s: %s", ru.Count, ru.Severity, ru.Rule)
+			}
+		}
+	}
+	var heads []string
+	var rules [][]jsonRule
+	for _, m := range r.Machines {
+		heads = append(heads, fmt.Sprintf("%s (%s): %s", m.Machine, m.Source, tally(m.Errors, m.Drift, m.Warnings)))
+		rules = append(rules, m.Rules)
+	}
+	group("Findings per machine", "No finding names a machine.", heads, rules)
+	heads, rules = nil, nil
+	for _, e := range r.Entities {
+		heads = append(heads, fmt.Sprintf("%s: %s", e.Entity, tally(e.Errors, e.Drift, e.Warnings)))
+		rules = append(rules, e.Rules)
+	}
+	group("Findings per entity", "No finding names an entity.", heads, rules)
 	return b.String()
+}
+
+// tally is the counts of a group, by severity.
+func tally(errors, drift, warns int) string {
+	return fmt.Sprintf("%d error(s), %d drift, %d warn(s)", errors, drift, warns)
 }
 
 func (a *assessment) writeReports() error {

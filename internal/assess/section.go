@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
@@ -373,15 +372,7 @@ func (a *assessment) rulesOf(s *section) []rule {
 	for key, n := range counts {
 		res = append(res, rule{key.sev, key.key, n})
 	}
-	sort.Slice(res, func(i, j int) bool {
-		if res[i].count != res[j].count {
-			return res[i].count > res[j].count
-		}
-		if res[i].sev != res[j].sev {
-			return res[i].sev < res[j].sev
-		}
-		return res[i].key < res[j].key
-	})
+	sortRules(res)
 	return res
 }
 

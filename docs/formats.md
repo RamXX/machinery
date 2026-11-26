@@ -2344,7 +2344,9 @@ the numbers of the lines as facts. Neither has a timestamp or an absolute path.
 {
   "config": "machinery.yaml",
   "dirty": {"changed": 0, "untracked": 0},
+  "entities": [{"drift": 0, "entity": "Loan", "errors": 3, "rules": [{"count": 3, "rule": "trace: unserved", "severity": "error"}], "warnings": 0}],
   "head": "<short sha>",
+  "machines": [{"drift": 0, "errors": 2, "machine": "loan", "rules": [{"count": 2, "rule": "trace: unverified", "severity": "error"}], "source": "machines/loan.json", "warnings": 0}],
   "outside_links": [],
   "project": "<directory name>",
   "sections": [
@@ -2357,6 +2359,19 @@ the numbers of the lines as facts. Neither has a timestamp or an absolute path.
   "version": 1
 }
 ```
+
+Both reports also group the findings of every section by what they name, so a large design is
+read one machine or one entity at a time. A finding names a machine when its message holds the
+machine id or the machine's file as a whole word (no letter, digit or `_` right before or after
+it, and for the file no `/`, `.` or `-` either), or a case id with the machine's tag
+(`tc:<TAG>-`). It names an entity when it holds the entity name as a whole word, as
+`entity:<E>` and `act:<E>.<action>` do. A finding may name several machines and entities, and
+counts for each. `report.md` ends with `## Findings per machine` and `## Findings per entity`:
+one line per machine or entity that at least one finding names, sorted by name,
+`- <machine id> (<file>): <n> error(s), <n> drift, <n> warn(s)` (`- <Entity>: ...`), then its
+rules (section 18.4) with their counts, most frequent first, as `  - <count> <severity>: <rule>`;
+`No finding names a machine.` (`No finding names an entity.`) when none does. `report.json`
+gives the same as `machines` and `entities`, sorted by name.
 
 Keys are sorted. `config` is `machinery.yaml` or `--config <file name>`. `result` is `passed`,
 `failed`, `not demonstrated` or `not applicable`, and `reason` holds the reason of the last two.
