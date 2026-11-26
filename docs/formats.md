@@ -1134,7 +1134,7 @@ are read. Zero files matched by a configured glob list is an ERROR. Not applicab
 is absent.
 
 Trace is static and cheap. It proves that a test claims an id, not that the test passed. Only
-`verify` proves that. The claim is also what lets a receipt count: `verify` takes a receipt only
+`verify` proves that. The claim is also what lets a receipt prove: `verify` takes a `pass` only
 from a test whose file claims the id (section 10.2).
 
 ### 8.1 A project's own markers
@@ -1317,7 +1317,7 @@ The file is JSON Lines. Three line types:
 
 ```json
 {"v":1,"type":"run","commit":"<40 hex>","dirty":false,"command":["go","test","./e2e/..."],"stack":"postgres 17 in docker","started":"2026-01-02T03:04:05Z"}
-{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"TestOrder/ORDE-2e883d","effects":["stampAttempt"],"observed":"Pending -> paying; attempt row written"}
+{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"order_test.go::TestOrder/ORDE-2e883d","effects":["stampAttempt"],"observed":"Pending -> paying; attempt row written"}
 {"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z"}
 ```
 
@@ -1326,9 +1326,9 @@ A test emits one `receipt` line per obligation it checked, by appending to the f
 
 - `id`: an obligation id.
 - `outcome`: `pass`, `fail` or `skip`.
-- `test`: the name of the test that made the observation, required. It is how machinery finds
-  the test's file (section 10.2): the name of the test function as its file writes it (Go's
-  `t.Name()` is that), or the path or base name of the test file.
+- `test`: the test that made the observation, required, written as `<file>` or
+  `<file>::<name>`: the test file by its path or its base name, then optionally the name of the
+  test in it (section 10.2).
 - `effects`: for `tc` ids, the effects the test actually observed. Omitted or empty means none.
 - `observed`: one short sentence, at most 300 characters, saying what was seen.
 - `replay`: for `cx` ids only, what the real system did when the counterexample was replayed:
@@ -1337,7 +1337,8 @@ A test emits one `receipt` line per obligation it checked, by appending to the f
 A test writes each line with a single append so that parallel tests do not interleave. When
 `MACHINERY_RECEIPTS` is not set, the test emits nothing and still runs. When `MACHINERY_ONLY` is
 set, a suite may run only the tests for those ids; a suite that ignores it is still correct.
-The Go helper `pkg/receipt` implements all of this for Go suites; other languages append the
+The Go helper `pkg/receipt` implements all of this for Go suites (`receipt.Test` builds the
+`test` of the calling file); other languages append the
 JSON line themselves.
 
 A receipt is a claim made by a test. A test asserts first and emits afterwards: it emits `pass`
@@ -1357,30 +1358,31 @@ Evidence from any other commit says nothing about the current one.
 
 ### 10.2 Which receipts count
 
-Two conditions hold before a receipt is read as evidence. Neither is about what the line says;
-both are about where it came from.
+Two conditions hold before a receipt is read as proof. Neither is about what the line says; both
+are about where it came from.
 
 **The file was written by `machinery run`.** `machinery run` keeps a run ledger outside the
 working tree, one entry per receipts file, at
 `<git common dir>/machinery/runs/<name of the receipts file>`. An entry is one JSON line:
 
 ```json
-{"v":1,"header":"<sha256 of the header line>","file":"<sha256 of the finished file>"}
+{"v":1,"file":"<sha256 of the finished file>"}
 ```
 
-The entry is written with `header` alone when the run starts; `file`, the digest of the whole
-file with its end line, is added when the command has exited. Every command that reads evidence
-compares each receipts file that is valid for the current commit (section 10.1) with the entry of
-its name:
+The entry is written as `{"v":1}` when the run starts; `file`, the digest of the whole file with
+its header and its end line, is added when the command has exited. Every command that reads
+evidence compares each receipts file that is valid for the current commit (section 10.1) with the
+entry of its name:
 
 | Finding | When |
 |---|---|
-| `ERROR  receipts: <file>: not produced by machinery run` | The ledger has no entry of that name. |
-| `ERROR  receipts: <file>: changed after the run` | The header line does not have the digest of the entry; or the file does not have the digest of the entry; or the file has an end line and the entry has no `file` digest (the run never ended and an end line was added). |
+| `ERROR  receipts: <file>: not produced by machinery run; delete the file and run the tests through machinery run` | The ledger has no entry of that name. |
+| `ERROR  receipts: <file>: changed after the run; delete the file and run the tests again through machinery run` | The file does not have the digest of the entry; or the file has an end line and the entry has no digest (the run never ended and an end line was added). |
 
-Nothing in such a file counts: it is not a run, none of its receipts is read, and nothing else
-about it is reported. A file with no end line whose entry has no `file` digest is the incomplete
-run of section 12. An entry that is not such a line is no entry.
+Nothing in such a file counts: it is not a run, none of its receipts is read, a failure in it
+included, and nothing else about it is reported. `machinery status` names it (section 14). A
+file with no end line whose entry has no digest is the incomplete run of section 12. An entry
+that is not such a line is no entry.
 
 - The entry goes by the name of the file, so a copy of a real run under another name has no
   entry. `machinery run` deletes the entry with the file (step 2 of section 10).
@@ -1390,23 +1392,34 @@ run of section 12. An entry that is not such a line is no entry.
 - Everything that appends receipts finishes before the command exits. A process that outlives
   the command and appends later changes the file after the run.
 
-**The test claims the id.** The `test` of a receipt must lie in a test file, a file matched by
-`trace.tests`, that statically claims the receipt's id: by a `machinery:verifies` tag, a
-`verifies` marker or a `scenarios` marker, read and resolved exactly as stage `trace` reads them
-(sections 8 and 8.1), `*` patterns included. A test lies in:
+**The test names a test file that claims the id.** The `test` of a receipt is `<file>` or
+`<file>::<name>`, where `<name>` is free text (the test function, a case). `<file>` is:
 
-1. the test files it names: `test` is the project-relative path of the file or its base name,
-   alone or followed by `:`, `/`, `#` or a space (`orders.sh`, `e2e/orders.sh::refund`);
-2. when it names none, the test files whose text holds the name of the test as a whole word,
-   with no letter, digit or underscore directly before or after it. The name of the test is
-   `test` up to its first `/`, so the Go subtest `TestOrder/ORDE-2e883d` is looked for as
-   `TestOrder`.
+1. the project-relative path of a file matched by `trace.tests` (`e2e/orders.sh`,
+   `e2e/order_test.go::TestOrder/ORDE-2e883d`); or
+2. a base name that exactly one file matched by `trace.tests` has (`orders.sh`,
+   `order_test.go::TestOrder`).
 
-When the test lies in several files, one that claims the id is enough. Otherwise the finding is
-`ERROR  receipt: <id>: <test> does not claim it`, once per id and test, and the receipt does not
-count, whatever its outcome: a `pass` proves nothing and a `fail` fails nothing, while the ERROR
-fails the stage. A receipt whose id is not an obligation gets the finding section 12 has for it
-instead. A project without `trace.tests` has no test file, so none of its receipts counts.
+That file must statically claim the receipt's id: by a `machinery:verifies` tag, a `verifies`
+marker or a `scenarios` marker, read and resolved exactly as stage `trace` reads them (sections
+8 and 8.1), `*` patterns included. Nothing else is tried: the text of the test files is not
+searched for the test's name. Otherwise the finding is
+`ERROR  receipt: <id>: <test> does not claim it; <what to do>`, once per id and test, where
+`<what to do>` is one of:
+
+| `<what to do>` | When |
+|---|---|
+| `trace.tests is not set: list the test files there in machinery.yaml` | The project has no `trace.tests`. |
+| `no file under trace.tests is named <file>: write test as <path of the test file> or <path>::<name>` | `<file>` is neither such a path nor such a base name. |
+| `<n> files under trace.tests are named <file>: write the path in test` | Several test files have that base name. |
+| `add machinery:verifies <id> to <path>, or emit the receipt from the test that claims it` | The file is found and does not claim the id. |
+
+Such a receipt cannot prove. A `pass` among them is not used, so it proves nothing and prunes
+nothing; a replay `pass` that would prove its `cx` id is not used either. What it reports
+against the system is kept: a `fail` still fails its obligation, and a replay that fails its
+trace is still reported, in `verify`, in the tier gates, in `proof` and in `status`, exactly as
+if the test claimed the id, and the ERROR above is printed as well. A receipt whose id is not an
+obligation gets the finding section 12 has for it instead.
 
 **What this defends against, and what it does not.** It defends against mistakes and casual
 edits:
@@ -1414,8 +1427,9 @@ edits:
 - a receipts file written or pasted by hand, or copied from another run or another project;
 - a receipt added, removed or reworded after the run, a header edited to another commit or to
   `"dirty":false`, an end line added to a run that never finished;
-- a receipt emitted for an id that the file of its test does not say it verifies: a mistyped id,
-  a helper that emits for every id it is given, an emitter left behind when the claim moved.
+- a `pass` emitted for an id that the file of its test does not say it verifies: a mistyped id,
+  a helper that emits for every id it is given, an emitter left behind when the claim moved, a
+  test name that points at no test file.
 
 It does not defend against a party who can run commands as the tool:
 
@@ -1423,14 +1437,16 @@ It does not defend against a party who can run commands as the tool:
   `MACHINERY_RECEIPTS`, and the ledger binds that file like any other. The ledger says that
   machinery ran a command and that the file is what the command left. It does not say that the
   command ran tests, that the test a receipt names ran, or that its assertions held.
-- Whoever can write the git directory can write a ledger entry. The digests are not secret and
+- Whoever can write the git directory can write a ledger entry. The digest is not secret and
   nothing is signed.
-- The claim rule reads text. A test name that appears in a comment of a file that claims the id
-  satisfies it, and the party who writes the receipts usually writes the test files too.
+- The claim rule compares two things the emitter chooses: the file name in `test` and the
+  claims in that file. A line that names any test file claiming the id passes it, whether or not
+  that file emitted the line, and the party who writes the receipts usually writes the test
+  files too.
 
 A receipt therefore stays what section 10 says: a claim made by a test. What checks the tests
 themselves is the probe (section 20), the verifier's fresh context (section 15.6) and a reader
-of the test file; the claim rule tells that reader which files to open.
+of the test file; the claim rule tells that reader which file to open.
 
 ## 11. The owed list
 
@@ -1529,8 +1545,9 @@ from the base's own `machinery.yaml`.
 Stage `verify` joins obligations to evidence.
 
 Evidence is every receipts file in the receipts directory that is valid for the current commit
-(section 10.1) and that `machinery run` produced and nothing changed since (section 10.2). When the working tree has uncommitted changes outside the owed file, the
-receipts directory and the property records, the evidence does not describe what is on disk: without `--allow-dirty` that
+(section 10.1) and that `machinery run` produced and nothing changed since (section 10.2). When
+the working tree has uncommitted changes outside the owed file, the receipts directory and the
+property records, the evidence does not describe what is on disk: without `--allow-dirty` that
 is `ERROR  working tree has uncommitted changes`. A file without an `end` line is
 `ERROR  incomplete run: <file>` and its receipts are not used. A file whose header says
 `dirty: true` is used only with `--allow-dirty`, and then the stage prints
@@ -1548,12 +1565,14 @@ Per obligation:
 
 Findings:
 
-- `ERROR  receipts: <file>: not produced by machinery run` and
-  `ERROR  receipts: <file>: changed after the run` (section 10.2). Nothing in the file is used.
-- `ERROR  receipt: <id>: <test> does not claim it` (section 10.2). The receipt is not used.
+- `ERROR  receipts: <file>: not produced by machinery run; ...` and
+  `ERROR  receipts: <file>: changed after the run; ...` (section 10.2, with the full text).
+  Nothing in the file is used.
+- `ERROR  receipt: <id>: <test> does not claim it; <what to do>` (section 10.2). A `pass` is not
+  used; a `fail` still fails its obligation.
 - `ERROR  malformed receipts file: <file>: line <n>: <what>`; a receipt without `id` or without
-  `test` is one. A file whose first line is not a run header is not a receipts file and is
-  ignored.
+  `test` is one (`<id>: receipt without test: name the test file in test`). A file whose first
+  line is not a run header is not a receipts file and is ignored.
 - `ERROR  unknown id in receipt: <id>` (an `act` id is not an obligation), and for a proposed or
   retired id (section 4.1) `ERROR  proposed id in receipt: <id>; a proposed id yields no obligation:
   drop the receipt, or take the id out of <status file>` (`retired`). For a proof obligation
@@ -1573,8 +1592,8 @@ When no complete run exists for the current commit the stage is
 `not demonstrated: no evidence at <short sha>`.
 
 `checked:` counts obligations, proven, partial, owed and receipts. `receipts` is the number of
-receipt lines read from the runs that are used; a receipt that does not count is among them and
-has its ERROR.
+receipt lines read from the runs that are used; a `pass` that is not used is among them and has
+its ERROR.
 
 When the risk file has a vital area, the stage also prints, so that its evidence never reads as
 more than it is (section 23.2): `warn   proofs awaiting: <n>`, the number of proof obligations;
@@ -1744,6 +1763,7 @@ proofs awaiting: <n>
 vital: <id> proven (by test and model; proof awaited)
 assumed, unproven: <area> <name>: <statement>
 owed without a story: <n>
+refused: <receipts file>: <not produced by machinery run|changed after the run>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
 
@@ -1756,7 +1776,9 @@ The `tiers` line counts obligations by the tier of their area and is omitted whe
 risk file; its `vital` part, and the three lines after the `proven` line, print only when the
 risk file has a vital area (section 23.2): the number of proof obligations, one `vital` line per
 id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
-whose evidence is owed, each group sorted. When there is no evidence the line is `evidence: none at <short sha>`. When
+whose evidence is owed, each group sorted. One `refused` line prints per receipts file that
+section 10.2 refuses, sorted by file. When there is no evidence the line is
+`evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
 `intake <id>: <n> of 7 steps done; next: <step>`; then the latest review of each kind (section 15.10):
