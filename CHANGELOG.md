@@ -69,6 +69,14 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   A serves tag that names an id which is not an action is a warn, counted by stage `trace`.
 - An owed file that does not parse is never read as empty: every command refuses with the
   parse error, and machinery writes the file through a YAML encoder.
+- Stage `xref-failure` prints how many failure modes are linked and how many are not, and is
+  not demonstrated while one names no subject: one linked row among many no longer passes. A
+  failure mode says it has none with `no_subject: "<reason>"`, in the failure-mode file or the
+  links file.
+- Failure-mode subject `system:<name>` for the system as a whole or a named part of it, with the
+  names declared under `systems` in `machinery.yaml`; no waiver covers an unknown name.
+- Links entries that cover many rows: `ids` takes ids and inclusive ranges
+  (`FM-01..FM-23`); two entries that name the same row are a finding that names both.
 
 ### Carried forward from v1
 

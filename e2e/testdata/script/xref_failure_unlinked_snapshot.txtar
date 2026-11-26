@@ -1,0 +1,22 @@
+# a links entry that names no subject links nothing, also where stage xref-failure runs on a
+# snapshot: in an assessment and in a rehearsal every row is unlinked, and the stage never
+# passes (docs/formats.md sections 6.6, 17.3 and 18)
+fixture library proj
+cp garbage.yaml proj/design/risk-links.yaml
+cd proj
+gitinit
+cd $WORK
+
+exec machinery -C proj assess --out out
+grep '^checked: 4 failure modes, 0 linked, 4 unlinked, ' out/stages/xref-failure.txt
+! grep '^passed$' out/stages/xref-failure.txt
+grep '^\| xref-failure \| failed \| 4 failure modes, 0 linked, 4 unlinked, ' out/report.md
+
+exec machinery -C proj adopt --rehearse --out out2
+grep '^checked: 4 failure modes, 0 linked, 4 unlinked, ' out2/stages/check.txt
+grep '^### xref-failure: failed: ' out2/rehearsal.md
+
+-- garbage.yaml --
+version: 1
+links:
+  - {ids: [RISK-1..RISK-4]}

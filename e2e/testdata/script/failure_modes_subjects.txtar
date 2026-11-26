@@ -10,8 +10,8 @@ stdout '^passed$'
 # the machine id and the name are both required
 cp no-name.yaml design/failure-modes.yaml
 exec mrun 1 lint --stage failure-modes
-stdout 'ERROR  design/failure-modes.yaml: bad-state: subject "state:order" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>$'
-stdout 'ERROR  design/failure-modes.yaml: bad-event: subject "event:providerDown" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>$'
+stdout 'ERROR  design/failure-modes.yaml: bad-state: subject "state:order" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>$'
+stdout 'ERROR  design/failure-modes.yaml: bad-event: subject "event:providerDown" is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>$'
 stdout 'failed: 2 finding\(s\)'
 
 # kind abuse stays limited to act and entity subjects

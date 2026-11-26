@@ -14,12 +14,14 @@ import (
 
 // FailureMode is one entry of failure-modes.yaml (section 5.4).
 type FailureMode struct {
-	ID       string `yaml:"id"`
-	Kind     string `yaml:"kind,omitempty"`
-	Subject  string `yaml:"subject"`
-	Failure  string `yaml:"failure"`
-	Required string `yaml:"required"`
-	Behavior string `yaml:"behavior"`
+	ID      string `yaml:"id"`
+	Kind    string `yaml:"kind,omitempty"`
+	Subject string `yaml:"subject"`
+	// NoSubject, when set, is the reason the failure mode names no subject.
+	NoSubject *Reason `yaml:"no_subject,omitempty"`
+	Failure   string  `yaml:"failure"`
+	Required  string  `yaml:"required"`
+	Behavior  string  `yaml:"behavior"`
 
 	// Source is the file the failure mode comes from: the failure-mode file
 	// or the imported catalog (section 5.4.1).
@@ -34,9 +36,34 @@ type FailureMode struct {
 	Line  int      `yaml:"-"`
 }
 
+// Reason is the text of a no_subject key. Only a YAML string is one: a
+// boolean or a number is refused, not read as its spelling.
+type Reason string
+
+// UnmarshalYAML refuses a value that is not a string.
+func (r *Reason) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.ScalarNode || n.Tag != "!!str" {
+		return fmt.Errorf("line %d: no_subject must be a string that gives the reason", n.Line)
+	}
+	*r = Reason(n.Value)
+	return nil
+}
+
 // Unlinked reports an imported row without a link: it names nothing, so it
 // takes part in no subject rule (section 5.4.1).
 func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
+
+// SubjectLess reports a failure mode declared to name no subject: no_subject
+// with a reason, and no subject beside it. Like an unlinked row it takes part
+// in no subject rule.
+func (fm FailureMode) SubjectLess() bool {
+	return fm.NoSubject != nil && strings.TrimSpace(string(*fm.NoSubject)) != "" && fm.Subject == ""
+}
+
+// Named reports a failure mode that names a subject. One that is neither
+// named nor subject-less is unaccounted for: an unlinked row, or a
+// no_subject without a reason or beside a subject.
+func (fm FailureMode) Named() bool { return !fm.Unlinked() && fm.NoSubject == nil }
 
 type failureFile struct {
 	Version      int           `yaml:"version"`
@@ -45,7 +72,7 @@ type failureFile struct {
 
 var (
 	kebabRe   = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
-	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
+	subjectRe = regexp.MustCompile(`^(invoke:[^.\s]+\.[^\s]+|dependency:[^\s]+|system:[^\s]+|act:[A-Za-z0-9_]+\.[A-Za-z0-9_]+|entity:[A-Za-z0-9_]+|state:[^.\s]+\.[^\s]+|event:[^.\s]+\.[^\s]+)$`)
 )
 
 func strictYAML(data []byte, out any) error {
@@ -92,7 +119,7 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 			problems = append(problems, where+": duplicate id")
 		}
 		seen[fm.ID] = true
-		problems = append(problems, checkValues(where, fm)...)
+		problems = append(problems, checkValues(where, fm, false)...)
 		if strings.TrimSpace(fm.Failure) == "" {
 			problems = append(problems, where+": failure is required")
 		}
@@ -103,19 +130,47 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 	return f.FailureModes, problems, true
 }
 
-// checkValues holds kind, subject and required to section 5.4, defaulting
-// kind to fault. where prefixes every problem.
-func checkValues(where string, fm *FailureMode) (problems []string) {
+// WellFormed reports a failure mode that names a subject of one of the
+// forms of section 5.4 and carries a required value: the precondition of
+// being compared with the design. Whether the subject resolves is stage
+// xref-failure's question.
+func (fm FailureMode) WellFormed() bool {
+	if !fm.Named() || !subjectRe.MatchString(fm.Subject) {
+		return false
+	}
+	switch fm.Required {
+	case "fail-closed", "retry-bounded", "surface", "refuse":
+		return true
+	}
+	return false
+}
+
+// checkValues holds kind, subject (or no_subject) and required to section
+// 5.4, defaulting kind to fault. where prefixes every problem. link is true
+// for an entry of the links file, where a no_subject entry may leave
+// required out (section 5.4.1).
+func checkValues(where string, fm *FailureMode, link bool) (problems []string) {
 	if fm.Kind == "" {
 		fm.Kind = "fault"
 	}
 	if fm.Kind != "fault" && fm.Kind != "abuse" {
 		problems = append(problems, fmt.Sprintf("%s: kind must be fault or abuse, got %q", where, fm.Kind))
 	}
-	if !subjectRe.MatchString(fm.Subject) {
-		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State> or event:<machine id>.<event>", where, fm.Subject))
+	switch {
+	case fm.NoSubject != nil && fm.Subject != "":
+		problems = append(problems, where+": subject and no_subject are both set; name the subject or say why there is none")
+	case fm.NoSubject != nil:
+		if strings.TrimSpace(string(*fm.NoSubject)) == "" {
+			problems = append(problems, where+": no_subject needs a reason")
+		}
+	case !subjectRe.MatchString(fm.Subject):
+		problems = append(problems, fmt.Sprintf("%s: subject %q is not invoke:<machine id>.<src>, dependency:<name>, act:<Entity>.<action>, entity:<Name>, state:<machine id>.<State>, event:<machine id>.<event> or system:<name>", where, fm.Subject))
 	}
 	switch fm.Required {
+	case "":
+		if !link || fm.NoSubject == nil {
+			problems = append(problems, fmt.Sprintf("%s: required must be fail-closed, retry-bounded, surface or refuse, got %q", where, fm.Required))
+		}
 	case "fail-closed", "retry-bounded", "surface":
 	case "refuse":
 		if fm.Kind != "abuse" {

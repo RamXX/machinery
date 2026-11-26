@@ -13,7 +13,7 @@ cp ops.json design/machines/Ops.machine.json
 cp both.yaml design/failure-modes.yaml
 exec mrun 1 lint --stage xref-failure
 stdout 'ERROR  invoke-failure-mode: invoke:ops.syncStock: no failure mode names this invoke'
-stdout 'checked: 3 failure modes, 2 invokes, 1 dependencies, 0 tiered actions'
+stdout 'checked: 3 failure modes, 2 linked, 1 unlinked, 2 invokes, 1 dependencies, 0 tiered actions'
 ! stdout 'invoke:order.chargePayment'
 
 -- machinery.yaml --
