@@ -1,0 +1,139 @@
+# adopt --rehearse: adoption on a snapshot outside the project, with what it writes, what it owes,
+# what the check says and what blocks; nothing is written in the project and the backlog is never run (section 17.3)
+fixture shop proj
+cd proj
+rm machinery.yaml
+mkdir .beads
+cp ../issues.jsonl .beads/issues.jsonl
+cp ../gitignore .gitignore
+gitinit
+cd ..
+
+# refusals, exit 2, nothing written
+exec mrun 2 -C proj adopt --rehearse --write
+stderr '^usage: --rehearse writes only in its out directory; it takes no --write$'
+exec mrun 2 -C proj adopt --config shop.yaml
+stderr '^usage: --config and --out go with --rehearse$'
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --out proj/out
+stderr '^usage: --out proj/out is inside .*proj; adopt --rehearse never writes in the project: name a directory outside it$'
+mkdir full
+cp shop.yaml full/x
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --out full
+stderr '^usage: --out full is not empty; name an absent or empty directory$'
+exec mrun 2 -C proj adopt --rehearse --config bad.yaml --out out
+stderr '^config: machinery.yaml: version must be 2$'
+exec mrun 2 -C proj adopt --rehearse --config none.yaml --out out
+stderr '^config: --config none.yaml: cannot read: no such file or directory$'
+exec mrun 2 -C proj adopt --rehearse --config shop.yaml --out out --paths '../x/**'
+stderr '^config: glob: "../x/\*\*" must stay inside the project root$'
+mkdir bare
+exec git -C bare init -q
+exec mrun 2 -C bare adopt --rehearse --out out
+stderr '^usage: .*bare is not a git repository with a commit; adopt --rehearse reads its HEAD$'
+! exists out
+
+# the rehearsal: adopt --write, check and plan run on the snapshot
+exec machinery -C proj adopt --rehearse --config shop.yaml --out out
+stdout '^out: /.*/out$'
+stdout '^project: proj at [0-9a-f]{7}$'
+stdout '^adopt: wrote 8 file\(s\), 0 waiver\(s\), 16 owed$'
+stdout '^check: machinery check: 9 passed, 1 failed, 0 not demonstrated, 6 not applicable$'
+stdout '^plan: 10 stories, 1 edge\(s\)$'
+stdout '^blocks adoption: 1 stage\(s\): xref-model-machine$'
+! stdout 'fix in the project first'
+stdout '^rehearse: rehearsal.md, rehearsal.json$'
+! stderr .
+
+# nothing in the project changed, and the backlog was not run
+exec git -C proj status --porcelain
+! stdout .
+! exists proj/machinery.yaml
+exec sh -c 'git -C proj log --oneline | wc -l | tr -d " "'
+stdout '^1$'
+
+# what the out directory holds
+exists out/snapshot/machinery.yaml
+exists out/snapshot/design/owed.yaml
+exists out/stages/adopt.txt
+exists out/stages/check.txt
+exists out/plan.md
+grep '^## Prove order pay$' out/plan.md
+exec git -C out/snapshot log --format=%s
+stdout '^rehearsed adoption\nsnapshot of [0-9a-f]{7}$'
+
+# the report: files with sizes, waivers, baselines, owed by kind, the check, the plan, what blocks
+grep '^# Adoption rehearsal: proj at [0-9a-f]{7}$' out/rehearsal.md
+grep '^- config: --config shop.yaml$' out/rehearsal.md
+grep '^- backlog: bd, not read in a rehearsal$' out/rehearsal.md
+grep '^\| `design/owed.yaml` \| [0-9]+ \|$' out/rehearsal.md
+grep '^\| `machinery.yaml` \| [0-9]+ \|$' out/rehearsal.md
+grep '^- design/tests-baseline.yaml: 0 entries$' out/rehearsal.md
+grep '^- tc: 10$' out/rehearsal.md
+grep '^- total: 16$' out/rehearsal.md
+grep '^`machinery check: 9 passed, 1 failed, 0 not demonstrated, 6 not applicable`$' out/rehearsal.md
+grep '^\| intake \| not applicable: a rehearsal never reads the backlog \|$' out/rehearsal.md
+grep '^\| tc \| routine \| 4 \|$' out/rehearsal.md
+grep '^### xref-model-machine: failed: 1 finding\(s\)$' out/rehearsal.md
+grep '^- ERROR  action-event: act:Order.place: no on event place in machine order' out/rehearsal.md
+grep '^  - waivable: - \{rule: action-event, id: "act:Order.place", reason: "found at adoption \([0-9a-f]{7}\)"\}$' out/rehearsal.md
+! grep '^## Fix in the project first' out/rehearsal.md
+! grep 'Order.place' out/snapshot/machinery.yaml
+
+# rehearsal.json holds the same, keys sorted
+grep '^  "backlog": "backlog: bd, not read in a rehearsal",$' out/rehearsal.json
+grep '"config": "--config shop.yaml"' out/rehearsal.json
+grep '"result": "machinery check: 9 passed, 1 failed, 0 not demonstrated, 6 not applicable"' out/rehearsal.json
+grep '"waiver": "- \{rule: action-event, id: \\"act:Order.place\\", reason: \\"found at adoption \([0-9a-f]{7}\)\\"\}"' out/rehearsal.json
+grep '"by_kind": \{\n      "fm": 1,' out/rehearsal.json
+exec sh -c 'grep -o "^  \"[a-z_]*\"" out/rehearsal.json | tr -d " \"" | tr "\n" " "'
+stdout '^backlog baselines blocked blocks check config dirty files fix_first head outside_links owed plan project version waivers $'
+
+# deterministic: a second rehearsal writes the same report
+exec machinery -C proj adopt --rehearse --config shop.yaml --out out2
+cmp out/rehearsal.md out2/rehearsal.md
+cmp out/rehearsal.json out2/rehearsal.json
+
+# without --config and without a machinery.yaml, adoption starts from scratch
+exec machinery -C proj adopt --rehearse --out out3
+stdout '^adopt: wrote [0-9]+ file\(s\)'
+grep '^- config: none$' out3/rehearsal.md
+exists out3/snapshot/machinery.yaml
+! exists proj/machinery.yaml
+
+# a dirty tree is counted and left out
+exec sh -c 'printf "x\n" > proj/scratch.txt'
+exec machinery -C proj adopt --rehearse --config shop.yaml --out out4
+stdout '^dirty: 0 changed, 1 untracked file\(s\) are not rehearsed$'
+! exists out4/snapshot/scratch.txt
+
+-- gitignore --
+.home/
+.machinery/
+-- issues.jsonl --
+{"id":"shop-1","title":"Existing work","status":"open","issue_type":"task"}
+-- bad.yaml --
+version: 1
+-- shop.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+backlog:
+  tool: bd
+tools:
+  bd: /nonexistent

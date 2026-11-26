@@ -24,6 +24,8 @@ type Options struct {
 	Paths []string // --paths
 	E2E   []string // --e2e
 	Write bool     // --write
+	// NoBacklog never runs the backlog tool (a rehearsal, section 17.3).
+	NoBacklog bool
 	// Gen writes the generated files (machinery gen). It refuses, returning
 	// the blocking stages, when the design has errors.
 	Gen func(*stages.Context) (written []string, blocked []*report.Stage, err error)
@@ -90,7 +92,7 @@ func Run(o Options) (*Result, error) {
 	if oldP != nil {
 		exe = oldP.Cfg.Tools.BD
 	}
-	res := &Result{Name: filepath.Base(root), Write: o.Write, Sha: "no commit", Backlog: readBacklog(root, exe)}
+	res := &Result{Name: filepath.Base(root), Write: o.Write, Sha: "no commit", Backlog: readBacklog(root, exe, o.NoBacklog)}
 	var head string
 	if h, herr := gitx.Head(root); herr == nil {
 		head = gitx.Short(h)

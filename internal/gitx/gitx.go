@@ -520,6 +520,23 @@ func Within(path, dir string) bool {
 // ignored files included, with hooks and signing off. The environment of a
 // surrounding repository (GIT_DIR and the like) is not inherited.
 func InitCommit(dir, message string) error {
+	return snapshotGit(dir, [][]string{
+		{"init", "-q"},
+		{"add", "-A", "-f"},
+		{"commit", "-q", "--no-verify", "--allow-empty", "-m", message},
+	})
+}
+
+// CommitAll commits everything in a snapshot made by InitCommit, hooks and
+// signing off.
+func CommitAll(dir, message string) error {
+	return snapshotGit(dir, [][]string{
+		{"add", "-A", "-f"},
+		{"commit", "-q", "--no-verify", "--allow-empty", "-m", message},
+	})
+}
+
+func snapshotGit(dir string, steps [][]string) error {
 	var env []string
 	for _, kv := range os.Environ() {
 		switch k, _, _ := strings.Cut(kv, "="); k {
@@ -530,11 +547,7 @@ func InitCommit(dir, message string) error {
 	}
 	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false",
 		"-c", "user.name=machinery assess", "-c", "user.email=assess@machinery.invalid"}
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"add", "-A", "-f"},
-		{"commit", "-q", "--no-verify", "--allow-empty", "-m", message},
-	} {
+	for _, args := range steps {
 		cmd := exec.Command("git", append(append([]string{}, base...), args...)...)
 		cmd.Dir = dir
 		cmd.Env = env

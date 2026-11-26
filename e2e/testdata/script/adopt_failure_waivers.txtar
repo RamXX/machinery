@@ -54,7 +54,7 @@ exec sh -c 'echo "version: [1" > design/failure-modes.yaml'
 cp job-crash.json design/machines/Job.machine.json
 exec mrun 1 adopt --paths 'internal/shipping/**'
 ! stdout 'new waivers'
-stdout '^== failure-modes ==$'
+stdout '^  failure-modes: design/failure-modes.yaml: line 1: '
 exec mrun 1 adopt --paths 'internal/shipping/**' --write
 ! grep 'crashDetected' machinery.yaml
 

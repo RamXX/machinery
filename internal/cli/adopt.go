@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/RamXX/machinery/internal/adopt"
+	"github.com/RamXX/machinery/internal/assess"
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/internal/rehearse"
 )
 
 func init() {
@@ -17,11 +20,31 @@ func runAdopt(e *Env, args []string) int {
 	fs.Var(&paths, "paths", "code paths to cover (repeatable glob); default every path")
 	fs.Var(&e2e, "e2e", "where end-to-end tests live (repeatable glob); default e2e/**")
 	write := fs.Bool("write", false, "write the files; without it adopt only reports")
+	rehearseIt := fs.Bool("rehearse", false, "adopt a snapshot outside the project and report what blocks")
+	config := fs.String("config", "", "with --rehearse: the machinery.yaml to use; it may live outside the project")
+	out := fs.String("out", "", "with --rehearse: the directory for everything it writes, outside the project, absent or empty")
 	if !e.Parse(fs, args) {
 		return 2
 	}
 	if fs.NArg() > 0 {
 		return e.Usage("machinery adopt takes no arguments")
+	}
+	switch {
+	case *rehearseIt && *write:
+		return e.Usage("--rehearse writes only in its out directory; it takes no --write")
+	case !*rehearseIt && (*config != "" || *out != ""):
+		return e.Usage("--config and --out go with --rehearse")
+	case *rehearseIt:
+		err := rehearse.Run(rehearse.Options{ProjectFlag: e.ProjectFlag, Config: *config, Out: *out, Paths: paths, E2E: e2e,
+			Stdout: e.Stdout, Gen: Generate})
+		var ue *assess.UsageError
+		if errors.As(err, &ue) {
+			return e.Usage("%s", ue.Msg)
+		}
+		if err != nil {
+			return e.Fail(err)
+		}
+		return 0
 	}
 	root := e.ProjectFlag
 	if root == "" {

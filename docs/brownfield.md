@@ -6,11 +6,11 @@ touching the backlog you have. Every command in a `sh` block is executed, in ord
 suite (`brownfield_walkthrough.txtar`) on a small existing Go project, the `brownfield` fixture:
 a depot with a shipping area and a billing area, unit tests, a smoke script and its own backlog.
 
-The contract is `docs/formats.md` sections 18 (`assess`) and 17.2 (`adopt`). Three properties
-hold at every step:
+The contract is `docs/formats.md` sections 18 (`assess`), 17.3 (`adopt --rehearse`) and 17.2
+(`adopt`). The order is assess, rehearse, then adopt. Three properties hold at every step:
 
-- `assess` writes nothing in the project, and `adopt` never changes existing code: it writes
-  `machinery.yaml` and files under `design/`.
+- `assess` and `adopt --rehearse` write nothing in the project, and `adopt` never changes existing
+  code: it writes `machinery.yaml` and files under `design/`.
 - Only the paths you point it at are covered. Everything else is left alone.
 - Coverage only grows: the scope does not narrow, baselines do not grow without a wider scope,
   and nothing proven becomes owed (`machinery check --base <ref>`).
@@ -43,7 +43,27 @@ even `.git`. Files you have not committed are not assessed; the report counts th
 the full output of every stage. Here the tests section fails with two `unit-test` findings, one
 per area: what adoption will baseline rather than delete.
 
-## 2. Look before you write
+## 2. Rehearse the adoption
+
+`assess` says where the project stands; `adopt --rehearse` says what adopting it would take. It
+takes another snapshot, runs `adopt --write`, `machinery check` and `machinery plan` there, and
+never runs the backlog tool:
+
+```sh
+machinery adopt --rehearse --config ../depot.machinery.yaml --out ../depot-rehearsal
+```
+
+`rehearsal.md` (and `rehearsal.json`) lists the files adoption would write with their sizes, the
+waivers it would add by rule, the baselines, what it would owe by kind, the result of the check,
+the stories `plan` would create by kind and tier, and what blocks adoption: each stage that fails
+or is not demonstrated, with its first findings. A finding of a cross-reference rule comes with
+the waiver that would cover it, offered and never written. A finding about the sources
+themselves, such as a machine that does not lint or a failure catalog with a row outside its
+tables or an id listed twice, is listed under "Fix in the project first": no waiver covers it,
+and `adopt --write` owes nothing until it is fixed. Fix those in the project, commit, and
+rehearse again until nothing you did not choose blocks.
+
+## 3. Look before you write
 
 Point `adopt` at the area that hurts most. Without `--write` it changes nothing:
 
@@ -54,7 +74,7 @@ machinery adopt --paths 'internal/shipping/**' --e2e 'e2e/**'
 The report says what it found: languages, code files in scope, test files (how many are unit
 tests, how many use test doubles), design sources, and the state of the backlog.
 
-## 3. Adopt the area
+## 4. Adopt the area
 
 ```sh
 machinery adopt --paths 'internal/shipping/**' --e2e 'e2e/**' --write
@@ -72,7 +92,7 @@ runs are kept. Receipts are evidence of one run at one commit and are not commit
 test or a new test double in the area fails from now on: new evidence comes from the real
 system. The billing area is outside the scope and is not looked at.
 
-## 4. Model the riskiest stateful resource
+## 5. Model the riskiest stateful resource
 
 Not the whole system: the one resource whose legal next step depends on its past. Here it is the
 shipment. Write its Modelith model and its machine from the code as it is (the fixture
@@ -119,7 +139,7 @@ rest. `states: pascal` turns `on_hold` into the domain state `OnHold`;
 the states it is never left in; and a register that lists the transitions your code makes
 (`import.machines.register`) is checked both ways against the machines.
 
-## 5. Turn what is owed into stories, beside the ones you have
+## 6. Turn what is owed into stories, beside the ones you have
 
 ```sh
 machinery owed list
@@ -131,7 +151,15 @@ machinery waves
 and a tier label. Your existing stories are untouched. To attach ids to a story you already have,
 use `machinery plan --link <story> <id>...`. `waves` shows what can run in parallel.
 
-## 6. Prove one story end to end
+Decisions you already keep in a file move into the backlog record by record:
+`machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'` prints one decision
+per record, with the design ids its text names, and `--apply` creates them; the file is never
+touched, and the last line says how many lines your instructions would shed once agents stop
+loading it. With a backlog, `machinery waves --freeze` and `machinery intake plan --apply` wait
+for the checker's review (`machinery review`); an adopted project may set `review.backlog` and
+`review.design` to `off` until it plans that way, and the ratchet reports turning one off later.
+
+## 7. Prove one story end to end
 
 A story is done when its ids are observed on the real system. The fixture `brownfield-proof` adds
 what the story "Prove shipment pack" needs: a `machinery:serves` comment in the shipping package
@@ -156,7 +184,7 @@ machinery status
 proven or still owed. `story` is the gate for that one story; a consequential or critical story
 would also need a fresh verifier (`docs/pm.md`).
 
-## 7. Hold the line, then widen
+## 8. Hold the line, then widen
 
 ```sh
 machinery check --base HEAD~2

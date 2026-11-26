@@ -1,4 +1,4 @@
-# a broken machine: the findings are printed, no owed entry is written, exit 1
+# a broken machine: exactly the findings that block are printed, no owed entry is written, exit 1
 fixture brownfield
 gitinit
 exec sh backlog.sh
@@ -11,9 +11,11 @@ cp .machinery/broken.machine.json design/machines/Shipment.machine.json
 # the dry run prints the findings and does not offer to owe anything
 exec mrun 1 adopt --paths 'internal/shipping/**'
 stdout '^design: 1 model\(s\), 1 machine\(s\), 0 contract\(s\)$'
-stdout '^== machines ==$'
-stdout 'ERROR  design/machines/Shipment.machine.json: '
-stdout '^failed: [0-9]+ finding\(s\)$'
+stdout '^blocked: machinery gen refuses while [0-9]+ finding\(s\) stand; no owed entry is written until they are fixed$'
+stdout '^  machines: design/machines/Shipment.machine.json: '
+stdout '^fix in the project first: no waiver covers a finding of stage model, machines or failure-modes; only cross-reference rules are waived \(section 6.7\)$'
+! stdout '^== machines ==$'
+! stdout 'warn'
 stdout 'fix the findings below'
 ! stdout 'design/owed.yaml'
 ! stdout 'new owed entries'
@@ -22,8 +24,8 @@ stdout 'fix the findings below'
 exec mrun 1 adopt --paths 'internal/shipping/**' --write
 stdout '^adopt: wrote 1 file\(s\)$'
 stdout '^  machinery.yaml$'
-stdout '^== machines ==$'
-stdout 'ERROR  design/machines/Shipment.machine.json: '
+stdout '^blocked: machinery gen refuses while [0-9]+ finding\(s\) stand'
+stdout '^  machines: design/machines/Shipment.machine.json: '
 grep 'design/model/depot.modelith.yaml' machinery.yaml
 ! exists design/owed.yaml
 ! exists design/gen/tables

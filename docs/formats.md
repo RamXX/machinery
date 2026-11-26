@@ -3285,6 +3285,7 @@ timestamp or an absolute path:
 
 | Part | What |
 |---|---|
+| `backlog` | The backlog line of the adopt report (section 17.2): `backlog: none found`, or `backlog: bd, not read in a rehearsal`. |
 | `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
 | `waivers` | The waivers adopt added, by rule, with counts. |
 | `baselines` | The tests and architecture baselines, each with its number of entries. |
@@ -3299,7 +3300,7 @@ A finding under `blocks` carries its disposition: `fix in the project first` for
 stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6.6, the message
 `<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
-otherwise. `rehearsal.json` is `{version, project, head, config, dirty, outside_links, files:
+otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links, files:
 [{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
 count}], total, edges}, blocks: [{stage, outcome, findings: [{severity, message, disposition,

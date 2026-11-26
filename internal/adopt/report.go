@@ -72,7 +72,43 @@ func (r *Result) Print(w io.Writer) {
 			fmt.Fprintf(w, "  %s\n", n)
 		}
 	}
-	for _, s := range r.Blocked {
-		report.Print(w, s)
+	if lines := r.BlockedLines(); len(lines) > 0 {
+		for _, l := range lines {
+			fmt.Fprintln(w, l)
+		}
 	}
+}
+
+// BlockedLines is what the report says when generation is refused (section
+// 17.2): exactly the findings that block, and that no waiver covers them.
+func (r *Result) BlockedLines() []string {
+	if len(r.Blocked) == 0 {
+		return nil
+	}
+	var body []string
+	errs, n := 0, 0
+	for _, s := range r.Blocked {
+		listed := false
+		for _, f := range s.Sorted() {
+			if f.Sev == report.Error {
+				body = append(body, fmt.Sprintf("  %s: %s", s.Name, f.Msg))
+				errs++
+				n++
+				listed = true
+			}
+		}
+		if !listed && s.Outcome() == report.NotDemonstrated {
+			reason := s.ND
+			if reason == "" {
+				reason = "nothing to check"
+			}
+			body = append(body, fmt.Sprintf("  %s: not demonstrated: %s", s.Name, reason))
+			n++
+		}
+	}
+	lines := append([]string{fmt.Sprintf("blocked: machinery gen refuses while %d finding(s) stand; no owed entry is written until they are fixed", n)}, body...)
+	if errs > 0 {
+		lines = append(lines, "fix in the project first: no waiver covers a finding of stage model, machines or failure-modes; only cross-reference rules are waived (section 6.7)")
+	}
+	return lines
 }

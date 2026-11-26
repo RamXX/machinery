@@ -54,7 +54,7 @@ still needs a verifier in a fresh context.
 | Situation | Start with |
 |---|---|
 | No `machinery.yaml`, new project | `machinery init`. Guide: `docs/getting-started.md`. |
-| No `machinery.yaml`, existing code and backlog | `machinery assess --config <a hand-written yaml outside the project>` (a read-only report), then `machinery adopt --paths '<area>/**'` (a dry run), then `--write`. Guide: `docs/brownfield.md`. |
+| No `machinery.yaml`, existing code and backlog | `machinery assess --config <a hand-written yaml outside the project>` (a read-only report), then `machinery adopt --rehearse --config <the same yaml>` (adoption on a copy: what it writes, owes and what blocks it), then `machinery adopt --paths '<area>/**'` (a dry run), then `--write`. Guide: `docs/brownfield.md`. |
 | A new requirement | `machinery intake new "<title>" --intent "..." --refuses "..."`, before any story or code. Guide: `docs/pm.md`. |
 | You were handed a story | `machinery brief <story>`, and run its lines in order. |
 | You are asked to verify a story | `machinery brief <story> --role verifier`. Predict before you read the proof. |

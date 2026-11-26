@@ -15,24 +15,31 @@ stdout '^out: .*/depot-assessment$'
 stdout '^tests: failed: 2 finding\(s\); checked: 2 test files, 1 files under e2e roots, 12 markers$'
 stdout '^assess: 10 sections, '
 exists ../depot-assessment/report.md
-# 2. the dry run reports and writes nothing
+# 2. the rehearsal adopts a snapshot, checks and plans it, and writes outside the project
+stdout '^out: .*/depot-rehearsal$'
+stdout '^adopt: wrote [0-9]+ file\(s\), [0-9]+ waiver\(s\), [0-9]+ owed$'
+stdout '^rehearse: rehearsal.md, rehearsal.json$'
+exists ../depot-rehearsal/rehearsal.md
+exists ../depot-rehearsal/rehearsal.json
+grep '^Nothing: every stage passed or was not applicable.$' ../depot-rehearsal/rehearsal.md
+# 3. the dry run reports and writes nothing
 stdout 'backlog: bd, 4 open, [0-9]+ ready, 1 closed, cycles: none'
 stdout 'test files: 0 under e2e roots, 1 elsewhere \(unit tests\), 1 with test doubles'
-# 3. adoption writes config and baseline only, and says what it leaves to the team
+# 4. adoption writes config and baseline only, and says what it leaves to the team
 stdout 'note: add .machinery/ to .gitignore'
 stdout 'warn   baselined: unit-test: internal/shipping/shipment_test.go'
-# 4. the modeled area is owed in full
+# 5. the modeled area is owed in full
 stdout 'tc:SHIP-422414  unproven at adoption \([0-9a-f]+\)'
-# 5. stories are created beside the existing ones
+# 6. stories are created beside the existing ones
 stdout 'plan: [0-9]+ created, 0 existing, [0-9]+ edge\(s\)'
 stdout 'Prove shipment pack'
-# 6. one story proven end to end
+# 7. one story proven end to end
 stdout 'shipment_e2e: ok'
 stdout 'owed: [0-9]+ kept, 0 added, 3 removed'
 stdout 'machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
 stdout 'tc:SHIP-422414 -> shipment_e2e.sh -> pass: Created -> Packed; packing recorded in the store history'
 stdout '== story =='
-# 7. the ratchet holds and the scope widens
+# 8. the ratchet holds and the scope widens
 stdout '== ratchet =='
 stdout 'internal/billing'
 

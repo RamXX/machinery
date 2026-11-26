@@ -13,6 +13,7 @@ import (
 type Backlog struct {
 	Found    bool // a .beads directory exists
 	Runnable bool // bd answered
+	NotRead  bool // a rehearsal: bd is never run (section 17.3)
 	Open     int
 	Ready    int
 	Closed   int
@@ -24,6 +25,8 @@ func (b Backlog) Line() string {
 	switch {
 	case !b.Found:
 		return "backlog: none found"
+	case b.NotRead:
+		return "backlog: bd, not read in a rehearsal"
 	case !b.Runnable:
 		return "backlog: bd not runnable"
 	}
@@ -57,12 +60,16 @@ type rawIssue struct {
 
 // readBacklog runs bd in the project directory when a .beads directory exists.
 // A missing or failing bd is reported in the result, never as an error.
-func readBacklog(root, exe string) Backlog {
+func readBacklog(root, exe string, notRead bool) Backlog {
 	var b Backlog
 	if info, err := os.Stat(filepath.Join(root, ".beads")); err != nil || !info.IsDir() {
 		return b
 	}
 	b.Found = true
+	if notRead {
+		b.NotRead = true
+		return b
+	}
 	out, err := bd(exe, root, "list", "--all", "--json", "--limit", "0")
 	if err != nil {
 		return b

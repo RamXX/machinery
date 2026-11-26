@@ -1,0 +1,36 @@
+# a project whose imported sources stop generation: adopt names exactly what blocks, a catalog's form is
+# fixed in the project, and the rehearsal lists it under fix in the project first (sections 17.2, 17.3)
+fixture library proj
+cd proj
+exec sh -c 'printf "RISK-3 | low | A copy is lent twice. | The desk refuses the second loan.\n\nRISK-9 | high | A stray row. | Nothing.\n" >> docs/risks.md'
+gitinit
+
+# the rehearsal: adopt is blocked, nothing is owed; the catalog's form is to be fixed first
+exec machinery adopt --rehearse --out ../out
+stdout '^adopt: blocked: machinery gen refuses while 2 finding\(s\) stand; nothing is owed$'
+stdout '^blocks adoption: 3 stage\(s\): model, failure-modes, gen-drift$'
+stdout '^fix in the project first: 2 finding\(s\)$'
+exec git status --porcelain
+! stdout .
+grep '^## Adopt is blocked$' ../out/rehearsal.md
+grep '^  failure-modes: docs/risks.md:24: RISK-3: duplicate id, first on line 22$' ../out/rehearsal.md
+grep '^- ERROR  docs/risks.md:26: RISK-9: the row is in no table \(a table needs a header row and a delimiter row above its rows, and a blank line ends it\)\n  - fix in the project first$' ../out/rehearsal.md
+grep '^## Fix in the project first\n\nNo waiver covers these' ../out/rehearsal.md
+grep '^- failure-modes: docs/risks.md:24: RISK-3: duplicate id, first on line 22$' ../out/rehearsal.md
+grep '"fix_first": \[\n    \{\n      "message": "docs/risks.md:24: RISK-3: duplicate id, first on line 22",\n      "stage": "failure-modes"' ../out/rehearsal.json
+grep '"disposition": "fix in the project first"' ../out/rehearsal.json
+! grep 'waivable' ../out/rehearsal.md
+
+# adopt --write says exactly which findings block, offers no waiver for them, and owes nothing
+exec mrun 1 adopt --write
+stdout '^blocked: machinery gen refuses while 2 finding\(s\) stand; no owed entry is written until they are fixed\n  failure-modes: docs/risks.md:24: RISK-3: duplicate id, first on line 22\n  failure-modes: docs/risks.md:26: RISK-9: the row is in no table \(a table needs a header row and a delimiter row above its rows, and a blank line ends it\)\nfix in the project first: no waiver covers a finding of stage model, machines or failure-modes; only cross-reference rules are waived \(section 6.7\)$'
+! stdout '== failure-modes =='
+! stdout 'warn'
+! grep 'reason: "unmodeled at adoption' machinery.yaml
+! exists design/gen/obligations.json
+
+# fixed in the catalog, the same adoption goes through
+exec sh -c 'head -n 23 docs/risks.md > risks.tmp && mv risks.tmp docs/risks.md'
+exec machinery adopt --write
+! stdout 'blocked'
+exists design/gen/obligations.json

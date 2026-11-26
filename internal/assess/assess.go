@@ -114,28 +114,11 @@ func (a *assessment) outsideLine() string {
 // directory, and refuses before anything is written (section 18.1).
 func (a *assessment) inputs() error {
 	o := a.o
-	root := o.ProjectFlag
-	if root == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		if r, ferr := project.Find(wd); ferr == nil {
-			root = r
-		} else if top, terr := gitx.TopLevel(wd); terr == nil {
-			root = top
-		} else {
-			root = wd
-		}
-	}
-	abs, err := filepath.Abs(root)
+	root, err := ResolveRoot(o.ProjectFlag)
 	if err != nil {
 		return err
 	}
-	if info, serr := os.Stat(abs); serr != nil || !info.IsDir() {
-		return usagef("%s is not a directory", root)
-	}
-	a.root = gitx.RealPath(abs)
+	a.root = root
 	a.name = filepath.Base(a.root)
 
 	if o.Config != "" {
@@ -155,11 +138,9 @@ func (a *assessment) inputs() error {
 		return perr
 	}
 
-	head, herr := gitx.Head(a.root)
-	if herr != nil || head == "" {
-		return usagef("%s is not a git repository with a commit; assess reads its HEAD", a.root)
+	if a.head, err = HeadOf(a.root, "assess"); err != nil {
+		return err
 	}
-	a.head = gitx.Short(head)
 	for _, ref := range o.Since {
 		sha, rerr := gitx.Resolve(a.root, ref)
 		if rerr != nil || sha == "" {
@@ -167,80 +148,15 @@ func (a *assessment) inputs() error {
 		}
 		a.since = append(a.since, sinceRef{label: ref, sha: sha})
 	}
-	return a.outDir()
-}
-
-// outDir checks --out, or makes the default one under the system temp
-// directory, outside the project and the repository that holds it.
-func (a *assessment) outDir() error {
-	containers := []string{a.root}
-	if top, err := gitx.TopLevel(a.root); err == nil && top != "" {
-		containers = append(containers, gitx.RealPath(top))
-	}
-	if gd, err := gitx.CommonDir(a.root); err == nil {
-		containers = append(containers, gitx.RealPath(gd))
-	}
-	inside := func(p string) string {
-		rp := gitx.RealPath(p)
-		for _, c := range containers {
-			if gitx.Within(rp, c) {
-				return c
-			}
-		}
-		return ""
-	}
-	if a.o.Out == "" {
-		tmp := os.TempDir()
-		if c := inside(tmp); c != "" {
-			return usagef("the system temp directory %s is inside %s; assess never writes in the project: name a directory outside it with --out", tmp, c)
-		}
-		dir, err := os.MkdirTemp("", "machinery-assess-")
-		if err != nil {
-			return err
-		}
-		a.out = dir
-		return nil
-	}
-	abs, err := filepath.Abs(a.o.Out)
-	if err != nil {
-		return err
-	}
-	if c := inside(abs); c != "" {
-		return usagef("--out %s is inside %s; assess never writes in the project: name a directory outside it", a.o.Out, c)
-	}
-	if info, serr := os.Lstat(abs); serr == nil {
-		entries, rerr := os.ReadDir(abs)
-		if !info.IsDir() || rerr != nil || len(entries) > 0 {
-			return usagef("--out %s is not empty; name an absent or empty directory", a.o.Out)
-		}
-	}
-	if err := os.MkdirAll(abs, 0o755); err != nil {
-		return err
-	}
-	a.out = abs
-	return nil
+	a.out, err = PrepareOut(a.root, a.o.Out, "assess")
+	return err
 }
 
 // snapshot extracts HEAD into <out>/snapshot, writes the config there and
 // makes it a repository with one commit (section 18.2).
 func (a *assessment) snapshot() error {
-	a.snap = filepath.Join(a.out, "snapshot")
-	if err := os.MkdirAll(a.snap, 0o755); err != nil {
-		return err
-	}
-	_, outside, err := gitx.Archive(a.root, a.snap)
-	if err != nil {
-		return err
-	}
-	a.outside = outside
-	cfg := filepath.Join(a.snap, project.ConfigName)
-	if err := os.RemoveAll(cfg); err != nil {
-		return err
-	}
-	if err := os.WriteFile(cfg, a.cfgBytes, 0o644); err != nil {
-		return err
-	}
-	if err := gitx.InitCommit(a.snap, "snapshot of "+a.head); err != nil {
+	var err error
+	if a.snap, a.outside, err = TakeSnapshot(a.root, a.out, a.head, a.cfgBytes); err != nil {
 		return err
 	}
 	p, err := project.Load(a.snap)
