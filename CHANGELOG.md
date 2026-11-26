@@ -50,7 +50,8 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - Evidence cannot be typed by hand: a receipts file counts only when `machinery run` entered it
   in the run ledger of the git directory and nothing changed it since, and a `pass` receipt
   proves only when its `test` names a test file that claims the id (`receipt.Test` in
-  `pkg/receipt` builds it); a `fail` always fails. A receipt needs a `test`. This guards
+  `pkg/receipt` builds it); a `fail` in a file that is used always fails, and a file that is not used fails
+  the story gate and replaces the counts of `proof`. A receipt needs a `test`. This guards
   against mistakes and casual edits, not against a party who can run commands as the tool
   (`docs/formats.md` section 10.2).
 

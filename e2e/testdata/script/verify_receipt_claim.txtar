@@ -24,7 +24,9 @@ stdout '^  ERROR  receipt: fm:payment-provider-down: TestNowhere does not claim 
 stdout '^  ERROR  receipt: tc:ORDE-2e883d: other\.sh does not claim it; add machinery:verifies tc:ORDE-2e883d to e2e/other\.sh'
 stdout '^  ERROR  failed: tc:ORDE-2e883d \(other\.sh\)$'
 ! stdout 'stale owed entry'
-stdout '^checked: 16 obligations, 13 proven, 1 partial, 2 owed, 25 receipts$'
+stdout '^checked: 16 obligations, 13 proven, 1 partial, 2 owed, 26 receipts$'
+# one finding per id and test, however many lines repeat it
+stdout -count=1 'receipt: tc:ORDE-8bd6e7: TestNowhere does not claim it'
 stdout '^failed: 11 finding\(s\)$'
 exec machinery owed sync --prune-only
 stdout '^owed: 2 kept, 0 added, 0 removed$'
@@ -55,6 +57,7 @@ stdout '^  ERROR  receipt: tc:ORDE-2e883d: orders\.sh does not claim it; trace\.
 stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 15 receipts$'
 
 -- refused.jsonl --
+{"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestNowhere","effects":["recordCharge"],"observed":"typed"}
 {"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestNowhere","effects":["recordCharge"],"observed":"typed"}
 {"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"machinery","effects":["recordCharge"],"observed":"typed"}
 {"v":1,"type":"receipt","id":"tc:ORDE-8bd6e7","outcome":"pass","test":"TestCharge/paid","effects":["recordCharge"],"observed":"typed"}

@@ -21,7 +21,9 @@ exec mrun 1 verify --story shop-v1
 stdout '^checked: 2 obligations, 2 proven, 0 partial, 0 owed, 2 receipts$'
 stdout '^  ERROR  failed: tc:ORDE-1ded14 \(some.sh\)$'
 ! stdout 'unproven'
-stdout '^failed: 1 finding\(s\)$'
+# a pass that names no claiming test file always prints, also for an id outside the story (section 10.2)
+stdout '^  ERROR  receipt: tc:ORDE-70d94f: TestNowhere does not claim it; no file'
+stdout '^failed: 2 finding\(s\)$'
 
 # a new commit and the whole suite
 exec sh -c 'printf "// next\n" >> internal/domain/order.go'
@@ -67,6 +69,7 @@ set -eu
 printf '{"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"some.sh","effects":["stampAttempt"],"observed":"Pending -> paying"}\n' >> "$MACHINERY_RECEIPTS"
 printf '{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"some.sh","observed":"final"}\n' >> "$MACHINERY_RECEIPTS"
 printf '{"v":1,"type":"receipt","id":"tc:ORDE-1ded14","outcome":"fail","test":"some.sh","effects":[],"observed":"stayed Pending"}\n' >> "$MACHINERY_RECEIPTS"
+printf '{"v":1,"type":"receipt","id":"tc:ORDE-70d94f","outcome":"pass","test":"TestNowhere","effects":["recordPayRefused"],"observed":"typed"}\n' >> "$MACHINERY_RECEIPTS"
 -- want-v1.txt --
 == verify ==
 checked: 2 obligations, 2 proven, 0 partial, 0 owed, 2 receipts

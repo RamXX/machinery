@@ -41,6 +41,8 @@ func StoryGate(d *design.Design, is *backlog.Issue, issues []backlog.Issue) (*re
 	if ev.Dirty {
 		s.Errorf("working tree has uncommitted changes")
 	}
+	// a receipts file that is not used may hold the failure of this story (section 10.2)
+	s.Findings = append(s.Findings, ev.RefusedFindings()...)
 	tier, _ := StoryTier(d, is, ids)
 	if l := LabelTier(is); l != "" && l != tier {
 		s.Warnf("label tier:%s disagrees with the ids: the story is %s", l, tier)
@@ -334,7 +336,8 @@ func judgeVerdict(s *report.Stage, t backlog.Tags, fresh []backlog.Stamp, valid 
 }
 
 // StoryVerify renders stage verify for the ids of one story (section 12):
-// findings about other obligations are dropped, except failed ones.
+// findings about other obligations are dropped, except failed ones and those
+// about receipts files and receipts that are not used (section 10.2).
 func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *report.Stage {
 	s := report.New("verify")
 	sel := setOf(ids)

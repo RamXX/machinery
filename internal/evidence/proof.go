@@ -141,13 +141,17 @@ func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra
 			}
 		}
 	}
-	if ev.HasEvidence {
+	exit := 0
+	if n := len(ev.Refused); n > 0 {
+		// what a file that is not used holds is unknown: no count stands (section 13)
+		exit = 1
+		fmt.Fprintf(w, "result:   %d receipts file(s) refused: delete them and run the tests through machinery run\n", n)
+	} else if ev.HasEvidence {
 		fmt.Fprintf(w, "result:   %d passed / %d failed / %d skipped%s\n", p, f, s, against(ev.Runs))
 	} else {
 		fmt.Fprintf(w, "result:   no evidence at %s\n", gitx.Short(ev.Head))
 	}
 	owed := d.OwedSet()
-	exit := 0
 	fmt.Fprintln(w, "criteria:")
 	var notProven []string
 	for _, id := range ids {

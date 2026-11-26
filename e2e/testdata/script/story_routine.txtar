@@ -84,6 +84,39 @@ exec mrun 1 verify --story shop-r1
 stdout '^  ERROR  failed: tc:ORDE-2e883d \(fail\.sh\)$'
 stdout '^  ERROR  receipt: tc:ORDE-2e883d: fail\.sh does not claim it; no file under trace\.tests is named fail\.sh: write test as <path of the test file> or <path>::<name>$'
 
+# touching the file of the failing run does not make the failure go away: the refused file fails
+# the gate, and the proof says so instead of counting (section 10.2)
+exec sh -c 'echo >> "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
+exec mrun 1 proof --story shop-r1 --post
+stdout '^result:   1 receipts file\(s\) refused: delete them and run the tests through machinery run$'
+! stdout '0 failed'
+exec bd show shop-r1 --json
+stdout '1 receipts file\(s\) refused'
+
+# nor does cutting its end line
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery run -- sh fail.sh
+exec sh -c 'f=$(ls .machinery/receipts/*.jsonl | tail -n 1); sed "\$d" "$f" > "$f.new" && mv "$f.new" "$f"'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  receipts: \.machinery/receipts/[^ ]+\.jsonl: changed after the run; delete the file and run the tests again through machinery run$'
+exec mrun 1 proof --story shop-r1
+stdout '^result:   1 receipts file\(s\) refused: delete them and run the tests through machinery run$'
+! stdout '0 failed'
+
+# nor does a failing run that machinery run never ended
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+! exec machinery run -- sh -c 'sh fail.sh; kill -9 $PPID'
+exec mrun 1 story shop-r1
+stdout '^  ERROR  incomplete run: \.machinery/receipts/[^ ]+\.jsonl$'
+exec mrun 1 proof --story shop-r1
+stdout '^result:   1 receipts file\(s\) refused: delete them and run the tests through machinery run$'
+exec machinery status
+stdout '^refused: \.machinery/receipts/[^ ]+\.jsonl: incomplete run$'
+
 -- r1.txt --
 machinery:ids inv:terminal-is-final tc:ORDE-2e883d
 machinery:scope internal/domain/**

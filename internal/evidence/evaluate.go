@@ -2,6 +2,7 @@ package evidence
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/gitx"
@@ -34,7 +35,8 @@ type Evaluation struct {
 	Dirty       bool // the working tree has changes outside receipts and owed file
 	HasEvidence bool // at least one complete, usable run valid for Head
 	Runs        []RunInfo
-	// Refused names the receipts files section 10.2 refuses, each with why.
+	// Refused names the receipts files that are not used and may hide a
+	// failure, each with why: those section 10.2 refuses and incomplete runs.
 	Refused []string
 	// Findings are those of stage verify (section 12), unsorted.
 	Findings []report.Finding
@@ -60,6 +62,18 @@ func (e *Evaluation) Design() *design.Design { return e.d }
 
 // Receipts returns the receipts of an id, in file and line order.
 func (e *Evaluation) Receipts(id string) []Receipt { return e.receipts[id] }
+
+// RefusedFindings returns the findings of stage verify about receipts files
+// that are not used (sections 10.2 and 12). The tier gates print them too.
+func (e *Evaluation) RefusedFindings() []report.Finding {
+	var res []report.Finding
+	for _, f := range e.Findings {
+		if f.Sev == report.Error && (strings.HasPrefix(f.Msg, "receipts: ") || strings.HasPrefix(f.Msg, "incomplete run: ")) {
+			res = append(res, f)
+		}
+	}
+	return res
+}
 
 // NoEvidence is the reason of a stage that found no evidence.
 func (e *Evaluation) NoEvidence() string { return "no evidence at " + gitx.Short(e.Head) }
@@ -116,6 +130,7 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		}
 		if fd.End == nil {
 			add(report.Error, "incomplete run: %s", rel)
+			ev.Refused = append(ev.Refused, rel+": incomplete run")
 			continue
 		}
 		if fd.Header.Dirty {
