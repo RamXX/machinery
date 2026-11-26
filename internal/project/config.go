@@ -110,12 +110,13 @@ func (c *Config) HasFailureModes() bool {
 
 // ImportMachines reads machines written in a JSON dialect (section 5.2.1).
 type ImportMachines struct {
-	Files    []string        `yaml:"files"`
-	States   string          `yaml:"states,omitempty"`
-	Rename   Rename          `yaml:"rename,omitempty"`
-	Terminal *Terminal       `yaml:"terminal,omitempty"`
-	Register *Register       `yaml:"register,omitempty"`
-	Bind     map[string]Bind `yaml:"bind,omitempty"`
+	Files    []string            `yaml:"files"`
+	States   string              `yaml:"states,omitempty"`
+	Rename   Rename              `yaml:"rename,omitempty"`
+	Terminal *Terminal           `yaml:"terminal,omitempty"`
+	Register *Register           `yaml:"register,omitempty"`
+	Bind     map[string]Bind     `yaml:"bind,omitempty"`
+	Annotate map[string]Annotate `yaml:"annotate,omitempty"`
 }
 
 // Register names a register of observed transitions and the keys of its
@@ -154,6 +155,28 @@ type Bind struct {
 	LifecycleOf string   `yaml:"lifecycle_of,omitempty"`
 	Aspect      string   `yaml:"aspect,omitempty"`
 	Serves      []string `yaml:"serves,omitempty"`
+}
+
+// Annotate says about an imported machine what its dialect has no key for
+// (section 5.2.1): the events that arrive from outside, the events that
+// report a failure, the states that record one, and the events that are a
+// model action under another name. The three lists hold exact names and
+// patterns in which "*" stands for any run of characters.
+type Annotate struct {
+	ExternalEvents []string          `yaml:"external_events,omitempty"`
+	FailureEvents  []string          `yaml:"failure_events,omitempty"`
+	FailureStates  []string          `yaml:"failure_states,omitempty"`
+	Aliases        map[string]string `yaml:"aliases,omitempty"`
+}
+
+// AnnotateKeys returns the keys of import.machines.annotate, sorted.
+func (im *ImportMachines) AnnotateKeys() []string {
+	keys := make([]string, 0, len(im.Annotate))
+	for k := range im.Annotate {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // BindKeys returns the keys of import.machines.bind, sorted.
@@ -739,6 +762,33 @@ func (c *Config) validateImport() error {
 		for _, id := range b.Serves {
 			if strings.TrimSpace(id) == "" {
 				return Errf("import.machines.bind.%s.serves: an id must not be empty", k)
+			}
+		}
+	}
+	for _, k := range im.AnnotateKeys() {
+		a := im.Annotate[k]
+		if strings.TrimSpace(k) == "" || !ValidGlob(k) {
+			return Errf("import.machines.annotate: %q is not a valid glob", k)
+		}
+		if err := CheckPath("import.machines.annotate", k); err != nil {
+			return err
+		}
+		if len(a.ExternalEvents)+len(a.FailureEvents)+len(a.FailureStates)+len(a.Aliases) == 0 {
+			return Errf("import.machines.annotate.%s: set external_events, failure_events, failure_states or aliases", k)
+		}
+		for _, l := range []struct {
+			name     string
+			patterns []string
+		}{{"external_events", a.ExternalEvents}, {"failure_events", a.FailureEvents}, {"failure_states", a.FailureStates}} {
+			for _, pat := range l.patterns {
+				if strings.TrimSpace(pat) == "" {
+					return Errf("import.machines.annotate.%s.%s: a pattern must not be empty", k, l.name)
+				}
+			}
+		}
+		for ev, act := range a.Aliases {
+			if strings.TrimSpace(ev) == "" || strings.TrimSpace(act) == "" {
+				return Errf("import.machines.annotate.%s.aliases: an event and its action must not be empty", k)
 			}
 		}
 	}

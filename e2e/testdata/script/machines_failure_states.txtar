@@ -20,6 +20,18 @@ stdout -count=2 '^  warn   '
 ! stdout 'event abort looks'
 stdout '^passed$'
 
+# an event the machine declares external, or an alias of an action, is declared: no hint for it
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_external_events\": [\"workerError\"], &/" hints.json > design/machines/Job.machine.json'
+exec machinery lint --stage machines
+! stdout 'event workerError looks'
+stdout -count=1 '^  warn   '
+stdout '^passed$'
+exec sh -c 'sed "s/\"_failure_events\": \[/\"_aliases\": {\"workerError\": \"abort\"}, &/" hints.json > design/machines/Job.machine.json'
+exec machinery lint --stage machines
+! stdout 'event workerError looks'
+stdout -count=1 '^  warn   '
+stdout '^passed$'
+
 # without the tag the failure state is hinted too
 cp untagged.json design/machines/Job.machine.json
 exec machinery lint --stage machines

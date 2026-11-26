@@ -205,20 +205,63 @@ func checkModelMachine(d *design.Design) (fs xfindings, c xrefCounts) {
 
 // externalEvents returns the events a machine declares as arriving from
 // outside: _external_events and _failure_events (a failure event arrives
-// from outside). A list of the wrong shape is a finding of event-action.
-func externalEvents(fs *xfindings, m *machine.Machine) map[string]bool {
-	external, ok := eventSet(m, "_external_events")
-	if !ok {
-		fs.add("event-action", m.ID, "_external_events must be a list of event names")
-	}
-	failure, ok := eventSet(m, "_failure_events")
-	if !ok {
-		fs.add("event-action", m.ID, "_failure_events must be a list of event names")
-	}
-	for ev := range failure {
-		external[ev] = true
+// from outside). A list of the wrong shape is a finding of event-action,
+// and so is a listed event that is an action (isAction; of is what it is an
+// action of): an action is a caller's command, and no list hides one.
+func externalEvents(fs *xfindings, m *machine.Machine, isAction map[string]bool, of string) map[string]bool {
+	external := map[string]bool{}
+	for _, key := range []string{"_external_events", "_failure_events"} {
+		set, ok := eventSet(m, key)
+		if !ok {
+			fs.add("event-action", m.ID, "%s must be a list of event names", key)
+		}
+		for _, ev := range sortedNames(set) {
+			if external[ev] {
+				continue // in both lists: stage machines reports it
+			}
+			external[ev] = true
+			if isAction[ev] {
+				fs.add("event-action", m.ID+"."+ev, "listed in %s and an action of %s; an action is a caller's command, not an event from outside: remove it from %s (for an imported machine, from import.machines.annotate)", key, of, key)
+			}
+		}
 	}
 	return external
+}
+
+func sortedNames(set map[string]bool) []string {
+	res := make([]string, 0, len(set))
+	for n := range set {
+		res = append(res, n)
+	}
+	sort.Strings(res)
+	return res
+}
+
+// aliasedEvents returns the events of a machine that are an action under
+// another name (_aliases), each with its action, for the ones that hold: the
+// action is one of isAction and the event is not. The others are findings
+// of event-action; missing is what to do about an action that is not one.
+func aliasedEvents(fs *xfindings, m *machine.Machine, isAction map[string]bool, of, missing string) (valid map[string]string, all map[string]bool) {
+	valid, all = map[string]string{}, map[string]bool{}
+	aliases := m.Aliases()
+	evs := make([]string, 0, len(aliases))
+	for ev := range aliases {
+		evs = append(evs, ev)
+	}
+	sort.Strings(evs)
+	for _, ev := range evs {
+		act := aliases[ev]
+		all[ev] = true
+		switch {
+		case isAction[ev]:
+			fs.add("event-action", m.ID+"."+ev, "_aliases gives the event the action %s, and %s is itself an action of %s; remove the alias", act, ev, of)
+		case !isAction[act]:
+			fs.add("event-action", m.ID+"."+ev, "_aliases names action %s, which is not an action of %s; %s, or remove the alias", act, of, missing)
+		default:
+			valid[ev] = act
+		}
+	}
+	return valid, all
 }
 
 // checkOperationalEvents applies event-action to an operational machine
@@ -252,11 +295,13 @@ func checkOperationalEvents(fs *xfindings, d *design.Design, m *machine.Machine)
 			anyAction = true
 		}
 	}
-	external := externalEvents(fs, m)
+	of := fmt.Sprintf("what the machine serves (%s)", strings.Join(serves, ", "))
+	external := externalEvents(fs, m, allowed, of)
+	_, aliased := aliasedEvents(fs, m, allowed, of, "serve the action (act:<Entity>.<action>)")
 	evs := m.Table.Events()
 	var unmatched []string
 	for _, ev := range evs {
-		if !allowed[ev] && !external[ev] {
+		if !allowed[ev] && !external[ev] && !aliased[ev] {
 			unmatched = append(unmatched, ev)
 		}
 	}
@@ -288,13 +333,17 @@ func checkLifecycleEvents(fs *xfindings, g *lifecycleGroup) (events int) {
 	var unmatched, ids []string
 	seen := map[string]bool{}
 	for _, m := range g.machines {
-		external := externalEvents(fs, m)
+		external := externalEvents(fs, m, acts, e.Name)
+		alias, aliased := aliasedEvents(fs, m, acts, e.Name, "name an action of "+e.Name)
 		evs := m.Table.Events()
 		events += len(evs)
 		ids = append(ids, m.ID)
 		for _, ev := range evs {
 			evSet[ev] = true
-			if acts[ev] || external[ev] {
+			if act, ok := alias[ev]; ok {
+				evSet[act] = true // the event is that action under another name
+			}
+			if acts[ev] || external[ev] || aliased[ev] {
 				continue
 			}
 			if len(e.Actions) > 0 {

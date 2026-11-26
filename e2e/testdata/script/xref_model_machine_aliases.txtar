@@ -1,0 +1,231 @@
+# _aliases says that an event is a model action under another name: event-action and action-event
+# read the event as that action. An action is never external (docs/formats.md section 6.4)
+
+mkdir design/machines
+
+# without the alias the event is no action and the action has no event
+cp order-plain.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.paid_up: event is not an action of Order; '
+stdout '^  ERROR  action-event: act:Order\.pay: no on event pay in machine order '
+stdout '^failed: 2 finding\(s\)$'
+
+# with it both rules hold
+cp order-alias.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
+stdout '^passed$'
+
+# an alias names an action of the entity
+cp order-unknown.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.paid_up: _aliases names action settle, which is not an action of Order; name an action of Order, or remove the alias$'
+stdout '^  ERROR  action-event: act:Order\.pay: no on event pay in machine order '
+stdout '^failed: 2 finding\(s\)$'
+
+# an event that is an action is not another action
+cp order-action.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel: _aliases gives the event the action pay, and cancel is itself an action of Order; remove the alias$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an action of the entity is a caller's command: it is not listed as external or as a failure
+cp order-external.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel: listed in _external_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _external_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^failed: 1 finding\(s\)$'
+cp order-failure.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel: listed in _failure_events and an action of Order; an action is a caller''s command, not an event from outside: remove it from _failure_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# the finding is a cross-reference finding: it is waived by <machine id>.<event>, with a reason
+cp waived.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: event-action: order\.cancel: listed in _failure_events '
+stdout '^passed$'
+cp base.yaml machinery.yaml
+cp order.json design/machines/Order.machine.json
+
+# an operational machine: the alias names an action the machine serves
+cp envelope-alias.json design/machines/Envelope.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 4 events, 2 actions, 1 entities with actions$'
+stdout '^passed$'
+cp envelope-unserved.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope\.charge_requested: _aliases names action cancel, which is not an action of what the machine serves \(act:Order\.pay\); serve the action \(act:<Entity>\.<action>\), or remove the alias$'
+stdout '^failed: 1 finding\(s\)$'
+cp envelope-action.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope\.pay: _aliases gives the event the action pay, and pay is itself an action of what the machine serves \(act:Order\.pay\); remove the alias$'
+stdout '^failed: 1 finding\(s\)$'
+cp envelope-external.json design/machines/Envelope.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: envelope\.pay: listed in _external_events and an action of what the machine serves \(act:Order\.pay\); an action is a caller''s command, not an event from outside: remove it from _external_events \(for an imported machine, from import.machines.annotate\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: event-action, id: "order.cancel", reason: "the courier reports a cancellation the customer made by phone"}
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- order.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order-plain.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "paid_up": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order-alias.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_aliases": {"paid_up": "pay"},
+  "states": {
+    "Pending": { "on": { "paid_up": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order-unknown.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_aliases": {"paid_up": "settle"},
+  "states": {
+    "Pending": { "on": { "paid_up": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order-action.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_aliases": {"cancel": "pay"},
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order-external.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_external_events": ["cancel"],
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- order-failure.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "_failure_events": ["cancel"],
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- envelope-alias.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": ["act:Order.pay"],
+  "_external_events": ["settled"],
+  "_aliases": {"charge_requested": "pay"},
+  "initial": "idle",
+  "states": {
+    "idle": { "on": { "charge_requested": { "target": "charging" } } },
+    "charging": { "on": { "settled": { "target": "idle" } } }
+  }
+}
+-- envelope-unserved.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": ["act:Order.pay"],
+  "_external_events": ["settled"],
+  "_aliases": {"charge_requested": "cancel"},
+  "initial": "idle",
+  "states": {
+    "idle": { "on": { "charge_requested": { "target": "charging" } } },
+    "charging": { "on": { "settled": { "target": "idle" } } }
+  }
+}
+-- envelope-action.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": ["act:Order.pay"],
+  "_external_events": ["settled"],
+  "_aliases": {"pay": "pay"},
+  "initial": "idle",
+  "states": {
+    "idle": { "on": { "pay": { "target": "charging" } } },
+    "charging": { "on": { "settled": { "target": "idle" } } }
+  }
+}
+-- envelope-external.json --
+{
+  "id": "envelope",
+  "_role": "operational",
+  "_serves": ["act:Order.pay"],
+  "_external_events": ["settled", "pay"],
+  "initial": "idle",
+  "states": {
+    "idle": { "on": { "pay": { "target": "charging" } } },
+    "charging": { "on": { "settled": { "target": "idle" } } }
+  }
+}

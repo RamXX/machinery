@@ -90,6 +90,74 @@ func lintEventList(base string, ro *ir.Object, states []ir.StateEntry, key, purp
 	return errs
 }
 
+// Aliases returns the root _aliases: the events that are a model action
+// under another name, each with the name of its action. Entries that are not
+// a non-empty string are left out; their shape is lintAliases's.
+func (m *Machine) Aliases() map[string]string {
+	res := map[string]string{}
+	o := m.Root.AsObject()
+	if o == nil {
+		return res
+	}
+	al := o.GetObject("_aliases")
+	for _, ev := range al.Keys() {
+		if v := al.Get2(ev); v != nil && v.Kind == ir.KindString && strings.TrimSpace(v.AsString()) != "" {
+			res[ev] = strings.TrimSpace(v.AsString())
+		}
+	}
+	return res
+}
+
+// ExternalEvents returns the root _external_events, in declaration order,
+// without duplicates.
+func (m *Machine) ExternalEvents() []string {
+	return eventList(m.Root.AsObject(), "_external_events")
+}
+
+// lintAliases holds the root _aliases: an object that maps an event some
+// state handles or ignores to a non-empty action name. An aliased event is
+// a caller's action, so it is in neither list of events from outside.
+func lintAliases(base string, ro *ir.Object, states []ir.StateEntry) (errs []string) {
+	av := ro.Get2("_aliases")
+	if av == nil {
+		return nil
+	}
+	if av.Kind != ir.KindObject {
+		return []string{base + ": _aliases must be an object that maps an event name to the name of the model action it is"}
+	}
+	handled := map[string]bool{}
+	for _, s := range states {
+		if o := s.Node.AsObject(); o != nil {
+			for _, k := range o.GetObject("on").Keys() {
+				handled[k] = true
+			}
+			for _, k := range o.GetObject("_ignores").Keys() {
+				handled[k] = true
+			}
+		}
+	}
+	outside := map[string]string{}
+	for _, key := range []string{"_failure_events", "_external_events"} {
+		for _, e := range eventList(ro, key) {
+			outside[e] = key
+		}
+	}
+	for _, ev := range av.AsObject().Keys() {
+		if v := av.AsObject().Get2(ev); v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
+			errs = append(errs, fmt.Sprintf("%s: _aliases[%s] must be a non-empty action name", base, ir.Repr(ev)))
+			continue
+		}
+		if !handled[ev] {
+			errs = append(errs, fmt.Sprintf("%s: _aliases names %s but no state handles or ignores it; the marker is stale (remove it, or wire the event)", base, ir.Repr(ev)))
+			continue
+		}
+		if key := outside[ev]; key != "" {
+			errs = append(errs, fmt.Sprintf("%s: event %s is in both _aliases and %s; an alias says the event is a caller's action, so it does not arrive from outside (keep one)", base, ir.Repr(ev), key))
+		}
+	}
+	return errs
+}
+
 // lintFailure holds the failure states and events: no state is tagged both
 // failure and accepting, _failure_events is a well-formed list of answered
 // events, and no event is in both _external_events and _failure_events.
@@ -125,8 +193,9 @@ func looksLikeFailure(name string) bool {
 // Hints returns the name hints of section 6.2, warnings that never fail the
 // stage: a state whose name looks like a failure and is not tagged failure,
 // and an event the machine answers whose name looks like a failure and that
-// is neither a failure event nor one of actions (the actions of the
-// machine's lifecycle entity).
+// is not declared: neither a failure event, nor an external event, nor an
+// alias of an action, nor one of actions (the actions of the machine's
+// lifecycle entity).
 func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 	ro := m.Root.AsObject()
 	if ro == nil {
@@ -147,12 +216,18 @@ func (m *Machine) Hints(actions map[string]bool) (hints []string) {
 			}
 		}
 	}
-	failure := map[string]bool{}
+	declared := map[string]bool{}
 	for _, e := range m.FailureEvents() {
-		failure[e] = true
+		declared[e] = true
+	}
+	for _, e := range m.ExternalEvents() {
+		declared[e] = true
+	}
+	for e := range m.Aliases() {
+		declared[e] = true
 	}
 	for _, ev := range sortedSet(events) {
-		if looksLikeFailure(ev) && !failure[ev] && !actions[ev] {
+		if looksLikeFailure(ev) && !declared[ev] && !actions[ev] {
 			hints = append(hints, fmt.Sprintf("%s: event %s looks like a failure event and is not in _failure_events", m.Path, ev))
 		}
 	}
