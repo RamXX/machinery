@@ -105,8 +105,16 @@ func Ratchet(ctx *Context) *report.Stage {
 		}
 	}
 
-	// tier-lowered
-	tiered := ratchetTiers(s, d, bp, ref, inv)
+	// tier-lowered and vital-weakened
+	base := loadBaseRisk(bp, ref)
+	var lowered []design.Lowering
+	if rel := p.Cfg.Design.Risk; rel != "" {
+		if now, err := p.Read(rel); err == nil {
+			lowered = design.ParseLowered(now)
+		}
+	}
+	tiered := ratchetTiers(s, d, base, lowered, inv)
+	vital := ratchetVital(s, d, base, lowered, inv)
 
 	// baseline-grew
 	entries := ratchetBaselines(s, p, bp, ref, widened)
@@ -116,6 +124,9 @@ func Ratchet(ctx *Context) *report.Stage {
 
 	s.Count(len(inv.Obligations), "obligations").Count(len(bcfg.Scope), "scope globs").
 		Count(tiered, "tiered ids").Count(entries, "baseline entries")
+	if vital > 0 {
+		s.Count(vital, "vital areas")
+	}
 	return s
 }
 
@@ -203,17 +214,27 @@ func set(xs []string) map[string]bool {
 	return m
 }
 
-// ratchetTiers reports lowered tiers and returns how many ids had a tier above
-// routine at the base.
-func ratchetTiers(s *report.Stage, d *design.Design, bp *project.Project, ref string, inv baseInventory) int {
+// baseRisk is the risk file at the base: its areas and its dismissals.
+type baseRisk struct {
+	areas    []design.Area
+	notVital []design.Dismissal
+}
+
+// loadBaseRisk reads the risk file of the base; empty when it had none.
+func loadBaseRisk(bp *project.Project, ref string) baseRisk {
 	if bp.Cfg.Design.Risk == "" {
-		return 0
+		return baseRisk{}
 	}
 	data, ok := gitx.Show(bp.Root, ref, bp.Cfg.Design.Risk)
 	if !ok {
-		return 0
+		return baseRisk{}
 	}
-	baseAreas, _, _ := design.ParseRisk(bp.Cfg.Design.Risk, data)
+	areas, _, _ := design.ParseRisk(bp.Cfg.Design.Risk, data)
+	return baseRisk{areas: areas, notVital: design.ParseNotVital(data)}
+}
+
+// baseIDs lists the obligations and actions of the base, sorted.
+func baseIDs(inv baseInventory) []string {
 	var ids []string
 	for _, o := range inv.Obligations {
 		ids = append(ids, o.ID)
@@ -222,15 +243,18 @@ func ratchetTiers(s *report.Stage, d *design.Design, bp *project.Project, ref st
 		ids = append(ids, a.ID)
 	}
 	sort.Strings(ids)
-	var lowered []design.Lowering
-	if rel := d.P.Cfg.Design.Risk; rel != "" {
-		if now, err := d.P.Read(rel); err == nil {
-			lowered = design.ParseLowered(now)
-		}
+	return ids
+}
+
+// ratchetTiers reports lowered tiers and returns how many ids had a tier above
+// routine at the base.
+func ratchetTiers(s *report.Stage, d *design.Design, base baseRisk, lowered []design.Lowering, inv baseInventory) int {
+	if len(base.areas) == 0 {
+		return 0
 	}
 	tiered := 0
-	for _, id := range ids {
-		old, in := design.TierOf(baseAreas, id)
+	for _, id := range baseIDs(inv) {
+		old, in := design.TierOf(base.areas, id)
 		if old == design.Routine {
 			continue
 		}

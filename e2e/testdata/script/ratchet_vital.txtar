@@ -14,6 +14,7 @@ cp risk-critical.yaml design/risk.yaml
 exec mrun 1 check --stage ratchet --base base
 stdout '^  ERROR  ratchet: tier lowered: act:Order.pay vital -> critical; record it under lowered: in the risk file with a reason$'
 stdout '^  ERROR  ratchet: tier lowered: inv:paid-before-shipped vital -> critical; record it under lowered: in the risk file with a reason$'
+! stdout 'vital weakened'
 cp risk-critical-recorded.yaml design/risk.yaml
 exec mrun 0 check --stage ratchet --base base
 stdout '^  warn   ratchet: tier lowered: act:Order.pay vital -> critical \(card payments moved to a hosted page\)$'

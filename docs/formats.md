@@ -1382,8 +1382,33 @@ that was established at the base may quietly stop being established:
 | `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 23), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
+| `vital-weakened` | A vital area of the base (section 23.1) states less now: `ERROR  ratchet: vital weakened: <area>: <what>; record it under lowered: in the risk file with a reason`, unless the risk file records that area and that `<what>` under `lowered:` (section 23), which prints as `warn   ratchet: vital weakened: <area>: <what> (<reason>)`. Adding or strengthening raises nothing. |
 
-`checked:` counts obligations, scope globs, tiered ids and baseline entries compared. An unknown
+The `<what>` of `vital-weakened`, one finding per change, in the order the base's area lists its
+parts (properties, then assumptions, then `core.paths`, then `core.entry`):
+
+| Change against the base | `<what>` |
+|---|---|
+| No area of that name is in the risk file | `area removed` |
+| A property of that name is gone | `property <name> removed` |
+| A property's `statement` differs (white space at either end ignored) | `property <name>: statement changed` |
+| A property's `kind` differs | `property <name>: kind <old> -> <new>` |
+| An id of a property's `over` is gone | `property <name>: over <id> removed` |
+| An assumption of that name is gone | `assumption <name> removed` |
+| An id of an assumption's `evidence` is gone | `assumption <name>: evidence <id> removed` |
+| A glob of `core.paths` is gone | `core path <glob> removed` |
+| An entry of `core.entry` is gone | `core entry <entry> removed` |
+| A `not_vital` entry the base did not have matches an id that a vital area held at the base | `not_vital <id> added` (the area is the first vital area of the base that held it) |
+
+Parts are matched by name: a renamed property is one removed and one added. An area that is still
+in the risk file at a lower tier is a lowering, which `tier-lowered` holds: `vital-weakened` says
+nothing more about it. A removed area is one finding; its parts are not listed again. An id
+added to `over` or `evidence`, a new property, assumption, glob or entry, and a new vital area
+raise nothing. The ids a `not_vital` entry is matched against are the ids of the design now and
+the obligations and actions of the base.
+
+`checked:` counts obligations, scope globs, tiered ids and baseline entries compared, and, when the
+base has a vital area, its vital areas. An unknown
 ref is a usage error. A base at which the project has no `machinery.yaml` established nothing:
 the stage is `not applicable: no machinery.yaml at <ref>: nothing was established there`.
 
@@ -3422,6 +3447,22 @@ lowered:
 `ids`, `from` (the tier the ids had: `consequential`, `critical` or `vital`) and `reason` are
 required. The entry stays in the file as the record of the decision. Lowering a vital area to
 critical is a lowering like any other.
+
+What a vital area states can be weakened while its tier stays (section 11.3, rule
+`vital-weakened`). Such a change is recorded with the second form of entry, the area and the
+exact `<what>` of the ratchet finding:
+
+```yaml
+lowered:
+  - {area: order-payment, what: "property charged-once: over tc:ORDE-8bd6e7 removed", reason: "the retry path moved to the provider"}
+```
+
+An entry has `ids` and `from`, or `area` and `what`, never both; `reason` is required in both
+forms. Each problem is an ERROR of stage `risk`: `<risk file>: lowered entry <n>: an entry has ids
+and from, or area and what, not both`, `<risk file>: lowered entry <n>: area must match
+^[a-z][a-z0-9-]+$`, `<risk file>: lowered entry <n>: what is required`, and the messages of the
+first form (`ids needs at least one id pattern`, `from must be consequential, critical or vital`,
+`reason is required`).
 
 ### 23.1 Vital areas
 

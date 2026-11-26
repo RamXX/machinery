@@ -1,0 +1,336 @@
+# a vital area may not quietly state less than at the base: a removed area, property, assumption,
+# core glob or entry, a changed property, a reduced over or evidence list and a new dismissal of a
+# vital id are ratchet errors unless the risk file records them (docs/formats.md sections 11.3 and 23)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+cp risk-base.yaml design/risk.yaml
+exec machinery gen
+gitinit
+exec git branch base
+
+exec mrun 0 check --stage ratchet --base base
+stdout '^checked: .*, 1 vital areas$'
+stdout '^passed$'
+
+# every weakening is one finding
+cp risk-weak.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout '^  ERROR  ratchet: vital weakened: order-payment: property charged-once: statement changed; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: property charged-once: kind exactly-once -> invariant; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: property charged-once: over tc:ORDE-8bd6e7 removed; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: property shipped-only-paid removed; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: assumption final-stays-final removed; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: assumption provider-charges-once: evidence fm:pay-for-another-customer removed; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: core path internal/domain/\*\.go removed; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: core entry internal/domain/order\.go#Transition removed; record it under lowered: in the risk file with a reason$'
+! stdout 'tier lowered'
+stdout '^failed: 8 finding\(s\)$'
+
+# a recorded weakening prints as a warning with its reason; the others still fail
+cp risk-weak-some.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout '^  warn   ratchet: vital weakened: order-payment: property shipped-only-paid removed \(the shipping rule moved to its own area\)$'
+stdout '^  warn   ratchet: vital weakened: order-payment: core path internal/domain/\*\.go removed \(the second glob matched nothing more\)$'
+stdout '^  ERROR  ratchet: vital weakened: order-payment: property charged-once: statement changed; record it under lowered: in the risk file with a reason$'
+stdout '^failed: 6 finding\(s\)$'
+cp risk-weak-all.yaml design/risk.yaml
+exec mrun 0 check --stage ratchet --base base
+! stdout 'ERROR'
+stdout '^  warn   ratchet: vital weakened: order-payment: property charged-once: over tc:ORDE-8bd6e7 removed \(the retry path moved to the provider\)$'
+stdout '^passed$'
+
+# adding and strengthening raise nothing
+cp risk-strong.yaml design/risk.yaml
+exec mrun 0 check --stage ratchet --base base
+! stdout 'vital weakened'
+stdout '^passed$'
+
+# a removed area is one finding, beside the tier lowering of its ids
+cp risk-removed.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout '^  ERROR  ratchet: vital weakened: order-payment: area removed; record it under lowered: in the risk file with a reason$'
+! stdout 'property charged-once removed'
+stdout '^  ERROR  ratchet: tier lowered: act:Order.pay vital -> routine; record it under lowered: in the risk file with a reason$'
+
+# dismissing an id that the vital area held at the base
+cp risk-dismissed.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base base
+stdout '^  ERROR  ratchet: vital weakened: order-payment: not_vital tc:ORDE-2e883d added; record it under lowered: in the risk file with a reason$'
+stdout '^  ERROR  ratchet: tier lowered: tc:ORDE-2e883d vital -> routine; record it under lowered: in the risk file with a reason$'
+
+# the second form of a lowered entry is held by stage risk
+cp risk-bad-lowered.yaml design/risk.yaml
+exec mrun 1 lint --stage risk
+stdout '^  ERROR  design/risk.yaml: lowered entry 1: an entry has ids and from, or area and what, not both$'
+stdout '^  ERROR  design/risk.yaml: lowered entry 2: area must match \^\[a-z\]\[a-z0-9-\]\+\$$'
+stdout '^  ERROR  design/risk.yaml: lowered entry 3: what is required$'
+stdout '^  ERROR  design/risk.yaml: lowered entry 4: reason is required$'
+stdout '^failed: 4 finding\(s\)$'
+
+-- risk-base.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+      - name: shipped-only-paid
+        statement: "No order ships before its payment is captured."
+        kind: never
+        over: ["inv:paid-before-shipped", "tc:ORDE-e6d28f"]
+    core:
+      paths: ["internal/domain/*.go", "internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply", "internal/domain/order.go#Transition"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down", "fm:pay-for-another-customer"]
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+-- risk-weak.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged once."
+        kind: invariant
+        over: ["act:Order.pay"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+-- risk-weak-some.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged once."
+        kind: invariant
+        over: ["act:Order.pay"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+lowered:
+  - {area: order-payment, what: "property shipped-only-paid removed", reason: "the shipping rule moved to its own area"}
+  - {area: order-payment, what: "core path internal/domain/*.go removed", reason: "the second glob matched nothing more"}
+-- risk-weak-all.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged once."
+        kind: invariant
+        over: ["act:Order.pay"]
+    core:
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+lowered:
+  - {area: order-payment, what: "property shipped-only-paid removed", reason: "the shipping rule moved to its own area"}
+  - {area: order-payment, what: "core path internal/domain/*.go removed", reason: "the second glob matched nothing more"}
+  - {area: order-payment, what: "property charged-once: statement changed", reason: "shorter wording"}
+  - {area: order-payment, what: "property charged-once: kind exactly-once -> invariant", reason: "restated as an invariant"}
+  - {area: order-payment, what: "property charged-once: over tc:ORDE-8bd6e7 removed", reason: "the retry path moved to the provider"}
+  - {area: order-payment, what: "assumption final-stays-final removed", reason: "the store is append-only now"}
+  - {area: order-payment, what: "assumption provider-charges-once: evidence fm:pay-for-another-customer removed", reason: "not evidence of this"}
+  - {area: order-payment, what: "core entry internal/domain/order.go#Transition removed", reason: "merged into Apply"}
+-- risk-strong.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7", "tc:ORDE-267d12"]
+      - name: shipped-only-paid
+        statement: "No order ships before its payment is captured."
+        kind: never
+        over: ["inv:paid-before-shipped", "tc:ORDE-e6d28f"]
+      - name: refunded-once
+        statement: "A paid order is refunded at most once."
+        kind: exactly-once
+        over: ["tc:ORDE-ad945c"]
+    core:
+      paths: ["internal/domain/*.go", "internal/domain/**", "internal/api/**"]
+      entry: ["internal/domain/order.go#Apply", "internal/domain/order.go#Transition", "internal/domain/order.go#New"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down", "fm:pay-for-another-customer", "inv:terminal-is-final"]
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+-- risk-removed.yaml --
+version: 1
+areas:
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+-- risk-dismissed.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+      - name: shipped-only-paid
+        statement: "No order ships before its payment is captured."
+        kind: never
+        over: ["inv:paid-before-shipped", "tc:ORDE-e6d28f"]
+    core:
+      paths: ["internal/domain/*.go", "internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply", "internal/domain/order.go#Transition"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down", "fm:pay-for-another-customer"]
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+not_vital:
+  - {id: "tc:ORDE-2e883d", reason: "a refused pay moves no money"}
+-- risk-bad-lowered.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d", "tc:ORDE-8bd6e7", "tc:ORDE-267d12", "tc:ORDE-ad945c", "tc:ORDE-e6d28f", "inv:paid-before-shipped", "fm:payment-provider-down", "fm:pay-for-another-customer"]
+    questions: [concurrency]
+    property:
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+      - name: shipped-only-paid
+        statement: "No order ships before its payment is captured."
+        kind: never
+        over: ["inv:paid-before-shipped", "tc:ORDE-e6d28f"]
+    core:
+      paths: ["internal/domain/*.go", "internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply", "internal/domain/order.go#Transition"]
+    assumes:
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down", "fm:pay-for-another-customer"]
+      - name: final-stays-final
+        statement: "The store never rewrites the status of a shipped or cancelled order."
+        evidence: ["inv:terminal-is-final"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship"]
+lowered:
+  - {area: order-payment, what: "area removed", ids: ["act:Order.pay"], from: vital, reason: "both forms"}
+  - {area: Order, what: "area removed", reason: "not a name"}
+  - {area: order-payment, reason: "no what"}
+  - {area: order-payment, what: "area removed"}

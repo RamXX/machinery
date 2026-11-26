@@ -164,10 +164,13 @@ type Area struct {
 	Assumes   []Assumption `yaml:"assumes,omitempty"`
 }
 
-// Lowering records a deliberate lowering of a tier (section 23).
+// Lowering records a deliberate lowering of a tier, or with Area and What a
+// weakening of what a vital area states (section 23).
 type Lowering struct {
-	IDs    []string `yaml:"ids"`
-	From   string   `yaml:"from"`
+	IDs    []string `yaml:"ids,omitempty"`
+	From   string   `yaml:"from,omitempty"`
+	Area   string   `yaml:"area,omitempty"`
+	What   string   `yaml:"what,omitempty"`
 	Reason string   `yaml:"reason"`
 }
 
@@ -261,11 +264,24 @@ func ParseRisk(rel string, data []byte) (areas []Area, problems []string, config
 	}
 	for i, l := range f.Lowered {
 		where := fmt.Sprintf("%s: lowered entry %d", rel, i+1)
-		if len(l.IDs) == 0 {
-			problems = append(problems, where+": ids needs at least one id pattern")
-		}
-		if l.From != Consequential && l.From != Critical && l.From != Vital {
-			problems = append(problems, where+": from must be consequential, critical or vital")
+		vitalForm := l.Area != "" || l.What != ""
+		switch {
+		case vitalForm && (len(l.IDs) > 0 || l.From != ""):
+			problems = append(problems, where+": an entry has ids and from, or area and what, not both")
+		case vitalForm:
+			if !kebabRe.MatchString(l.Area) {
+				problems = append(problems, where+": area must match ^[a-z][a-z0-9-]+$")
+			}
+			if strings.TrimSpace(l.What) == "" {
+				problems = append(problems, where+": what is required")
+			}
+		default:
+			if len(l.IDs) == 0 {
+				problems = append(problems, where+": ids needs at least one id pattern")
+			}
+			if l.From != Consequential && l.From != Critical && l.From != Vital {
+				problems = append(problems, where+": from must be consequential, critical or vital")
+			}
 		}
 		if strings.TrimSpace(l.Reason) == "" {
 			problems = append(problems, where+": reason is required")

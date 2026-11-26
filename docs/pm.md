@@ -21,7 +21,9 @@ break cannot be undone: each vital area is a promise that its core will one day 
 its proof obligations are counted until then. At planning, run `machinery vital candidates`: it
 lists the ids that look vital from the design alone. Make each one vital, or dismiss it under
 `not_vital` in the risk file with the reason; the list only shrinks. Lowering a tier later fails the
-ratchet unless the risk file records it under `lowered:` with a reason.
+ratchet unless the risk file records it under `lowered:` with a reason, and so does a vital area
+that states less: a property, an assumption, a core glob or entry removed or reduced, or a vital id
+dismissed. Record each as `{area, what, reason}`, `what` being the ratchet finding's text.
 
 ## Statuses: proposed and retired
 
