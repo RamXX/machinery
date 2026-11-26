@@ -1577,6 +1577,10 @@ names it with `spec: <name>`.
 | Two relationships that mirror each other (`A` to `B` and `B` to `A`, one pair only) | A fact that the two fields are inverses. |
 
 Scoped references to imported models and derived entities are skipped and listed in the header.
+A name of the model that is an Alloy keyword (`set`, `once`, `releases` and the other reserved
+words of Alloy 6) appears with a trailing underscore (`releases_`), in the skeleton and wherever
+machinery writes Alloy. A fact names a field by itself, or as `(<Entity> <: <field>)` when another
+entity has a field of the same name and target, where the bare name would be ambiguous.
 The property file starts with `open <model>` and holds facts, predicates and assertions, and no
 commands: machinery writes the commands from the runs.
 

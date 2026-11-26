@@ -70,6 +70,27 @@ func boundFact(expr string, lo, hi int) string {
 	return fmt.Sprintf("#%s >= %d and #%s =< %d", expr, lo, expr, hi)
 }
 
+// refMark stands for a field reference in a fact until every field is known.
+const refMark = "\x01"
+
+// alloyKeywords are the reserved words of Alloy 6, temporal operators included.
+var alloyKeywords = map[string]bool{}
+
+func init() {
+	for _, k := range strings.Fields("abstract after all always and as assert before but check disj else enum eventually exactly expect extends fact for fun historically iden iff implies in Int int let lone module no none not once one open or pred private releases run seq set sig since some steps String sum this triggered univ until var") {
+		alloyKeywords[k] = true
+	}
+}
+
+// AlloyName is how a name of the model appears in the skeleton: as it is,
+// or with a trailing underscore when it is an Alloy keyword (section 16.2).
+func AlloyName(s string) string {
+	if alloyKeywords[s] {
+		return s + "_"
+	}
+	return s
+}
+
 // AlloyModule is the module name derived from a model path.
 func AlloyModule(modelPath string) string {
 	base := path.Base(modelPath)
@@ -108,13 +129,13 @@ func AlloySkeleton(m *design.Model) []byte {
 	bw := func(format string, a ...any) { fmt.Fprintf(&body, format+"\n", a...) }
 
 	for _, e := range m.Enums {
-		bw("abstract sig %s {}", e.Name)
+		bw("abstract sig %s {}", AlloyName(e.Name))
 		if len(e.Values) > 0 {
 			names := make([]string, len(e.Values))
 			for i, v := range e.Values {
-				names[i] = valueName(e.Name, v)
+				names[i] = AlloyName(valueName(e.Name, v))
 			}
-			bw("one sig %s extends %s {}", strings.Join(names, ", "), e.Name)
+			bw("one sig %s extends %s {}", strings.Join(names, ", "), AlloyName(e.Name))
 		}
 		bw("")
 	}
@@ -124,6 +145,13 @@ func AlloySkeleton(m *design.Model) []byte {
 	}
 	var fields []field
 	var facts []string
+	// refs[i] is the field a fact refers to by name (sentinel refMark in its
+	// text), resolved once every field is known; the zero field for none
+	var refs []field
+	addFact := func(text string, ref field) {
+		facts = append(facts, text)
+		refs = append(refs, ref)
+	}
 	for _, e := range m.Entities {
 		if e.Derived {
 			skipped = append(skipped, "derived entity "+e.Name)
@@ -137,7 +165,7 @@ func AlloySkeleton(m *design.Model) []byte {
 				skipped = append(skipped, fmt.Sprintf("%s.%s: scoped type %s", e.Name, a.Name, a.Type))
 			case enum[a.Type] || entity[a.Type]:
 				used[a.Name]++
-				lines = append(lines, fmt.Sprintf("  %s: one %s", a.Name, a.Type))
+				lines = append(lines, fmt.Sprintf("  %s: one %s", AlloyName(a.Name), AlloyName(a.Type)))
 			}
 		}
 		for _, r := range e.Relationships {
@@ -160,26 +188,29 @@ func AlloySkeleton(m *design.Model) []byte {
 			if used[name] > 1 {
 				name = fmt.Sprintf("%s%d", name, used[name])
 			}
+			name = AlloyName(name)
+			owner, target := AlloyName(e.Name), AlloyName(r.Entity)
 			kw, lo, hi, bounded := multiplicity(sides[1])
-			lines = append(lines, fmt.Sprintf("  %s: %s %s", name, kw, r.Entity))
+			lines = append(lines, fmt.Sprintf("  %s: %s %s", name, kw, target))
+			f := field{owner, name, target, sides[0], r.Ownership == "owned"}
 			if bounded {
-				facts = append(facts, fmt.Sprintf("fact { all x: %s | %s }", e.Name, boundFact("x."+name, lo, hi)))
+				addFact(fmt.Sprintf("fact { all x: %s | %s }", owner, boundFact("x."+name, lo, hi)), field{})
 			}
 			lkw, llo, lhi, lbounded := multiplicity(sides[0])
 			switch {
 			case lbounded:
-				facts = append(facts, fmt.Sprintf("fact { all y: %s | %s }", r.Entity, boundFact(name+".y", llo, lhi)))
+				addFact(fmt.Sprintf("fact { all y: %s | %s }", target, boundFact(refMark+".y", llo, lhi)), f)
 			case lkw != "set":
-				facts = append(facts, fmt.Sprintf("fact { all y: %s | %s %s.y }", r.Entity, lkw, name))
+				addFact(fmt.Sprintf("fact { all y: %s | %s %s.y }", target, lkw, refMark), f)
 			}
 			if r.Ownership == "owned" && lkw != "one" && lkw != "some" {
-				facts = append(facts, fmt.Sprintf("fact { all y: %s | some %s.y }", r.Entity, name))
+				addFact(fmt.Sprintf("fact { all y: %s | some %s.y }", target, refMark), f)
 			}
-			fields = append(fields, field{e.Name, name, r.Entity, sides[0], r.Ownership == "owned"})
+			fields = append(fields, f)
 		}
-		head := "sig " + e.Name
+		head := "sig " + AlloyName(e.Name)
 		if e.SubtypeOf != "" && entity[e.SubtypeOf] {
-			head += " extends " + e.SubtypeOf
+			head += " extends " + AlloyName(e.SubtypeOf)
 		}
 		if len(lines) == 0 {
 			bw("%s {}", head)
@@ -214,7 +245,23 @@ func AlloySkeleton(m *design.Model) []byte {
 				other = g
 			}
 		}
-		facts = append(facts, fmt.Sprintf("fact { all a: %s, b: %s | b in a.%s iff a in b.%s }", f.owner, f.target, f.name, other.name))
+		addFact(fmt.Sprintf("fact { all a: %s, b: %s | b in a.%s iff a in b.%s }", f.owner, f.target, f.name, other.name), field{})
+	}
+	// a field named by itself is ambiguous when another entity has a field of
+	// the same name and target; it is then qualified with its entity
+	shared := map[string]int{}
+	for _, f := range fields {
+		shared[f.name+">"+f.target]++
+	}
+	for i, ref := range refs {
+		if ref.name == "" {
+			continue
+		}
+		expr := ref.name
+		if shared[ref.name+">"+ref.target] > 1 {
+			expr = "(" + ref.owner + " <: " + ref.name + ")"
+		}
+		facts[i] = strings.ReplaceAll(facts[i], refMark, expr)
 	}
 	sort.Strings(skipped)
 	w("module %s", AlloyModule(m.Path))

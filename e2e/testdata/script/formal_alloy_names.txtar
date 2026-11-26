@@ -1,0 +1,57 @@
+# a model whose names are Alloy keywords, or whose entities share a field name and target, still
+# gives a skeleton Alloy can read: a keyword gets a trailing underscore, and a shared field is
+# qualified with its entity in facts (docs/formats.md section 16.2)
+cd proj
+gitinit
+exec machinery formal new releases --tool alloy --model design/model/shelf.modelith.yaml --area shelving
+exec machinery formal gen
+grep '^  releases_: set Release$' design/formal/shelf.als
+grep '^abstract sig State {}$' design/formal/shelf.als
+grep '^one sig once_, always_ extends State {}$' design/formal/shelf.als
+grep '^  state: one State$' design/formal/shelf.als
+grep '^sig Release \{$' design/formal/shelf.als
+grep '^fact \{ all y: Release \| one \(Shelf <: releases_\)\.y \}$' design/formal/shelf.als
+grep '^fact \{ all y: Release \| one \(Archive <: releases_\)\.y \}$' design/formal/shelf.als
+grep '^fact \{ all y: Shelf \| one place\.y \}$' design/formal/shelf.als
+# Alloy reads it: the run is checked and its reach predicate has an instance
+! exec machinery formal check
+grep '"outcome": "passed"' design/formal/releases.result.json
+grep '"NonEmpty": true' design/formal/releases.result.json
+! grep 'Syntax error|Type error' design/formal/releases.result.json
+
+-- proj/machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/shelf.modelith.yaml
+-- proj/design/model/shelf.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Shelf
+enums:
+  State:
+    values:
+      - {name: once, definition: "Placed once."}
+      - {name: always, definition: "Always there."}
+entities:
+  Shelf:
+    definition: "A shelf that holds releases."
+    attributes:
+      - {name: id, type: string}
+    relationships:
+      - {entity: Release, cardinality: "1:n", role: releases, ownership: owned}
+  Archive:
+    definition: "Where old releases are kept."
+    attributes:
+      - {name: id, type: string}
+    relationships:
+      - {entity: Release, cardinality: "1:n", role: releases}
+  Place:
+    definition: "Where a shelf stands."
+    relationships:
+      - {entity: Shelf, cardinality: "1:1", role: place}
+  Release:
+    definition: "One release on a shelf."
+    attributes:
+      - {name: id, type: string}
+      - {name: state, type: State}
