@@ -134,6 +134,8 @@ ids:
 read:
   design/model/shop.modelith.yaml
   docs/formats.md
+decisions:
+  none
 scope:
   e2e/orders.sh
   internal/domain/**
@@ -156,6 +158,8 @@ ids:
 read:
   design/formal/order-payment.spec.yaml
   design/machines/Order.machine.json
+decisions:
+  none
 scope:
   none
 run:

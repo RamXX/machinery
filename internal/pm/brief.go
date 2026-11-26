@@ -24,8 +24,9 @@ const (
 const formatsDoc = "docs/formats.md"
 
 // Brief writes the brief of a story for a role, as pointers. ids are the
-// story's design ids (for a capstone, those of its intake's other stories).
-func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []string) error {
+// story's design ids (for a capstone, those of its intake's other stories);
+// decisions are the current decisions of the backlog (section 15.8).
+func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []string, decisions []Decision) error {
 	p := d.P
 	t := backlog.ParseTags(is)
 	tier, areas := StoryTier(d, is, ids)
@@ -86,6 +87,13 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []
 		}
 	}
 	section(w, "read", read)
+	var governing []string
+	for _, dec := range decisions {
+		if dec.Governs(ids) {
+			governing = append(governing, dec.ID+"  "+dec.Title)
+		}
+	}
+	section(w, "decisions", governing)
 	scope := append([]string{}, t.Scope...)
 	sort.Strings(scope)
 	section(w, "scope", scope)

@@ -1,0 +1,138 @@
+# decide: a decision is a backlog item of type decision; --supersedes closes the older one; decisions
+# lists the current ones by the ids they govern; brief points at them; assess counts them (section 15.8)
+fixture shop proj
+cd proj
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-s1 --title 'Prove order pay' --body-file s1.txt --silent
+exec bd create --id shop-s2 --title 'Prove shipping' --body-file s2.txt --silent
+exec bd create --id shop-s3 --title 'Prove the terminal invariant' --body-file s3.txt --silent
+
+# a decision records why, the ids it governs and who took it
+exec sh -c 'machinery decide "Charge before the provider confirms" --why "the provider confirms late. Rejected: wait for the webhook" --ids tc:ORDE-2e883d,act:Order.pay > out.txt'
+exec sh -c 'grep "^decision: shop-[a-z0-9]*$" out.txt | sed "s/^decision: //" > $WORK/d1'
+exec sh -c 'bd show $(cat $WORK/d1) --json'
+stdout '"issue_type": "decision"'
+stdout '"description": "Why:\\nthe provider confirms late. Rejected: wait for the webhook\\n\\nmachinery:decision builder\\nmachinery:ids act:Order.pay tc:ORDE-2e883d\\n"'
+
+# a vetoable one an agent took over a pattern, and one that governs no id
+exec sh -c 'machinery decide "Ship from one warehouse" --why "one carrier contract" --ids "tc:ORDE-*" --vetoable --actor agent-7 | sed "s/^decision: //" > $WORK/d2'
+exec sh -c 'machinery decide "Prices in cents" --why "$(printf "no rounding\nanywhere")" | sed "s/^decision: //" > $WORK/d3'
+exec sh -c 'bd show $(cat $WORK/d2) --json'
+stdout 'machinery:decision agent-7\\nmachinery:ids tc:ORDE-\*\\nmachinery:vetoable\\n"'
+exec sh -c 'bd show $(cat $WORK/d3) --json'
+stdout '"description": "Why:\\nno rounding anywhere\\n\\nmachinery:decision builder\\n"'
+
+# decisions lists the current ones, three lines each
+exec sh -c '. $WORK/lib.sh; machinery decisions | names'
+stdout '^D1  Charge before the provider confirms\n  governs: act:Order.pay tc:ORDE-2e883d\n  by: builder$'
+stdout '^D2  Ship from one warehouse\n  governs: tc:ORDE-\*\n  by: agent-7, vetoable$'
+stdout '^D3  Prices in cents\n  governs: none\n  by: builder$'
+stdout '^decisions: 3 current$'
+
+# --ids keeps the decisions that govern one of them; patterns overlap
+exec sh -c '. $WORK/lib.sh; machinery decisions --ids tc:ORDE-2e883d | names'
+stdout '^D1  '
+stdout '^D2  '
+! stdout '^D3  '
+stdout '^decisions: 2 current$'
+exec sh -c '. $WORK/lib.sh; machinery decisions --ids "act:Order.*" | names'
+stdout '^D1  '
+! stdout '^D2  '
+stdout '^decisions: 1 current$'
+exec sh -c '. $WORK/lib.sh; machinery decisions --ids "tc:*" --ids inv:terminal-is-final | names'
+stdout '^decisions: 2 current$'
+exec machinery decisions --ids inv:terminal-is-final
+stdout '^decisions: 0 current$'
+
+# open vetoes until the owner confirms
+exec sh -c '. $WORK/lib.sh; machinery decisions --open-vetoes | names'
+stdout '^D2  Ship from one warehouse$'
+stdout '^decisions: 1 open to veto$'
+exec sh -c 'bd update $(cat $WORK/d2) --append-notes "machinery:confirmed owner"'
+exec machinery decisions --open-vetoes
+stdout '^decisions: 0 open to veto$'
+exec sh -c '. $WORK/lib.sh; machinery decisions | names'
+stdout '^  by: agent-7, vetoable, confirmed by owner$'
+
+# --supersedes: the newer one is current, the older one closed with a link
+exec sh -c 'machinery decide "Charge after the provider confirms" --why "refunds cost more than waiting" --ids tc:ORDE-2e883d --supersedes $(cat $WORK/d1) > out.txt'
+exec sh -c 'grep "^decision: " out.txt | sed "s/^decision: //" > $WORK/d4'
+exec sh -c 'grep -c "^superseded: $(cat $WORK/d1) by $(cat $WORK/d4)$" out.txt'
+stdout '^1$'
+exec sh -c 'bd show $(cat $WORK/d1) --json'
+stdout '"status": "closed"'
+stdout '"dependency_type": "supersedes"'
+exec sh -c 'bd show $(cat $WORK/d4) --json | grep -c "machinery:supersedes $(cat $WORK/d1)"'
+stdout '^1$'
+exec sh -c '. $WORK/lib.sh; machinery decisions | names'
+! stdout '^D1  '
+stdout '^D4  Charge after the provider confirms$'
+stdout '^decisions: 3 current$'
+
+# brief: the current decisions that govern an id of the story, as pointers
+exec sh -c '. $WORK/lib.sh; machinery brief shop-s1 | names'
+stdout '^decisions:$'
+stdout '^  D2  Ship from one warehouse$'
+stdout '^  D4  Charge after the provider confirms$'
+! stdout 'D1'
+! stdout 'Prices in cents'
+exec sh -c '. $WORK/lib.sh; machinery brief shop-s2 --role verifier | names'
+stdout '^decisions:\n  D2  Ship from one warehouse\nscope:$'
+exec machinery brief shop-s3
+stdout '^decisions:\n  none\nscope:$'
+
+# a decision is not a unit of build work
+exec machinery waves
+stdout '^checked: 3 stories, 0 edges, 1 waves$'
+! stdout 'Ship from one warehouse'
+
+# refusals
+exec mrun 2 decide 'Use one queue'
+stderr '^usage: machinery decide needs --why$'
+exec mrun 2 decide --why 'a reason'
+stderr '^usage: machinery decide takes one title$'
+exec mrun 2 decide 'Use one queue' --why 'a reason' --ids tc:NOPE-1
+stderr '^usage: --ids tc:NOPE-1 names no design id$'
+exec mrun 2 decide 'Use one queue' --why 'a reason' --supersedes shop-s1
+stderr '^usage: shop-s1 is not a decision: it has no machinery:decision line$'
+exec sh -c 'mrun 2 decide "Use one queue" --why "a reason" --supersedes $(cat $WORK/d1) 2> err.txt; cat err.txt'
+stdout '^usage: shop-[a-z0-9]+ is superseded already by shop-[a-z0-9]+$'
+exec mrun 2 decisions extra
+stderr '^usage: machinery decisions takes no arguments$'
+
+# assess counts the decision items of the backlog export
+exec bd export -o .beads/issues.jsonl
+cd $WORK
+exec machinery -C proj assess --out out
+stdout '^decisions: passed; checked: 0 decision files, 0 records, 0 instruction files, 4 backlog decisions$'
+grep '^backlog: 4 decision item\(s\) in .beads/issues.jsonl, 3 current$' out/report.md
+grep '"current": 3' out/report.json
+cd proj
+
+# a story that names a proposed id is not accepted on it
+cp status.yaml design/status.yaml
+exec mrun 1 story shop-s3
+stdout '^  ERROR  proposed: inv:terminal-is-final yields no obligation; commit it first$'
+
+-- proj/s1.txt --
+machinery:ids tc:ORDE-2e883d act:Order.pay
+-- proj/s2.txt --
+machinery:ids tc:ORDE-e6d28f
+-- proj/s3.txt --
+machinery:ids inv:terminal-is-final
+-- proj/status.yaml --
+version: 1
+proposed:
+  - {id: "inv:terminal-is-final"}
+-- lib.sh --
+# names: the decision ids written D1 to D4, so the output reads the same in every run
+names() {
+  s=""
+  for n in 1 2 3 4; do
+    if [ -f "$WORK/d$n" ]; then s="$s -e s/$(cat $WORK/d$n)/D$n/g"; fi
+  done
+  sed $s
+}

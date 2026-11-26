@@ -1,6 +1,7 @@
 package assess
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -132,7 +133,8 @@ func (a *assessment) decisions(s *section) {
 		}
 	}
 	inst := instructions(a.p.Root)
-	if !configured && len(inst) == 0 {
+	exported, current, readable := backlogDecisions(a.root)
+	if !configured && len(inst) == 0 && exported == 0 {
 		s.own.NotApplicable("no assess.decisions configured and no CLAUDE.md or AGENTS.md at the root")
 		return
 	}
@@ -170,4 +172,58 @@ func (a *assessment) decisions(s *section) {
 	}
 	s.own.Count(len(files), "decision files").Count(records, "records").Count(len(inst), "instruction files")
 	s.facts = map[string]any{"files": fileFacts, "instructions": instFacts}
+	if readable {
+		s.lines = append(s.lines, fmt.Sprintf("backlog: %d decision item(s) in %s, %d current", exported, exportFile, current))
+		s.own.Count(exported, "backlog decisions")
+		s.facts["backlog"] = map[string]any{"decisions": exported, "current": current}
+	}
+}
+
+// backlogDecisions counts the decision items of the tracker export, read as a
+// file: an item of type decision or one that carries a machinery:decision
+// line, current unless an item of the export supersedes it (section 18.7).
+func backlogDecisions(root string) (decisions, current int, readable bool) {
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(exportFile)))
+	if err != nil {
+		return 0, 0, false
+	}
+	var ids []string
+	superseded := map[string]bool{}
+	for _, line := range strings.Split(string(data), "\n") {
+		var is exportIssue
+		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &is) != nil {
+			continue
+		}
+		if is.Type != nil && *is.Type != "issue" {
+			continue
+		}
+		text := is.Desc + "\n" + is.Notes
+		for _, l := range strings.Split(text, "\n") {
+			word, args, _ := strings.Cut(strings.TrimSpace(l), " ")
+			if word == "machinery:supersedes" {
+				for _, id := range strings.Fields(args) {
+					superseded[id] = true
+				}
+			}
+		}
+		if is.IssueType == "decision" || hasDecisionLine(text) {
+			ids = append(ids, is.ID)
+		}
+	}
+	for _, id := range ids {
+		if !superseded[id] {
+			current++
+		}
+	}
+	return len(ids), current, true
+}
+
+// hasDecisionLine reports whether a text carries a machinery:decision line.
+func hasDecisionLine(text string) bool {
+	for _, l := range strings.Split(text, "\n") {
+		if word, _, _ := strings.Cut(strings.TrimSpace(l), " "); word == "machinery:decision" {
+			return true
+		}
+	}
+	return false
 }
