@@ -195,9 +195,19 @@ the model calls `giveBack`. Rules `event-action` and `action-event` then read th
 action (`docs/formats.md` section 6.4), which must be an action of the machine's entity, or of
 what an operational machine serves. Each value is a non-empty string, and each event is one some
 state handles or ignores (a stale entry is an error). An aliased event is a caller's action, so it
-is in neither `_external_events` nor `_failure_events`, and an event that is itself an action
-takes no alias. Prefer one name in the model and the machine; the alias is for a machine whose
+is in neither `_external_events` nor `_failure_events`. An alias hides nothing: an event that is
+itself an action of the model takes no alias, an action that has an event of its own name is the
+action of no alias (several events may share an action that has none), the stage prints one line
+for every alias in effect and counts them, and an aliased event whose name looks like a failure
+is still hinted. Prefer one name in the model and the machine; the alias is for a machine whose
 names cannot change.
+
+**`_not_failures`** (root, optional). An object that maps a name to the reason it only looks
+like a failure, which dismisses its name hint ("Failure idioms"):
+`"_not_failures": {"count_aborted": "a stocktake that is called off changes no loan"}`. A key is
+an event some state handles or ignores, or the dotted path of a state (a stale key is an error);
+a reason is a non-empty string. A declared failure is not dismissed: a key that is in
+`_failure_events`, or a state tagged `failure`, is an error.
 
 **`_serves`** (root, required on an operational machine). A non-empty array of the model ids the
 machine exists for, each `entity:<Name>` or `act:<Entity>.<action>`, none twice:
@@ -417,13 +427,10 @@ it.
 
 **Name hints.** The lint warns about a state whose name contains `fail`, `error`, `abort`,
 `crash` or `timeout` (in any case) and is not tagged `failure`, and about an event with such a
-name that is neither in `_failure_events`, nor an alias of an action (`_aliases`), nor an action
-of the lifecycle entity; an event in `_external_events` is still hinted. When the name means
-something else, dismiss the hint with the reason in the root `_not_failures`, keyed by the event
-name or the dotted path of the state:
-`"_not_failures": {"count_aborted": "a stocktake that is called off changes no loan"}`. Each
-key is an event some state handles or ignores, or a state; each reason is a non-empty string;
-and a failure event or a state tagged `failure` is not dismissed. A warning never
+name that is neither in `_failure_events` nor an action of the lifecycle entity; an event in
+`_external_events` or in `_aliases` is still hinted. When the name means something else, dismiss
+the hint with the reason in the root `_not_failures`, keyed by the event name or the dotted path
+of the state. A warning never
 fails the stage; tag the state, list the event, or dismiss the hint when the name means something else.
 
 A per-state `after` is cancelled when its state exits. A bound that must hold across several
