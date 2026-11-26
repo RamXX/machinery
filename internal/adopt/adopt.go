@@ -165,6 +165,20 @@ func Run(o Options) (*Result, error) {
 	return res, nil
 }
 
+// Describe returns the facts of the adopt report for a configured project,
+// planning nothing (section 18.3: the inventory of machinery assess).
+func Describe(p *project.Project) (*Result, error) {
+	files, err := p.Files()
+	if err != nil {
+		return nil, err
+	}
+	res := &Result{Name: filepath.Base(p.Root)}
+	if err := describe(res, p, files); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 // describe fills the facts of the report from the configuration that adoption
 // leaves behind.
 func describe(res *Result, p *project.Project, files []string) error {

@@ -35,7 +35,22 @@ type Config struct {
 	Routing      map[string]string `yaml:"routing,omitempty"`
 	Tools        Tools             `yaml:"tools"`
 	Waivers      []Waiver          `yaml:"waivers,omitempty"`
+	Assess       *Assess           `yaml:"assess,omitempty"`
 }
+
+// Assess is read only by machinery assess (section 18).
+type Assess struct {
+	Decisions *Decisions `yaml:"decisions,omitempty"`
+}
+
+// Decisions names a project's own decision records (section 18.7).
+type Decisions struct {
+	Files  []string `yaml:"files"`
+	Record string   `yaml:"record"`
+}
+
+// RecordPattern compiles the expression that matches the heading line of one record.
+func (d *Decisions) RecordPattern() (*regexp.Regexp, error) { return regexp.Compile(d.Record) }
 
 type Design struct {
 	Models       []string `yaml:"models,omitempty"`
@@ -409,6 +424,9 @@ func (c *Config) validate() error {
 	if err := c.validateImport(); err != nil {
 		return err
 	}
+	if err := c.validateAssess(); err != nil {
+		return err
+	}
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
 	}
@@ -426,6 +444,32 @@ func (c *Config) validate() error {
 		}
 	}
 	return errors.Join(steps...)
+}
+
+// validateAssess holds the assess block to section 2.
+func (c *Config) validateAssess() error {
+	if c.Assess == nil || c.Assess.Decisions == nil {
+		return nil
+	}
+	d := c.Assess.Decisions
+	if len(d.Files) == 0 {
+		return Errf("assess.decisions.files is required")
+	}
+	for _, g := range d.Files {
+		if err := CheckPath("assess.decisions.files", g); err != nil {
+			return err
+		}
+		if !ValidGlob(g) {
+			return Errf("assess.decisions.files: %q is not a valid glob", g)
+		}
+	}
+	if strings.TrimSpace(d.Record) == "" {
+		return Errf("assess.decisions.record is required")
+	}
+	if _, err := d.RecordPattern(); err != nil {
+		return Errf("assess.decisions.record is not a regular expression: %v", err)
+	}
+	return nil
 }
 
 // validateImport holds the import block to section 2.

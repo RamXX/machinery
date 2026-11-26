@@ -1,0 +1,87 @@
+# assess refuses before it writes anything (docs/formats.md section 18.1)
+fixture library proj
+cd proj
+gitinit
+cd $WORK
+
+# --out inside the project, or inside its .git directory
+exec mrun 2 -C proj assess --out proj/report
+stderr '^usage: --out proj/report is inside .*/proj; assess never writes in the project: name a directory outside it$'
+! exists proj/report
+exec mrun 2 -C proj assess --out proj/.git/report
+stderr 'is inside .*/proj; assess never writes in the project'
+! exists proj/.git/report
+
+# a non-empty --out, or a file
+mkdir full
+exec sh -c 'echo x > full/x'
+exec mrun 2 -C proj assess --out full
+stderr '^usage: --out full is not empty; name an absent or empty directory$'
+exec mrun 2 -C proj assess --out full/x
+stderr '^usage: --out full/x is not empty; name an absent or empty directory$'
+
+# an unknown --since
+exec mrun 2 -C proj assess --out o1 --since nosuch
+stderr '^usage: --since nosuch: not a commit of the project$'
+! exists o1
+
+# no config at all
+mkdir bare
+exec git -C bare init -q
+exec mrun 2 -C bare assess --out o2
+stderr '^config: no machinery.yaml in .*/bare and no --config: write one by hand \(docs/brownfield.md, step 1\) and pass it with --config$'
+! exists o2
+
+# a config, but no commit to assess
+exec mrun 2 -C bare assess --config proj/machinery.yaml --out o3
+stderr '^usage: .*/bare is not a git repository with a commit; assess reads its HEAD$'
+! exists o3
+
+# an invalid config, and the assess.decisions rules of section 2
+exec mrun 2 -C proj assess --config badversion.yaml --out o4
+stderr '^config: machinery.yaml: version must be 2$'
+exec mrun 2 -C proj assess --config nofiles.yaml --out o4
+stderr '^config: assess.decisions.files is required$'
+exec mrun 2 -C proj assess --config norecord.yaml --out o4
+stderr '^config: assess.decisions.record is required$'
+exec mrun 2 -C proj assess --config badrecord.yaml --out o4
+stderr '^config: assess.decisions.record is not a regular expression: '
+exec mrun 2 -C proj assess --config missing.yaml --out o4
+stderr '^config: --config missing.yaml: cannot read: no such file or directory$'
+! exists o4
+
+# arguments
+exec mrun 2 -C proj assess extra
+stderr '^usage: machinery assess takes no arguments$'
+
+# the default --out is a new directory under the system temp directory
+exec machinery -C proj assess
+stdout '^out: .*/machinery-assess-[0-9]+$'
+stdout '^assess: 10 sections, '
+
+# when the system temp directory is inside the project there is no default
+env TMPDIR=$WORK/proj/tmp
+exec mrun 2 -C proj assess
+stderr '^usage: the system temp directory .*/proj/tmp is inside .*/proj; assess never writes in the project: name a directory outside it with --out$'
+! exists proj/tmp
+exec git -C proj status --porcelain
+! stdout .
+
+-- badversion.yaml --
+version: 1
+-- nofiles.yaml --
+version: 2
+assess:
+  decisions:
+    record: "^## "
+-- norecord.yaml --
+version: 2
+assess:
+  decisions:
+    files: ["docs/*.md"]
+-- badrecord.yaml --
+version: 2
+assess:
+  decisions:
+    files: ["docs/*.md"]
+    record: "^## ("

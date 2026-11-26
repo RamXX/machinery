@@ -1,0 +1,107 @@
+# history: the model ids added, reworded and removed between a commit and HEAD, read with git
+# show on the project (docs/formats.md section 18.6). By default the comparison starts at the
+# first commit of each model file; --since names others.
+fixture library proj
+cd proj
+gitinit
+cp $WORK/library-v2.modelith.yaml design/model/library.modelith.yaml
+gitcommit 'model: second version'
+cd $WORK
+
+exec machinery -C proj assess --out out1
+stdout '^history: passed; checked: 1 comparisons, 11 ids at HEAD$'
+grep '^since first commit of design/model/library.modelith.yaml \([0-9a-f]{7}\): 8 ids then, 11 at HEAD$' out1/report.md
+grep '^  inv: 0 added, 1 reworded, 0 removed$' out1/report.md
+grep '^    reworded: inv:returned-is-final$' out1/report.md
+grep '^  sc: 0 added, 1 reworded, 1 removed$' out1/report.md
+grep '^    removed: sc:blocked-member-is-refused-a-loan$' out1/report.md
+grep '^    reworded: sc:member-borrows-and-returns-a-copy$' out1/report.md
+grep '^  entity: 1 added, 1 reworded, 0 removed$' out1/report.md
+grep '^    reworded: Loan$' out1/report.md
+grep '^  act: 3 added, 0 reworded, 0 removed$' out1/report.md
+# a statement only re-wrapped is not reworded
+! grep 'inv:lent-before-returned' out1/report.md
+grep '"reworded": \[$' out1/report.json
+grep '"since": "first commit of design/model/library.modelith.yaml"' out1/report.json
+
+# one comparison per --since ref, in the order given
+exec machinery -C proj assess --out out2 --since HEAD --since HEAD~1
+stdout '^history: passed; checked: 2 comparisons, 11 ids at HEAD$'
+grep '^since HEAD \([0-9a-f]{7}\): 11 ids then, 11 at HEAD$' out2/report.md
+grep '^since HEAD~1 \([0-9a-f]{7}\): 8 ids then, 11 at HEAD$' out2/report.md
+grep '"since": "HEAD~1"' out2/report.json
+
+# a model file that no commit holds has no history
+cp $WORK/extra.modelith.yaml proj/design/model/extra.modelith.yaml
+exec sh -c 'printf "version: 2\ndesign:\n  models:\n    - design/model/extra.modelith.yaml\n" > only-extra.yaml'
+exec machinery -C proj assess --config only-extra.yaml --out out3
+stdout '^history: not demonstrated: no configured model file has a commit$'
+grep '^design/model/extra.modelith.yaml: no commit adds it$' out3/stages/history.txt
+
+-- library-v2.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Library
+description: >
+  The circulation desk of a small library. A Librarian lends a copy to a
+  Member, the Member gives it back, and a copy that never comes back is
+  reported lost.
+
+glossary:
+  Librarian: "A desk worker who lends copies and records what happens to a `Loan`."
+  Member: "A reader who borrows a copy and gives it back."
+
+enums:
+  LoanStatus:
+    values:
+      - {name: Reserved, definition: "A copy is set aside for the member."}
+      - {name: Lent, definition: "The member has the copy."}
+      - {name: Returned, definition: "The copy is back on the shelf; terminal."}
+      - {name: Lost, definition: "The copy will not come back; terminal."}
+
+entities:
+  Loan:
+    definition: >
+      One copy lent to one member for three weeks. Its status follows the loan
+      lifecycle from reserved to returned or lost.
+    attributes:
+      - {name: id, type: string}
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian, preserves: [lent-before-returned]}
+      - {name: giveBack, actor: Member, preserves: [returned-is-final]}
+      - {name: reportLost, actor: Librarian, preserves: [returned-is-final]}
+      - {name: renew, actor: Member, description: "The member keeps the copy three more weeks."}
+    invariants:
+      - id: lent-before-returned
+        statement: >
+          A `Loan` reaches the returned status
+          only from the lent status.
+  Fine:
+    definition: "Money a member owes for a late or lost copy."
+    attributes:
+      - {name: id, type: string}
+    actions:
+      - {name: charge, actor: Librarian}
+      - {name: pay, actor: Member}
+
+invariants:
+  - {id: returned-is-final, statement: "A returned or lost `Loan` never changes status again, and its fine is charged once."}
+
+scenarios:
+  - name: Member borrows and returns a copy
+    actors: [Librarian, Member]
+    steps:
+      - "Librarian lends a reserved copy; the `Loan` is lent."
+      - "Member renews it once."
+      - "Member gives it back; the `Loan` is returned."
+    invariants_touched: [lent-before-returned]
+-- extra.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Extra
+entities:
+  Shelf:
+    definition: "Where copies wait."
+    attributes:
+      - {name: id, type: string}

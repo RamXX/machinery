@@ -1,0 +1,36 @@
+# a dirty work tree is counted and not assessed; the config is written by hand outside the
+# project; without -C the project is the git work tree holding the current directory. git
+# status runs with optional locks off, so even a touched file does not make git rewrite the index.
+fixture library proj
+cd proj
+exec mv machinery.yaml ../library.yaml
+gitinit
+exec sh -c 'echo "// changed in the work tree" >> internal/desk/desk.go'
+exec sh -c 'echo note > notes.txt && mkdir -p extra && echo more > extra/more.txt'
+exec sleep 1
+exec touch e2e/loans.sh
+cd $WORK
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../before.txt'
+
+cd proj/internal/desk
+exec machinery assess --config $WORK/library.yaml --out $WORK/out
+stdout '^project: proj at [0-9a-f]{7}$'
+stdout '^dirty: 1 changed, 2 untracked file\(s\) are not assessed$'
+stdout '^trace: passed; '
+stdout '^assess: 10 sections, '
+cd $WORK
+
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../after.txt'
+cmp before.txt after.txt
+
+grep '^- dirty: 1 changed, 2 untracked file\(s\) are not assessed$' out/report.md
+grep '^- config: --config library.yaml$' out/report.md
+grep '"changed": 1,' out/report.json
+grep '"untracked": 2' out/report.json
+grep '^  "config": "--config library.yaml",$' out/report.json
+
+# the snapshot is HEAD with the config beside it: the work tree changes are not in it
+! grep 'changed in the work tree' out/snapshot/internal/desk/desk.go
+! exists out/snapshot/notes.txt
+! exists out/snapshot/extra
+cmp out/snapshot/machinery.yaml library.yaml

@@ -1,0 +1,63 @@
+# formal sanity: TLC checks a specification generated from each machine with no hand-written
+# property, and finds an unreachable state and a deadlock; final and _terminal states rest, entry
+# states start (docs/formats.md section 18.5). Missing tools are not demonstrated, never passed.
+cd proj
+gitinit
+cd $WORK
+
+exec machinery -C proj assess --out out
+stdout '^formal: failed: 2 finding\(s\); checked: 2 machines, 9 states, 0 models$'
+stdout '^generation: not demonstrated: gen refused: machines have errors$'
+grep '^ticket: 6 states, 5 distinct states found, failed$' out/stages/formal.txt
+grep '^intake: 3 states, 3 distinct states found, passed$' out/stages/formal.txt
+grep '^  ERROR  ticket: deadlock in state Stuck: neither final nor _terminal, and no transition applies$' out/stages/formal.txt
+grep '^  ERROR  ticket: unreachable state Orphan$' out/stages/formal.txt
+grep '^- 1 error: formal: deadlock in state \*: neither final nor _terminal, and no transition applies$' out/report.md
+grep '^- 1 error: formal: unreachable state \*$' out/report.md
+grep '"deadlock": "Stuck",' out/report.json
+grep '"Orphan"' out/report.json
+
+# the generated specification: the machine's own states and steps, nothing hand-written
+grep '^Start == \{"Open"\}$' out/formal/machines/ticket/Sanity.tla
+grep '^Rest == \{"Done", "Parked"\}$' out/formal/machines/ticket/Sanity.tla
+grep '^Start == \{"Queued", "Migrated"\}$' out/formal/machines/intake/Sanity.tla
+cmp out/formal/machines/ticket/Sanity.cfg spec.cfg
+exists out/formal/machines/ticket/states.dump
+
+# without the pinned jars the section is not demonstrated
+env MACHINERY_TOOLS=$WORK/notools
+exec machinery -C proj assess --out out2
+stdout '^formal: not demonstrated: jars/tla2tools.jar: missing \(run machinery formal tools\)$'
+
+-- spec.cfg --
+SPECIFICATION Spec
+-- proj/machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- proj/design/machines/Ticket.machine.json --
+{
+  "id": "ticket",
+  "_role": "operational",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"start": {"target": "Working"}, "park": {"target": "Parked"}}},
+    "Working": {"on": {"finish": {"target": "Done"}, "block": {"target": "Stuck"}}},
+    "Stuck": {},
+    "Parked": {"_terminal": "a parked ticket is kept for the record", "on": {"note": {"actions": ["recordNote"]}}},
+    "Orphan": {"on": {"reopen": {"target": "Open"}}},
+    "Done": {"type": "final"}
+  }
+}
+-- proj/design/machines/Intake.machine.json --
+{
+  "id": "intake",
+  "_role": "operational",
+  "initial": "Queued",
+  "_entries": ["Migrated"],
+  "states": {
+    "Queued": {"on": {"load": {"target": "Loaded"}}},
+    "Migrated": {"on": {"load": {"target": "Loaded"}}},
+    "Loaded": {"type": "final"}
+  }
+}

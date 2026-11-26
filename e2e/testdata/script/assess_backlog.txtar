@@ -1,0 +1,48 @@
+# backlog: the tracker's export read as a file, never running the tracker, and the other local
+# branches read with git for-each-ref (docs/formats.md section 18.8)
+fixture library proj
+cd proj
+gitinit
+exec git branch spike/recount
+exec git branch notices
+cd $WORK
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../before.txt'
+
+exec machinery -C proj assess --out out1
+stdout '^backlog: passed; checked: 6 issues, 4 open, 2 naming an obligation$'
+grep '^export: .beads/issues.jsonl, 6 issues$' out1/report.md
+grep '^by status: blocked 1, closed 1, deferred 1, in_progress 2, open 1$' out1/report.md
+grep '^by type: bug 2, epic 1, feature 1, task 2$' out1/report.md
+grep '^in progress: 2$' out1/report.md
+grep '^  lib-2  Notify members when a hold is ready$' out1/report.md
+grep '^  lib-5  Recount the shelves$' out1/report.md
+grep '^open issues naming an obligation id: 2 of 4$' out1/report.md
+grep '^branches: 2 other local branch\(es\): notices, spike/recount$' out1/report.md
+grep '"open_naming_obligations": 2$' out1/report.json
+grep '"export": ".beads/issues.jsonl",' out1/report.json
+
+# nothing in the project changed: the tracker did not run
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../after.txt'
+cmp before.txt after.txt
+! exists proj/.beads/beads.db
+
+# a line that is not a JSON object is a finding
+exec sh -c 'echo "not json" >> proj/.beads/issues.jsonl'
+exec machinery -C proj assess --out out2
+stdout '^backlog: failed: 1 finding\(s\); checked: 6 issues, 4 open, 2 naming an obligation$'
+grep '^  ERROR  .beads/issues.jsonl:8: not a JSON object$' out2/stages/backlog.txt
+
+# without an export the section is not applicable, and the branches still print
+rm proj/.beads/issues.jsonl
+exec machinery -C proj assess --out out3
+stdout '^backlog: not applicable: none found \(no \.beads/issues\.jsonl\)$'
+grep '^branches: 2 other local branch\(es\): notices, spike/recount$' out3/stages/backlog.txt
+
+-- proj/.beads/issues.jsonl --
+{"_type":"issue","id":"lib-1","title":"Circulation desk","status":"open","issue_type":"epic","description":"Everything the desk does with loans."}
+{"_type":"issue","id":"lib-2","title":"Notify members when a hold is ready","status":"in_progress","issue_type":"feature","description":"Covers RISK-2: the notice service may not answer."}
+{"_type":"issue","id":"lib-3","title":"Refuse blocked members","status":"closed","issue_type":"bug","description":"fm:risk-1 is the failure mode."}
+{"_type":"memory","id":"mem-1","title":"Not an issue","status":"open"}
+{"_type":"issue","id":"lib-4","title":"A returned loan changed status","status":"blocked","issue_type":"bug","notes":"Breaks inv:returned-is-final."}
+{"_type":"issue","id":"lib-5","title":"Recount the shelves","status":"in_progress","issue_type":"task","description":"Weekly, see RISK-40 in the old list."}
+{"_type":"issue","id":"lib-6","title":"Archive old loans","status":"deferred","issue_type":"task","description":"Touches tc:LOAN-unknown and RISK-3."}

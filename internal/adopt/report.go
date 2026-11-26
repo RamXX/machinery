@@ -34,6 +34,19 @@ func next(res *Result, o Options) []string {
 	return n
 }
 
+// FactLines are the lines of the report that describe the project: scope,
+// languages, code and test files, design sources.
+func (r *Result) FactLines() []string {
+	return []string{
+		"scope: " + strings.Join(r.Scope, ", "),
+		"languages: " + list(r.Languages, "none found"),
+		fmt.Sprintf("code files: %d in scope", r.Counts.Code),
+		fmt.Sprintf("test files: %d under e2e roots, %d elsewhere (unit tests), %d with test doubles",
+			r.Counts.E2E, r.Counts.Unit, r.Counts.Doubles),
+		fmt.Sprintf("design: %d model(s), %d machine(s), %d contract(s)", r.Models, r.Machines, r.Contracts),
+	}
+}
+
 // Print writes the dry-run report, or after --write the files written.
 func (r *Result) Print(w io.Writer) {
 	if r.Write {
@@ -43,12 +56,9 @@ func (r *Result) Print(w io.Writer) {
 		}
 	} else {
 		fmt.Fprintf(w, "adopt: %s at %s\n", r.Name, r.Sha)
-		fmt.Fprintf(w, "scope: %s\n", strings.Join(r.Scope, ", "))
-		fmt.Fprintf(w, "languages: %s\n", list(r.Languages, "none found"))
-		fmt.Fprintf(w, "code files: %d in scope\n", r.Counts.Code)
-		fmt.Fprintf(w, "test files: %d under e2e roots, %d elsewhere (unit tests), %d with test doubles\n",
-			r.Counts.E2E, r.Counts.Unit, r.Counts.Doubles)
-		fmt.Fprintf(w, "design: %d model(s), %d machine(s), %d contract(s)\n", r.Models, r.Machines, r.Contracts)
+		for _, l := range r.FactLines() {
+			fmt.Fprintln(w, l)
+		}
 		fmt.Fprintln(w, r.Backlog.Line())
 		fmt.Fprintln(w, "would write:")
 		for _, c := range r.Would {

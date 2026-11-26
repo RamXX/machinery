@@ -1,0 +1,86 @@
+# decisions: the census of a project's own decision records (assess.decisions) and of its agent
+# instruction files, counted once when one links to the other (docs/formats.md section 18.7)
+fixture library proj
+cd proj
+exec sh -c 'cat $WORK/assess.yaml >> machinery.yaml'
+symlink AGENTS.md -> CLAUDE.md
+gitinit
+cd $WORK
+
+exec machinery -C proj assess --out out1
+stdout '^decisions: passed; checked: 2 decision files, 4 records, 1 instruction files$'
+grep '^docs/decisions/circulation.md: 3 records, 13 lines, 59 words$' out1/report.md
+grep '^docs/decisions/stock.md: 1 records, 4 lines, 18 words$' out1/report.md
+grep '^CLAUDE.md: 3 lines, 11 words \(AGENTS.md links to it\)$' out1/report.md
+grep '"linked": \[$' out1/report.json
+grep '"records": 3,' out1/report.json
+
+# a file of one line that names the other links to it as well
+cd proj
+rm AGENTS.md
+exec sh -c 'echo "Read CLAUDE.md." > AGENTS.md'
+gitcommit 'agents: point at CLAUDE.md'
+cd $WORK
+exec machinery -C proj assess --out out2
+grep '^CLAUDE.md: 3 lines, 11 words \(AGENTS.md links to it\)$' out2/report.md
+! grep '^AGENTS.md:' out2/report.md
+
+# two separate files are both counted
+cd proj
+exec sh -c 'printf "Agents read the desk rules.\nThen they read CLAUDE.md.\n" > AGENTS.md'
+gitcommit 'agents: own file'
+cd $WORK
+exec machinery -C proj assess --out out3
+stdout '^decisions: passed; checked: 2 decision files, 4 records, 2 instruction files$'
+grep '^AGENTS.md: 2 lines, 9 words$' out3/report.md
+grep '^CLAUDE.md: 3 lines, 11 words$' out3/report.md
+
+# globs that match nothing fail; a file without a record warns
+exec machinery -C proj assess --config nomatch.yaml --out out4
+stdout '^decisions: failed: 1 finding\(s\); checked: 0 decision files, 0 records, 2 instruction files$'
+grep '^  ERROR  assess.decisions.files matches no file$' out4/stages/decisions.txt
+exec machinery -C proj assess --config norecords.yaml --out out5
+stdout '^decisions: passed; checked: 1 decision files, 0 records, 2 instruction files$'
+grep '^  warn   docs/decisions/stock.md: no line matches assess.decisions.record$' out5/stages/decisions.txt
+grep '"rule": "decisions: no line matches \*",' out5/report.json
+
+-- assess.yaml --
+assess:
+  decisions:
+    files: ["docs/decisions/*.md"]
+    record: "^## L[0-9]+\\. "
+-- nomatch.yaml --
+version: 2
+assess:
+  decisions:
+    files: ["docs/adr/*.md"]
+    record: "^## "
+-- norecords.yaml --
+version: 2
+assess:
+  decisions:
+    files: ["docs/decisions/stock.md"]
+    record: "^### "
+-- proj/CLAUDE.md --
+# Desk agents
+
+Read docs/decisions before you change how loans move.
+-- proj/docs/decisions/circulation.md --
+# Circulation decisions
+
+## L1. Loans start reserved
+
+A copy is set aside before it is lent, so the desk can refuse a blocked member.
+
+## L2. Lost is terminal
+
+A lost copy is never found again in the system; a found copy is a new copy.
+
+## L3. Renewals are counted
+
+Each renewal is recorded on the loan.
+-- proj/docs/decisions/stock.md --
+# Stock decisions
+
+## L4. The shelf is recounted weekly
+Counting more often costs more than it saves.

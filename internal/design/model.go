@@ -30,6 +30,7 @@ type Enum struct {
 
 type Entity struct {
 	Name          string
+	Definition    string
 	SubtypeOf     string
 	Derived       bool
 	Attributes    []Attribute
@@ -52,9 +53,10 @@ type Relationship struct {
 }
 
 type Action struct {
-	Name      string
-	Actor     string
-	Preserves []string
+	Name        string
+	Actor       string
+	Preserves   []string
+	Description string
 }
 
 type Invariant struct {
@@ -66,6 +68,7 @@ type Scenario struct {
 	Name       string
 	Actors     []string
 	Invariants []string
+	Steps      []string
 }
 
 func mapPairs(n *yaml.Node) [][2]*yaml.Node {
@@ -148,7 +151,7 @@ func ParseModel(rel string, data []byte) (*Model, error) {
 		m.Enums = append(m.Enums, e)
 	}
 	for _, kv := range mapPairs(child(root, "entities")) {
-		en := Entity{Name: kv[0].Value, SubtypeOf: str(kv[1], "subtypeOf"), Derived: str(kv[1], "derived") == "true"}
+		en := Entity{Name: kv[0].Value, Definition: str(kv[1], "definition"), SubtypeOf: str(kv[1], "subtypeOf"), Derived: str(kv[1], "derived") == "true"}
 		for _, a := range seq(kv[1], "attributes") {
 			en.Attributes = append(en.Attributes, Attribute{Name: str(a, "name"), Type: str(a, "type")})
 		}
@@ -164,7 +167,7 @@ func ParseModel(rel string, data []byte) (*Model, error) {
 			if a.Kind == yaml.ScalarNode {
 				en.Actions = append(en.Actions, Action{Name: a.Value})
 			} else {
-				en.Actions = append(en.Actions, Action{Name: str(a, "name"), Actor: str(a, "actor"), Preserves: strList(a, "preserves")})
+				en.Actions = append(en.Actions, Action{Name: str(a, "name"), Actor: str(a, "actor"), Preserves: strList(a, "preserves"), Description: str(a, "description")})
 			}
 		}
 		en.Invariants = invariants(kv[1])
@@ -172,7 +175,7 @@ func ParseModel(rel string, data []byte) (*Model, error) {
 	}
 	m.Invariants = invariants(root)
 	for _, s := range seq(root, "scenarios") {
-		m.Scenarios = append(m.Scenarios, Scenario{Name: str(s, "name"), Actors: strList(s, "actors"), Invariants: strList(s, "invariants_touched")})
+		m.Scenarios = append(m.Scenarios, Scenario{Name: str(s, "name"), Actors: strList(s, "actors"), Invariants: strList(s, "invariants_touched"), Steps: strList(s, "steps")})
 	}
 	return m, nil
 }

@@ -1,0 +1,75 @@
+# machinery assess on a project that keeps its design in its own formats (docs/formats.md
+# section 18): every section runs on a snapshot of HEAD, and the project, .git included, is
+# byte-identical afterwards.
+fixture library proj
+cd proj
+gitinit
+cd $WORK
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../before.txt'
+
+exec machinery -C proj assess --out out
+stdout '^out: .*/out$'
+stdout '^project: proj at [0-9a-f]{7}$'
+! stdout '^dirty:'
+stdout '^inventory: passed; checked: 10 files$'
+stdout '^design: failed: 1 finding\(s\); checked: 8 stages$'
+stdout '^generation: passed; checked: 7 generated files, 8 written$'
+stdout '^trace: passed; checked: 1 code files, 1 test files, 3 act ids, 19 obligations$'
+stdout '^tests: passed; checked: 0 test files, 1 files under e2e roots, 12 markers$'
+stdout '^arch: not applicable: no constraints configured$'
+stdout '^formal: passed; checked: 2 machines, 6 states, 1 models$'
+stdout '^history: passed; checked: 1 comparisons, 8 ids at HEAD$'
+stdout '^decisions: not applicable: no assess.decisions configured and no CLAUDE.md or AGENTS.md at the root$'
+stdout '^backlog: not applicable: none found \(no \.beads/issues\.jsonl\)$'
+stdout '^assess: 10 sections, 6 passed, 1 failed, 0 not demonstrated, 3 not applicable$'
+
+# nothing in the project changed, .git included
+exec sh -c 'cd proj && find . -type f | LC_ALL=C sort | xargs cksum > ../after.txt'
+cmp before.txt after.txt
+exec git -C proj status --porcelain
+! stdout .
+
+# report.md, for people
+grep '^# machinery assess: proj at [0-9a-f]{7}$' out/report.md
+grep '^- config: machinery.yaml$' out/report.md
+grep '^- dirty: none; the work tree matches HEAD$' out/report.md
+grep '^\| design \| failed: 1 finding\(s\) \| 1 \|$' out/report.md
+grep '^\| model \| failed \| 1 models, 1 entities, 3 actions, 2 invariants, 2 scenarios \| 1 \| stages/model.txt \|$' out/report.md
+grep '^- 1 drift: model: missing$' out/report.md
+grep '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$' out/report.md
+grep '^loan: 4 states, 4 distinct states found, passed$' out/report.md
+grep '^hold_queue: 2 states, 2 distinct states found, passed$' out/report.md
+grep '^design/model/library.modelith.yaml: instance found$' out/report.md
+grep '^  act: 0 added, 0 reworded, 0 removed$' out/report.md
+
+# report.json, for tools: sorted keys, no absolute path, no timestamp
+grep '^  "config": "machinery.yaml",$' out/report.json
+grep '^  "head": "[0-9a-f]{7}",$' out/report.json
+grep '^  "project": "proj",$' out/report.json
+grep '"rule": "model: missing",' out/report.json
+grep '"code_files": 1,' out/report.json
+grep '"distinct": 4,' out/report.json
+grep '^    "sections": 10$' out/report.json
+grep '^  "version": 1$' out/report.json
+! grep $WORK out/report.json
+! grep $WORK out/report.md
+
+# the full output of every stage and section
+grep '^  DRIFT  design/model/library.modelith.md: missing; run machinery gen$' out/stages/model.txt
+grep '^== xstate ==$' out/stages/xstate.txt
+grep '^== xref-failure ==$' out/stages/xref-failure.txt
+grep '^scope: internal/\*\*$' out/stages/inventory.txt
+grep '^  design/gen/obligations.json$' out/stages/generation.txt
+exists out/stages/trace.txt out/stages/tests.txt out/stages/arch.txt out/stages/formal.txt out/stages/history.txt out/stages/decisions.txt out/stages/backlog.txt
+
+# the snapshot is a repository of its own with the config and what gen wrote
+exists out/snapshot/.git
+exists out/snapshot/design/gen/obligations.json
+cmp out/snapshot/machinery.yaml proj/machinery.yaml
+exists out/formal/machines/loan/Sanity.tla
+exists out/formal/models/library/Sanity.als
+
+# the report is deterministic
+exec machinery -C proj assess --out out2
+cmp out/report.json out2/report.json
+cmp out/report.md out2/report.md
