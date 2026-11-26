@@ -1561,7 +1561,9 @@ observations:
   <kind>: <something seen outside this story's scope>
 ```
 
-`--ids` and `--prefix` select the union; each must match something. Without evidence the block
+`--ids` and `--prefix` select the union; each must match something. A proof obligation
+(section 23.2) has no evidence to select:
+`usage: --ids: <id> is a proof obligation: it awaits a machine-checked proof and has no evidence to show`. Without evidence the block
 has no `command:` line and `result:   no evidence at <short sha>`. The `, against <stack>` part is
 left out when no run names a stack. An owed id prints under `not proven` as
 `<id> (<state>, owed)`.
@@ -3455,8 +3457,8 @@ Each problem is an ERROR of stage `risk`, `<risk file>: <area>: <message>`:
   `property <name>: over needs at least one id`;
 - `property <name>: over <id>: a property is over inv, act or tc ids`,
   `property <name>: over <id>: name an exact id, not a pattern`,
-  `property <name>: over <id> is not an id of the design` (`is proposed`, `is retired` for an id of
-  that status: it yields no obligation),
+  `property <name>: over <id> is not an id of the design`,
+  `property <name>: over <id> is proposed: it yields no obligation` (`retired`),
   `property <name>: over <id> is not in the area; add it to ids, or name an id the area holds`;
 - `core.paths needs at least one glob`, `core.paths: "<glob>" is not a valid glob`,
   `core.entry needs at least one <file>#<symbol>`, `core.entry: "<entry>" is not <file>#<symbol>`;
