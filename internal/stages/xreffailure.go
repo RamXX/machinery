@@ -55,10 +55,12 @@ func XrefFailure(ctx *Context) *report.Stage {
 		deps["dependency:"+dep.Name] = true
 	}
 	named, abused := map[string]bool{}, map[string]bool{}
+	linked := 0
 	for _, fm := range d.FailureModes {
 		if fm.Unlinked() {
 			continue // names nothing (section 5.4.1)
 		}
+		linked++
 		named[fm.Subject] = true
 		if fm.Kind == "abuse" {
 			abused[fm.Subject] = true
@@ -101,6 +103,11 @@ func XrefFailure(ctx *Context) *report.Stage {
 		Count(len(fstates), "failure states").Count(len(fevents), "failure events")
 	if len(d.FailureModes) == 0 && len(invokes) == 0 && len(deps) == 0 && tiered == 0 && len(fstates) == 0 && len(fevents) == 0 && len(d.FMProblems) == 0 {
 		s.NotDemonstrated("nothing to check")
+	}
+	if len(d.FailureModes) > 0 && linked == 0 {
+		// every failure mode is an unlinked row: none was compared with the
+		// design, so the stage is never a pass
+		s.NotDemonstrated("no failure mode names a subject")
 	}
 	return s
 }

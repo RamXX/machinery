@@ -1,0 +1,143 @@
+# a catalog whose rows are all unlinked names no subject: xref-failure compared nothing with the
+# design and is not demonstrated, never passed, as xref-model-machine is with no bound machine
+# (docs/formats.md section 6.6)
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '(?s)== failure-modes ==\nchecked: 2 failure modes, 0 abuse cases, 2 imported, 2 unlinked\npassed\n'
+stdout '(?s)== xref-failure ==\nchecked: 2 failure modes, 0 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events\nnot demonstrated: no failure mode names a subject\n'
+stdout '^machinery lint: 1 passed, 0 failed, 1 not demonstrated, 0 not applicable$'
+
+# a links file that links nothing changes nothing
+cp links-empty.yaml design/links.yaml
+cp with-links.yaml machinery.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^not demonstrated: no failure mode names a subject$'
+
+# one linked row is compared with the design: its subject resolves, and the stage passes
+cp links-one.yaml design/links.yaml
+exec machinery lint --stage xref-failure
+stdout 'checked: 2 failure modes, 0 invokes'
+stdout '^passed$'
+
+# a linked row whose subject names nothing is a finding: the stage fails
+cp links-bad.yaml design/links.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  subject-resolves: act:Loan.burn: failure mode risk-2: Loan.burn is not an action of the model$'
+stdout '^failed: 1 finding\(s\)$'
+
+# unlinked rows beside a finding: failed, not merely not demonstrated
+cp links-empty.yaml design/links.yaml
+cp with-invoke.yaml machinery.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^  ERROR  invoke-failure-mode: invoke:desk.checkCard: no failure mode names this invoke; declare what happens when it fails in design/links.yaml$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a waiver accepts the finding but links nothing: still not demonstrated
+cp with-waiver.yaml machinery.yaml
+exec mrun 1 lint --stage xref-failure
+stdout '^  warn   waived: invoke-failure-mode: invoke:desk.checkCard: '
+stdout '^not demonstrated: no failure mode names a subject$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+-- with-links.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+-- with-invoke.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  machines: design/machines
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+-- with-waiver.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  machines: design/machines
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+waivers:
+  - {rule: invoke-failure-mode, id: "invoke:desk.checkCard", reason: "the card check is modeled next"}
+-- links-empty.yaml --
+version: 1
+links: []
+-- links-one.yaml --
+version: 1
+links:
+  - {id: RISK-2, subject: "act:Loan.lend", required: surface}
+-- links-bad.yaml --
+version: 1
+links:
+  - {id: RISK-2, subject: "act:Loan.burn", required: surface}
+-- docs/risks.md --
+# Risks
+
+| Risk | Failure | Required behavior |
+|------|---------|-------------------|
+| RISK-1 | The card reader is down. | The desk refuses the loan with READER_DOWN. |
+| RISK-2 | A loan is recorded twice. | The second record is refused. |
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  LoanStatus:
+    values:
+      - {name: Shelved, definition: "On the shelf."}
+      - {name: Lent, definition: "With a member."}
+entities:
+  Loan:
+    definition: "One copy lent to one member."
+    attributes:
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian}
+-- design/machines/Desk.machine.json --
+{
+  "id": "desk",
+  "_role": "operational",
+  "_serves": ["act:Loan.lend"],
+  "initial": "Idle",
+  "_delays": {"cardTimeout": "2000 ms - upper bound on the card reader"},
+  "states": {
+    "Idle": {"on": {"lend": {"target": "checking"}}},
+    "checking": {
+      "invoke": {"src": "checkCard", "onDone": {"target": "Idle"}, "onError": {"target": "Idle"}},
+      "after": {"cardTimeout": {"target": "Idle"}}
+    }
+  }
+}

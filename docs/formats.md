@@ -662,6 +662,12 @@ event is a finding that says to configure `design.failure_modes`, and `checked:`
 states and failure events only. Not applicable when there is neither a failure-mode file nor a
 failure state or failure event.
 
+When there are failure modes and none of them names a subject (every one is an imported row that
+is not linked, section 5.4.1), the stage compared no failure mode with the design, and its result
+is `not demonstrated: no failure mode names a subject` (`nothing to check` when there is nothing
+at all to compare), never passed, waivers or not; with findings it is failed (section 3.2). A
+waiver does not link a row.
+
 ### 6.7 Waivers
 
 A cross-reference finding (sections 6.4 to 6.6) can be waived in `machinery.yaml`:
