@@ -54,7 +54,7 @@ func LoadImportedFailureModes(p *project.Project, native []FailureMode) (fms []F
 			continue
 		}
 		byID[r.ID] = len(fms)
-		fms = append(fms, FailureMode{ID: r.ID, Kind: "fault", Failure: r.Failure, Behavior: r.Behavior, Required: r.Required, Source: c.File, Imported: true, Cells: r.Cells, Line: r.Line})
+		fms = append(fms, FailureMode{ID: r.ID, Kind: "fault", Failure: r.Failure, Behavior: r.Behavior, Required: r.Required, CellRefused: r.RequiredRefused, Source: c.File, Imported: true, Cells: r.Cells, Line: r.Line})
 	}
 	if c.Links == "" {
 		return fms, problems, true
@@ -138,7 +138,8 @@ func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[s
 				switch {
 				case required != "" && required != cell:
 					differ = append(differ, written)
-				case cell == "" && l.NoSubject == nil && cells:
+				case cell == "" && l.NoSubject == nil && cells && !fm.CellRefused:
+					// a cell that holds no value has its own finding: one cause, one finding
 					empty = append(empty, written)
 				}
 				if required = cell; cell == "refuse" && values.Kind != "abuse" {

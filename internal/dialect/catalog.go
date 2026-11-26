@@ -17,7 +17,10 @@ type Row struct {
 	// when the catalog has a column for it and the cell holds one of the
 	// four values; "" otherwise.
 	Required string
-	Cells    []string // every cell of the row, trimmed
+	// RequiredRefused is true when the cell holds something that is no
+	// value: the row has none, and the cell has its own finding.
+	RequiredRefused bool
+	Cells           []string // every cell of the row, trimmed
 }
 
 // Columns names, for each column a failure-mode row needs, the header
@@ -128,6 +131,7 @@ func Catalog(rel string, data []byte, id *regexp.Regexp, cols Columns) (rows []R
 				if ValidRequired(strings.ToLower(v)) {
 					r.Required = strings.ToLower(v)
 				} else {
+					r.RequiredRefused = true
 					problems = append(problems, fmt.Sprintf("%s: the required cell %q must be fail-closed, retry-bounded, surface or refuse", where, v))
 				}
 			}

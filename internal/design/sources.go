@@ -35,6 +35,9 @@ type FailureMode struct {
 	// Line the line of the row.
 	Cells []string `yaml:"-"`
 	Line  int      `yaml:"-"`
+	// CellRefused is true for an imported row whose required cell holds
+	// something that is no value; the catalog has the finding.
+	CellRefused bool `yaml:"-"`
 }
 
 // Reason is the text of a no_subject key. Only a YAML string is one: a

@@ -13,7 +13,7 @@ cp markers.yaml m.tmp
 exec sh -c 'sed "/^  tests: /r m.tmp" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
 cp order.go.in internal/domain/order.go
 exec machinery trace
-stdout '^  warn   serves: 3 tag\(s\) name 3 id\(s\) that are not actions; machinery trace --non-action-serves lists them$'
+stdout '^  warn   serves: 4 tag\(s\) name 3 id\(s\) that are not actions; machinery trace --non-action-serves lists them$'
 stdout -count=1 'warn   serves: '
 stdout '^checked: 2 code files, 1 test files, 4 act ids, 16 obligations, 3 non-action serves$'
 stdout '^passed$'
@@ -28,11 +28,18 @@ stderr '^usage: machinery trace takes no arguments$'
 exec sh -c 'sed "s/ inv:terminal-is-final//" e2e/orders.sh > o.tmp && mv o.tmp e2e/orders.sh'
 exec mrun 1 trace
 stdout 'ERROR  unverified: inv:terminal-is-final'
-stdout '^  warn   serves: 3 tag\(s\) name 3 id\(s\) that are not actions; machinery trace --non-action-serves lists them$'
+stdout '^  warn   serves: 4 tag\(s\) name 3 id\(s\) that are not actions; machinery trace --non-action-serves lists them$'
 stdout '^failed: 1 finding\(s\)$'
 # the list is a report, never a gate
 exec machinery trace --non-action-serves
 cmp stdout list.txt
+
+# a file that cannot be read: the list is not known, and saying nothing would read as "none"
+chmod 000 internal/domain/order.go
+exec mrun 1 trace --non-action-serves
+! stdout .
+stderr '^machinery: trace --non-action-serves: cannot read tags: .*order\.go.*; the list is not known$'
+chmod 644 internal/domain/order.go
 
 # without trace there are no tags to list
 exec sh -c 'printf "version: 2\n" > machinery.yaml'
@@ -44,6 +51,7 @@ internal/domain/order.go:7: inv:paid-before-shipped
 internal/domain/order.go:8: inv:paid-before-shipped
 internal/domain/order.go:9: inv:terminal-is-final
 internal/domain/order.go:9: sc:customer-pays-and-the-order-ships
+internal/domain/order.go:10: inv:terminal-is-final
 -- markers.yaml --
   markers:
     serves: ["Implements:"]
@@ -57,6 +65,7 @@ package domain
 // Implements: paid-before-shipped, Order.pay
 // Implements: paid-before-shipped
 // machinery:serves inv:terminal-is-final sc:customer-pays-*
+// machinery:serves inv:terminal-is-final
 func Apply(event string) string {
 	return event
 }

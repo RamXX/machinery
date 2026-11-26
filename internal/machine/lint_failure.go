@@ -96,8 +96,35 @@ func (m *Machine) Aliases() map[string]string { return eventMap(m.Root.AsObject(
 // machine writes that it refused a caller's command, each with the name of
 // the action it refuses. Entries of another shape are left out; their shape
 // is lintRefusalEvents's.
-func (m *Machine) RefusalEvents() map[string]string {
-	return eventMap(m.Root.AsObject(), "_refusal_events")
+func (m *Machine) RefusalEvents() map[string]RefusalEvent {
+	res := map[string]RefusalEvent{}
+	o := m.Root.AsObject()
+	if o == nil {
+		return res
+	}
+	rv := o.GetObject("_refusal_events")
+	for _, ev := range rv.Keys() {
+		d := rv.Get2(ev).AsObject()
+		if d == nil {
+			continue
+		}
+		if act := stringOf(d.Get2("action")); act != "" {
+			res[ev] = RefusalEvent{Action: act, Reason: stringOf(d.Get2("reason"))}
+		}
+	}
+	return res
+}
+
+// RefusalEvent is one entry of _refusal_events: the action the event
+// refuses, and the reason the event is a refusal and no failure.
+type RefusalEvent struct{ Action, Reason string }
+
+// stringOf returns a string value, trimmed, or "".
+func stringOf(v *ir.Value) string {
+	if v == nil || v.Kind != ir.KindString {
+		return ""
+	}
+	return strings.TrimSpace(v.AsString())
 }
 
 // eventMap reads a root object that maps an event to an action name,
@@ -143,7 +170,7 @@ func lintRefusalEvents(base string, ro *ir.Object, states []ir.StateEntry) (errs
 		return nil
 	}
 	if rv.Kind != ir.KindObject {
-		return []string{base + ": _refusal_events must be an object that maps an event name to the name of the model action it refuses"}
+		return []string{base + ": _refusal_events must be an object that maps an event name to {action, reason}: the model action it refuses and why it is a refusal and no failure"}
 	}
 	handled := handledEvents(states)
 	other := map[string]string{}
@@ -159,8 +186,23 @@ func lintRefusalEvents(base string, ro *ir.Object, states []ir.StateEntry) (errs
 		}
 	}
 	for _, ev := range rv.AsObject().Keys() {
-		if v := rv.AsObject().Get2(ev); v == nil || v.Kind != ir.KindString || strings.TrimSpace(v.AsString()) == "" {
-			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s] must be a non-empty action name", base, ir.Repr(ev)))
+		// a declaration takes a finding away from review, so it says why
+		d := rv.AsObject().Get2(ev).AsObject()
+		shaped := d != nil
+		if shaped {
+			for _, k := range d.Keys() {
+				shaped = shaped && (k == "action" || k == "reason")
+			}
+		}
+		switch {
+		case !shaped:
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s] must be an object with action and reason, and nothing else", base, ir.Repr(ev)))
+			continue
+		case stringOf(d.Get2("action")) == "":
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].action must be a non-empty action name", base, ir.Repr(ev)))
+			continue
+		case stringOf(d.Get2("reason")) == "":
+			errs = append(errs, fmt.Sprintf("%s: _refusal_events[%s].reason must be a non-empty reason: say why the event is a refusal and no failure", base, ir.Repr(ev)))
 			continue
 		}
 		if !handled[ev] {
@@ -260,7 +302,7 @@ func lintNotFailures(base string, ro *ir.Object, states []ir.StateEntry) (errs [
 	for _, e := range eventList(ro, "_failure_events") {
 		failure[e] = true
 	}
-	refusal := eventMap(ro, "_refusal_events")
+	refusal := ro.GetObject("_refusal_events")
 	for _, n := range nv.AsObject().Keys() {
 		v := nv.AsObject().Get2(n)
 		switch {
@@ -271,7 +313,7 @@ func lintNotFailures(base string, ro *ir.Object, states []ir.StateEntry) (errs [
 		case !looksLikeFailure(n[strings.LastIndex(n, ".")+1:]):
 			// no hint is printed for the name, so the entry dismisses nothing
 			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which does not look like a failure (%s), so there is no hint to dismiss (remove it)", base, ir.Repr(n), ir.NoFailureWord))
-		case handled[n] && !isState[n] && refusal[n] != "":
+		case handled[n] && !isState[n] && refusal.Has(n):
 			errs = append(errs, fmt.Sprintf("%s: _not_failures names %s, which is in _refusal_events and is never hinted, so there is no hint to dismiss (remove it)", base, ir.Repr(n)))
 		default:
 			if handled[n] && failure[n] {

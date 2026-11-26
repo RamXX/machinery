@@ -20,7 +20,9 @@ grep '"id": "fm:risk-1"' design/gen/obligations.json
 exec sh -c 'sed "s/| retry-bounded |/| sometimes |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
 exec mrun 1 lint --stage failure-modes --stage xref-failure
 stdout '^  ERROR  docs/risks.md:5: RISK-1: the required cell "sometimes" must be fail-closed, retry-bounded, surface or refuse$'
-stdout '^  ERROR  design/links.yaml: RISK-1: required is not set and the required cell of RISK-1 is empty; set required in the entry or fill the cell$'
+# one cause, one finding: the cell is not empty, and nothing says it is
+! stdout 'is empty'
+stdout -count=1 'ERROR'
 stdout '^checked: 5 failure modes, 4 linked, 1 unlinked, 1 name a subject and no required value, 0 invokes, '
 exec sh -c 'sed "s/| sometimes |/| retry-bounded |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
 

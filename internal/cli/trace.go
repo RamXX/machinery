@@ -26,7 +26,15 @@ func init() {
 			if p.Cfg.Trace == nil {
 				return e.Fail(project.Errf("no trace configured: machinery trace --non-action-serves lists serves tags, and trace says where they are"))
 			}
-			for _, n := range stages.NonActionServes(&stages.Context{P: p}) {
+			list, unread := stages.NonActionServes(&stages.Context{P: p})
+			if len(unread) > 0 {
+				// no list is better than a part of one that reads as whole
+				for _, why := range unread {
+					fmt.Fprintf(e.Stderr, "machinery: trace --non-action-serves: %s; the list is not known\n", why)
+				}
+				return 1
+			}
+			for _, n := range list {
 				fmt.Fprintf(e.Stdout, "%s:%d: %s\n", n.File, n.Line, n.ID)
 			}
 			return 0

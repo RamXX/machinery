@@ -217,10 +217,18 @@ type Annotate struct {
 	Aliases        map[string]string `yaml:"aliases,omitempty"`
 	// RefusalEvents maps an event by which the machine writes that it
 	// refused a caller's command to the action it refuses.
-	RefusalEvents map[string]string `yaml:"refusal_events,omitempty"`
+	// Each carries the reason the event is a refusal and no failure.
+	RefusalEvents map[string]Refusal `yaml:"refusal_events,omitempty"`
 	// NotFailures dismisses the name hint of an event or a state, by its
 	// exact name, with the reason it is no failure.
 	NotFailures map[string]string `yaml:"not_failures,omitempty"`
+}
+
+// Refusal is one entry of refusal_events: the action the event refuses and
+// the reason it is a refusal and no failure.
+type Refusal struct {
+	Action string `yaml:"action"`
+	Reason string `yaml:"reason"`
 }
 
 // AnnotateKeys returns the keys of import.machines.annotate, sorted.
@@ -902,9 +910,18 @@ func (c *Config) validateImport() error {
 				return Errf("import.machines.annotate.%s.aliases: an event and its action must not be empty", k)
 			}
 		}
-		for ev, act := range a.RefusalEvents {
-			if strings.TrimSpace(ev) == "" || strings.TrimSpace(act) == "" {
+		refused := make([]string, 0, len(a.RefusalEvents))
+		for ev := range a.RefusalEvents {
+			refused = append(refused, ev)
+		}
+		sort.Strings(refused)
+		for _, ev := range refused {
+			rf := a.RefusalEvents[ev]
+			if strings.TrimSpace(ev) == "" || strings.TrimSpace(rf.Action) == "" {
 				return Errf("import.machines.annotate.%s.refusal_events: an event and its action must not be empty", k)
+			}
+			if strings.TrimSpace(rf.Reason) == "" {
+				return Errf("import.machines.annotate.%s.refusal_events.%s: reason is required: say why the event is a refusal and no failure", k, ev)
 			}
 		}
 		for name, reason := range a.NotFailures {

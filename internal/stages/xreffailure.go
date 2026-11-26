@@ -307,7 +307,7 @@ func unresolved(d *design.Design, subject string, invokes, deps, fstates, fevent
 		if m == nil {
 			return fmt.Sprintf("no machine has the id %s", mid)
 		}
-		if m.RefusalEvents()[ev] != "" {
+		if _, refusal := m.RefusalEvents()[ev]; refusal {
 			// a declared refusal: a failure mode may name it, none is asked for
 			return ""
 		}

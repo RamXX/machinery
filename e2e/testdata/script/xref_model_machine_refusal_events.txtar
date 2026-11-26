@@ -15,7 +15,7 @@ stdout '^  ERROR  event-action: order\.cancel_refused: _aliases gives the event 
 # declared, the rule holds, and the declaration is one line of the stage and counted
 cp declared.json design/machines/Order.machine.json
 exec machinery lint --stage xref-model-machine
-stdout '^  warn   refusal: order: cancel_refused refuses cancel$'
+stdout '^  warn   refusal: order: cancel_refused refuses cancel \(the command was refused, nothing failed\)$'
 stdout -count=1 '^  warn   '
 stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions, 1 refusal events$'
 stdout '^passed$'
@@ -43,7 +43,20 @@ stdout '^  ERROR  event-action: order\.cancel: _refusal_events gives the event t
 ! stdout 'refusal: order: cancel '
 stdout '^failed: 1 finding\(s\)$'
 
+# an event on which the machine enters a failure state records a failure, whatever it is called: it is
+# no refusal, and the failure mode its failure event asks for is not declared away
+cp enters-failure.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_failed: _refusal_events declares the event, and on it the machine enters broken, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or remove it from _refusal_events in design/machines/Order\.machine\.json$'
+! stdout 'refusal: order'
+stdout '^failed: 1 finding\(s\)$'
+cp enters-failure-plain.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events declares the event, and on it the machine enters broken, a state tagged failure; '
+! stdout 'refusal: order'
+
 # the finding is a cross-reference finding and is waived like one
+cp action.json design/machines/Order.machine.json
 cp waived.yaml machinery.yaml
 exec machinery lint --stage xref-model-machine
 stdout '^  warn   waived: event-action: order\.cancel: _refusal_events gives the event the action pay, '
@@ -53,8 +66,8 @@ cp declared.json design/machines/Order.machine.json
 # an operational machine: the action is one of an entity behind what it serves, with its event in the machine
 cp envelope.json design/machines/Envelope.machine.json
 exec machinery lint --stage xref-model-machine
-stdout '^  warn   refusal: envelope: pay_refused refuses pay$'
-stdout '^  warn   refusal: order: cancel_refused refuses cancel$'
+stdout '^  warn   refusal: envelope: pay_refused refuses pay \(the command was refused, nothing failed\)$'
+stdout '^  warn   refusal: order: cancel_refused refuses cancel \(the command was refused, nothing failed\)$'
 stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 5 events, 2 actions, 1 entities with actions, 2 refusal events$'
 stdout '^passed$'
 cp envelope-unknown.json design/machines/Envelope.machine.json
@@ -191,7 +204,7 @@ entities:
 {
   "id": "order",
   "_refusal_events": {
-    "cancel_refused": "cancel"
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
   },
   "initial": "Pending",
   "states": {
@@ -221,7 +234,7 @@ entities:
 {
   "id": "order",
   "_refusal_events": {
-    "cancel_refused": "revoke"
+    "cancel_refused": {"action": "revoke", "reason": "the command was refused, nothing failed"}
   },
   "initial": "Pending",
   "states": {
@@ -251,7 +264,7 @@ entities:
 {
   "id": "order",
   "_refusal_events": {
-    "cancel_refused": "cancel"
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
   },
   "initial": "Pending",
   "states": {
@@ -278,8 +291,8 @@ entities:
 {
   "id": "order",
   "_refusal_events": {
-    "cancel": "pay",
-    "cancel_refused": "cancel"
+    "cancel": {"action": "pay", "reason": "the command was refused, nothing failed"},
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
   },
   "initial": "Pending",
   "states": {
@@ -313,7 +326,7 @@ entities:
     "act:Order.pay"
   ],
   "_refusal_events": {
-    "pay_refused": "pay"
+    "pay_refused": {"action": "pay", "reason": "the command was refused, nothing failed"}
   },
   "initial": "idle",
   "states": {
@@ -341,7 +354,7 @@ entities:
     "act:Order.pay"
   ],
   "_refusal_events": {
-    "pay_refused": "revoke"
+    "pay_refused": {"action": "revoke", "reason": "the command was refused, nothing failed"}
   },
   "initial": "idle",
   "states": {
@@ -369,7 +382,7 @@ entities:
     "act:Order.pay"
   ],
   "_refusal_events": {
-    "pay_refused": "cancel"
+    "pay_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
   },
   "initial": "idle",
   "states": {
@@ -386,6 +399,88 @@ entities:
           "target": "idle"
         }
       }
+    }
+  }
+}
+-- enters-failure.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_failed": {
+      "action": "cancel",
+      "reason": "the command was refused, nothing failed"
+    }
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_failed": {
+          "target": "broken"
+        }
+      }
+    },
+    "broken": {
+      "tags": "failure",
+      "on": {
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- enters-failure-plain.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {
+      "action": "cancel",
+      "reason": "the command was refused, nothing failed"
+    }
+  },
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {
+          "target": "Paid"
+        },
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {
+          "target": "broken"
+        }
+      }
+    },
+    "broken": {
+      "tags": "failure",
+      "on": {
+        "cancel": {
+          "target": "Cancelled"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
     }
   }
 }

@@ -68,7 +68,7 @@ func (t *translator) annotate(out *ir.Object) {
 
 	external, failure := map[string]bool{}, map[string]bool{}
 	aliases, aliasKey := map[string]string{}, map[string]string{}
-	refusals, refusalKey := map[string]string{}, map[string]string{}
+	refusals, refusalKey, reasons := map[string]string{}, map[string]string{}, map[string]string{}
 	dismissed, dismissOrder := map[string]dismissal{}, []string{}
 	t.listed = map[string]string{}
 	for _, k := range keys {
@@ -108,11 +108,18 @@ func (t *translator) annotate(out *ir.Object) {
 			}
 		}
 		t.dismiss(k, a.NotFailures, events, states, dismissed, &dismissOrder)
+		refused := map[string]string{}
+		for ev, rf := range a.RefusalEvents {
+			refused[ev] = strings.TrimSpace(rf.Action)
+			if _, have := reasons[ev]; !have {
+				reasons[ev] = strings.TrimSpace(rf.Reason) // the first entry that names the event gives the reason
+			}
+		}
 		for _, m := range []struct {
 			list, noun, actions string
 			given               map[string]string
 			into, from          map[string]string
-		}{{"aliases", "alias", "actions", a.Aliases, aliases, aliasKey}, {"refusal_events", "refusal", "refused actions", a.RefusalEvents, refusals, refusalKey}} {
+		}{{"aliases", "alias", "actions", a.Aliases, aliases, aliasKey}, {"refusal_events", "refusal", "refused actions", refused, refusals, refusalKey}} {
 			evs := make([]string, 0, len(m.given))
 			for ev := range m.given {
 				evs = append(evs, ev)
@@ -133,9 +140,82 @@ func (t *translator) annotate(out *ir.Object) {
 	}
 	t.addNames(out, "_external_events", external)
 	t.addNames(out, "_failure_events", failure)
-	t.addEventMap(out, "_aliases", "alias", "action", aliases, aliasKey)
-	t.addEventMap(out, "_refusal_events", "refusal", "refused action", refusals, refusalKey)
+	t.addAliases(out, aliases, aliasKey)
+	t.addRefusals(out, refusals, refusalKey, reasons)
 	t.addDismissed(out, dismissed, dismissOrder)
+}
+
+// addRefusals adds the refusal events, in event order, to the root
+// _refusal_events, each with its action and reason, after the ones the
+// source has. A refusal for an event that is also listed as external or as
+// a failure, or that has an alias, is a problem that names the entry and
+// what lists the event, and is not added: the lint of the translated
+// machine could only name keys the source file does not have.
+func (t *translator) addRefusals(out *ir.Object, refusals, from, reasons map[string]string) {
+	if len(refusals) == 0 {
+		return
+	}
+	res := ir.NewObject()
+	if v := out.Get2("_refusal_events"); v != nil {
+		if v.Kind != ir.KindObject {
+			return
+		}
+		for _, ev := range v.AsObject().Keys() {
+			res.Set(ev, v.AsObject().Get2(ev))
+		}
+	}
+	listedIn := func(key, ev string) (by string, in bool) {
+		for _, e := range out.Get2(key).AsArray() {
+			if e != nil && e.Kind == ir.KindString && e.AsString() == ev {
+				if by = t.listed[key+" "+ev]; by == "" {
+					by = "the source lists it"
+				}
+				return by, true
+			}
+		}
+		return "", false
+	}
+	evs := make([]string, 0, len(refusals))
+	for ev := range refusals {
+		evs = append(evs, ev)
+	}
+	sort.Strings(evs)
+	for _, ev := range evs {
+		k := from[ev]
+		if have := res.Get2(ev); have != nil {
+			if act := textOf(have.AsObject().Get2("action")); have.Kind != ir.KindObject || act != refusals[ev] {
+				if have.Kind != ir.KindObject {
+					act = textOf(have)
+				}
+				t.fail("import.machines.annotate %s gives event %s the refused action %s, and the source gives it %s; keep one", k, ev, refusals[ev], act)
+			}
+			continue
+		}
+		if by, in := listedIn("_external_events", ev); in {
+			t.fail("import.machines.annotate %s: refusal_events names %s, which is also in _external_events (%s); the machine writes a refusal itself, so it does not arrive from outside: keep one", k, ev, by)
+			continue
+		}
+		if by, in := listedIn("_failure_events", ev); in {
+			t.fail("import.machines.annotate %s: refusal_events names %s, which is also in _failure_events (%s); a refusal is declared, not a failure: keep one", k, ev, by)
+			continue
+		}
+		if out.GetObject("_aliases").Has(ev) {
+			by := "the source gives it"
+			if t.listed["_aliases "+ev] != "" {
+				by = "import.machines.annotate " + t.aliasFrom[ev] + " gives it"
+			}
+			t.fail("import.machines.annotate %s: refusal_events names %s, which also has an alias (%s); an event refuses an action or is one under another name: keep one", k, ev, by)
+			continue
+		}
+		d := ir.NewObject()
+		d.Set("action", ir.StringValue(refusals[ev]))
+		d.Set("reason", ir.StringValue(reasons[ev]))
+		res.Set(ev, ir.ObjectValue(d))
+		t.listed["_refusal_events "+ev] = fmt.Sprintf("remove the refusal from import.machines.annotate %s (for %s)", k, t.src)
+	}
+	if res.Len() > 0 {
+		out.Set("_refusal_events", ir.ObjectValue(res))
+	}
 }
 
 // dismissal is one target of import.machines.annotate.<key>.not_failures:
@@ -336,17 +416,16 @@ func (t *translator) addNames(out *ir.Object, key string, names map[string]bool)
 	out.Set(key, ir.ArrayValue(list))
 }
 
-// addEventMap adds the aliases or the refusal events, in event order, to the
-// root object of that key (_aliases, _refusal_events), after the entries
-// the source has. An event the source gives another action is a problem; a
-// value of another shape is left to the lint. noun and action name the
-// entry and its value in messages.
-func (t *translator) addEventMap(out *ir.Object, key, noun, action string, aliases, from map[string]string) {
+// addAliases adds the aliases, in event order, to the root _aliases, after
+// the ones the source has. An event the source gives another action is a
+// problem; a value of another shape is left to the lint.
+func (t *translator) addAliases(out *ir.Object, aliases, from map[string]string) {
 	if len(aliases) == 0 {
 		return
 	}
+	t.aliasFrom = from
 	res := ir.NewObject()
-	if v := out.Get2(key); v != nil {
+	if v := out.Get2("_aliases"); v != nil {
 		if v.Kind != ir.KindObject {
 			return
 		}
@@ -362,12 +441,12 @@ func (t *translator) addEventMap(out *ir.Object, key, noun, action string, alias
 	for _, ev := range evs {
 		if have := res.Get2(ev); have != nil {
 			if have.Kind != ir.KindString || have.AsString() != aliases[ev] {
-				t.fail("import.machines.annotate %s gives event %s the %s %s, and the source gives it %s; keep one", from[ev], ev, action, aliases[ev], textOf(have))
+				t.fail("import.machines.annotate %s gives event %s the action %s, and the source gives it %s; keep one", from[ev], ev, aliases[ev], textOf(have))
 			}
 			continue
 		}
 		res.Set(ev, ir.StringValue(aliases[ev]))
-		t.listed[key+" "+ev] = fmt.Sprintf("remove the %s from import.machines.annotate %s (for %s)", noun, from[ev], t.src)
+		t.listed["_aliases "+ev] = fmt.Sprintf("remove the alias from import.machines.annotate %s (for %s)", from[ev], t.src)
 	}
-	out.Set(key, ir.ObjectValue(res))
+	out.Set("_aliases", ir.ObjectValue(res))
 }

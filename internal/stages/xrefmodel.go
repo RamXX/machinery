@@ -322,8 +322,13 @@ type refusalRules struct {
 func refusalEvents(fs *xfindings, lines *[]string, m *machine.Machine, r refusalRules) (all map[string]bool) {
 	all = map[string]bool{}
 	refusals := m.RefusalEvents()
-	for _, ev := range sortedKeys(refusals) {
-		act := refusals[ev]
+	evs := make([]string, 0, len(refusals))
+	for ev := range refusals {
+		evs = append(evs, ev)
+	}
+	sort.Strings(evs)
+	for _, ev := range evs {
+		act := refusals[ev].Action
 		all[ev] = true
 		where := "remove it from _refusal_events in " + m.Path
 		if by := m.Listed["_refusal_events "+ev]; by != "" {
@@ -336,20 +341,33 @@ func refusalEvents(fs *xfindings, lines *[]string, m *machine.Machine, r refusal
 			fs.add("event-action", m.ID+"."+ev, "_refusal_events names action %s, which is not an action of %s; %s, or %s", act, r.of, r.missing, where)
 		case !r.handled[act]:
 			fs.add("event-action", m.ID+"."+ev, "_refusal_events gives the event the action %s, and %s has no event of its own name in %s; a refusal is of a command the machine handles: %s", act, act, m.ID, where)
+		case entersFailure(m, ev) != "":
+			// the declaration takes the failure hint and the failure-event
+			// obligation away: it does not take them from an event that
+			// the machine itself records as a failure
+			fs.add("event-action", m.ID+"."+ev, "_refusal_events declares the event, and on it the machine enters %s, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or %s", entersFailure(m, ev), where)
 		default:
-			*lines = append(*lines, fmt.Sprintf("refusal: %s: %s refuses %s", m.ID, ev, act))
+			*lines = append(*lines, fmt.Sprintf("refusal: %s: %s refuses %s (%s)", m.ID, ev, act, refusals[ev].Reason))
 		}
 	}
 	return all
 }
 
-func sortedKeys(m map[string]string) []string {
-	res := make([]string, 0, len(m))
-	for k := range m {
-		res = append(res, k)
+// entersFailure returns the first state tagged failure, in document order,
+// that a transition on the event enters: the target itself, a state the
+// target is inside, or one inside the target. "" when there is none.
+func entersFailure(m *machine.Machine, ev string) string {
+	for _, f := range m.FailureStates() {
+		for _, t := range m.Table.Transitions {
+			if t.Kind != "on" || t.Event != ev || t.Target == "" {
+				continue
+			}
+			if t.Target == f || strings.HasPrefix(t.Target, f+".") || strings.HasPrefix(f, t.Target+".") {
+				return f
+			}
+		}
 	}
-	sort.Strings(res)
-	return res
+	return ""
 }
 
 // checkOperationalEvents applies event-action to an operational machine

@@ -26,15 +26,19 @@ type NonAction struct {
 
 // Trace is stage trace (section 8).
 func Trace(ctx *Context) *report.Stage {
-	s, _ := trace(ctx)
+	s, _, _ := trace(ctx)
 	return s
 }
 
 // NonActionServes returns what machinery trace --non-action-serves lists:
 // every id a serves tag names that is not an action, once per tag, by file,
-// line and id.
-func NonActionServes(ctx *Context) []NonAction {
-	_, list := trace(ctx)
+// line and id. unread says why the files could not all be listed or read;
+// the list is then not known, and is never given as if it were whole.
+func NonActionServes(ctx *Context) (list []NonAction, unread []string) {
+	_, list, unread = trace(ctx)
+	if len(unread) > 0 {
+		return nil, unread
+	}
 	sort.Slice(list, func(i, j int) bool {
 		a, b := list[i], list[j]
 		if a.File != b.File {
@@ -45,25 +49,31 @@ func NonActionServes(ctx *Context) []NonAction {
 		}
 		return a.ID < b.ID
 	})
-	return list
+	return list, nil
 }
 
 // trace runs the stage and returns, with its result, the serves tags that
-// name an id which is not an action.
-func trace(ctx *Context) (*report.Stage, []NonAction) {
+// name an id which is not an action, and what kept it from listing or
+// reading every file.
+func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
 	s := report.New("trace")
 	p := ctx.P
 	if p.Cfg.Trace == nil {
-		return s.NotApplicable("no trace configured"), nil
+		return s.NotApplicable("no trace configured"), nil, nil
+	}
+	var unread []string
+	cannot := func(format string, err error) {
+		unread = append(unread, fmt.Sprintf(format, err))
+		s.Errorf(format, err)
 	}
 	d := ctx.Design()
 	code, err := tags.CodeFiles(p)
 	if err != nil {
-		s.Errorf("cannot list code files: %v", err)
+		cannot("cannot list code files: %v", err)
 	}
 	tests, err := tags.TestFiles(p)
 	if err != nil {
-		s.Errorf("cannot list test files: %v", err)
+		cannot("cannot list test files: %v", err)
 	}
 	if len(p.Cfg.Trace.Code) > 0 && len(code) == 0 {
 		s.Errorf("trace.code matches no file")
@@ -73,7 +83,7 @@ func trace(ctx *Context) (*report.Stage, []NonAction) {
 	}
 	found, err := tags.Scan(p, append(append([]string{}, code...), tests...))
 	if err != nil {
-		s.Errorf("cannot read tags: %v", err)
+		cannot("cannot read tags: %v", err)
 	}
 
 	for _, msg := range d.OwedProblems {
@@ -164,5 +174,5 @@ func trace(ctx *Context) (*report.Stage, []NonAction) {
 	if len(d.Served)+len(d.Obligations) == 0 && s.Blocking() == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
-	return s, nonActions
+	return s, nonActions, unread
 }
