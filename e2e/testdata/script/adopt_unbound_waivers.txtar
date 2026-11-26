@@ -1,0 +1,132 @@
+# adopt --write waives the machines that bind to nothing and the entities with actions and no
+# lifecycle machine that the design already has, so day one passes (docs/formats.md section 17.2)
+fixture brownfield
+gitinit
+mkdir design/model design/machines
+cp depot-model.yaml design/model/depot.modelith.yaml
+cp shipment.json design/machines/Shipment.machine.json
+cp courier.json design/machines/CourierRun.machine.json
+
+# the dry run says how many it would add, and writes nothing
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^  machinery.yaml  new config; unbound waivers: 2$'
+! exists machinery.yaml
+
+# --write adds one per finding, with the reason and the commit
+exec machinery adopt --paths 'internal/shipping/**' --write
+stdout '^  machinery.yaml$'
+grep '^  - \{rule: entity-machine, id: "entity:Carrier", reason: "unbound at adoption \([0-9a-f]{7}\)"\}$' machinery.yaml
+grep '^  - \{rule: machine-binding, id: "courierRun", reason: "unbound at adoption \([0-9a-f]{7}\)"\}$' machinery.yaml
+
+# machinery check passes: what is unbound is waived and prints as warnings
+exec mrun 0 check --stage xref-model-machine --stage gen-drift
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 2 entities with actions$'
+stdout '^  warn   waived: entity-machine: entity:Carrier: declares 1 action\(s\) and no machine is its lifecycle; .* \(unbound at adoption \([0-9a-f]{7}\)\)$'
+stdout '^  warn   waived: machine-binding: courierRun: operational and serves nothing in the model; '
+
+# a second run writes nothing
+exec machinery adopt --paths 'internal/shipping/**' --write
+cmp stdout want-wrote-nothing.txt
+gitcommit adopted
+
+# binding the machine makes its waiver stale, and adopt never removes one
+cp courier-bound.json design/machines/CourierRun.machine.json
+exec mrun 1 check --stage xref-model-machine
+stdout '^  ERROR  stale waiver: machine-binding courierRun$'
+exec machinery adopt --paths 'internal/shipping/**' --write
+grep 'id: "courierRun"' machinery.yaml
+cp courier.json design/machines/CourierRun.machine.json
+
+# while a machine file cannot be read no waiver is added: what binds to what is then unknown
+cp dispatch.json design/machines/Dispatch.machine.json
+exec sh -c 'echo "{" > design/machines/Broken.machine.json'
+exec mrun 1 adopt --paths 'internal/shipping/**'
+! stdout 'unbound waivers'
+exec mrun 1 adopt --paths 'internal/shipping/**' --write
+! grep 'dispatch' machinery.yaml
+rm design/machines/Broken.machine.json
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^  machinery.yaml  edit: unbound waivers: 1$'
+
+# a design whose machines all bind to nothing: adopt waives them, and xref-model-machine is not
+# demonstrated until the first one is bound
+fixture brownfield second
+cd second
+gitinit
+mkdir design/model design/machines
+cp ../depot-model.yaml design/model/depot.modelith.yaml
+cp ../courier.json design/machines/CourierRun.machine.json
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^  machinery.yaml  new config; unbound waivers: 3$'
+exec machinery adopt --paths 'internal/shipping/**' --write
+exec mrun 1 check --stage xref-model-machine
+stdout '^  warn   waived: entity-machine: entity:Shipment: '
+stdout '^not demonstrated: no machine is bound to a model entity$'
+
+-- depot-model.yaml --
+kind: DomainModel
+version: v1
+title: Depot
+enums:
+  ShipmentStatus:
+    values:
+      - {name: Created, definition: "Registered, not yet packed."}
+      - {name: Packed, definition: "Packed; terminal here."}
+      - {name: Cancelled, definition: "Abandoned; terminal."}
+entities:
+  Shipment:
+    definition: "One parcel moving through the depot."
+    attributes:
+      - {name: status, type: ShipmentStatus}
+    actions:
+      - {name: pack, actor: Warehouse}
+      - {name: cancel, actor: Warehouse}
+  Carrier:
+    definition: "A company that moves parcels."
+    attributes:
+      - {name: name, type: string}
+    actions:
+      - {name: onboard, actor: Warehouse}
+-- shipment.json --
+{
+  "id": "shipment",
+  "initial": "Created",
+  "states": {
+    "Created": {"on": {"pack": {"target": "Packed"}, "cancel": {"target": "Cancelled"}}},
+    "Packed": {"type": "final"},
+    "Cancelled": {"type": "final"}
+  }
+}
+-- courier.json --
+{
+  "id": "courierRun",
+  "_role": "operational",
+  "initial": "Waiting",
+  "states": {
+    "Waiting": {"on": {"pickUp": {"target": "Driving"}}, "_ignores": {"dropOff": "nothing is picked up yet"}},
+    "Driving": {"on": {"dropOff": {"target": "Waiting"}}, "_ignores": {"pickUp": "already carrying a load"}}
+  }
+}
+-- courier-bound.json --
+{
+  "id": "courierRun",
+  "_role": "operational",
+  "_serves": ["entity:Shipment"],
+  "initial": "Waiting",
+  "states": {
+    "Waiting": {"on": {"pickUp": {"target": "Driving"}}, "_ignores": {"dropOff": "nothing is picked up yet"}},
+    "Driving": {"on": {"dropOff": {"target": "Waiting"}}, "_ignores": {"pickUp": "already carrying a load"}}
+  }
+}
+-- dispatch.json --
+{
+  "id": "dispatch",
+  "_role": "operational",
+  "initial": "Idle",
+  "states": {
+    "Idle": {"on": {"assign": {"target": "Busy"}}, "_ignores": {"release": "nothing is assigned"}},
+    "Busy": {"on": {"release": {"target": "Idle"}}, "_ignores": {"assign": "already assigned"}}
+  }
+}
+-- want-wrote-nothing.txt --
+adopt: wrote 0 file(s)

@@ -174,8 +174,9 @@ func (e *editor) addContract(path string) {
 }
 
 // addWaivers appends one waiver per entry, each with the reason, to the
-// waivers list (section 17.2). It never removes or rewrites a waiver.
-func (e *editor) addWaivers(ws []project.Waiver, reason string) {
+// waivers list (section 17.2), and notes how many. It never removes or
+// rewrites a waiver.
+func (e *editor) addWaivers(ws []project.Waiver, reason, note string) {
 	seq := get(e.root, "waivers")
 	if seq == nil || (seq.Kind == yaml.ScalarNode && seq.Tag == "!!null") {
 		fresh := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
@@ -198,7 +199,7 @@ func (e *editor) addWaivers(ws []project.Waiver, reason string) {
 			scalar("id", false), scalar(w.ID, true),
 			scalar("reason", false), scalar(reason, true)}})
 	}
-	e.note("new waivers: %d", len(ws))
+	e.note(note, len(ws))
 }
 
 func (e *editor) contractPaths() map[string]bool {

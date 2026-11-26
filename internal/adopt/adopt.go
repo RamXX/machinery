@@ -118,14 +118,27 @@ func Run(o Options) (*Result, error) {
 
 	// step 4: the failure states and events the design already has are
 	// unmodeled, not new; waive them so day one passes
-	waived := 0
-	if gaps := stages.UnmodeledFailures(&stages.Context{P: p}); len(gaps) > 0 {
-		sha := head
-		if sha == "" {
-			sha = "no commit"
+	// and step 5: what the design already has that binds to nothing is
+	// unbound, not new
+	sha := head
+	if sha == "" {
+		sha = "no commit"
+	}
+	var waiverNotes []string
+	for _, step := range []struct {
+		gaps   func(*stages.Context) []project.Waiver
+		reason string
+		note   string
+	}{
+		{stages.UnmodeledFailures, "unmodeled at adoption", "new waivers: %d"},
+		{stages.UnboundDesign, "unbound at adoption", "unbound waivers: %d"},
+	} {
+		gaps := step.gaps(&stages.Context{P: p})
+		if len(gaps) == 0 {
+			continue
 		}
-		ed.addWaivers(gaps, "unmodeled at adoption ("+sha+")")
-		waived = len(gaps)
+		ed.addWaivers(gaps, step.reason+" ("+sha+")", step.note)
+		waiverNotes = append(waiverNotes, fmt.Sprintf(step.note, len(gaps)))
 		if newBytes, err = ed.bytes(); err != nil {
 			return nil, err
 		}
@@ -143,8 +156,8 @@ func Run(o Options) (*Result, error) {
 		what := "new config"
 		if existing {
 			what = "edit: " + strings.Join(ed.changes, "; ")
-		} else if waived > 0 {
-			what += fmt.Sprintf("; new waivers: %d", waived)
+		} else if len(waiverNotes) > 0 {
+			what += "; " + strings.Join(waiverNotes, "; ")
 		}
 		if err := w.config(newBytes, what); err != nil {
 			return nil, err
