@@ -24,6 +24,31 @@ grep '^Start == \{"Queued", "Migrated"\}$' out/formal/machines/intake/Sanity.tla
 cmp out/formal/machines/ticket/Sanity.cfg spec.cfg
 exists out/formal/machines/ticket/states.dump
 
+# a run that did not complete gives no verdict (section 16.9): TLC cannot read a state name (the
+# lint reports it too), so the machine is neither passed nor failed and the section is not
+# demonstrated with the reason, never an ERROR
+cd bells
+gitinit
+cd $WORK
+exec machinery -C bells assess --out out3
+stdout '^formal: not demonstrated: bell: the sanity run did not complete: Lexical error at line [0-9]+, column [0-9]+\..*; fix the cause and run machinery assess again; checked: 2 machines, 5 states, 0 models$'
+grep '^bell: 2 states, did not complete$' out3/stages/formal.txt
+grep '^intake: 3 states, 3 distinct states found, passed$' out3/stages/formal.txt
+grep '^  warn   bell: the sanity run did not complete: Lexical error' out3/stages/formal.txt
+! grep 'ERROR' out3/stages/formal.txt
+grep '"reason": "Lexical error at line' out3/report.json
+grep '"result": "incomplete"' out3/report.json
+
+# beside an ERROR the section is failed, and the warn line still says what did not complete
+cp bells/design/machines/Bell.machine.json proj/design/machines/Bell.machine.json
+cd proj
+gitcommit 'a bell'
+cd $WORK
+exec machinery -C proj assess --out out4
+stdout '^formal: failed: 2 finding\(s\); checked: 3 machines, 11 states, 0 models$'
+grep '^  warn   bell: the sanity run did not complete: ' out4/stages/formal.txt
+grep '^failed: 2 finding\(s\)$' out4/stages/formal.txt
+
 # without the pinned jars the section is not demonstrated
 env MACHINERY_TOOLS=$WORK/notools
 exec machinery -C proj assess --out out2
@@ -47,6 +72,32 @@ design:
     "Parked": {"_terminal": "a parked ticket is kept for the record", "on": {"note": {"actions": ["recordNote"]}}},
     "Orphan": {"on": {"reopen": {"target": "Open"}}},
     "Done": {"type": "final"}
+  }
+}
+-- bells/machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- bells/design/machines/Bell.machine.json --
+{
+  "id": "bell",
+  "_role": "operational",
+  "initial": "Open",
+  "states": {
+    "Open": {"on": {"ring": {"target": "Rung\u0007"}}},
+    "Rung\u0007": {"type": "final"}
+  }
+}
+-- bells/design/machines/Intake.machine.json --
+{
+  "id": "intake",
+  "_role": "operational",
+  "initial": "Queued",
+  "_entries": ["Migrated"],
+  "states": {
+    "Queued": {"on": {"load": {"target": "Loaded"}}},
+    "Migrated": {"on": {"load": {"target": "Loaded"}}},
+    "Loaded": {"type": "final"}
   }
 }
 -- proj/design/machines/Intake.machine.json --

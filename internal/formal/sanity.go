@@ -27,19 +27,21 @@ type MachineSanity struct {
 	Distinct    int      // distinct states TLC found
 	Unreachable []string // leaves no behavior reaches, in table order
 	Deadlock    string   // the first deadlocked leaf TLC reached, or ""
-	Error       string   // set when TLC could not check the spec
+	// Incomplete says why a run gave no verdict (section 16.9), or "".
+	Incomplete string
 }
 
 // Failed reports whether the machine has a finding.
 func (m MachineSanity) Failed() bool {
-	return len(m.Unreachable) > 0 || m.Deadlock != "" || m.Error != ""
+	return len(m.Unreachable) > 0 || m.Deadlock != ""
 }
 
 // ModelSanity is what Alloy established about one model.
 type ModelSanity struct {
 	Model    string
 	Instance bool
-	Error    string // set when Alloy could not check the skeleton
+	// Incomplete says why the Alloy run gave no verdict (section 16.9), or "".
+	Incomplete string
 }
 
 // SanityTimeout bounds each tool run of the sanity.
@@ -203,7 +205,7 @@ func sanityMachine(tlc *tlcRunner, dir string, m *machine.Machine) (MachineSanit
 	leaves, _, _ := sanityLeaves(m)
 	res := MachineSanity{Machine: m.ID, Path: m.Path, States: len(leaves)}
 	if len(leaves) == 0 {
-		res.Error = "the machine has no states"
+		res.Incomplete = "the machine has no states; TLC was not run"
 		return res, nil
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -218,7 +220,7 @@ func sanityMachine(tlc *tlcRunner, dir string, m *machine.Machine) (MachineSanit
 	dump := []string{"-dump", "states"}
 	out, runErr, failure := tlc.exec(dir, "Sanity", "Sanity.cfg", dump, SanityTimeout)
 	if failure != "" {
-		res.Error = failure
+		res.Incomplete = relativeTo(dir, failure)
 		return res, nil
 	}
 	o := parseTLC(out, runErr)
@@ -229,16 +231,18 @@ func sanityMachine(tlc *tlcRunner, dir string, m *machine.Machine) (MachineSanit
 		// TLC stops at the deadlock: explore again for every reachable state
 		out, runErr, failure = tlc.exec(dir, "Sanity", "Sanity.cfg", append([]string{"-deadlock"}, dump...), SanityTimeout)
 		if failure != "" {
-			res.Error = failure
+			res.Incomplete = relativeTo(dir, failure)
 			return res, nil
 		}
 		o = parseTLC(out, runErr)
 	}
-	if o.Outcome != "passed" {
-		res.Error = o.Reason
-		if o.Outcome == "violated" {
-			res.Error = "TLC reported " + o.Violated
-		}
+	switch o.Outcome {
+	case "passed":
+	case "violated":
+		res.Incomplete = "TLC reported " + o.Violated + ", which the sanity spec has no property for"
+		return res, nil
+	default:
+		res.Incomplete = relativeTo(dir, o.Reason)
 		return res, nil
 	}
 	if mm := sanityDistinctRe.FindStringSubmatch(out); mm != nil {
@@ -246,7 +250,7 @@ func sanityMachine(tlc *tlcRunner, dir string, m *machine.Machine) (MachineSanit
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "states.dump"))
 	if err != nil {
-		res.Error = "TLC wrote no state dump"
+		res.Incomplete = "TLC wrote no state dump"
 		return res, nil
 	}
 	reached := map[string]bool{}
@@ -275,9 +279,9 @@ func sanityModel(alloy *alloyRunner, dir string, m *design.Model) (ModelSanity, 
 	found, known, errLine := alloy.exec(dir, "Sanity.als", SanityTimeout)
 	switch {
 	case errLine != "":
-		res.Error = errLine
+		res.Incomplete = errLine
 	case !known["Inhabited"]:
-		res.Error = "the run Inhabited was not executed"
+		res.Incomplete = "Alloy wrote a receipt without the run Inhabited"
 	default:
 		_, res.Instance = found["Inhabited"]
 	}

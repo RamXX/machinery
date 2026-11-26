@@ -117,6 +117,13 @@ func (a *assessment) formal(s *section) {
 	}
 	states := 0
 	machines := []any{}
+	// a run that did not complete gives no verdict (sections 16.9 and 18.5)
+	var incomplete []string
+	notComplete := func(name, reason string) {
+		msg := fmt.Sprintf("%s: the sanity run did not complete: %s", name, reason)
+		s.own.Warnf("%s", msg)
+		incomplete = append(incomplete, msg)
+	}
 	for _, m := range ms {
 		states += m.States
 		for _, u := range m.Unreachable {
@@ -125,35 +132,44 @@ func (a *assessment) formal(s *section) {
 		if m.Deadlock != "" {
 			s.own.Errorf("%s: deadlock in state %s: neither final nor _terminal, and no transition applies", m.Machine, m.Deadlock)
 		}
-		if m.Error != "" {
-			s.own.Errorf("%s: TLC could not check the sanity spec: %s", m.Machine, m.Error)
-		}
 		result := "passed"
-		if m.Failed() {
+		line := fmt.Sprintf("%s: %d states, %d distinct states found, ", m.Machine, m.States, m.Distinct)
+		switch {
+		case m.Incomplete != "":
+			notComplete(m.Machine, m.Incomplete)
+			result = "incomplete"
+			line = fmt.Sprintf("%s: %d states, did not complete", m.Machine, m.States)
+		case m.Failed():
 			result = "failed"
+			line += result
+		default:
+			line += result
 		}
-		s.lines = append(s.lines, fmt.Sprintf("%s: %d states, %d distinct states found, %s", m.Machine, m.States, m.Distinct, result))
+		s.lines = append(s.lines, line)
 		unreach := m.Unreachable
 		if unreach == nil {
 			unreach = []string{}
 		}
 		machines = append(machines, map[string]any{"machine": m.Machine, "states": m.States, "distinct": m.Distinct,
-			"result": result, "unreachable": unreach, "deadlock": m.Deadlock})
+			"result": result, "reason": m.Incomplete, "unreachable": unreach, "deadlock": m.Deadlock})
 	}
 	models := []any{}
 	for _, m := range mods {
-		result := "instance found"
+		result, line := "instance found", "instance found"
 		switch {
-		case m.Error != "":
-			result = "not checked"
-			s.own.Errorf("%s: Alloy could not check the skeleton: %s", m.Model, m.Error)
+		case m.Incomplete != "":
+			notComplete(m.Model, m.Incomplete)
+			result, line = "incomplete", "did not complete"
 		case !m.Instance:
-			result = "no instance"
+			result, line = "no instance", "no instance"
 			s.own.Errorf("%s: no instance in which every entity exists (for 4)", m.Model)
 		}
-		s.lines = append(s.lines, fmt.Sprintf("%s: %s", m.Model, result))
-		models = append(models, map[string]any{"model": m.Model, "result": result})
+		s.lines = append(s.lines, fmt.Sprintf("%s: %s", m.Model, line))
+		models = append(models, map[string]any{"model": m.Model, "result": result, "reason": m.Incomplete})
 	}
 	s.own.Count(len(ms), "machines").Count(states, "states").Count(len(mods), "models")
 	s.facts = map[string]any{"machines": machines, "models": models}
+	if len(incomplete) > 0 {
+		s.own.NotDemonstrated(incomplete[0] + "; fix the cause and run machinery assess again")
+	}
 }

@@ -2150,19 +2150,32 @@ runs again with deadlock checking off for the full set of reachable states. Find
   reaches the leaf.
 - `ERROR  <machine>: deadlock in state <state>: neither final nor _terminal, and no transition
   applies`. TLC reports the first deadlock it reaches.
-- `ERROR  <machine>: TLC could not check the sanity spec: <first error line>`.
 
 **Models.** For every model, assess writes `<out>/formal/models/<module>/<module>.als` (the
 skeleton of section 16.2) and `Sanity.als`, which opens it and runs `Inhabited` (an atom of every
 entity signature at once; `some univ` when there is none) `for 4`. Alloy must find an instance:
-otherwise `ERROR  <model>: no instance in which every entity exists (for 4)`, or
-`ERROR  <model>: Alloy could not check the skeleton: <first error line>`.
+otherwise `ERROR  <model>: no instance in which every entity exists (for 4)`.
+
+**Runs that did not complete.** A sanity run completes as a run of section 16.9 does: TLC exits
+0 after `Model checking completed. No error has been found.`, or with the deadlock status after
+naming the deadlock; Alloy exits 0 and writes a receipt that holds `Inhabited`. Anything else
+gave no verdict: the run reached 300 seconds, the tool could not start, crashed or was killed,
+reported an error (a generated spec it cannot parse included), reported a violation the sanity
+spec has no property for, or left output that cannot be read (no state dump). A machine with no
+state has no run. Such a machine or model is never judged passed or failed on its account:
+`warn   <machine>: the sanity run did not complete: <reason>` (or `<model>`), with the reason of
+section 16.9 naming files relative to the run's directory, and the section is
+`not demonstrated: <the first of them>; fix the cause and run machinery assess again` (machines
+in design order, then models). When the section also has an ERROR it is failed (section 3.2),
+and the warn lines still say what did not complete. A deadlock found by the first TLC run stays
+an ERROR when the run that explores past it does not complete.
 
 The tools are the pinned jars and the Java runtime, found as `machinery formal check` finds them
 (section 16.8). When one the project needs is missing the section is not demonstrated with the
 reason, never passed. Lines: `<machine>: <n> states, <n> distinct states found, passed` (or
-`failed`) per machine, `<model>: instance found` (or `no instance`) per model. `checked:`
-counts machines, states and models.
+`failed`) per machine, or `<machine>: <n> states, did not complete`; `<model>: instance found`
+(or `no instance`, or `did not complete`) per model. `checked:` counts machines, states and
+models.
 
 ### 18.6 History
 
@@ -2244,7 +2257,7 @@ A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`
 | `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
 | `design` | `bound_machines`, `unbound_machines` (when at least one machine was read) |
 | `generation` | `files` (generated files), `written` |
-| `formal` | `machines`: `{deadlock, distinct, machine, result, states, unreachable}`; `models`: `{model, result}` |
+| `formal` | `machines`: `{deadlock, distinct, machine, reason, result, states, unreachable}`; `models`: `{model, reason, result}`; `result` is `passed`, `failed` or `incomplete` (`instance found`, `no instance` or `incomplete` for a model), and `reason` says why a run did not complete, else is empty |
 | `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
 | `decisions` | `files`: `{lines, path, records, words}`; `instructions`: `{linked, lines, path, words}` |
 | `backlog` | `branches`, `by_status`, `by_type`, `export`, `in_progress` (`{id, title}`), `issues`, `open`, `open_naming_obligations` |
