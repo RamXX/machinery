@@ -72,6 +72,9 @@ type endLine struct {
 	Type     string `json:"type"`
 	Exit     int    `json:"exit"`
 	Finished string `json:"finished"`
+	// Adapter is the number of receipt lines the run adapter wrote right
+	// before the end line (section 10.3); absent without an adapter.
+	Adapter *int `json:"adapter_receipts,omitempty"`
 }
 
 func jsonLine(v any) []byte {
@@ -205,16 +208,20 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	if err != nil {
 		return exit, file, err
 	}
-	if opts.Adapter != nil && streamErr == nil {
-		// the adapter's receipts go in before the end line, each in one write
-		for _, l := range opts.Adapter.Receipts() {
-			if _, err = f.Write(l); err != nil {
-				f.Close()
-				return exit, file, err
-			}
+	end := endLine{V: 1, Type: "end", Exit: exit, Finished: time.Now().UTC().Format(time.RFC3339)}
+	var tail []byte
+	if opts.Adapter != nil {
+		// the adapter's receipts and the end line that counts them go in
+		// one append, after the command has exited
+		var lines [][]byte
+		if streamErr == nil {
+			lines = opts.Adapter.Receipts()
 		}
+		n := len(lines)
+		end.Adapter = &n
+		tail = bytes.Join(lines, nil)
 	}
-	_, err = f.Write(jsonLine(endLine{V: 1, Type: "end", Exit: exit, Finished: time.Now().UTC().Format(time.RFC3339)}))
+	_, err = f.Write(append(tail, jsonLine(end)...))
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}

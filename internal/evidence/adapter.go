@@ -2,12 +2,11 @@ package evidence
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -43,17 +42,19 @@ type GoTest struct {
 	Argv []string
 
 	p *project.Project
-	// tags are the build tags of the run; nil when they are not known
-	tags []string
-	// listFlags are the flags of the command that decide which files a
-	// package builds; go list is asked with them
-	listFlags []string
-	files     map[string]*goTestFile // the test files under trace.tests
-	other     map[string]*goTestFile // other files parsed as candidates, by project-relative or absolute path
-	sources   []project.AdapterSource
-	units     []claimUnit
-	effects   map[string]bool // claimed tc ids
-	replay    map[string]bool // claimed cx ids
+	// tags are the tags of -tags; nil when they are not known
+	tags    []string
+	files   map[string]*goTestFile  // the test files under trace.tests
+	other   map[string]*goTestFile  // other Go files parsed, by project-relative path
+	sources []project.AdapterSource // read with streams only
+	// pkgFiles: the import path of a directory that holds test files under
+	// trace.tests -> those files (direct mode, section 10.3)
+	pkgFiles map[string][]string
+	pkgDir   map[string]string   // that import path -> its directory
+	dirGo    map[string][]string // directory -> its Go files, read once
+	units    []claimUnit
+	effects  map[string]bool // claimed tc ids
+	replay   map[string]bool // claimed cx ids
 
 	// streams are the event streams read: the command's standard output, or
 	// with fromDir the files the command left in MACHINERY_GO_TEST_JSON
@@ -83,10 +84,14 @@ type goPackage struct {
 // With streams the command is any command: it is not read, and the streams
 // are the files it leaves in MACHINERY_GO_TEST_JSON.
 func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool) (*GoTest, error) {
-	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, fromDir: streams}
-	for _, w := range strings.Fields(os.Getenv("GOFLAGS")) { // a count there reaches every go test of the run
-		if name, val, _ := flagOf(w); (name == "count" || name == "test.count") && val != "1" {
+	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, fromDir: streams,
+		pkgFiles: map[string][]string{}, pkgDir: map[string]string{}, dirGo: map[string][]string{}}
+	for _, w := range strings.Fields(os.Getenv("GOFLAGS")) { // GOFLAGS reaches every go test of the run
+		switch name, val, _ := flagOf(w); {
+		case (name == "count" || name == "test.count") && val != "1":
 			return nil, refuse("GOFLAGS has -%s=%s, which is refused: take it out of GOFLAGS", name, val)
+		case name == "overlay":
+			return nil, refuse("GOFLAGS has -overlay, which is refused: take it out of GOFLAGS")
 		}
 	}
 	if streams {
@@ -109,11 +114,31 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 		goFiles = append(goFiles, rel)
 	}
 	sort.Strings(goFiles)
-	a.sources = p.Cfg.AdapterSources()
-	for i, s := range a.sources {
-		if len(matching(goFiles, s.Files)) == 0 {
-			return nil, refuse("evidence.adapter.sources: entry %d: files match no file under trace.tests", i+1)
+	for _, rel := range goFiles {
+		dir := path.Dir(rel)
+		if ip, ok := importPath(p.Abs(dir)); ok {
+			a.pkgFiles[ip] = append(a.pkgFiles[ip], rel)
+			if _, seen := a.pkgDir[ip]; !seen {
+				a.pkgDir[ip] = dir
+			}
 		}
+	}
+	entries := p.Cfg.AdapterSources()
+	for i, s := range entries {
+		if streams && len(matching(goFiles, s.Files)) == 0 {
+			return nil, refuse("evidence.adapter.sources: entry %d (package %s): files %s match no file under trace.tests: correct the globs, or list the files in trace.tests", i+1, s.Package, strings.Join(s.Files, ", "))
+		}
+		if streams {
+			continue
+		}
+		for _, ip := range sortedKeys(a.pkgDir) { // not read without streams: an entry may not seem to narrow a package
+			if project.Match([]string{s.Package}, ip) {
+				return nil, refuse("evidence.adapter.sources: entry %d (package %s) matches %s, the package of %s: entries are read only with --streams; remove the entry, or run the suite through --streams", i+1, s.Package, ip, a.pkgDir[ip])
+			}
+		}
+	}
+	if streams {
+		a.sources = entries
 	}
 	found, err := tags.Scan(p, goFiles)
 	if err != nil {
@@ -175,15 +200,15 @@ func matching(files, globs []string) []string {
 	return res
 }
 
-// readCommand holds the command to go test, adds -json and reads -count and
-// -tags among the flags before -args.
+// readCommand holds the command to go test, adds -json and -count=1, refuses
+// what it cannot read, and reads -tags among the flags before -args.
 func (a *GoTest) readCommand(argv []string) error {
 	if len(argv) < 2 || filepath.Base(argv[0]) != "go" || argv[1] != "test" {
 		n := len(argv)
 		if n > 2 {
 			n = 2
 		}
-		return refuse("the command must be go test, got %s", strings.Join(argv[:n], " "))
+		return refuse("the command must be go test, got %s: run go test itself, or add --streams and have the command leave its go test -json output in %s", strings.Join(argv[:n], " "), StreamsEnv)
 	}
 	rest := argv[2:]
 	insert, hasJSON, hasCount, afterArgs := 0, false, false, false
@@ -210,14 +235,13 @@ func (a *GoTest) readCommand(argv []string) error {
 			afterArgs = true
 		case "C":
 			first := i == 0
-			dir := next()
+			next()
 			if first {
 				insert = i + 1
-				a.listFlags = append([]string{"-C", dir}, a.listFlags...)
 			}
 		case "json":
 			if hasVal && (val == "false" || val == "0" || val == "f" || val == "F" || val == "FALSE" || val == "False") {
-				return refuse("-json=false is refused: the adapter reads the event stream")
+				return refuse("-json=false is refused: the adapter reads the event stream; leave it out")
 			}
 			hasJSON = true
 		case "count", "test.count":
@@ -227,9 +251,10 @@ func (a *GoTest) readCommand(argv []string) error {
 			hasCount = true
 		case "tags":
 			tagList = next()
-			a.listFlags = append(a.listFlags, "-tags="+tagList)
-		case "mod", "modfile", "overlay":
-			a.listFlags = append(a.listFlags, "-"+name+"="+next())
+		case "overlay":
+			return refuse("-overlay is refused: the adapter reads the test files on disk; run without it")
+		case "mod", "modfile":
+			next()
 		}
 	}
 	a.tags = tagsOf(tagList)
@@ -387,7 +412,7 @@ const (
 	stAmbiguous
 	stSkip
 	stNotRun
-	stBlocked // passed in a cached package, or in one that did not end with pass
+	stBlocked // a pass replayed from the cache, or one of a package that did not end with pass
 	stPass
 )
 
@@ -407,7 +432,7 @@ type adapterReceipt struct {
 // Receipts joins the stream to the claims and returns the receipt lines, in
 // the order they are written. Call it once, after Consume.
 func (a *GoTest) Receipts() [][]byte {
-	// the verdicts of each function, by the file that defines it
+	// the state of each function, by the file its verdict belongs to
 	state := map[string]map[string]int{} // file -> function -> state
 	set := func(file, fn string, st int) {
 		if state[file] == nil {
@@ -427,101 +452,120 @@ func (a *GoTest) Receipts() [][]byte {
 			names[name] = true
 		}
 	}
-	built, listErr := map[string][]string(nil), ""
-	if !a.fromDir && len(names) > 0 {
-		built, listErr = a.listBuilt(sortedKeys(names))
-	}
 	raw := map[string]map[string][2]string{} // file -> function -> its verdict and the package it came from
 	for _, name := range sortedKeys(names) {
-		// what each stream says of the package: one cached answer anywhere
-		// refuses it in the whole run
+		// what each stream says of the package. A pass replayed from the
+		// cache is not read; every other verdict of every stream is
 		cached, notOK := false, false
 		type seen struct {
 			verdict, stream string
 		}
-		byFn := map[string][]seen{}
+		read := map[string][]seen{}
+		replayed := map[string]bool{}
 		for _, s := range a.streams {
 			pkg := s.pkgs[name]
 			if pkg == nil {
 				continue
 			}
-			if pkg.cached {
-				cached = true
-			} else if pkg.end != Pass && len(pkg.verdicts) > 0 {
+			cached = cached || pkg.cached
+			if pkg.end != Pass && len(pkg.verdicts) > 0 {
 				notOK = true
 			}
 			for fn, vs := range pkg.verdicts {
 				for _, v := range vs {
-					byFn[fn] = append(byFn[fn], seen{v, s.name})
+					if pkg.cached && v == Pass {
+						replayed[fn] = true
+						continue
+					}
+					read[fn] = append(read[fn], seen{v, s.name})
 				}
 			}
 		}
 		if cached {
-			refused = append(refused, fmt.Sprintf("adapter: package %s: answered from the cache; nothing in it counts: run with -count=1", name))
+			refused = append(refused, fmt.Sprintf("adapter: package %s: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1", name))
 		}
 		if notOK {
 			refused = append(refused, fmt.Sprintf("adapter: package %s: did not end with pass; no pass is written from it", name))
 		}
-		for _, fn := range sortedKeys(byFn) {
-			got := byFn[fn]
-			verdict, same := got[0].verdict, true
-			var parts []string
-			for _, g := range got {
-				same = same && g.verdict == verdict
-				if g.stream != "" {
-					parts = append(parts, g.verdict+" in "+g.stream)
-				} else {
-					parts = append(parts, g.verdict)
+		fns := sortedKeys(read)
+		for fn := range replayed {
+			if read[fn] == nil {
+				fns = append(fns, fn)
+			}
+		}
+		sort.Strings(fns)
+		for _, fn := range fns {
+			verdict := "" // only a pass replayed from the cache
+			if got := read[fn]; len(got) > 0 {
+				verdict = got[0].verdict
+				same := true
+				var parts []string
+				for _, g := range got {
+					same = same && g.verdict == verdict
+					if g.stream != "" {
+						parts = append(parts, g.verdict+" in "+g.stream)
+					} else {
+						parts = append(parts, g.verdict)
+					}
+				}
+				if !same { // verdicts that differ: a fail, whichever they are
+					verdict = Fail
+					differ = append(differ, fmt.Sprintf("adapter: %s.%s: %s: verdicts differ, read as fail", name, fn, strings.Join(parts, ", ")))
 				}
 			}
-			if !same && !cached { // verdicts that differ: a fail, whichever they are
-				verdict = Fail
-				differ = append(differ, fmt.Sprintf("adapter: %s.%s: %s: verdicts differ, read as fail", name, fn, strings.Join(parts, ", ")))
-			}
-			st := stPass
-			switch {
-			case cached:
-				st = stBlocked
-			case verdict == Fail:
-				st = stFail
-			case verdict == Skip:
-				st = stSkip
-			case notOK:
-				st = stBlocked
-			}
+			st := stBlocked
 			switch verdict {
-			case Pass:
-				passed++
 			case Fail:
+				st = stFail
 				failed++
-			default:
+			case Skip:
+				st = stSkip
 				skipped++
+			default:
+				if verdict == Pass && !notOK {
+					st = stPass
+				}
+				passed++
 			}
-			defs := a.definers(name, fn, built)
+			defs, cands := a.definers(name, fn)
 			switch {
-			case len(defs) == 0 || (len(defs) == 1 && a.files[defs[0]] == nil):
-				homeless++
-				lost[name] = true
-			case len(defs) == 1:
+			case len(defs) > 1 || (len(defs) == 1 && a.parsed(defs[0]).Broken):
+				// another file could have given the verdict: a pass or a
+				// skip counts for none of them, a fail fails each
+				var named []string
+				for _, f := range defs {
+					if a.parsed(f).Broken {
+						f += " (does not parse)"
+					}
+					named = append(named, f)
+				}
+				ambiguous = append(ambiguous, fmt.Sprintf("adapter: %s.%s: defined in %s: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions", name, fn, strings.Join(named, ", ")))
+				for _, f := range defs {
+					if a.files[f] == nil {
+						continue
+					}
+					if st == stFail {
+						set(f, fn, stFail)
+					} else {
+						set(f, fn, stAmbiguous)
+					}
+				}
+			case len(defs) == 1 && cands[defs[0]] && a.files[defs[0]] != nil:
 				file := defs[0]
 				if raw[file] == nil {
 					raw[file] = map[string][2]string{}
 				}
-				if prev, seen := raw[file][fn]; seen && !cached && prev[0] != verdict {
+				if prev, seen := raw[file][fn]; seen && verdict != "" && prev[0] != verdict {
 					// one file, several packages, verdicts that differ: a fail
 					differ = append(differ, fmt.Sprintf("adapter: %s::%s: %s in package %s, %s in package %s: verdicts differ, read as fail", file, fn, prev[0], prev[1], verdict, name))
 					st = stFail
-				} else if !cached {
+				} else if verdict != "" {
 					raw[file][fn] = [2]string{verdict, name}
 				}
 				set(file, fn, st)
 			default:
-				ambiguous = append(ambiguous, fmt.Sprintf("adapter: %s.%s: defined in %s: ambiguous, its verdict counts for none of them", name, fn, strings.Join(defs, ", ")))
-				for _, f := range defs {
-					if a.files[f] != nil {
-						set(f, fn, stAmbiguous)
-					}
-				}
+				homeless++
+				lost[name] = true
 			}
 		}
 	}
@@ -624,10 +668,11 @@ func (a *GoTest) Receipts() [][]byte {
 	add(len(a.effects), "adapter: needs a receipt with effects: %d tc id(s)")
 	add(len(a.replay), "adapter: needs a receipt with a replay: %d cx id(s)")
 	if homeless > 0 {
-		a.summary = append(a.summary, fmt.Sprintf("adapter: %d test function(s) with a verdict are in no file under trace.tests: package(s) %s; a package built from copies, and every package of a --streams run, is mapped to its files in evidence.adapter.sources", homeless, nameList(sortedKeys(lost))))
-	}
-	if listErr != "" {
-		a.summary = append(a.summary, fmt.Sprintf("adapter: go list failed (%s): which files the packages built is not known, and only evidence.adapter.sources attributes a verdict", listErr))
+		todo := "a package's verdicts go to the files under trace.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence.adapter.sources"
+		if a.fromDir {
+			todo = "with --streams a package's verdicts go only to the files of its entry in evidence.adapter.sources: add one"
+		}
+		a.summary = append(a.summary, fmt.Sprintf("adapter: %d test function(s) with a verdict are in no file under trace.tests: package(s) %s; %s", homeless, nameList(sortedKeys(lost)), todo))
 	}
 	add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
 	sort.Strings(differ)
@@ -649,65 +694,8 @@ func (a *GoTest) Receipts() [][]byte {
 	return lines
 }
 
-// listBuilt asks go list which test files each package of the run compiled,
-// under the flags and the environment of the run (section 10.3). The files
-// are project-relative where they are inside the project. errLine is the
-// first line go list printed when it could not answer.
-func (a *GoTest) listBuilt(pkgs []string) (built map[string][]string, errLine string) {
-	args := []string{"list"}
-	if len(a.listFlags) > 0 && a.listFlags[0] == "-C" { // -C comes first on the command line
-		args = append(append(args, a.listFlags[:2]...), "-e", "-json=ImportPath,Dir,TestGoFiles,XTestGoFiles")
-		args = append(args, a.listFlags[2:]...)
-	} else {
-		args = append(append(args, "-e", "-json=ImportPath,Dir,TestGoFiles,XTestGoFiles"), a.listFlags...)
-	}
-	cmd := exec.Command(a.Argv[0], append(args, pkgs...)...)
-	cmd.Dir = a.p.Root
-	var out, errOut bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errOut
-	if err := cmd.Run(); err != nil {
-		line, _, _ := strings.Cut(strings.TrimSpace(errOut.String()), "\n")
-		if line == "" {
-			line = err.Error()
-		}
-		return nil, line
-	}
-	root := a.p.Root
-	if r, err := filepath.EvalSymlinks(root); err == nil {
-		root = r
-	}
-	built = map[string][]string{}
-	dec := json.NewDecoder(&out)
-	for {
-		var pkg struct {
-			ImportPath, Dir           string
-			TestGoFiles, XTestGoFiles []string
-		}
-		if err := dec.Decode(&pkg); err != nil {
-			break
-		}
-		if pkg.Dir == "" {
-			continue // go list does not know the package
-		}
-		dir := pkg.Dir
-		if r, err := filepath.EvalSymlinks(dir); err == nil {
-			dir = r
-		}
-		files := []string{}
-		for _, name := range append(append([]string{}, pkg.TestGoFiles...), pkg.XTestGoFiles...) {
-			file := filepath.Join(dir, name)
-			if rel, err := filepath.Rel(root, file); err == nil && !strings.HasPrefix(rel, "..") {
-				file = filepath.ToSlash(rel)
-			}
-			files = append(files, file)
-		}
-		built[pkg.ImportPath] = files
-	}
-	return built, ""
-}
-
-// parsed returns a candidate file, read once: a file under trace.tests, or
-// any other by its project-relative or absolute path.
+// parsed returns a Go file of the project, read once: a file under
+// trace.tests, or any other by its project-relative path.
 func (a *GoTest) parsed(file string) *goTestFile {
 	if f := a.files[file]; f != nil {
 		return f
@@ -715,46 +703,23 @@ func (a *GoTest) parsed(file string) *goTestFile {
 	if f := a.other[file]; f != nil {
 		return f
 	}
-	abs := file
-	if !filepath.IsAbs(file) {
-		abs = a.p.Abs(file)
-	}
 	f := &goTestFile{Path: file, Broken: true}
-	if data, err := os.ReadFile(abs); err == nil {
+	if data, err := a.p.Read(file); err == nil {
 		f = parseGoTest(file, data)
 	}
 	a.other[file] = f
 	return f
 }
 
-// definers returns the files that define the function of a verdict, sorted
-// (section 10.3, "Whose verdict"). One file that is under trace.tests has
-// the verdict; several make the name ambiguous; none, or one outside
-// trace.tests, leaves it with no file.
-//
-// The candidates are the files the package built, when go list gave them.
-// When those give the verdict to no file under trace.tests, they are the
-// files the source map entries of the package name: every _test.go file
-// their globs match in the project, claiming or not.
-func (a *GoTest) definers(pkg, fn string, built map[string][]string) []string {
-	among := func(cands []string) []string {
-		seen := map[string]bool{}
-		var res []string
-		for _, file := range cands {
-			if !seen[file] && a.parsed(file).defines(fn) {
-				seen[file] = true
-				res = append(res, file)
-			}
-		}
-		sort.Strings(res)
-		return res
+// candidates returns the files a verdict of the package may belong to
+// (section 10.3, "Whose verdict"): without streams the test files under
+// trace.tests in the package's own directory, with streams the test files
+// the source map entries of the package name.
+func (a *GoTest) candidates(pkg string) []string {
+	if !a.fromDir {
+		return a.pkgFiles[pkg]
 	}
-	if files, known := built[pkg]; known {
-		if defs := among(files); len(defs) > 1 || (len(defs) == 1 && a.files[defs[0]] != nil) {
-			return defs
-		}
-	}
-	var mapped []string
+	var res []string
 	for _, s := range a.sources {
 		if !project.Match([]string{s.Package}, pkg) {
 			continue
@@ -765,11 +730,99 @@ func (a *GoTest) definers(pkg, fn string, built map[string][]string) []string {
 		}
 		for _, file := range all {
 			if strings.HasSuffix(file, "_test.go") {
-				mapped = append(mapped, file)
+				res = append(res, file)
 			}
 		}
 	}
-	return among(mapped)
+	return res
+}
+
+// definers returns the files that could have given the verdict of a
+// function of the package, sorted, and the candidates of the package. Those
+// files are the candidates and every Go file of a directory that holds one,
+// whatever its build constraints; one that does not parse may define any
+// name.
+func (a *GoTest) definers(pkg, fn string) (defs []string, cands map[string]bool) {
+	cands = map[string]bool{}
+	dirs := map[string]bool{}
+	for _, file := range a.candidates(pkg) {
+		cands[file] = true
+		dirs[path.Dir(file)] = true
+	}
+	seen := map[string]bool{}
+	consider := func(file string) {
+		if seen[file] {
+			return
+		}
+		seen[file] = true
+		if f := a.parsed(file); f.Broken || f.defines(fn) {
+			defs = append(defs, file)
+		}
+	}
+	for file := range cands {
+		consider(file)
+	}
+	for dir := range dirs {
+		for _, file := range a.goFiles(dir) {
+			consider(file)
+		}
+	}
+	sort.Strings(defs)
+	return defs, cands
+}
+
+// goFiles returns the Go files directly in a project directory, read once.
+func (a *GoTest) goFiles(dir string) []string {
+	if files, ok := a.dirGo[dir]; ok {
+		return files
+	}
+	files := []string{}
+	entries, _ := os.ReadDir(a.p.Abs(dir))
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".go") {
+			files = append(files, path.Join(dir, e.Name()))
+		}
+	}
+	a.dirGo[dir] = files
+	return files
+}
+
+// importPath returns the import path of a directory: the module path of the
+// nearest go.mod at or above it, then the path of the directory below it.
+func importPath(abs string) (string, bool) {
+	for dir := abs; ; {
+		if data, err := os.ReadFile(filepath.Join(dir, "go.mod")); err == nil {
+			mod := modulePath(data)
+			rel, err := filepath.Rel(dir, abs)
+			switch {
+			case mod == "" || err != nil:
+				return "", false
+			case rel == ".":
+				return mod, true
+			}
+			return mod + "/" + filepath.ToSlash(rel), true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+}
+
+// modulePath reads the module line of a go.mod file.
+func modulePath(data []byte) string {
+	for _, line := range strings.Split(string(data), "\n") {
+		rest, ok := strings.CutPrefix(strings.TrimSpace(line), "module")
+		if !ok || rest == "" || !strings.ContainsAny(rest[:1], " \t\"") {
+			continue
+		}
+		if i := strings.Index(rest, "//"); i >= 0 {
+			rest = rest[:i]
+		}
+		return strings.Trim(strings.TrimSpace(rest), "\"")
+	}
+	return ""
 }
 
 // Summary returns the lines of the run summary, after Receipts.

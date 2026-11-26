@@ -28,13 +28,13 @@ func runRun(e *Env, args []string) int {
 		return e.Usage("machinery run [--stack <description>] -- <command> [args...]\n       machinery run --adapter go-test-json [--stack <description>] -- go test [flags] [packages]\n       machinery run --adapter go-test-json --streams [--stack <description>] -- <command> [args...]")
 	}
 	if *adapter != "" && *adapter != evidence.GoTestJSON {
-		return e.Usage("--adapter: unknown adapter %q; the only adapter is %s", *adapter, evidence.GoTestJSON)
+		return e.Usage("--adapter: unknown adapter %q: write --adapter %s, the only adapter", *adapter, evidence.GoTestJSON)
 	}
 	if *targeted != (*base != "") {
 		return e.Usage("--affected and --base go together: machinery run --affected --base <ref> -- <command> [args...]")
 	}
 	if *streams && *adapter == "" {
-		return e.Usage("--streams needs --adapter %s", evidence.GoTestJSON)
+		return e.Usage("--streams needs --adapter %s: add it before --streams", evidence.GoTestJSON)
 	}
 	p, ok := e.Project()
 	if !ok {
