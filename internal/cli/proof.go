@@ -45,6 +45,10 @@ func runProof(e *Env, args []string) int {
 	case *post && *story == "":
 		return e.Usage("--post needs --story")
 	}
+	session, err := backlog.Session()
+	if err != nil && *post {
+		return e.Usage("%v", err)
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2
@@ -92,7 +96,7 @@ func runProof(e *Env, args []string) int {
 		if c.Actor == "" {
 			return e.Usage("no actor: pass --actor or set BEADS_ACTOR")
 		}
-		note := fmt.Sprintf("machinery:proof %s %s\n%s", ev.Head, c.Actor, strings.TrimRight(block.String(), "\n"))
+		note := fmt.Sprintf("machinery:proof %s %s%s\n%s", ev.Head, c.Actor, backlog.SessionPart(session), strings.TrimRight(block.String(), "\n"))
 		for _, l := range notes.Learnings {
 			note += "\nmachinery:learning " + l
 		}

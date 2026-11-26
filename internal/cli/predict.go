@@ -27,6 +27,10 @@ func runPredict(e *Env, args []string) int {
 	case *observation == "" || *expect == "":
 		return e.Usage("machinery predict needs --observation and --expect")
 	}
+	session, err := backlog.Session()
+	if err != nil {
+		return e.Usage("%v", err)
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2
@@ -52,8 +56,8 @@ func runPredict(e *Env, args []string) int {
 			return 1
 		}
 	}
-	line := fmt.Sprintf("machinery:prediction commit=%s actor=%s observation=%s expect=%s",
-		head, c.Actor, backlog.Quote(*observation), backlog.Quote(*expect))
+	line := fmt.Sprintf("machinery:prediction commit=%s actor=%s%s observation=%s expect=%s",
+		head, c.Actor, backlog.SessionPart(session), backlog.Quote(*observation), backlog.Quote(*expect))
 	if err := c.Note(is.ID, line); err != nil {
 		return e.Fail(err)
 	}

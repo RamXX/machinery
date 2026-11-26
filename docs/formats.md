@@ -1666,9 +1666,9 @@ syntax of section 8:
 ```
 machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f
 machinery:scope internal/api/** e2e/orders_test.go
-machinery:proof <full sha> <actor>
-machinery:prediction commit=<full sha> actor=<actor> observation="<text>" expect="<text>"
-machinery:verdict <accept|reject> commit=<full sha> actor=<actor> observed="<text>"
+machinery:proof <full sha> <actor> [session=<session>]
+machinery:prediction commit=<full sha> actor=<actor> [session=<session>] observation="<text>" expect="<text>"
+machinery:verdict <accept|reject> commit=<full sha> actor=<actor> [session=<session>] observed="<text>"
 machinery:intake
 machinery:intake <intake id>
 machinery:intake-base <full sha> <contract hash>
@@ -1691,6 +1691,14 @@ machinery:confirmed <actor>
 - The tier of a story is the highest tier among its ids (section 23). The label `tier:<tier>` on
   the story mirrors it for people and for routing; when label and ids disagree the ids win.
 - The actor is `--actor`, else the environment variable `BEADS_ACTOR`, else `git config user.name`.
+- The session is the environment variable `MACHINERY_SESSION`, white space at either end removed.
+  When it is set and not empty, `proof --post`, `predict` and `accept` write `session=<value>` on
+  their line, and no session part otherwise. A value that is not one word (it holds white space
+  or a `"`) is a usage error, before anything is written:
+  `usage: MACHINERY_SESSION must be one word, got "<value>"`. In Claude Code the `session-start`
+  hook exports the harness's session id as `MACHINERY_SESSION` (section 21.1); another harness sets
+  it or leaves it unset. The last word of a proof line is its session when it starts with
+  `session=`; the words between the sha and it are the actor.
 - `machinery:intake` with nothing after it marks an intake item; `machinery:intake <id>` marks a
   story of that intake. The other intake lines are described in section 15.7.
 - `machinery:repair` records that a story was closed while the integration branch was red, as
@@ -1930,6 +1938,14 @@ An `act` id of the story only has to be not owed. A reject verdict is recorded a
 (`machinery accept --verdict reject` itself exits 0; `--close` with `reject` is a usage error).
 The verifier must differ from every actor who posted a proof the evidence is valid for.
 
+When the tier asks for a verifier, the sessions of section 15.1 are compared as well. A prediction
+for the commit, by an actor who posted no such proof, whose session is the session of a proof the
+evidence is valid for is `ERROR  verifier shares a session with the builder: <session>`, once per
+session. When such a proof records no session the gate prints
+`warn   no session recorded for proof: independence rests on the actor name`, and when such a
+prediction records none, `warn   no session recorded for prediction: independence rests on the actor name`.
+A missing session is never an error: harnesses that give none exist.
+
 Findings name what is missing, for example `ERROR  no prediction for <short sha>: a verifier runs
 machinery predict before reading the proof`, `ERROR  verifier is the builder: <actor>`,
 `ERROR  unproven: <id>`. `checked:` counts ids, proofs, predictions and verdicts. A story without
@@ -1970,7 +1986,7 @@ The verifier is a fresh context that did not build the change. It receives the v
 predicts, and only then reads the proof. machinery cannot see what an agent read, and an actor
 name is only as trustworthy as the backlog's own record of who wrote a note. What the gate
 checks is what is recorded: that a prediction exists for this commit, under another name than
-the proof's, before the verdict.
+the proof's and, where both record one, from another session, before the verdict.
 
 ### 15.7 Intake: `machinery intake`
 

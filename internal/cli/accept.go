@@ -38,13 +38,16 @@ func runAccept(e *Env, args []string) int {
 	case *repair && !*closeIt:
 		return e.Usage("--repair needs --close")
 	}
+	session, err := backlog.Session()
+	if err != nil {
+		return e.Usage("%v", err)
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2
 	}
 	var red *landing.Red
 	if *closeIt {
-		var err error
 		if red, err = landing.LoadRed(p); err != nil {
 			return e.Fail(err)
 		}
@@ -73,7 +76,7 @@ func runAccept(e *Env, args []string) int {
 			return e.Fail(err)
 		}
 	}
-	line := fmt.Sprintf("machinery:verdict %s commit=%s actor=%s observed=%s", *verdict, head, c.Actor, backlog.Quote(*observed))
+	line := fmt.Sprintf("machinery:verdict %s commit=%s actor=%s%s observed=%s", *verdict, head, c.Actor, backlog.SessionPart(session), backlog.Quote(*observed))
 	if err := c.Note(is.ID, line); err != nil {
 		return e.Fail(err)
 	}

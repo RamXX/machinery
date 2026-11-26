@@ -113,7 +113,9 @@ Routine stories pass on evidence. Consequential, critical and vital ones need a 
 not the builder, a prediction for the same commit, and then the verdict. Critical and vital ones
 also need their formal model proven and its counterexamples replayed; vital ones also need the
 evidence of every assumption proven. A proof obligation never blocks a story and never counts as
-proven.
+proven. When the harness sets `MACHINERY_SESSION` (the Claude Code plugin's hooks do, see
+`docs/hooks.md`), the proof, the prediction and the verdict record it, and the gate refuses a
+verifier who predicted from the builder's session.
 
 The builder posts the proof with what it does not prove and what it learned:
 `--limit "<claim still unproven>"`, `--learning "<rule for the next story>"`,

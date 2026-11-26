@@ -310,9 +310,10 @@ type Mark struct {
 
 // Proof is a machinery:proof line.
 type Proof struct {
-	Commit string
-	Actor  string
-	Seq    int // position among all tag lines of the story
+	Commit  string
+	Actor   string
+	Session string // the session=<value> last word, "" when none
+	Seq     int    // position among all tag lines of the story
 }
 
 // Stamp is a machinery:prediction or machinery:verdict line.
@@ -406,9 +407,15 @@ func ParseTags(is *Issue) Tags {
 			t.Confirmed = append(t.Confirmed, strings.TrimSpace(args))
 		case "proof":
 			f := strings.Fields(args)
-			if len(f) >= 2 {
-				t.Proofs = append(t.Proofs, Proof{Commit: f[0], Actor: strings.Join(f[1:], " "), Seq: seq})
+			if len(f) < 2 {
+				continue
 			}
+			pr := Proof{Commit: f[0], Seq: seq}
+			if last := f[len(f)-1]; len(f) >= 3 && strings.HasPrefix(last, "session=") {
+				pr.Session, f = strings.TrimPrefix(last, "session="), f[:len(f)-1]
+			}
+			pr.Actor = strings.Join(f[1:], " ")
+			t.Proofs = append(t.Proofs, pr)
 		case "prediction", "verdict":
 			st := Stamp{Fields: map[string]string{}, Seq: seq}
 			if word == "verdict" {
@@ -432,6 +439,29 @@ func ParseTags(is *Issue) Tags {
 	}
 	sort.Strings(t.IDs)
 	return t
+}
+
+// SessionEnv names the environment variable that holds the harness session
+// (section 15.1).
+const SessionEnv = "MACHINERY_SESSION"
+
+// Session returns the session of section 15.1, "" when it is unset or empty.
+// A value that is not one word is an error that names it.
+func Session() (string, error) {
+	v := strings.TrimSpace(os.Getenv(SessionEnv))
+	if strings.ContainsAny(v, " \t\r\n\"") {
+		return "", fmt.Errorf("%s must be one word, got %q", SessionEnv, v)
+	}
+	return v, nil
+}
+
+// SessionPart renders the session part of a tag line: " session=<value>", or
+// "" without a session.
+func SessionPart(session string) string {
+	if session == "" {
+		return ""
+	}
+	return " session=" + session
 }
 
 // Quote renders a value for a key="value" tag field.

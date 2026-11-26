@@ -1,0 +1,121 @@
+# sessions: proof --post, predict and accept record MACHINERY_SESSION; the gate refuses a
+# verifier in the builder's session and warns when a session is missing (sections 15.1 and 15.6)
+fixture shop
+cp machinery-bd.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-s1 --title 'Only a clerk ships' --body-file c1.txt --silent
+exec bd create --id shop-s2 --title 'Only a clerk ships, again' --body-file c1.txt --silent
+exec bd create --id shop-s3 --title 'Only a clerk ships, no sessions' --body-file c1.txt --silent
+exec machinery run -- sh e2e/orders.sh
+
+# a value that is not one word is refused before anything is written
+env 'MACHINERY_SESSION=two words'
+exec mrun 2 proof --story shop-s1 --post
+stderr '^usage: MACHINERY_SESSION must be one word, got "two words"$'
+exec mrun 2 predict shop-s1 --observation x --expect y
+stderr '^usage: MACHINERY_SESSION must be one word, got "two words"$'
+exec mrun 2 accept shop-s1 --verdict accept --observed x
+stderr '^usage: MACHINERY_SESSION must be one word, got "two words"$'
+exec bd show shop-s1 --json
+! stdout 'machinery:proof'
+! stdout 'machinery:prediction'
+! stdout 'machinery:verdict'
+
+# the builder's session goes on the proof line; an actor of several words stays whole
+env 'MACHINERY_SESSION=  sess-build '
+exec machinery proof --story shop-s1 --post --actor 'the builder'
+exec bd show shop-s1 --json
+stdout 'machinery:proof [0-9a-f]{40} the builder session=sess-build'
+exec mrun 1 predict shop-s1 --observation x --expect y --actor 'the builder'
+stderr '^machinery: refused: the builder posted the proof for [0-9a-f]{7}; a fresh verifier predicts$'
+
+# a verifier in the builder's session fails the gate
+env BEADS_ACTOR=verifier
+exec machinery predict shop-s1 --observation 'a Customer ships' --expect 'refused'
+stdout '^machinery:prediction commit=[0-9a-f]{40} actor=verifier session=sess-build observation="a Customer ships" expect="refused"$'
+exec mrun 1 accept shop-s1 --verdict accept --observed 'refused'
+stdout '^machinery:verdict accept commit=[0-9a-f]{40} actor=verifier session=sess-build observed="refused"$'
+stdout '^  ERROR  verifier shares a session with the builder: sess-build$'
+! stdout 'no session recorded'
+stdout '^failed: 1 finding\(s\)$'
+
+# another session passes
+env BEADS_ACTOR=builder
+env MACHINERY_SESSION=sess-build
+exec machinery proof --story shop-s2 --post
+env BEADS_ACTOR=verifier
+env MACHINERY_SESSION=sess-verify
+exec machinery predict shop-s2 --observation 'a Customer ships' --expect 'refused'
+exec machinery accept shop-s2 --verdict accept --observed 'refused'
+stdout '^machinery:verdict accept commit=[0-9a-f]{40} actor=verifier session=sess-verify observed="refused"$'
+! stdout 'shares a session'
+! stdout 'no session recorded'
+stdout '^passed$'
+
+# no session anywhere: the actor names decide, and the gate says so
+env BEADS_ACTOR=builder
+env MACHINERY_SESSION=
+exec machinery proof --story shop-s3 --post
+env BEADS_ACTOR=verifier
+exec machinery predict shop-s3 --observation 'a Customer ships' --expect 'refused'
+stdout '^machinery:prediction commit=[0-9a-f]{40} actor=verifier observation="a Customer ships" expect="refused"$'
+exec machinery accept shop-s3 --verdict accept --observed 'refused'
+stdout '^  warn   no session recorded for prediction: independence rests on the actor name$'
+stdout '^  warn   no session recorded for proof: independence rests on the actor name$'
+stdout '^passed$'
+
+# a routine story has no verifier: no session lines
+exec bd create --id shop-r1 --title 'Pay an order' --body-file r1.txt --silent
+env BEADS_ACTOR=builder
+exec machinery proof --story shop-r1 --post
+exec machinery story shop-r1
+! stdout 'session'
+stdout '^passed$'
+
+-- machinery-bd.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+backlog:
+  tool: bd
+routing:
+  routine: "small model, one pass"
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves; a double charge cannot be undone"
+    ids: ["tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: shipping-permission
+    tier: consequential
+    why: "authorization: only a Clerk ships"
+    ids: ["act:Order.ship", "tc:ORDE-e6d28f"]
+-- c1.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/api/**
+-- r1.txt --
+machinery:ids inv:terminal-is-final
