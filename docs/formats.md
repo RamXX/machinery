@@ -31,7 +31,9 @@ Three rules shape everything below:
 
 - **Formality follows risk.** Each area of the design has a tier chosen at planning (section 23):
   routine (machines and generated end-to-end cases), consequential (plus a fresh verifier who
-  predicts before reading the proof), critical (plus a formal model).
+  predicts before reading the proof), critical (plus a formal model), vital (plus the exact
+  properties its code must keep, a core shaped so that a later version can prove them, and the
+  assumptions that core makes, each with its evidence).
 - **Evidence comes from the real system.** There are no unit tests and no test doubles, in
   machinery or in a project that uses it (section 9.4). Test quality is measured by probing
   (section 20), not by counting tests.
@@ -114,6 +116,10 @@ constraints:                    # optional
     paths: ["internal/**/*.go"] # optional, defaults to trace.code
     max_file_lines: 500
     max_func_lines: 80
+  cores:                        # optional: the shape of the core of every vital area (section 9)
+    deny_imports: ["net/http", "database/sql", "os", "time", "math/rand"]   # optional
+    max_file_lines: 300         # required
+    max_func_lines: 60          # required
   baseline: design/arch-baseline.yaml   # optional
 receipts:
   dir: .machinery/receipts      # optional, this is the default
@@ -126,6 +132,11 @@ routing:                        # optional: model routing guidance printed in br
   routine: "small model"
   consequential: "standard model; fresh verifier"
   critical: "strongest model for the formal model; standard model for code; fresh verifier"
+  vital: "strongest model for the formal model and the core; standard model elsewhere; fresh verifier"
+vital:                          # optional: the word lists of machinery vital candidates (section 23.3)
+  names: [pay, charge]          # optional: replaces the default list for action, entity and event names
+  failure: [lost, twice]        # optional: replaces the default list for failure-mode text
+  effects: [charge, emit]       # optional: replaces the default list for transition effects
 tools:
   modelith: modelith            # optional, executable name or path; this is the default
   java: java                    # optional
@@ -172,6 +183,13 @@ Rules:
   It may be set beside `design.failure_modes`.
 - An empty marker in `trace.markers` is a config error
   (`trace.markers.verifies: a marker must not be empty`).
+- `constraints.cores` needs `max_file_lines` and `max_func_lines`, each a positive number
+  (`constraints.cores.max_file_lines is required and must be positive`), and an empty entry of
+  `deny_imports` is a config error (`constraints.cores.deny_imports: an entry must not be empty`).
+- An empty word in `vital.names`, `vital.failure` or `vital.effects` is a config error
+  (`vital.names: a word must not be empty`). A list that is set replaces its default; words are
+  compared lower-cased.
+- `routing` keys are tier names: `routine`, `consequential`, `critical` and `vital`.
 - `assess.decisions` needs a non-empty `files` list of valid globs
   (`assess.decisions.files is required`) and a `record` that is a regular expression
   (`assess.decisions.record is required`,
@@ -236,6 +254,7 @@ Rules:
 | `machinery init` | Scaffolds a new project (section 17.1). |
 | `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). |
 | `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). |
+| `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
 | `machinery version` | Prints `machinery <version>`. |
 
@@ -337,9 +356,10 @@ list refer to the design. An id is `<kind>:<name>`.
 | `sc` | `sc:<slug>` | Each model scenario, slug of its `name` | Obligation. |
 | `tc` | `tc:<TAG>-<hex>` | Each transition case of each machine (section 7.2) | Obligation. |
 | `fm` | `fm:<failure-mode-id>` | Each failure mode (section 5.4) | Obligation. |
-| `fv` | `fv:<area>` | Each critical area of the risk file (section 23) | Obligation, proven by the formal stage. |
+| `fv` | `fv:<area>` | Each critical or vital area of the risk file (section 23) | Obligation, proven by the formal stage. |
 | `cx` | `cx:<spec>:<run>` | Each counterexample trace of a formal model (section 16.10) | Obligation, proven by replay. |
 | `ck` | `ck:<checker id>:<name>` | Each obligation an external checker's evidence declares (section 22.5) | Obligation. |
+| `pf` | `pf:<area>:<name>` | Each property of a vital area of the risk file (section 23.1) | Proof obligation: awaiting proof, never owed and never proven in this version (section 23.2). |
 
 - The scenario slug is the scenario name lowercased, every run of characters outside `[a-z0-9]`
   replaced by one `-`, with leading and trailing `-` removed. Example: `Customer pays and the
@@ -347,9 +367,13 @@ list refer to the design. An id is `<kind>:<name>`.
 - Ids are unique across the whole project. A duplicate is an ERROR in the stage that reads it.
 - An **obligation** is an id that must be either proven at the current commit or listed in
   `owed.yaml`. The obligation kinds are `inv`, `sc`, `tc`, `fm`, `fv`, `cx` and `ck`.
+- A **proof obligation** (`pf`) is what a machine-checked proof of the code will one day
+  discharge. Nothing in this version can: a `pf` id is awaiting proof, is not owed (it would
+  block every gate forever), is never proven, is not in `obligations.json` and no test may claim
+  it (section 23.2).
 - An id pattern is a full id or a prefix ending in `*` (`tc:ORDE-*`, `act:Order.*`).
-- An `fv` id has the tier of its area, and a `cx` id the highest tier among the areas its formal
-  model lists (section 23).
+- An `fv` id and a `pf` id have the tier of their area, and a `cx` id the highest tier among the
+  areas its formal model lists (section 23).
 
 ### 4.1 Statuses: `design/status.yaml`
 
@@ -804,7 +828,7 @@ Operations without a binding are counted and are not an error (reads and queries
 | `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
 | `invoke-failure-mode` | Every `invoke` `src` of every machine is the subject of at least one failure mode. |
 | `dependency-failure-mode` | Every configured dependency is the subject of at least one failure mode. |
-| `tiered-action-abuse` | Every action that belongs to a consequential or critical area (section 23) is the subject of at least one failure mode of kind `abuse`. |
+| `tiered-action-abuse` | Every action that belongs to a consequential, critical or vital area (section 23) is the subject of at least one failure mode of kind `abuse`. |
 | `failure-state-mode` | Every state tagged `failure` of every machine is the subject (`state:<machine id>.<State>`) of at least one failure mode. |
 | `failure-event-mode` | Every `_failure_events` entry of every machine is the subject (`event:<machine id>.<event>`) of at least one failure mode. |
 
@@ -880,6 +904,7 @@ machines and cases compared. Not applicable when `tools.xstate` is false or abse
 - `imported/machines/<machine id>.machine.json` for each imported machine (section 5.2.1): the
   translated machine, so that people and XState tooling can read it. It is generated like every
   file here; the source file stays the one to change;
+- `vital/<area>.json` for each vital area of the risk file: the property record (section 23.4);
 
 and beside each model its `<name>.modelith.md`.
 
@@ -1070,10 +1095,13 @@ Stage `trace` rules:
 | `unverified` | Every obligation of kind `inv`, `sc`, `tc`, `fm`, `cx` and `ck` has at least one `machinery:verifies`, or is listed in `owed.yaml`. `fv` ids are proven by the formal stage and are not claimed by tests. |
 | `proposed` | No tag or marker names a proposed id (section 4.1): `ERROR  proposed: <id> is claimed by <file>; commit it first`, once per id and file. |
 | `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
+| `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
 
 A proposed or retired id counts as an id of the design for rule `unknown-id`. A `*` token claims
 only the ids among its matches that yield an obligation, so a pattern that also matches a
-proposed or retired id is not a finding. `unserved` and `unverified` ask only for ids that yield
+proposed or retired id is not a finding. A `pf:` token is matched against the proof obligations
+alone, and a pattern among them (`pf:*`) is a claim of each one it matches; a bare marker token
+is never read as a `pf` id. `unserved` and `unverified` ask only for ids that yield
 an obligation, and the owed list is checked as in section 4.1.
 
 `checked:` counts code files, test files, `act` ids and obligations. Only files inside `scope`
@@ -1128,6 +1156,42 @@ path is mapped to a project path through the module path in the project's `go.mo
 `ERROR  file-size: <file> has <n> lines (max <m>)`; a Go function longer than `max_func_lines` is
 `ERROR  func-size: <file>:<func> has <n> lines (max <m>)`.
 
+**Cores.** The core of a vital area (section 23.1) is where the code of a path that must not fail
+lives: the files its `core.paths` globs match. A later version will hand these files to a
+machine-checked proof, so they are held to a shape a proof can work with. `constraints.cores`
+gives the limits, and the core of every vital area is held to them:
+
+| Rule | Finding |
+|---|---|
+| `core-missing` | A `core.paths` glob matches no file: `ERROR  core-missing: <area>: <glob> matches no file`. |
+| `core-scope` | A core file lies outside scope: `ERROR  core-scope: <area>: <file> is outside scope; widen the scope or move the core`. It is not read. |
+| `core-file-size` | A core file is longer than `max_file_lines`: `ERROR  core-file-size: <file> has <n> lines (max <m> for a core)`. |
+| `core-func-size` | A Go function of a core file is longer than `max_func_lines`: `ERROR  core-func-size: <file>:<func> has <n> lines (max <m> for a core)`. |
+| `core-entry` | Each `core.entry` names a core file and a symbol in it, found by the Go parser: a function, a method (`Type.Method`) or a type. Otherwise `ERROR  core-entry: <area>: <file>#<symbol>: <what is wrong>`, one of `no such file`, `<file> is not matched by core.paths` and `no function, method or type <symbol> in <file>`. |
+| `core-impure` | A core file imports a package that `deny_imports` names, or one below it (`os` denies `os/exec`): `ERROR  core-impure: <file> imports <package>, which constraints.cores.deny_imports denies`. |
+| `core-bypass` | A file that serves (section 8) an `act` id a property of the area is over, is not a core file of the area and does not import one: `ERROR  core-bypass: <file> serves <act id> outside the core of <area> and does not import it: the path that must not fail has a second implementation`. A Go file imports a core file when one of its imports is the directory of a core file; a file in another language when one of its imports resolves to a core file. |
+
+- A core file obeys the layer rule like any other file: a core never imports a higher layer.
+- What cannot be read is not demonstrated, never passed. Denied imports, function sizes and entry
+  symbols are read in Go files only. For a core file in another language the stage prints
+  `warn   core <area>: <file>: <what> is checked in Go files only`, `<what>` being
+  `deny_imports` (when the list is not empty) and `max_func_lines`, and
+  `warn   core <area>: entry <file>#<symbol>: symbols are found in Go files only` for an entry
+  there. `core-bypass` reads the serves tags of `trace.code`: without `trace:` it is
+  `warn   core <area>: core-bypass reads serves tags and trace is not configured` when a
+  property of the area is over an `act` id, and a serving file in a language whose imports are
+  not read (section 9, below) is `warn   core <area>: <file>: imports are not read for this
+  language`. With any of these warnings the stage is `not demonstrated: <the first of them,
+  sorted>`.
+- A vital area while `constraints.cores` is absent is
+  `ERROR  cores: <area> is vital and constraints.cores is not set; set max_file_lines and max_func_lines for its core`.
+- Baseline subjects: `<area>: <glob>` for `core-missing`, `<file>` for `core-scope` and
+  `core-file-size`, `<file>:<func>` for `core-func-size`, `<file>#<symbol>` for `core-entry`,
+  `<file> -> <package>` for `core-impure` and `<file> -> <act id>` for `core-bypass`.
+- `checked:` adds, per vital area in name order, its core files, their lines and its entry
+  points: `checked: 3 files, 1 imports, 2 functions, 1 core files of order-payment, 9 core lines
+  of order-payment, 1 entry points of order-payment`.
+
 **Baseline.** Existing violations may be listed in the baseline file:
 
 ```yaml
@@ -1150,7 +1214,7 @@ Subjects: a layer violation is `<file> -> <package directory or file>`; a functi
 `ERROR  go-mod: <file>: no go.mod found`.
 
 `checked:` counts files, imports and functions. Only files inside `scope` are read. Not applicable
-when `constraints:` is absent.
+when `constraints:` is absent and the risk file has no vital area.
 
 Other languages: imports are read by pattern from Python (`import`, `from`), TypeScript and
 JavaScript (`import`, `require`), Elixir (`alias`, `import`, `use`) and Rust (`use crate::`,
@@ -1203,8 +1267,9 @@ machinery run [--stack "<description>"] -- <command> [args...]
 `machinery run`:
 
 1. reads the current commit (`git rev-parse HEAD`) and whether the tree is dirty
-   (`git status --porcelain` not empty, ignoring the owed file and the receipts files: the
-   `.jsonl` files directly in the receipts directory, and nothing else in it);
+   (`git status --porcelain` not empty, ignoring the owed file, the receipts files (the
+   `.jsonl` files directly in the receipts directory, and nothing else in it) and the property
+   records `<gen>/vital/*.json`, whose statuses render the owed file (section 23.4));
 2. deletes receipt files in the receipts directory that are not valid for the current commit
    (section 10.1);
 3. creates `<receipts dir>/<UTC timestamp>-<short sha>.jsonl` (timestamp
@@ -1253,8 +1318,10 @@ only after its assertions held.
 
 Evidence is bound to a commit. A receipts file is **valid for the current commit** when its header
 commit is the current commit, or when the tree of its header commit differs from the tree of the
-current commit only in the owed file and in receipts files (`git diff --name-only <receipt commit>
-HEAD` lists nothing else). Receipts are not meant to be committed; when they are, by a broad
+current commit only in the owed file, in receipts files and in the property records
+`<gen>/vital/*.json` (`git diff --name-only <receipt commit> HEAD` lists nothing else). A property
+record changes on its own only when the owed file does: any other change to it comes from a risk
+file, a design source or a core file, which are not exempt. Receipts are not meant to be committed; when they are, by a broad
 `git add`, the evidence stays valid. The owed file is bookkeeping about evidence, not part of the system under
 test, so pruning it and committing does not invalidate the run that justified the pruning.
 Evidence from any other commit says nothing about the current one.
@@ -1273,8 +1340,10 @@ owed:
 
 machinery writes entries sorted by id; a hand-edited file may be in any order. `id` and `reason`
 are required. An entry names an obligation, or an `act` id that no code serves yet. Unknown
-keys, duplicate ids and unknown ids are an ERROR wherever the file is read. A missing file is an
-empty list.
+keys, duplicate ids and unknown ids are an ERROR wherever the file is read. A proof obligation is
+not owed (section 23.2): an entry that names a `pf` id is
+`ERROR  proof: <id> is in <owed file>; a proof obligation is not owed: it awaits a machine-checked proof, which this version cannot give; remove the entry`
+wherever the file is read. A missing file is an empty list.
 
 The owed list is the single ratchet of the method. In a new project nearly everything is owed
 right after the skeleton; each story proves some ids and removes them. In an existing project the
@@ -1326,8 +1395,8 @@ from the base's own `machinery.yaml`.
 Stage `verify` joins obligations to evidence.
 
 Evidence is every receipts file in the receipts directory that is valid for the current commit
-(section 10.1). When the working tree has uncommitted changes outside the owed file and the
-receipts directory, the evidence does not describe what is on disk: without `--allow-dirty` that
+(section 10.1). When the working tree has uncommitted changes outside the owed file, the
+receipts directory and the property records, the evidence does not describe what is on disk: without `--allow-dirty` that
 is `ERROR  working tree has uncommitted changes`. A file without an `end` line is
 `ERROR  incomplete run: <file>` and its receipts are not used. A file whose header says
 `dirty: true` is used only with `--allow-dirty`, and then the stage prints
@@ -1349,7 +1418,8 @@ Findings:
   run header is not a receipts file and is ignored.
 - `ERROR  unknown id in receipt: <id>` (an `act` id is not an obligation), and for a proposed or
   retired id (section 4.1) `ERROR  proposed id in receipt: <id>; a proposed id yields no obligation:
-  drop the receipt, or take the id out of <status file>` (`retired`).
+  drop the receipt, or take the id out of <status file>` (`retired`). For a proof obligation
+  (section 23.2) it is `ERROR  proof id in receipt: <id>; tests do not discharge a proof obligation: drop the receipt`.
 - `ERROR  unexpected effect: <id> observed <name>` when a receipt lists an effect the case does
   not have.
 - `ERROR  failed: <id> (<test>)`.
@@ -1365,6 +1435,13 @@ When no complete run exists for the current commit the stage is
 `not demonstrated: no evidence at <short sha>`.
 
 `checked:` counts obligations, proven, partial, owed and receipts.
+
+When the risk file has a vital area, the stage also prints, so that its evidence never reads as
+more than it is (section 23.2): `warn   proofs awaiting: <n>`, the number of proof obligations;
+`warn   vital: <id> proven (by test and model; proof awaited)` for every id a property is over
+that the evidence proves; and `warn   assumed, unproven: <area> <name>: <statement>` for every
+assumption whose evidence is owed. With `--story` they are limited to the vital areas of the
+story's ids and to those ids.
 
 This is how a noop shows up. A skeleton moves state for real but its effects do nothing, so its
 tests observe the target state and no effects: the case is `partial`, therefore owed. When a story
@@ -1490,10 +1567,14 @@ left out when no run names a stack. An owed id prints under `not proven` as
 `<id> (<state>, owed)`.
 
 `criteria` lists one line per selected obligation that has a receipt, sorted by id; an `fv` id
-prints as `<id> -> formal -> pass: <n> run(s), <n> mutation(s) detected`. `not proven` lists the
-selected obligations that are partial, unproven or owed, and every unproven assumption of a
-formal model that covers a selected id. Exit 0 when every selected obligation is proven, 1
-otherwise, 2 when a selector matches nothing.
+prints as `<id> -> formal -> pass: <n> run(s), <n> mutation(s) detected`. The `pass` line of an
+id that a property of a vital area is over ends with ` (by test and model; proof awaited)`
+(section 23.2). `not proven` lists the selected obligations that are partial, unproven or owed,
+every unproven assumption of a formal model that covers a selected id, and, for every vital area
+a selected id belongs to (the ids of the story, with `--story`), each of its proof obligations
+as `<pf id> (awaiting proof)` and each assumption whose evidence is owed as
+`assumed, unproven: <area> <name>: <statement>`. Exit 0 when every selected obligation is proven,
+1 otherwise, 2 when a selector matches nothing; the lines of a vital area do not change it.
 
 `limits`, `learnings` and `observations` are written by the author, one line per `--limit`,
 `--learning` and `--observation` (each repeatable), in the order given; a part without one prints
@@ -1514,9 +1595,12 @@ note, one `machinery:learning <text>` line per learning and one `machinery:obser
 red: since <short sha> (<stages>): repair or revert first
 project: <root directory name>
 obligations: <n> (tc <n>, sc <n>, inv <n>, fm <n>)
-tiers: routine <n>, consequential <n>, critical <n>
+tiers: routine <n>, consequential <n>, critical <n>, vital <n>
 ids: <n> proposed, <n> owed, <n> proven, <n> retired
 proven: <n>  partial: <n>  failed: <n>  owed: <n>  unproven and not owed: <n>
+proofs awaiting: <n>
+vital: <id> proven (by test and model; proof awaited)
+assumed, unproven: <area> <name>: <statement>
 owed without a story: <n>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
@@ -1527,7 +1611,10 @@ counts every `act` and obligation id by its status (section 4.1): `owed` the ids
 holds, `proven` the other ids that yield an obligation, which is what `verify` holds them to; the
 next line says what the evidence shows.
 The `tiers` line counts obligations by the tier of their area and is omitted when there is no
-risk file. When there is no evidence the line is `evidence: none at <short sha>`. When
+risk file; its `vital` part, and the three lines after the `proven` line, print only when the
+risk file has a vital area (section 23.2): the number of proof obligations, one `vital` line per
+id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
+whose evidence is owed, each group sorted. When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
 `intake <id>: <n> of 7 steps done; next: <step>`. Exit 0 unless the config is invalid.
@@ -1601,12 +1688,12 @@ Groups:
 - one story `Serve <Entity> actions` per entity with owed `act` ids.
 
 Every story has type `task` and a priority from its tier: 2 routine, 1 consequential, 0
-critical.
+critical and vital.
 
 A story title is `Prove <machine> <event>` or `Prove <id>` unless given above. Its labels
 are `tier:<tier>` and `machinery`. Its acceptance criteria (the backlog's own field) say that
 each listed id is proven by `machinery verify` at the story's commit and removed from
-`owed.yaml`, and for a consequential or critical tier that `machinery story <id>` passes.
+`owed.yaml`, and for a consequential, critical or vital tier that `machinery story <id>` passes.
 
 **Story text.** The description of every story a plan creates, here and in section 15.7, has
 five sections in this order, each a header line followed by its lines, one blank line between
@@ -1665,7 +1752,7 @@ Edges. An edge means that one story needs a specific output of another:
 
 | From (blocked) | To (blocker) | The output needed |
 |---|---|---|
-| Every `Prove` story with an id in a critical area | The `Model <area>` story | The formal model the tier requires. |
+| Every `Prove` story with an id in a critical or vital area | The `Model <area>` story | The formal model the tier requires. |
 | `Prove fm:<id>` whose subject is `invoke:<machine>.<src>` | The `internal transitions` story of that machine | The invoke path the failure is induced on. |
 | `Prove cx:<spec>:<run>` | The `Prove` stories of the cases its trace steps name | The transitions the replay drives. |
 
@@ -1804,6 +1891,13 @@ the current commit.
 | routine | Every id of the story is `proven` by evidence valid for the current commit (section 12) and is not owed. A `machinery:proof` line exists for a commit the evidence is valid for. |
 | consequential | The routine gate. A `machinery:prediction` for that commit by an actor other than the proof's actor. A `machinery:verdict accept` for that commit by the predicting actor, recorded after the prediction. |
 | critical | The consequential gate. Every `fv` id of the areas the story's ids belong to is `proven`, and every `cx` id of the formal models covering them is `proven`. |
+| vital | The critical gate, the areas being the critical and vital ones. Every evidence id of every assumption of the vital areas the story's ids belong to is not owed: `ERROR  assumed, unproven: <area> <name>: <id> is owed; a story of a vital area needs the evidence of every assumption proven`. |
+
+A vital gate never waits on a proof obligation and never counts one as proven: it prints
+`warn   proofs awaiting: <n>` for the proof obligations of the story's vital areas and
+`warn   vital: <id> proven (by test and model; proof awaited)` for each id of the story that a
+property of those areas is over and the evidence proves. A story whose `machinery:ids` names a
+`pf` id is `ERROR  proof: <id> awaits a machine-checked proof; a story does not discharge it: take it out of the story`.
 
 An `act` id of the story only has to be not owed. A reject verdict is recorded and fails the gate
 (`machinery accept --verdict reject` itself exits 0; `--close` with `reject` is a usage error).
@@ -1919,7 +2013,7 @@ intake <id>: 6 of 7 steps done; next: planned
 | `generated` | Stage `gen-drift` passes or is not applicable and no file of the gen directory has uncommitted changes (`machinery gen --check: no drift`). | `machinery gen --check: <outcome line>; run machinery gen and commit`; `uncommitted generated file: <path>, ...; commit it` |
 | `new ids` | The base commit exists (`<n> new id(s) since <short sha>`, or `none since <short sha>: only the capstone is planned`). | `base commit <short sha> is not in this repository` |
 | `tiers` | Stage `risk` passes or is not applicable (`stage risk passed`, or `no design.risk configured: every new id is routine`). | `stage risk: <outcome line>; run machinery lint --stage risk` |
-| `formal` | Every critical area that holds a new id has its `fv` obligation proven, or for each of its questions a spec of the matching tool that lists the area (section 16.1) (`no critical area holds a new id`, or `modeled: <area>, ...`). | `fv:<area>: no <tool> spec answers <question>; ...; scaffold it with machinery formal new` |
+| `formal` | Every critical or vital area that holds a new id has its `fv` obligation proven, or for each of its questions a spec of the matching tool that lists the area (section 16.1) (`no critical area holds a new id`, or `modeled: <area>, ...`). | `fv:<area>: no <tool> spec answers <question>; ...; scaffold it with machinery formal new` |
 | `planned` | Every new id is in the `machinery:ids` of a story of the intake, and the intake has its capstone (`every new id has a story; capstone <id>`). | `<n> new id(s) without a story; run machinery intake plan <id> --apply`, or `no capstone; run machinery intake plan <id> --apply` |
 
 `machinery:no-design-change <reason>` is written by the planner on the item's notes
@@ -2127,7 +2221,7 @@ them before the next plan; `machinery intake plan` reminds it (section 15.7).
 
 ## 16. Formal models
 
-A critical area (section 23) gets a formal model. A model is worth nothing when it is vacuous,
+A critical or vital area (section 23) gets a formal model. A model is worth nothing when it is vacuous,
 out of date, quietly weakened, or built on unstated assumptions, so every model carries the
 mechanical checks below. `machinery formal check` runs the tools and records results; stage
 `formal` is pure and reads only committed files, so `machinery check` needs no Java.
@@ -2143,7 +2237,7 @@ The area's `questions` pick the tool:
 | `recovery` | What happens when work is lost or repeated: crash, timeout, retry. | TLA+ |
 | `structure` | Which shapes of data may exist: ownership, authorization reachability, referential rules. | Alloy |
 
-A critical area needs, for each of its questions, at least one spec of the matching tool that
+A critical or vital area needs, for each of its questions, at least one spec of the matching tool that
 lists the area. Otherwise: `ERROR  fv:<area>: no <tool> spec answers <question>`.
 
 ### 16.2 Files
@@ -2481,8 +2575,8 @@ and deletes them when it exits; with a shared one, a run can delete or truncate 
 another run is reading.
 
 Stage `formal` applies when the formal directory holds a manifest or the risk file has a critical
-area. With no manifest at all and every critical area owed it is
-`not applicable: no formal model yet: <n> critical area(s) owed`. It reads the manifests, the results, the baseline, the risk file and git history, and runs
+or vital area. With no manifest at all and every such area owed it is
+`not applicable: no formal model yet: <n> critical area(s) owed` (vital areas counted among them). It reads the manifests, the results, the baseline, the risk file and git history, and runs
 no tool:
 
 - manifest errors; skeleton drift (as `formal gen --check`);
@@ -2726,7 +2820,7 @@ each section is saved under `<out>/stages/`.
 | Section | What runs | Saved as |
 |---|---|---|
 | `inventory` | The facts of the adopt report (section 17.2) for the snapshot: scope, languages, code files, test files (under e2e roots, elsewhere, with test doubles), design sources. `checked:` counts the files. | `inventory.txt` |
-| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). | `<stage>.txt` each |
+| `design` | The stages of `machinery lint` (section 3.1). When at least one machine was read, `checked:` adds the machines bound to the model and those unbound (section 6.4): `checked: 8 stages, 1 bound machines, 1 unbound machines`. The line `ids: <n> proposed, <n> owed, <n> proven, <n> retired` counts the ids by status (section 14). When the risk file has a vital area, `proofs awaiting: <n>` follows, then `vital: <id> proven (by test and model; proof awaited)` for every id a property is over that is not owed, and `assumed, unproven: <area> <name>: <statement>` for every assumption whose evidence is owed (section 23.2). Then the candidates of section 23.3, always: `vital candidates: <n>, dismissed: <n>`, and one line `  <id>  <reason>` per candidate. | `<stage>.txt` each |
 | `generation` | `machinery gen` (section 7). When gen refuses, not demonstrated: `gen refused: <stages> have errors`. | `generation.txt` |
 | `trace`, `tests`, `arch` | The stage of that name. | `<stage>.txt` |
 | `formal` | The sanity run, section 18.5. | `formal.txt` |
@@ -2891,7 +2985,7 @@ A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`
 | Section | Keys of `facts` |
 |---|---|
 | `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
-| `design` | `statuses`: `{owed, proposed, proven, retired}`; `bound_machines`, `unbound_machines` (when at least one machine was read) |
+| `design` | `statuses`: `{owed, proposed, proven, retired}`; `bound_machines`, `unbound_machines` (when at least one machine was read); `proofs_awaiting`; `vital_candidates`: `{id, reason}`; `vital_dismissed` |
 | `generation` | `files` (generated files), `written` |
 | `formal` | `machines`: `{deadlock, distinct, machine, reason, result, states, unreachable}`; `models`: `{model, reason, result}`; `result` is `passed`, `failed` or `incomplete` (`instance found`, `no instance` or `incomplete` for a model), and `reason` says why a run did not complete, else is empty |
 | `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
@@ -2927,7 +3021,7 @@ before any code. The tool holds the order:
 1. `machinery intake new "<title>" --intent "..." --refuses "..."` records it at the current
    commit.
 2. The design changes first and lands alone: the model and the machines, the failure modes and
-   the tiers in `risk.yaml`, a formal model where a critical area asks for one
+   the tiers in `risk.yaml`, a formal model where a critical or vital area asks for one
    (`machinery formal new`), then `machinery lint` and `machinery gen`, committed.
 3. `machinery intake status <id>` names the step that is missing and why.
 4. `machinery intake plan <id> --apply` writes every story at once from what the design now owes,
@@ -2951,8 +3045,9 @@ requirement behind them (the skeleton of a new project, an adoption) become stor
    `--limit` for each claim still unproven, a `--learning` for each rule the next story should
    know and an `--observation` for each thing seen outside the story's scope.
 
-**Accept.** By tier (section 15.6): routine on evidence; consequential and critical through a
-fresh verifier who predicts, reads, then accepts; critical with its formal model current. The
+**Accept.** By tier (section 15.6): routine on evidence; consequential, critical and vital
+through a fresh verifier who predicts, reads, then accepts; critical and vital with the formal
+model current; vital with the evidence of its assumptions proven. The
 capstone of an intake closes last: when every other story of the intake is closed, its builder
 records the commands that show the intent (`machinery:demo` lines) and a fresh verifier accepts
 it. Then the intake item is closed; stage `intake` warns while a delivered one stays open.
@@ -3244,23 +3339,54 @@ much formality the area gets, and writes it down as data:
 version: 1
 areas:
   - name: order-payment          # ^[a-z][a-z0-9-]+$, unique
-    tier: critical               # consequential | critical
-    why: "money moves; a double charge cannot be undone"
-    ids: ["act:Order.pay", "tc:ORDE-*"]
-    questions: [concurrency]     # required for critical: ordering | concurrency | recovery | structure
+    tier: vital                  # consequential | critical | vital
+    why: "money moves; a customer charged twice cannot be made whole by a retry"
+    ids: ["act:Order.pay", "tc:ORDE-*", "inv:paid-before-shipped"]
+    questions: [concurrency]     # required for critical and vital: ordering | concurrency | recovery | structure
+    property:                    # vital only, required (section 23.1)
+      - name: charged-once
+        statement: "An order is charged at most once, whatever its callers do at the same time."
+        kind: exactly-once       # invariant | pre-post | exactly-once | never
+        over: ["act:Order.pay", "tc:ORDE-8bd6e7"]
+    core:                        # vital only, required
+      paths: ["internal/domain/**"]
+      entry: ["internal/domain/order.go#Apply"]
+    assumes:                     # vital only, required
+      - name: provider-charges-once
+        statement: "The payment provider charges a payment at most once, however often it is asked."
+        evidence: ["fm:payment-provider-down"]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
   - name: shipping-permission
     tier: consequential
     why: "authorization: only a Clerk ships"
     ids: ["act:Order.ship"]
+not_vital:                       # optional: dismissed candidates (section 23.3)
+  - {id: "tc:ORDE-70d94f", reason: "a refused pay records the refusal and moves no money"}
 ```
 
-An id in no area is **routine**. An id in several areas has the highest of their tiers.
+An id in no area is **routine**. An id in several areas has the highest of their tiers, in the
+order routine, consequential, critical, vital.
 
 | Tier | Use it for | What it adds |
 |---|---|---|
 | routine | Work where a wrong result is cheap to see and to undo. | The machine, its generated transition cases, end-to-end evidence. |
 | consequential | Published contract semantics, authorization, tenant isolation, money or audit integrity, data migrations. | An abuse case for every action in the area (section 6.6), and acceptance by a fresh verifier who predicts a disproving observation before reading the proof (section 15.6). |
 | critical | Promises whose break harms users and that tests rarely reach: races, lost or repeated work, structural rules that must hold for every shape of data. | A formal model with the checks of section 16. The area yields the obligation `fv:<name>`. |
+| vital | Paths that must never go wrong: a customer charged twice, an audit record lost, a signature attributed to the wrong person. | Everything critical adds; the exact properties the code must keep, the core that holds them, shaped for a proof (section 9), and what that core assumes, each assumption with its evidence (section 23.1). Each property yields the proof obligation `pf:<area>:<name>` (section 23.2) and the area its property record (section 23.4). |
+
+**What vital is for, and what it is not.** A formal model (section 16) checks the design; it does
+not check the code that runs. On most paths that gap is acceptable: the tests and the model
+together catch what matters. A vital area names the few paths where it is not, and makes them
+explicit, countable and shaped for proof: each property is stated exactly, over the design ids it
+holds for; the code that must keep it is confined to a small core; what the core takes on trust
+is written down with its evidence. This version proves nothing more about a vital area than about
+a critical one. A later version will require a machine-checked proof of each property; until
+then every report that calls an id of a vital property proven says what kind of proof it has:
+`(by test and model; proof awaited)`.
 
 Stage `risk`:
 
@@ -3268,14 +3394,19 @@ Stage `risk`:
 |---|---|
 | `area-shape` | Unique names, a valid tier, a non-empty `why`, at least one id pattern. |
 | `id-resolves` | Every pattern matches at least one `act`, `inv`, `sc`, `tc` or `fm` id. |
-| `critical-question` | A critical area lists at least one question; a non-critical area lists none. |
+| `critical-question` | A critical or vital area lists at least one question; another area lists none. |
+| `vital-shape` | A vital area has `property`, `core` and `assumes`, each well formed; another area has none of them (section 23.1). |
+| `vital-refs` | Every id a property is over, and every evidence id of an assumption, is an id of the design of the right kind (section 23.1). |
+| `not-vital` | Every dismissed candidate names ids of the design that are in no vital area, with a reason (section 23.3). |
 | `status-file` | The status file (section 4.1) is well formed and every entry names ids of the design. |
 
 Stage `risk` holds both files the planner writes about ids: tiers and statuses. `checked:` counts
-areas, consequential ids and critical ids when `design.risk` is set, then, when the status file
-exists, the proposed ids and the retired ids it gives. Not applicable when `design.risk` is absent
-and there is no status file (`not applicable: no design.risk configured`). Not demonstrated when it
-has no area and no status entry.
+areas, consequential ids and critical ids when `design.risk` is set, and, when an area is vital,
+vital ids, properties and assumptions; then the dismissals when `not_vital` has an
+entry; then, when the status file exists, the proposed ids and the retired ids it gives. Not
+applicable when `design.risk` is absent and there is no status file
+(`not applicable: no design.risk configured`). Not demonstrated when it has no area and no status
+entry.
 
 The tier is chosen at planning, not discovered at review. When it is unclear which tier applies,
 the higher one does. Lowering a tier is a deliberate, recorded act: the ratchet (section 11.3)
@@ -3286,5 +3417,169 @@ lowered:
   - {ids: ["act:Order.pay", "tc:ORDE-*"], from: critical, reason: "card payments moved to the hosted page"}
 ```
 
-`ids`, `from` (the tier the ids had) and `reason` are required. The entry stays in the file as the
-record of the decision.
+`ids`, `from` (the tier the ids had: `consequential`, `critical` or `vital`) and `reason` are
+required. The entry stays in the file as the record of the decision. Lowering a vital area to
+critical is a lowering like any other.
+
+### 23.1 Vital areas
+
+A vital area has every key of a critical area and three more, all required:
+
+- `property`: one or more entries, each an exact thing that must hold, stated over inputs and
+  stored state:
+  - `name` matches `^[a-z][a-z0-9-]+$` and is unique in the area;
+  - `statement` is the property in the system's words;
+  - `kind` is `invariant` (it holds in every reachable state), `pre-post` (an operation that
+    starts where its precondition holds ends where its postcondition holds), `exactly-once` (an
+    effect happens once per request, however often the request is repeated) or `never` (no
+    behavior reaches the state or the effect);
+  - `over` lists one or more full ids (no `*`) of kind `inv`, `act` or `tc` that yield an
+    obligation and that the area's `ids` match: the design ids the property is a statement about.
+- `core`: where the code of the path lives. `paths` is one or more globs; `entry` is one or
+  more entry points, each `<file>#<symbol>`. Stage `arch` holds the files to the shape of
+  section 9.
+- `assumes`: one or more entries, each something the core relies on from its surroundings (the
+  database enforces a unique key; the caller is authenticated): `name` (`^[a-z][a-z0-9-]+$`,
+  unique in the area), `statement`, and `evidence`, one or more obligation ids. An assumption is
+  only as good as its evidence: while one of its evidence ids is in the owed list it is
+  **assumed, unproven**.
+
+Each problem is an ERROR of stage `risk`, `<risk file>: <area>: <message>`:
+
+- `a vital area states at least one property`; `a vital area names its core (core.paths and core.entry)`;
+  `a vital area states what its core assumes (at least one entry under assumes)`;
+- `only a vital area has property, core and assumes`;
+- `property <n>: name must match ^[a-z][a-z0-9-]+$`, `property <name>: duplicate name`,
+  `property <name>: statement is required`,
+  `property <name>: kind must be invariant, pre-post, exactly-once or never, got "<kind>"`,
+  `property <name>: over needs at least one id`;
+- `property <name>: over <id>: a property is over inv, act or tc ids`,
+  `property <name>: over <id>: name an exact id, not a pattern`,
+  `property <name>: over <id> is not an id of the design` (`is proposed`, `is retired` for an id of
+  that status: it yields no obligation),
+  `property <name>: over <id> is not in the area; add it to ids, or name an id the area holds`;
+- `core.paths needs at least one glob`, `core.paths: "<glob>" is not a valid glob`,
+  `core.entry needs at least one <file>#<symbol>`, `core.entry: "<entry>" is not <file>#<symbol>`;
+- `assumes <n>: name must match ^[a-z][a-z0-9-]+$`, `assumes <name>: duplicate name`,
+  `assumes <name>: statement is required`, `assumes <name>: evidence needs at least one id`,
+  `assumes <name>: evidence <id> is not an obligation of the design`.
+
+### 23.2 Proof obligations
+
+Each property yields the proof obligation `pf:<area>:<name>`, with the tier of its area. In this
+version nothing can prove one, and machinery says so wherever the evidence of a vital area is
+reported:
+
+- A `pf` id is **awaiting proof**, a status of its own: never owed and never proven. It is not in
+  `obligations.json` (it is in the property record, section 23.4), `owed sync` neither adds nor
+  removes it, and an owed entry that names one is an ERROR (section 11.1).
+- No test discharges it: a tag or marker that names one is a trace ERROR (section 8), a receipt
+  that names one a verify ERROR (section 12), and a story whose ids name one a story ERROR
+  (section 15.6).
+- `status`, `verify` and the design section of `assess` count the proof obligations on their own
+  line, `proofs awaiting: <n>` (sections 14, 12, 18.3), and a proof block lists those of the
+  selected areas as `<pf id> (awaiting proof)` under `not proven` (section 13).
+- An id a property is over is proven as any id is (section 12): by its tests, and for the area by
+  its formal model. Wherever such an id is reported as proven (status, verify, the proof block,
+  the story gate, assess), the line ends with `(by test and model; proof awaited)`.
+- An assumption with an owed evidence id prints as `assumed, unproven: <area> <name>: <statement>`
+  in status, verify, the proof block and assess, fails the story gate (section 15.6), and is
+  `assumed, unproven` in the property record.
+
+The `fv` obligation of a vital area, and the `inv`, `tc` and `act` ids its properties are over,
+behave exactly as they do in a critical area.
+
+### 23.3 Candidates: `machinery vital candidates`
+
+So that nobody has to remember to look, `machinery vital candidates` lists the design ids that
+look as if they belong in a vital area and are in none, from fixed rules over the design alone:
+it reads no code. An id is in a vital area when the `ids` of a vital area match it. Only ids that
+yield an obligation (section 4.1) are candidates. The rules, in this order:
+
+| Rule | Candidate | Reason |
+|---|---|---|
+| action | An `act` id whose action name matches a word of `vital.names`. | `action <action> matches "<word>"` |
+| entity | An `act` id whose entity name matches a word of `vital.names`. | `entity <Entity> matches "<word>"` |
+| event | A `tc` id of a transition of kind `on` whose event matches a word of `vital.names`. | `event <event> matches "<word>"` |
+| event entity | A `tc` id of a transition of kind `on` of a lifecycle machine whose entity name matches a word of `vital.names`. | `entity <Entity> matches "<word>"` |
+| failure | An `fm` id whose `failure` or `behavior` text matches a word of `vital.failure`. | `failure mode text matches "<word>"` |
+| effect | A `tc` id of a transition, of any kind, one of whose effects matches a word of `vital.effects`. | `effect <effect> matches "<word>"` |
+
+The default lists:
+
+- `vital.names`: pay, charge, refund, transfer, debit, credit, sign, approve, destroy, delete,
+  erase, grant, revoke, seal, audit, ledger;
+- `vital.failure`: lost, twice, duplicate, double, replay;
+- `vital.effects`: charge, debit, credit, emit, send, publish.
+
+A name or a text matches a word when one of its words, lower-cased, starts with it. Words are
+split at every character that is not a letter or a digit, between a lower-case letter or a digit
+and an upper-case letter, and before the last upper-case letter of a run that a lower-case letter
+follows: `recordCharge` is `record`, `charge`; `HTTPServer` is `http`, `server`; `pay_out` is
+`pay`, `out`. So `pay` matches `Payment` and not `display`. The reason names the first word of
+the list that matches; for an effect, the first effect of the row that matches one.
+
+Each candidate prints once, with the reason of the first rule that matched it, sorted by id in
+byte order, then the summary line:
+
+```
+fm:charge-replayed  failure mode text matches "twice"
+tc:ORDE-507e4f  effect refundPayment matches "refund"
+vital candidates: 2, dismissed: 1
+```
+
+A candidate is dismissed by listing it in the risk file under `not_vital`, with the reason, so
+that the list only shrinks and every dismissal stays on record. `id` is a full id or a pattern
+(section 4); `dismissed` counts the candidates its entries match. Stage `risk` holds the entries,
+`<risk file>: <message>`: `not_vital entry <n>: id is required`,
+`not_vital: <id>: reason is required`, `not_vital: <id> is listed twice`,
+`not_vital: <id> matches no act, inv, sc, tc or fm id` and
+`not_vital: <id> is in vital area <area>; a dismissed id is not vital`.
+
+The command needs a `machinery.yaml`, takes no arguments, writes nothing and exits 0 (2 on a usage
+or config error). The design section of `machinery assess` prints the same list (section 18.3).
+
+### 23.4 The property record: `<gen>/vital/<area>.json`
+
+`machinery gen` writes one file per vital area, the hand-off a prover integration will read, and
+`gen --check` holds it like every generated file (section 7):
+
+```json
+{
+  "version": 1,
+  "area": "order-payment",
+  "why": "money moves; a customer charged twice cannot be made whole by a retry",
+  "source": "design/risk.yaml",
+  "properties": [
+    {"id": "pf:order-payment:charged-once", "name": "charged-once", "kind": "exactly-once", "statement": "An order is charged at most once, whatever its callers do at the same time.", "over": ["act:Order.pay", "tc:ORDE-8bd6e7"], "status": "awaiting proof"}
+  ],
+  "core": {
+    "paths": ["internal/domain/**"],
+    "entry": ["internal/domain/order.go#Apply"],
+    "files": [{"path": "internal/domain/order.go", "sha256": "<sha256 of the file bytes>"}]
+  },
+  "assumes": [
+    {"name": "provider-charges-once", "statement": "The payment provider charges a payment at most once, however often it is asked.", "evidence": ["fm:payment-provider-down"], "status": "assumed, unproven"}
+  ],
+  "over": [
+    {"id": "act:Order.pay", "status": "proven (by test and model; proof awaited)"},
+    {"id": "tc:ORDE-8bd6e7", "status": "owed"}
+  ]
+}
+```
+
+- `properties` and `assumes` keep the order of the risk file, and so do the ids of a property's
+  `over` and of an assumption's `evidence`. `core.paths` and `core.entry` are as written;
+  `core.files` are the files `core.paths` matches, sorted, each with the SHA-256 of its bytes. The
+  top-level `over` lists every id the properties are over, once, sorted.
+- Statuses come from committed files only, so that the record is the same for everyone at one
+  commit: an id is `owed` while the owed list holds it and `proven (by test and model; proof
+  awaited)` otherwise (its status of section 4.1, with the wording of section 23.2); an
+  assumption is `assumed, unproven` while one of its evidence ids is owed and `assumed,
+  evidenced` otherwise; a property is always `awaiting proof`. Whether the evidence at a commit
+  in fact proves an id is the judgment of `verify`.
+- The records render the owed file: after `machinery owed sync`, run `machinery gen`. They are
+  exempt with the owed file from the dirty rule and the validity rule of evidence (sections 10
+  and 10.1), so committing them does not invalidate the run that justified the change.
+- A file under `<gen>/vital/` whose area is not vital is
+  `ERROR  <path>: unexpected file in gen directory`, as in section 7.
