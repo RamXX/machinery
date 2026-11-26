@@ -1,0 +1,153 @@
+# ratchet: a policy that lets adapter evidence prove more than at the base is named, and a
+# critical or vital tier added to it is an error (sections 10.3 and 11.3)
+fixture shop
+exec machinery gen
+gitinit
+exec git tag defaults
+
+# the defaults written out, and a narrower policy: nothing to report
+cp explicit.yaml machinery.yaml
+exec machinery check --stage ratchet --base defaults
+! stdout 'adapter widened'
+stdout '^passed$'
+cp narrow.yaml machinery.yaml
+exec machinery check --stage ratchet --base defaults
+! stdout 'adapter widened'
+stdout '^passed$'
+gitcommit 'a narrow adapter policy'
+exec git tag narrow
+
+# every widening against the narrow base is a warn that names it
+cp wide.yaml machinery.yaml
+exec machinery check --stage ratchet --base narrow
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.allow now lists sc$'
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.tiers now lists consequential$'
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.min_granularity\.default: function -> file$'
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.min_granularity\.fm: function -> file$'
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.sources: example\.test/shop/staged/\*\* <- e2e/suite/\*_test\.go added$'
+stdout -count=5 'adapter widened'
+stdout '^passed$'
+# the same policy against the defaults widens nothing but the map
+exec machinery check --stage ratchet --base defaults
+stdout -count=1 'adapter widened'
+stdout 'evidence\.adapter\.sources: .* added$'
+
+# critical or vital added to the tiers is an error
+cp critical.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base defaults
+stdout '^  ERROR  ratchet: adapter widened: evidence\.adapter\.tiers now lists critical; an id of such an area needs a receipt its test emits after its own assertions$'
+stdout '^  ERROR  ratchet: adapter widened: evidence\.adapter\.tiers now lists vital; an id of such an area needs a receipt its test emits after its own assertions$'
+stdout '^failed: 2 finding\(s\)$'
+# a base that already listed it established it: nothing new
+gitcommit 'critical and vital by adapter'
+exec machinery check --stage ratchet --base HEAD
+! stdout 'adapter widened'
+
+-- explicit.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [inv, sc, fm, ck]
+    tiers: [routine, consequential]
+    min_granularity: file
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [inv]
+    tiers: [routine]
+    min_granularity: {default: function, fm: function}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- wide.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [inv, sc]
+    tiers: [routine, consequential]
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- critical.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    tiers: [routine, consequential, critical, vital]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

@@ -15,6 +15,19 @@ exec mrun 2 run --adapter go-test-json -- go test -count=2 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -count=2 is refused: write -count=1$'
 exec mrun 2 run --adapter go-test-json -- go test -count 3 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -count=3 is refused: write -count=1$'
+# every spelling that sets another count
+exec mrun 2 run --adapter go-test-json -- go test -test.count=2 ./e2e/suite
+stderr '^usage: --adapter go-test-json: -test\.count=2 is refused: write -count=1$'
+exec mrun 2 run --adapter go-test-json -- go test --count=2 ./e2e/suite
+stderr '^usage: --adapter go-test-json: -count=2 is refused: write -count=1$'
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite -args -test.count=2
+stderr '^usage: --adapter go-test-json: -test\.count=2 is refused: write -count=1$'
+env GOFLAGS=-count=2
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: GOFLAGS has -count=2, which is refused: take it out of GOFLAGS$'
+exec mrun 2 run --adapter go-test-json --streams -- sh run-suite.sh
+stderr '^usage: --adapter go-test-json: GOFLAGS has -count=2, which is refused: take it out of GOFLAGS$'
+env GOFLAGS=
 exec mrun 2 run --adapter go-test-json -- go test -json=false -count=1 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -json=false is refused: the adapter reads the event stream$'
 # nothing ran and nothing was recorded

@@ -18,7 +18,9 @@ stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
 stdout '"command":\["sh","run-suite.sh"\],"stack":"","started":"[^"]+","adapter":"go-test-json"\}$'
 exec sh -c 'grep -h inv:paid-before-shipped .machinery/receipts/*.jsonl'
-stdout '"test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":\[\]\}$'
+stdout '"test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":"unknown"\}$'
+# machinery did not see the flags the wrapper passed: the build tags are unknown, never []
+exec sh -c '! grep -q "\"tags\":\\[" .machinery/receipts/*.jsonl'
 exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
 stdout '"outcome":"pass","test":"e2e/suite/outage_test.go"'
 exec mrun 1 verify
@@ -48,7 +50,7 @@ exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
 exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
 env SUITE_FLAGS=
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, verdict not counted: 6 id\(s\)$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
 stderr '^machinery run: adapter: package example\.test/shop/stage/suite: answered from the cache; nothing in it counts: run with -count=1$'
 exec sh -c '! grep -q "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
 
@@ -62,6 +64,38 @@ exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
 stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+
+# one package answered from the cache in one stream and fresh in another: it counts nothing
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh cachedonce.sh
+stdout '^cachedonce: 0 cached in the first stream, 1 in the second$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: answered from the cache; nothing in it counts: run with -count=1$'
+
+# one function with two verdicts in one stream (the wrapper ran it twice): they differ, it failed
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh again.sh
+stderr '^machinery run: adapter: example\.test/shop/e2e/again\.TestSettlesOnce: pass in again\.json, skip in again\.json: verdicts differ, read as fail$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/again/again_test.go::TestSettlesOnce"'
+
+# one file staged into two packages: a function whose verdicts differ between them failed
+rm .machinery/receipts
+env TWO_ENV=SHOP_EMAIL=skip
+exec machinery run --adapter go-test-json --streams -- sh two.sh
+stderr '^machinery run: adapter: e2e/suite/email_test\.go::TestEmailUnique: pass in package example\.test/shop/stage/a, skip in package example\.test/shop/stage/b: verdicts differ, read as fail$'
+stderr '^machinery run: adapter: receipts written: 4 pass, 1 fail, 0 skip$'
+# and with equal verdicts the worst of what each package gives stands: one of the two did not
+# end with pass, so the passes of the other do not count
+rm .machinery/receipts
+env TWO_ENV=SHOP_ROUTING=fail
+exec machinery run --adapter go-test-json --streams -- sh two.sh
+env TWO_ENV=
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
+stderr 'package example\.test/shop/stage/b: did not end with pass; no pass is written from it$'
 
 # a test binary run directly under go tool test2json -p: read under the same rules
 rm .machinery/receipts
@@ -98,6 +132,80 @@ rm .machinery/receipts
 exec mrun 3 run --adapter go-test-json --streams -- sh -c ': > "$MACHINERY_GO_TEST_JSON/empty.json"; exit 3'
 stderr '^machinery: run: stream empty\.json: no event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again$'
 
+# a same-named function in a mapped file that claims nothing: ambiguous, counts nothing. The
+# claiming file was not built in this run, and machinery has no way to know
+cp shadow_test.go e2e/suite/shadow_test.go
+cp named.yaml machinery.yaml
+gitcommit 'a second file defines the function'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh once.sh
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous, its verdict counts for none of them$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+
+# without an entry for its package a verdict finds no file, also in the package's own directory
+rm e2e/suite/shadow_test.go
+cp unmapped.yaml machinery.yaml
+gitcommit 'no map'
+exec machinery run --adapter go-test-json --streams -- sh once.sh
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; a package built from copies, and every package of a --streams run, is mapped to its files in evidence\.adapter\.sources$'
+
+-- once.sh --
+#!/bin/sh
+set -eu
+go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/once.json"
+-- cachedonce.sh --
+#!/bin/sh
+# the same package twice without -count=1: the second answer comes from the cache
+set -eu
+SHOP_ROUTING="fresh-$$-$(date +%s)"
+export SHOP_ROUTING
+go test -json ./e2e/suite > "$MACHINERY_GO_TEST_JSON/a.json"
+go test -json ./e2e/suite > "$MACHINERY_GO_TEST_JSON/b.json"
+first=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/a.json" || true)
+second=$(grep -c '(cached)' "$MACHINERY_GO_TEST_JSON/b.json" || true)
+echo "cachedonce: $first cached in the first stream, $second in the second"
+-- again.sh --
+#!/bin/sh
+set -eu
+go test -json -count=2 ./e2e/again > "$MACHINERY_GO_TEST_JSON/again.json"
+-- two.sh --
+#!/bin/sh
+# stages the suite into two packages and tests each; TWO_ENV is set for the second
+set -u
+rm -rf stage
+mkdir -p stage/a stage/b
+cp e2e/suite/order_test.go e2e/suite/email_test.go e2e/suite/scenario_test.go stage/a/
+cp e2e/suite/order_test.go e2e/suite/email_test.go e2e/suite/scenario_test.go stage/b/
+go test -json -count=1 ./stage/a > "$MACHINERY_GO_TEST_JSON/a.json"
+env ${TWO_ENV:-X=} go test -json -count=1 ./stage/b > "$MACHINERY_GO_TEST_JSON/b.json"
+rm -rf stage
+exit 0
+-- e2e/again/again_test.go --
+package again
+
+import "testing"
+
+var settled int
+
+// TestSettlesOnce passes the first time it runs in a process and is skipped after that.
+//
+// machinery:verifies inv:terminal-is-final
+func TestSettlesOnce(t *testing.T) {
+	settled++
+	if settled > 1 {
+		t.Skip("already settled")
+	}
+}
+-- shadow_test.go --
+//go:build !faults
+
+package suite
+
+import "testing"
+
+func TestProviderDown(t *testing.T) {}
 -- twice.sh --
 #!/bin/sh
 # the same suite twice, the second time without a customer store
@@ -134,6 +242,59 @@ evidence:
     sources:
       - package: "example.test/shop/stage/**"
         files: ["e2e/suite/*_test.go"]
+      - package: "example.test/shop/e2e/suite"
+        files: ["e2e/suite/*_test.go"]
+      - package: "example.test/shop/e2e/again"
+        files: ["e2e/again/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- named.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/suite/order_test.go", "e2e/suite/email_test.go", "e2e/suite/scenario_test.go", "e2e/suite/outage_test.go"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/suite"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- unmapped.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}

@@ -64,6 +64,19 @@ exec mrun 1 verify --story shop-k3
 stdout -count=1 'not counted'
 stdout 'adapter: sc:customer-pays-and-the-order-ships not counted'
 
+# a fail the adapter wrote fails its obligation whatever the policy says: allow does not list inv
+rm .machinery/receipts
+cp no-inv.yaml machinery.yaml
+gitcommit 'adapter: no inv'
+env SHOP_EMAIL=fail
+exec mrun 1 run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+env SHOP_EMAIL=
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+exec machinery status
+stdout '^proven: .*  failed: 1  owed: 2 '
+rm .machinery/receipts
+
 # min_granularity: function: a marker that stands above no function proves nothing
 cp function.yaml machinery.yaml
 gitcommit 'adapter: function granularity'
@@ -198,6 +211,34 @@ evidence:
   adapter:
     allow: [inv, fm]
     tiers: [routine, consequential, critical]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- no-inv.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [sc, fm]
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}
