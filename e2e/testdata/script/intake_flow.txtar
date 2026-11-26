@@ -95,13 +95,13 @@ env MACHINERY_SESSION= MACHINERY_AGENT=
 # --apply: every story and edge in one backlog call, under the intake; then the owed list
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
 stdout '^warn: no session recorded for the plan: independence rests on the actor name$'
-stdout '^plan: 3 created, 0 existing, 2 edge\(s\)$'
+stdout '^plan: 4 created, 0 existing, 5 edge\(s\)$'
 stdout '^owed: 3 added$'
 stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
 exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
-stdout '^4$'
+stdout '^5$'
 exec sh -c '. ./lib.sh; bd list --all --json --limit 0 | grep -c "\"parent\": \"$(iid)\""'
-stdout '^3$'
+stdout '^4$'
 exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Refund a paid order") --json'
 stdout '"title": "Prove order refund"'
 stdout '"title": "Serve Order actions"'
@@ -115,7 +115,7 @@ stdout '^0$'
 exec sh -c '. ./lib.sh; bd show $(sid "Prove order refund") --json'
 stdout 'machinery:ids tc:ORDE-10c92a tc:ORDE-28f78c'
 stdout '"tier:routine"'
-exec sh -c '. ./lib.sh; bd show $(sid "Prove order refund") --json | grep -c "machinery:intake $(iid)"'
+exec sh -c '. ./lib.sh; bd show $(sid "Prove order refund") --json | grep "^    \"description\":" | grep -c "machinery:intake $(iid)"'
 stdout '^1$'
 exec sh -c '. ./lib.sh; bd show $(iid) --json | grep -c "machinery:intake-planned $(git rev-parse HEAD) "'
 stdout '^1$'
@@ -131,7 +131,7 @@ gitcommit 'owe the refund'
 
 # every step is done
 exec sh -c '. ./lib.sh; mrun 0 intake status $(iid)'
-stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+$'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+; design story shop-[a-z0-9]+$'
 stdout '^intake shop-[a-z0-9]+: 7 of 7 steps done$'
 exec machinery status
 stdout '^intake shop-[a-z0-9]+: 7 of 7 steps done$'
@@ -140,12 +140,12 @@ stdout '^intake shop-[a-z0-9]+: 7 of 7 steps done$'
 cp design/owed.yaml owed-planned.yaml
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
 stdout '^intake shop-[a-z0-9]+: every new id has a story; nothing to create$'
-stdout '^plan: 0 created, 3 existing, 0 edge\(s\)$'
+stdout '^plan: 0 created, 4 existing, 0 edge\(s\)$'
 stdout '^owed: 0 added$'
 ! stdout 'planned at'
 cmp design/owed.yaml owed-planned.yaml
 exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
-stdout '^4$'
+stdout '^5$'
 exec sh -c '. ./lib.sh; bd show $(iid) --json | grep -o "machinery:intake-planned" | wc -l | tr -d " "'
 stdout '^1$'
 exec sh -c '. ./lib.sh; machinery intake plan $(iid)'
@@ -158,14 +158,15 @@ stdout '^checked: 1 intake items$'
 ! stdout 'warn'
 stdout '^passed$'
 exec machinery waves
-stdout '^checked: 3 stories, 2 edges, 2 waves$'
+stdout '^checked: 4 stories, 5 edges, 3 waves$'
 stdout '^  shop-[a-z0-9]+  consequential  Demonstrate: Refund a paid order$'
 ! stdout '  [a-z]+  Refund a paid order$'
 ! stdout 'no design ids'
 
 # the capstone gate: a demo and closed siblings on top of its tier
 exec sh -c '. ./lib.sh; mrun 1 story $(sid "Demonstrate: Refund a paid order")'
-stdout '^checked: 3 ids, 0 proofs, 0 predictions, 0 verdicts, 0 demos, 2 stories$'
+stdout '^checked: 3 ids, 0 proofs, 0 predictions, 0 verdicts, 0 demos, 3 stories$'
+stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Land the design: Refund a paid order: the capstone closes last$'
 stdout '^  ERROR  no demo: record each command that shows the intent on its own machinery:demo line$'
 stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Prove order refund: the capstone closes last$'
 stdout '^  ERROR  open story of the intake: shop-[a-z0-9]+ Serve Order actions: the capstone closes last$'
@@ -175,6 +176,12 @@ exec sh -c '. ./lib.sh; machinery brief $(sid "Demonstrate: Refund a paid order"
 stdout '^tier: consequential$'
 stdout '^  tc:ORDE-10c92a  Paid on:refund -> Cancelled$'
 stdout '^  act:Order.refund  action refund of Order$'
+
+# the design story lands first: its design is sound, generated and approved; it closes
+gitcommit 'keep the planned owed list'
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Land the design: Refund a paid order")'
+stdout '^checked: 9 stages, 1 design reviews$'
+exec sh -c '. ./lib.sh; bd close $(sid "Land the design: Refund a paid order") --reason landed'
 
 # the stories are built: the refund is served and observed; they close
 exec sh -c 'sed -i.bak "s/act:Order.cancel$/act:Order.cancel act:Order.refund/" internal/domain/order.go && rm internal/domain/order.go.bak'
@@ -203,7 +210,7 @@ stdout '^  ERROR  no prediction for [0-9a-f]{7}: a verifier runs machinery predi
 env BEADS_ACTOR=verifier
 exec sh -c '. ./lib.sh; machinery predict $(sid "Demonstrate: Refund a paid order") --observation "a refund of a Pending order" --expect "ORDER_NOT_PAID, still Pending"'
 exec sh -c '. ./lib.sh; machinery accept $(sid "Demonstrate: Refund a paid order") --verdict accept --observed "refunded once; a Pending order refused" --close'
-stdout '^checked: 3 ids, 1 proofs, 1 predictions, 1 verdicts, 1 demos, 2 stories$'
+stdout '^checked: 3 ids, 1 proofs, 1 predictions, 1 verdicts, 1 demos, 3 stories$'
 stdout '^passed$'
 stdout '^closed: shop-[a-z0-9]+$'
 env BEADS_ACTOR=builder
@@ -390,6 +397,42 @@ paths:
       responses:
         "200": {description: Refunded or refused with a code}
 -- want-plan.md --
+## Land the design: Refund a paid order
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Intent:
+Land the design change of the requirement alone, before the stories that build on it.
+Requirement INTAKE: A Clerk refunds a paid order: it ends Cancelled and the payment is returned
+
+Acceptance:
+- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.
+- The checker approved the design change: machinery review design INTAKE.
+
+Ids:
+machinery:intake-design
+machinery:scope contracts/openapi.yaml design/failure-modes.yaml design/gen/** design/machines/Order.machine.json design/model/shop.modelith.yaml
+machinery:intake INTAKE
+
+Excludes:
+- No code and no test: the stories of the intake build on this design.
+
+Needs:
+- none
+
+### Acceptance Criteria
+- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.
+- The checker approved the design change: machinery review design INTAKE.
+- machinery story passes for this story.
+
 ## Prove order refund
 
 ### Type
@@ -418,7 +461,7 @@ Excludes:
 - No design change: a design change is its own story.
 
 Needs:
-- none
+- Land the design: Refund a paid order: the design it builds on
 
 ### Acceptance Criteria
 - Each listed obligation is proven by machinery verify at the story's commit and removed from owed.yaml.
@@ -450,7 +493,7 @@ Excludes:
 - No design change: a design change is its own story.
 
 Needs:
-- none
+- Land the design: Refund a paid order: the design it builds on
 
 ### Acceptance Criteria
 - Each listed action is served by code (stage trace) and removed from owed.yaml.
@@ -484,6 +527,7 @@ Excludes:
 - No design change: a design change is its own story.
 
 Needs:
+- Land the design: Refund a paid order: the behavior shown
 - Prove order refund: the behavior shown
 - Serve Order actions: the behavior shown
 

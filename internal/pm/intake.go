@@ -207,7 +207,8 @@ type IntakeStatus struct {
 	Proposed         []string        // new ids that are only proposed (section 4.1): never planned
 	Stories          []backlog.Issue // the stories of the intake, the capstone included
 	Capstone         *backlog.Issue
-	without          []string // new ids that no story of the intake lists
+	DesignStory      *backlog.Issue // the story of the intake that carries machinery:intake-design
+	without          []string       // new ids that no story of the intake lists
 	newKnown         bool
 	contract         string
 }
@@ -376,6 +377,9 @@ func (st *IntakeStatus) planned(issues []backlog.Issue) Step {
 	covered := map[string]bool{}
 	for i := range st.Stories {
 		t := backlog.ParseTags(&st.Stories[i])
+		if t.IntakeDesign && st.DesignStory == nil {
+			st.DesignStory = &st.Stories[i]
+		}
 		if t.Capstone {
 			if st.Capstone == nil {
 				st.Capstone = &st.Stories[i]
@@ -399,8 +403,14 @@ func (st *IntakeStatus) planned(issues []backlog.Issue) Step {
 		return stepMissing(name, fmt.Sprintf("%d new id(s) without a story; %s", len(st.without), run))
 	case st.Capstone == nil:
 		return stepMissing(name, "no capstone; "+run)
+	case st.designChanged() && st.DesignStory == nil:
+		return stepMissing(name, "no design story; "+run)
 	}
-	return stepDone(name, "every new id has a story; capstone "+st.Capstone.ID)
+	done := "every new id has a story; capstone " + st.Capstone.ID
+	if st.DesignStory != nil {
+		done += "; design story " + st.DesignStory.ID
+	}
+	return stepDone(name, done)
 }
 
 // newIDs lists the ids now that the generated obligation list at the base
@@ -588,10 +598,61 @@ const (
 	capstoneNeed    = "the behavior shown"
 )
 
-// Plan builds the stories an intake still owes: one per group of new ids
+// Design story texts (section 15.7).
+const (
+	designIntent  = "Land the design change of the requirement alone, before the stories that build on it."
+	designExclude = "- No code and no test: the stories of the intake build on this design."
+	designNeed    = "the design it builds on"
+)
+
+// designChanged reports whether the contract hash is not the base hash.
+func (st *IntakeStatus) designChanged() bool {
+	return st.In.Tags.Base != nil && st.In.Tags.Base.Contract != st.contract
+}
+
+// addDesignStory puts the design story first in the plan and makes every
+// other story of the plan wait for it (section 15.7).
+func (st *IntakeStatus) addDesignStory(d *design.Design, plan *Plan) {
+	in := st.In
+	used := map[string]bool{}
+	for _, s := range plan.Stories {
+		used[s.Key] = true
+	}
+	ds := &Story{Title: "Land the design: " + in.Title, design: true}
+	ds.Key = uniqueKey(slug(ds.Title), used)
+	tier := design.Routine
+	for _, n := range st.NewIDs {
+		if design.TierRank(n.Tier) > design.TierRank(tier) {
+			tier = n.Tier
+		}
+	}
+	ds.Tier, ds.Priority = tier, Priority(tier)
+	ds.Labels = []string{"machinery", "tier:" + tier}
+	scope := append(append([]string{}, d.ContractFiles()...), gen.Dir(d)+"/**")
+	sort.Strings(scope)
+	review := "- The checker approved the design change: machinery review design " + in.ID + "."
+	sound := "- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass."
+	ds.Description = storyText(designIntent, []string{sound, review},
+		[]string{"machinery:intake-design", "machinery:scope " + strings.Join(scope, " ")}, []string{designExclude}, nil, in)
+	ds.Acceptance = strings.Join([]string{sound, review, "- machinery story passes for this story."}, "\n") + "\n"
+	for _, s := range plan.Stories {
+		s.needs = append(s.needs, need{ds.Key, ds.Title, designNeed})
+		sort.SliceStable(s.needs, func(i, j int) bool { return s.needs[i].title < s.needs[j].title })
+		s.Description = description(d, s, in)
+		plan.Edges = append(plan.Edges, backlog.Edge{FromKey: s.Key, ToKey: ds.Key, Type: "blocks"})
+	}
+	sortEdges(plan.Edges)
+	plan.Stories = append([]*Story{ds}, plan.Stories...)
+}
+
+// Plan builds the stories an intake still owes: the design story when the
+// design changed and the intake has none, one story per group of new ids
 // without a story, and the capstone when the intake has none (section 15.7).
 func (st *IntakeStatus) Plan(d *design.Design) *Plan {
 	plan := BuildPlanFor(d, st.without, st.In)
+	if st.designChanged() && st.DesignStory == nil {
+		st.addDesignStory(d, plan)
+	}
 	if st.Capstone != nil {
 		for _, s := range plan.Stories {
 			plan.Edges = append(plan.Edges, backlog.Edge{FromID: st.Capstone.ID, ToKey: s.Key, Type: "blocks"})
@@ -664,7 +725,7 @@ func ApplyIntake(c *backlog.Client, ds *DesignState, st *IntakeStatus, plan *Pla
 			at[e.ID] = i
 		}
 		for _, s := range plan.Stories {
-			if s.capstone {
+			if s.capstone || s.design {
 				continue
 			}
 			story := ids[s.Key]

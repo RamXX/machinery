@@ -1,0 +1,41 @@
+# machinery hook pre-tool: on a branch named after a story, the commit is held to the story's scope (sections 15.11, 21.1)
+fixture shop proj
+cd proj
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a --title 'Prove order pay' --body-file ../a.txt --silent
+cd ..
+exec sh -c 'sed "s|@WORK@|$WORK|g" commit.tpl > commit.json'
+
+# on main, a staged file anywhere is no finding of scope
+exec sh -c 'cd proj && printf "// shipped\n" >> internal/api/handlers.go && git add internal/api/handlers.go'
+stdin commit.json
+exec machinery hook pre-tool
+! stdout 'scope'
+
+# on a branch named after the story, the staged file outside its scope refuses the commit
+exec sh -c 'cd proj && git checkout -q -b shop-a'
+stdin commit.json
+exec machinery hook pre-tool
+stdout '"permissionDecision":"deny"'
+stdout 'scope: ERROR  scope: internal/api/handlers.go is outside the scope of shop-a'
+
+# inside the scope: no opinion
+exec sh -c 'cd proj && git reset -q && git checkout -q -- internal/api/handlers.go && printf "// paid\n" >> internal/domain/order.go && git add internal/domain/order.go'
+stdin commit.json
+exec machinery hook pre-tool
+! stdout .
+
+# a branch whose name is no item of the backlog is not held to a scope
+exec sh -c 'cd proj && git checkout -q -b feature-x && printf "// shipped\n" >> internal/api/handlers.go && git add internal/api/handlers.go'
+stdin commit.json
+exec machinery hook pre-tool
+! stdout 'scope'
+
+-- a.txt --
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**
+-- commit.tpl --
+{"session_id":"sess-1","cwd":"@WORK@/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m pay"},"tool_use_id":"toolu_01ABC"}

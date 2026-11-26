@@ -2235,7 +2235,8 @@ and is landed by its branch, `machinery check --base <ref> --story <id>` holding
 A planner who wants another story to land the design appends `machinery:intake-design` to it
 before planning; then none is created.
 
-Without `--apply` it prints the stories as the Markdown of section 15.2, the capstone last. With
+Without `--apply` it prints the stories as the Markdown of section 15.2, the design story first and
+the capstone last. With
 `--apply`:
 
 1. it creates every story and edge in one `bd create --graph` call; an edge to a story that
@@ -2251,7 +2252,8 @@ It prints `plan: <n> created, <n> existing, <n> edge(s)` (existing: the stories 
 before), `owed: <n> added`, and `intake <id>: planned at <short sha>, contract <12 hex>` when step 3
 wrote a line. Both forms first print `intake <id>: no new id: the design change adds none; only
 the capstone is planned` for an intake without new ids (a rewording, a removal, or a
-requirement the design already covers), and `intake <id>: every new id has a story; nothing to
+requirement the design already covers), with `only the design story and the capstone are
+planned` in place of the last part when the contract hash is not the base hash, and `intake <id>: every new id has a story; nothing to
 create` when there is nothing left to create. Running it again therefore creates nothing twice.
 
 When it does not refuse, both forms print first a reminder when closed stories carry learnings

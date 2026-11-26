@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/backlog"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/hook"
 	"github.com/RamXX/machinery/internal/landing"
@@ -211,7 +212,7 @@ func hookPreTool(e *Env, in *hook.Input) (*hook.Output, error) {
 			findings = append(findings, redFinding(p, red, base))
 		}
 	}
-	findings = append(findings, hookCheck(p, base)...)
+	findings = append(findings, hookCheck(p, base, branchStory(p))...)
 	if len(findings) == 0 {
 		return nil, nil
 	}
@@ -233,9 +234,27 @@ func redFinding(p *project.Project, red *landing.Red, base string) string {
 	return fmt.Sprintf("red: the integration branch is red since %s; marker %s; repair: fix forward and run machinery landing --base %s --repair, or revert and run machinery landing --clear-red --reason \"<what was reverted>\"", red.What(), marker, base)
 }
 
+// branchStory returns the current branch when it names an item of the
+// backlog (section 21.1), else "".
+func branchStory(p *project.Project) string {
+	branch := gitx.Branch(p.Root)
+	if p.Cfg.Backlog == nil || branch == "" {
+		return ""
+	}
+	c, err := backlog.New(p, "")
+	if err != nil {
+		return ""
+	}
+	if _, err := c.Show(branch); err != nil {
+		return ""
+	}
+	return branch
+}
+
 // hookCheck runs the stages of machinery check, with the ratchet against base
-// when base is not empty, and lists what blocks.
-func hookCheck(p *project.Project, base string) []string {
+// when base is not empty and stage scope for story when it is not empty, and
+// lists what blocks.
+func hookCheck(p *project.Project, base, story string) []string {
 	names := append([]string{}, stages.CheckStages...)
 	ctx := &stages.Context{P: p}
 	var tail []string
@@ -243,6 +262,9 @@ func hookCheck(p *project.Project, base string) []string {
 		if _, err := gitx.Head(p.Root); err == nil {
 			if _, err := gitx.Resolve(p.Root, base); err == nil {
 				names, ctx.Base = append(names, "ratchet"), base
+				if story != "" {
+					names, ctx.Story = append(names, "scope"), story
+				}
 			} else {
 				tail = append(tail, "ratchet: not demonstrated: base "+base+" is not a commit; set backlog.base to the integration branch")
 			}
@@ -268,7 +290,7 @@ func hookStop(e *Env, in *hook.Input) (*hook.Output, error) {
 	if err != nil || !changed {
 		return nil, err
 	}
-	findings := hookCheck(p, "")
+	findings := hookCheck(p, "", "")
 	if len(findings) == 0 {
 		return nil, nil
 	}

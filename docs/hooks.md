@@ -8,7 +8,7 @@ is `docs/formats.md` section 21.1.
 | Hook event | When | What happens |
 |---|---|---|
 | `SessionStart` | A session starts, resumes, clears or compacts. | The model gets the status summary: the red line, the ids, the proofs awaiting, the open intakes and questions. The session's start (HEAD) is recorded and `MACHINERY_SESSION` exported. It never blocks. |
-| `PreToolUse` on `Bash` | Before `git commit` or `git push`. | `machinery check --base <backlog.base, else main>` runs; on findings the command is refused and the model reads the first 40 of them. A push is also refused while the integration branch is red, with the marker and the repair path. Any other command: no opinion. |
+| `PreToolUse` on `Bash` | Before `git commit` or `git push`. | `machinery check --base <backlog.base, else main>` runs, with `--story <branch>` (stage `scope`) when the branch is named after a story of the backlog; on findings the command is refused and the model reads the first 40 of them. A push is also refused while the integration branch is red, with the marker and the repair path. Any other command: no opinion. |
 | `Stop` | The model ends its turn. | When files changed this session, `machinery check` runs. Its findings are shown to you (warn, the default) or, in block mode, the turn goes on once with the findings in front of the model. |
 
 ## Setup

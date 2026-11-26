@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"github.com/RamXX/machinery/internal/backlog"
 	"github.com/RamXX/machinery/internal/stages"
 )
 
@@ -17,9 +18,10 @@ func runStageCommand(e *Env, name string, args []string, all []string, withBase 
 	fs := e.Flags(name)
 	var want StringList
 	fs.Var(&want, "stage", "run only this stage (repeatable)")
-	base := ""
+	base, story := "", ""
 	if withBase {
 		fs.StringVar(&base, "base", "", "git ref to ratchet against")
+		fs.StringVar(&story, "story", "", "with --base: hold this story to its scope (stage scope)")
 	}
 	if !e.Parse(fs, args) {
 		return 2
@@ -27,9 +29,15 @@ func runStageCommand(e *Env, name string, args []string, all []string, withBase 
 	if fs.NArg() > 0 {
 		return e.Usage("machinery %s takes no arguments", name)
 	}
+	if story != "" && base == "" {
+		return e.Usage("--story needs --base <ref>")
+	}
 	list := all
 	if base != "" {
 		list = append(append([]string{}, all...), "ratchet")
+	}
+	if withBase && (story != "" || wants(want, "scope")) {
+		list = append(append([]string{}, list...), "scope")
 	}
 	sel, unknown := stages.Select(list, want)
 	if unknown != "" {
@@ -42,7 +50,25 @@ func runStageCommand(e *Env, name string, args []string, all []string, withBase 
 	if base != "" && !e.CheckRef(p, base) {
 		return 2
 	}
-	return e.RunStages(name, &stages.Context{P: p, Base: base}, sel)
+	if story != "" {
+		c, err := backlog.New(p, "")
+		if err != nil {
+			return e.Fail(err)
+		}
+		if is, code := showStory(e, c, story); is == nil {
+			return code
+		}
+	}
+	return e.RunStages(name, &stages.Context{P: p, Base: base, Story: story}, sel)
+}
+
+func wants(want []string, stage string) bool {
+	for _, w := range want {
+		if w == stage {
+			return true
+		}
+	}
+	return false
 }
 
 // singleStage registers a command that runs exactly one stage.

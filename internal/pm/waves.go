@@ -109,7 +109,7 @@ func designIDs(s *report.Stage, ids []string, open map[string]*backlog.Issue, in
 	for _, id := range ids {
 		is := open[id]
 		t := backlog.ParseTags(is)
-		if len(t.IDs) > 0 || t.Capstone {
+		if len(t.IDs) > 0 || t.Capstone || t.IntakeDesign {
 			continue
 		}
 		if is.HasLabel("machinery") || t.IntakeOf != "" || intakes[is.Parent] {

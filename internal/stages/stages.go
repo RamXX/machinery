@@ -12,6 +12,10 @@ import (
 type Context struct {
 	P    *project.Project
 	Base string // --base git ref, "" when absent
+	// Story is the story stage scope holds to its scope (--story), "" when absent.
+	Story string
+	// NoBacklog, when set, is why no stage may run the backlog tool.
+	NoBacklog string
 
 	d *design.Design
 }
@@ -52,6 +56,7 @@ var Defs = []Def{
 	{"contract", "Stories running in parallel build against the same design."},
 	{"intake", "A requirement reaches the backlog only through the design it changed, and is closed once delivered."},
 	{"ratchet", "What was proven, covered or modeled stays so."},
+	{"scope", "A story writes only inside its declared scope, and leaves the design to an intake."},
 	{"verify", "Each obligation is observed on the running system at this commit."},
 	{"probe", "The tests would notice a wrong transition or a missing effect."},
 	{"story", "A story is accepted with the formality its risk tier requires."},

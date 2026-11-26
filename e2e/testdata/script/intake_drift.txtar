@@ -43,7 +43,7 @@ exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
 exec machinery check --stage intake
 ! stdout 'warn'
 exec machinery waves
-stdout '^checked: 3 stories, 2 edges, 2 waves$'
+stdout '^checked: 4 stories, 5 edges, 3 waves$'
 ! stdout 'no design ids'
 ! stdout 'outside machinery'
 
@@ -66,6 +66,7 @@ stderr '^machinery: cannot freeze: stage waves does not pass$'
 
 # delivered and still open: a warning to close it
 exec sh -c '. ./lib.sh; bd close shop-m1 shop-p1 shop-p2 $(sid "Polish the refund page") --reason dropped'
+exec sh -c '. ./lib.sh; bd close $(sid "Land the design: Refund a paid order") --reason landed'
 exec sh -c '. ./lib.sh; bd close $(sid "Prove order refund") $(sid "Serve Order actions") --reason done'
 exec machinery check --stage intake
 ! stdout 'is delivered'

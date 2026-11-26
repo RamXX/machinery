@@ -137,6 +137,38 @@ func StoryGate(d *design.Design, is *backlog.Issue, issues []backlog.Issue) (*re
 	return s, nil
 }
 
+// DesignStoryGate is stage story for a design story (section 15.6): the
+// design sound and generated at the current commit, a clean tree, and with
+// reviewOn an approved design review of its intake for the current contract.
+// designStages are the lint stages and stage gen-drift, run by the caller;
+// intake is the story's intake item, nil when it names none.
+func DesignStoryGate(d *design.Design, is *backlog.Issue, intake *Intake, designStages []*report.Stage, reviewOn bool) *report.Stage {
+	s := report.New("story")
+	for _, st := range designStages {
+		if !st.OK() {
+			s.Errorf("design: %s: %s", st.Name, OutcomeLine(st))
+		}
+	}
+	if dirty, err := gitx.Dirty(d.P.Root, d.P.Cfg.Receipts.Dir+"/"); err != nil || dirty {
+		s.Errorf("working tree has uncommitted changes")
+	}
+	reviews := 0
+	if reviewOn {
+		c := ContractOf(d)
+		switch {
+		case intake == nil:
+			s.Errorf("%s names no intake: a design story is a story of one (machinery:intake <id>)", is.ID)
+		default:
+			var ok bool
+			ok, reviews = DesignReviewApproved(intake, c.Hash)
+			if !ok {
+				s.Errorf("no approved design review of %s at %s: the checker runs machinery review design %s", intake.ID, c.Short(), intake.ID)
+			}
+		}
+	}
+	return s.Count(len(designStages), "stages").Count(reviews, "design reviews")
+}
+
 // judgeVital adds what the vital tier asks on top of the critical gate
 // (section 15.6): the evidence of every assumption of the story's vital areas
 // is not owed. Its proof obligations never block and are never proven.

@@ -147,6 +147,23 @@ func DiffNames(root, a, b string) ([]string, error) {
 	return lines(out), nil
 }
 
+// MergeBase returns the merge base of two refs.
+func MergeBase(root, a, b string) (string, error) {
+	out, err := run(root, "merge-base", a, b)
+	return strings.TrimSpace(out), err
+}
+
+// StagedSince lists the project-relative paths that differ between a commit
+// and the index: what is committed since it and what is staged. A rename is a
+// deletion and an addition.
+func StagedSince(root, commit string) ([]string, error) {
+	out, err := run(root, "diff", "--name-only", "--relative", "--no-renames", "--cached", commit, "--", ".")
+	if err != nil {
+		return nil, err
+	}
+	return lines(out), nil
+}
+
 // ChangedSince lists project-relative paths that differ between a ref and the
 // working tree, untracked files included.
 func ChangedSince(root, ref string) ([]string, error) {

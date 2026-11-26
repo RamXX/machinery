@@ -33,7 +33,7 @@ exec git status --short
 # with a writable backlog the same plan goes through whole
 cp machinery-bd.yaml machinery.yaml
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
-stdout '^plan: 3 created, 0 existing, 2 edge\(s\)$'
+stdout '^plan: 4 created, 0 existing, 5 edge\(s\)$'
 stdout '^owed: 3 added$'
 gitcommit 'owe the refund'
 
@@ -47,11 +47,11 @@ exec sh -c '. ./lib.sh; mrun 1 intake status $(iid)'
 stdout '^  new ids         done     4 new id\(s\) since [0-9a-f]{7}$'
 stdout '^  planned         missing  1 new id\(s\) without a story; run machinery intake plan shop-[a-z0-9]+ --apply$'
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
-stdout '^plan: 1 created, 3 existing, 1 edge\(s\)$'
+stdout '^plan: 1 created, 4 existing, 1 edge\(s\)$'
 stdout '^owed: 1 added$'
 stdout '^intake shop-[a-z0-9]+: planned at [0-9a-f]{7}, contract [0-9a-f]{12}$'
 exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Refund a paid order") --json | grep -c "\"dependency_type\": \"blocks\""'
-stdout '^3$'
+stdout '^4$'
 exec sh -c '. ./lib.sh; mrun 0 intake status $(iid)'
 exec machinery check --stage intake
 ! stdout 'warn'

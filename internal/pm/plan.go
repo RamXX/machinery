@@ -25,6 +25,7 @@ type Story struct {
 	Acceptance  string
 	needs       []need
 	capstone    bool
+	design      bool // the design story of an intake (section 15.7)
 }
 
 type need struct {

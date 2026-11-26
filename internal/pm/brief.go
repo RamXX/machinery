@@ -86,7 +86,7 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []
 		}
 		run = []string{
 			"export MACHINERY_AGENT=" + agent,
-			"machinery check --base " + base,
+			fmt.Sprintf("machinery check --base %s --story %s", base, is.ID),
 			fmt.Sprintf("machinery run --affected --base %s -- %s", base, e2e),
 			"machinery verify --story " + is.ID,
 			fmt.Sprintf("machinery proof --story %s --post", is.ID),

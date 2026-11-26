@@ -66,6 +66,9 @@ machinery intake plan <id> --apply  # all of them in one backlog call, owed, wit
   tiers, and every critical area it touches has a formal spec. `--apply` also waits for the
   checker's approved design review of the change (`review.design` in `machinery.yaml`). It
   refuses while a wave is frozen: a contract change lands alone.
+- The design story, `Land the design: <title>`, comes first when the design changed: it is the
+  one story that may change design sources (stage `scope`), its gate is the design sound,
+  generated and approved, and every other story of the intake waits for it.
 - The capstone, `Demonstrate: <title>`, closes last. It shows the intent and each refusal on
   the running system through its real interface, records the commands as `machinery:demo`
   lines, and is accepted by a fresh verifier.
@@ -100,7 +103,9 @@ machinery waves --thaw         # when the wave has landed
 ```
 
 - Fix cycles and competing writers before dispatch. Two stories of one wave that write the same
-  paths need an edge or a split. Stories declare what they write with a `machinery:scope` line.
+  paths need an edge or a split. Stories declare what they write with a `machinery:scope` line,
+  and stage `scope` (`machinery check --base <base> --story <id>`, run by the builder's brief and
+  by the commit hook on a branch named after the story) holds each story to it.
 - While a wave is frozen, a change to a design source fails stage `contract`. A contract change
   is its own story and lands alone.
 - A brief is pointers and commands, and it is all a worker gets: context pasted beside it carries

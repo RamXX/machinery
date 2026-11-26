@@ -8,6 +8,7 @@ import (
 	"github.com/RamXX/machinery/internal/pm"
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/internal/stages"
 )
 
 func init() {
@@ -40,15 +41,32 @@ func storyGate(e *Env, p *project.Project, c *backlog.Client, id string) int {
 	if is == nil {
 		return code
 	}
-	issues, err := capstoneBacklog(c, is)
-	if err != nil {
-		return e.Fail(err)
-	}
-	s, err := pm.StoryGate(design.Load(p), is, issues)
+	s, err := gateOf(p, c, is)
 	if err != nil {
 		return e.Fail(err)
 	}
 	return report.PrintAll(e.Stdout, "story", []*report.Stage{s})
+}
+
+// gateOf runs stage story for one story: the design story of an intake is
+// judged by its design and its review, every other story by its tier.
+func gateOf(p *project.Project, c *backlog.Client, is *backlog.Issue) (*report.Stage, error) {
+	if backlog.ParseTags(is).IntakeDesign {
+		ctx := &stages.Context{P: p}
+		checked := stages.Run(ctx, append(append([]string{}, stages.LintStages...), "gen-drift"))
+		var in *pm.Intake
+		if id := pm.IntakeOf(is); id != "" {
+			if item, err := c.Show(id); err == nil {
+				in, _ = pm.ParseIntake(item)
+			}
+		}
+		return pm.DesignStoryGate(ctx.Design(), is, in, checked, p.Cfg.ReviewOn(pm.ReviewDesign)), nil
+	}
+	issues, err := capstoneBacklog(c, is)
+	if err != nil {
+		return nil, err
+	}
+	return pm.StoryGate(design.Load(p), is, issues)
 }
 
 // capstoneBacklog reads the backlog when a story is a capstone, whose ids and

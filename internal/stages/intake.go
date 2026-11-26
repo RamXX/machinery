@@ -16,6 +16,9 @@ func Intake(ctx *Context) *report.Stage {
 	if ctx.P.Cfg.Backlog == nil {
 		return s.NotApplicable("no backlog configured")
 	}
+	if ctx.NoBacklog != "" {
+		return s.NotApplicable(ctx.NoBacklog)
+	}
 	c, err := backlog.New(ctx.P, "")
 	if err != nil {
 		return s.NotApplicable("bd not runnable")

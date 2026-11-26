@@ -4,10 +4,8 @@ import (
 	"fmt"
 
 	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/landing"
-	"github.com/RamXX/machinery/internal/pm"
 	"github.com/RamXX/machinery/internal/report"
 )
 
@@ -87,11 +85,7 @@ func runAccept(e *Env, args []string) int {
 	if is, code = showStory(e, c, is.ID); is == nil {
 		return code
 	}
-	issues, err := capstoneBacklog(c, is)
-	if err != nil {
-		return e.Fail(err)
-	}
-	s, err := pm.StoryGate(design.Load(p), is, issues)
+	s, err := gateOf(p, c, is)
 	if err != nil {
 		return e.Fail(err)
 	}

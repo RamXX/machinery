@@ -1,0 +1,98 @@
+# stage scope: a story changes only files of its machinery:scope, and no design source unless it lands the design (section 15.11)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-a --title 'Prove order pay' --body-file a.txt --silent
+exec bd create --id shop-n --title 'Prove order ship' --body-file n.txt --silent
+exec bd create --id shop-d --title 'Land the design: reword' --body-file d.txt --silent
+
+# usage and config errors
+exec mrun 2 check --story shop-a
+stderr '^usage: --story needs --base <ref>$'
+exec mrun 2 check --base main --story shop-zzz
+stderr '^usage: no story shop-zzz in the backlog'
+exec mrun 2 lint --story shop-a
+stderr 'flag provided but not defined: -story'
+
+# without --story the stage does not run; asked for, it is not applicable
+exec machinery check --base main
+! stdout '== scope =='
+exec machinery check --base main --stage scope
+stdout '^not applicable: no story named; run machinery check --base <ref> --story <id>$'
+exec machinery checks
+stdout '^scope +on demand: machinery check --base <ref> --story <id>$'
+stdout 'protects: A story writes only inside its declared scope, and leaves the design to an intake.$'
+
+# the brief's run line names the story
+exec machinery brief shop-a
+stdout '^  machinery check --base main --story shop-a$'
+
+# nothing changed since the base: nothing to check
+exec git checkout -q -b shop-a
+exec mrun 1 check --base main --story shop-a --stage scope
+stdout '^not demonstrated: nothing changed since main$'
+
+# a story without a scope cannot be held to one
+exec mrun 1 check --base main --story shop-n --stage scope
+stdout '^not demonstrated: shop-n declares no scope; the planner adds a machinery:scope line$'
+
+# inside the scope, committed or staged, it passes; the owed list is not judged
+exec sh -c 'printf "// paid\n" >> internal/domain/order.go'
+exec git add internal/domain/order.go
+exec machinery check --base main --story shop-a --stage scope
+stdout '^checked: 1 files, 1 scope globs$'
+stdout '^passed$'
+exec git commit -q -m 'pay'
+exec sh -c 'printf "version: 1\nowed: []\n" > design/owed.yaml'
+gitcommit 'prune the owed list'
+exec machinery check --base main --story shop-a --stage scope
+stdout '^checked: 1 files, 1 scope globs$'
+stdout '^passed$'
+
+# a file outside the scope, and a design source, fail; an unstaged change is not looked at
+exec sh -c 'printf "// shipped\n" >> internal/api/handlers.go'
+exec machinery check --base main --story shop-a --stage scope
+stdout '^passed$'
+exec git add internal/api/handlers.go
+exec sed -i.bak 's/Order lifecycle/The order lifecycle/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec git add design/machines/Order.machine.json
+exec mrun 1 check --base main --story shop-a --stage scope
+stdout '^checked: 3 files, 1 scope globs$'
+stdout '^  ERROR  scope: design/machines/Order.machine.json is a design source; a design change is an intake$'
+stdout '^  ERROR  scope: internal/api/handlers.go is outside the scope of shop-a$'
+stdout '^failed: 2 finding\(s\)$'
+
+# the whole check runs it after the ratchet
+exec mrun 1 check --base main --story shop-a
+stdout '== ratchet ==\n(.*\n)*== scope =='
+stdout '^machinery check: .*$'
+
+# the design story of an intake may change design sources inside its scope
+exec git reset -q
+exec git checkout -q -- internal/api/handlers.go design/machines/Order.machine.json
+exec git checkout -q main
+exec git checkout -q -b shop-d
+exec sed -i.bak 's/Order lifecycle/The order lifecycle/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: reword'
+exec machinery check --base main --story shop-d --stage scope
+stdout '^checked: 2 files, 2 scope globs$'
+stdout '^passed$'
+exec sh -c 'printf "// x\n" >> internal/domain/order.go'
+gitcommit 'and code'
+exec mrun 1 check --base main --story shop-d --stage scope
+stdout '^  ERROR  scope: internal/domain/order.go is outside the scope of shop-d$'
+! stdout 'is a design source'
+
+-- a.txt --
+machinery:ids tc:ORDE-2e883d
+machinery:scope internal/domain/**
+-- n.txt --
+machinery:ids tc:ORDE-e6d28f
+-- d.txt --
+machinery:intake-design
+machinery:scope design/machines/Order.machine.json design/gen/**

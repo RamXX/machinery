@@ -4,12 +4,13 @@ exec machinery gen
 
 # every stage of section 3.4, in order, each with what it protects
 exec mrun 0 checks
-stdout -count=20 'protects: '
-stdout -count=20 '^[a-z-]+ +(applicable|not applicable|on demand)'
+stdout -count=21 'protects: '
+stdout -count=21 '^[a-z-]+ +(applicable|not applicable|on demand)'
 stdout '^model +applicable$'
 stdout '^ +protects: The vocabulary every other artifact uses: entities, actions, invariants, scenarios\.$'
 stdout '^ +protects: What was proven, covered or modeled stays so\.$'
 stdout '^ratchet +on demand: machinery check --base <ref>$'
+stdout '^scope +on demand: machinery check --base <ref> --story <id>$'
 stdout '^verify +on demand: machinery verify$'
 stdout '^probe +on demand: machinery probe -- <command>$'
 stdout '^story +on demand: machinery story <id>$'
@@ -36,7 +37,7 @@ stdout '^checkers +not applicable: no checkers and no design.facts configured$'
 stdout '^arch +not applicable: no constraints configured$'
 stdout '^tests +not applicable: no tests or trace.tests configured$'
 stdout '^trace +not applicable: no trace configured$'
-stdout -count=20 'protects: '
+stdout -count=21 'protects: '
 
 # it is a report, never a gate, and takes no arguments
 exec mrun 2 checks extra
@@ -61,6 +62,7 @@ trace
 contract
 intake
 ratchet
+scope
 verify
 probe
 story

@@ -26,11 +26,11 @@ stdout '^## Prove inv:total-is-positive$'
 stdout '^## Demonstrate: Order totals$'
 ! stdout 'refund-window'
 exec sh -c 'machinery intake plan $(cat iid.txt) --apply'
-stdout '^plan: 2 created, 0 existing, 1 edge\(s\)$'
+stdout '^plan: 3 created, 0 existing, 3 edge\(s\)$'
 stdout '^owed: 1 added$'
 ! grep 'refund-window' design/owed.yaml
 exec sh -c 'machinery intake status $(cat iid.txt)'
-stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+$'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+; design story shop-[a-z0-9]+$'
 
 # a proposed id that stays proposed is not new again at a later intake
 gitcommit 'owe the new id'

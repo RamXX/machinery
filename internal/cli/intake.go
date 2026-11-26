@@ -156,7 +156,11 @@ func runIntakePlan(e *Env, args []string) int {
 		fmt.Fprintln(e.Stdout, line)
 	}
 	if len(st.NewIDs) == 0 {
-		fmt.Fprintf(e.Stdout, "intake %s: no new id: the design change adds none; only the capstone is planned\n", in.ID)
+		only := "only the capstone is planned"
+		if in.Tags.Base != nil && in.Tags.Base.Contract != ds.Contract.Hash {
+			only = "only the design story and the capstone are planned"
+		}
+		fmt.Fprintf(e.Stdout, "intake %s: no new id: the design change adds none; %s\n", in.ID, only)
 	}
 	if len(plan.Stories) == 0 {
 		fmt.Fprintf(e.Stdout, "intake %s: every new id has a story; nothing to create\n", in.ID)

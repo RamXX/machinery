@@ -28,8 +28,10 @@ story's paths, and nothing in the backlog but your proof.
 
 - Evidence comes from the real system and is bound to a commit: `machinery verify --story <id>`
   judges it, and stage `tests` fails on a unit test or a test double.
-- `machinery check --base <base>` runs the ratchet: nothing proven at the base is owed now. While
-  the wave is frozen, a changed design source fails stage `contract`.
+- `machinery check --base <base> --story <id>` runs the ratchet (nothing proven at the base is owed
+  now) and stage `scope`: a changed file outside your scope, or any design source, fails it, and so
+  does the commit hook on a branch named after your story. While the wave is frozen, a changed
+  design source fails stage `contract`.
 - A consequential, critical or vital story waits for a verifier that is not you.
 
 ## Judgment the tool cannot hold

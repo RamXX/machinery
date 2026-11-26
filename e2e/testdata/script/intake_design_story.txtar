@@ -1,0 +1,332 @@
+# intake plan creates the design story: the one story of an intake that lands its design change, first (sections 15.6, 15.7)
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+
+exec machinery intake new 'Word the lifecycle' --intent 'The machine says what an order is'
+exec sed -i.bak 's/Order lifecycle/The lifecycle of an order/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: word the lifecycle'
+
+# the plan: the design story first, the capstone last and blocked by it
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") | sed "s/$(sid "Word the lifecycle")/INTAKE/g"'
+stdout '^intake INTAKE: no new id: the design change adds none; only the design story and the capstone are planned$'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") | sed 1d | sed "s/$(sid "Word the lifecycle")/INTAKE/g"'
+cmp stdout want-plan.md
+
+# applied after the checker's review: two stories, one edge; the design story carries the marker and its scope
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(sid "Word the lifecycle") --verdict approved --actor checker'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") --apply'
+stdout '^plan: 2 created, 0 existing, 1 edge\(s\)$'
+stdout '^owed: 0 added$'
+exec sh -c '. ./lib.sh; bd show $(sid "Land the design: Word the lifecycle") --json'
+stdout '"tier:routine"'
+stdout 'machinery:intake-design\\nmachinery:scope contracts/openapi.yaml design/failure-modes.yaml design/gen/\*\* design/machines/Order.machine.json design/model/shop.modelith.yaml\\nmachinery:intake shop-'
+stdout '"acceptance_criteria": "- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.\\n- The checker approved the design change: machinery review design shop-[a-z0-9]+.\\n- machinery story passes for this story.\\n"'
+exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Word the lifecycle") --json'
+stdout '"title": "Land the design: Word the lifecycle"'
+stdout '"dependency_type": "blocks"'
+exec sh -c '. ./lib.sh; mrun 0 intake status $(sid "Word the lifecycle")'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+; design story shop-[a-z0-9]+$'
+
+# again: nothing twice
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") --apply'
+stdout '^intake shop-[a-z0-9]+: every new id has a story; nothing to create$'
+stdout '^plan: 0 created, 2 existing, 0 edge\(s\)$'
+
+# waves: the design story names no ids and is no finding; it runs first
+exec machinery waves
+stdout '^wave 1\n  shop-[a-z0-9]+  routine  Land the design: Word the lifecycle$'
+stdout '^wave 2\n  shop-[a-z0-9]+  consequential  Demonstrate: Word the lifecycle$'
+! stdout 'no design ids'
+
+# its gate: the design sound and generated, a clean tree, the approved design review for this contract
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Land the design: Word the lifecycle")'
+stdout '^checked: 9 stages, 1 design reviews$'
+stdout '^passed$'
+exec sed -i.bak 's/The lifecycle of an order/An order from placed to done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Land the design: Word the lifecycle")'
+stdout '^  ERROR  design: gen-drift: failed: 1 finding\(s\)$'
+stdout '^  ERROR  no approved design review of shop-[a-z0-9]+ at [0-9a-f]{12}: the checker runs machinery review design shop-[a-z0-9]+$'
+stdout '^  ERROR  working tree has uncommitted changes$'
+exec machinery gen
+gitcommit 'design: word it again'
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(sid "Word the lifecycle") --verdict approved --actor checker'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Land the design: Word the lifecycle")'
+stdout '^checked: 9 stages, 2 design reviews$'
+
+# a story the planner names by appending the marker lands the design instead: none is created
+exec machinery intake new 'Word it once more' --intent 'The machine says it plainly'
+exec sh -c '. ./lib.sh; bd create --title "Reword by hand" --body-file named.txt --parent $(sid "Word it once more") --silent'
+exec sed -i.bak 's/An order from placed to done/An order, placed to done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: once more'
+exec sh -c 'printf "review:\n  design: off\n" >> machinery.yaml'
+gitcommit 'review.design off'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word it once more") --apply'
+stdout '^plan: 1 created, 1 existing, 1 edge\(s\)$'
+! stdout 'Land the design'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"title\": \"Land the design: Word it once more\"" || true'
+stdout '^0$'
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Reword by hand")'
+stdout '^checked: 9 stages, 0 design reviews$'
+
+# an intake whose design changed and that has no design story is not planned
+exec machinery intake new 'Word it last' --intent 'The machine says it last'
+exec sh -c '. ./lib.sh; bd create --title "Demonstrate by hand" --body-file capstone.txt --parent $(sid "Word it last") --silent'
+exec sed -i.bak 's/An order, placed to done/An order: placed, then done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: last'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Word it last")'
+stdout '^  planned         missing  no design story; run machinery intake plan shop-[a-z0-9]+ --apply$'
+
+-- named.txt --
+machinery:intake-design
+machinery:scope design/machines/** design/gen/**
+-- capstone.txt --
+machinery:capstone
+-- want-plan.md --
+## Land the design: Word the lifecycle
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Intent:
+Land the design change of the requirement alone, before the stories that build on it.
+Requirement INTAKE: The machine says what an order is
+
+Acceptance:
+- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.
+- The checker approved the design change: machinery review design INTAKE.
+
+Ids:
+machinery:intake-design
+machinery:scope contracts/openapi.yaml design/failure-modes.yaml design/gen/** design/machines/Order.machine.json design/model/shop.modelith.yaml
+machinery:intake INTAKE
+
+Excludes:
+- No code and no test: the stories of the intake build on this design.
+
+Needs:
+- none
+
+### Acceptance Criteria
+- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.
+- The checker approved the design change: machinery review design INTAKE.
+- machinery story passes for this story.
+
+## Demonstrate: Word the lifecycle
+
+### Type
+task
+
+### Priority
+1
+
+### Labels
+machinery, tier:consequential
+
+### Description
+Intent:
+Show the requirement on the running system through its real interface.
+Requirement INTAKE: The machine says what an order is
+
+Acceptance:
+- The intent is observed: The machine says what an order is
+
+Ids:
+machinery:capstone
+machinery:intake INTAKE
+
+Excludes:
+- No new behavior: the capstone shows what the other stories built.
+- No design change: a design change is its own story.
+
+Needs:
+- Land the design: Word the lifecycle: the behavior shown
+
+### Acceptance Criteria
+- The intent is shown on the running system through its real interface: The machine says what an order is
+- The commands that show it are recorded on this story, one machinery:demo <command> line each.
+- Every other story of the intake is closed.
+- machinery story passes for this story.
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}
+
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") | sed 1d | sed "s/$(sid "Word the lifecycle")/INTAKE/g"'
+cmp stdout want-plan.md
+
+# applied after the checker's review: two stories, one edge; the design story carries the marker and its scope
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(sid "Word the lifecycle") --verdict approved --actor checker'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") --apply'
+stdout '^plan: 2 created, 0 existing, 1 edge\(s\)$'
+stdout '^owed: 0 added$'
+exec sh -c '. ./lib.sh; bd show $(sid "Land the design: Word the lifecycle") --json'
+stdout '"tier:routine"'
+stdout 'machinery:intake-design\\nmachinery:scope contracts/openapi.yaml design/failure-modes.yaml design/gen/\*\* design/machines/Order.machine.json design/model/shop.modelith.yaml\\nmachinery:intake shop-'
+stdout '"acceptance_criteria": "- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.\\n- The checker approved the design change: machinery review design shop-[a-z0-9]+.\\n- machinery story passes for this story.\\n"'
+exec sh -c '. ./lib.sh; bd show $(sid "Demonstrate: Word the lifecycle") --json'
+stdout '"title": "Land the design: Word the lifecycle"'
+stdout '"dependency_type": "blocks"'
+exec sh -c '. ./lib.sh; mrun 0 intake status $(sid "Word the lifecycle")'
+stdout '^  planned         done     every new id has a story; capstone shop-[a-z0-9]+; design story shop-[a-z0-9]+$'
+
+# again: nothing twice
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word the lifecycle") --apply'
+stdout '^intake shop-[a-z0-9]+: every new id has a story; nothing to create$'
+stdout '^plan: 0 created, 2 existing, 0 edge\(s\)$'
+
+# waves: the design story names no ids and is no finding; it runs first
+exec machinery waves
+stdout '^wave 1\n  shop-[a-z0-9]+  routine  Land the design: Word the lifecycle$'
+stdout '^wave 2\n  shop-[a-z0-9]+  consequential  Demonstrate: Word the lifecycle$'
+! stdout 'no design ids'
+
+# its gate: the design sound and generated, a clean tree, the approved design review for this contract
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Land the design: Word the lifecycle")'
+stdout '^checked: 9 stages, 1 design reviews$'
+stdout '^passed$'
+exec sed -i.bak 's/The lifecycle of an order/An order from placed to done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec sh -c '. ./lib.sh; mrun 1 story $(sid "Land the design: Word the lifecycle")'
+stdout '^  ERROR  design: gen-drift: failed: 1 finding\(s\)$'
+stdout '^  ERROR  no approved design review of shop-[a-z0-9]+ at [0-9a-f]{12}: the checker runs machinery review design shop-[a-z0-9]+$'
+stdout '^  ERROR  working tree has uncommitted changes$'
+exec machinery gen
+gitcommit 'design: word it again'
+env MACHINERY_SESSION=s1 MACHINERY_AGENT=design-checker
+exec sh -c '. ./lib.sh; machinery review design $(sid "Word the lifecycle") --verdict approved --actor checker'
+env MACHINERY_SESSION= MACHINERY_AGENT=
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Land the design: Word the lifecycle")'
+stdout '^checked: 9 stages, 2 design reviews$'
+
+# a story the planner names by appending the marker lands the design instead: none is created
+exec machinery intake new 'Word it once more' --intent 'The machine says it plainly'
+exec sh -c '. ./lib.sh; bd create --title "Reword by hand" --body-file named.txt --parent $(sid "Word it once more") --silent'
+exec sed -i.bak 's/An order from placed to done/An order, placed to done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: once more'
+exec sh -c 'printf "review:\n  design: off\n" >> machinery.yaml'
+exec sh -c '. ./lib.sh; machinery intake plan $(sid "Word it once more") --apply'
+stdout '^plan: 1 created, 1 existing, 1 edge\(s\)$'
+! stdout 'Land the design'
+exec sh -c 'bd list --all --json --limit 0 | grep -c "\"title\": \"Land the design: Word it once more\"" || true'
+stdout '^0$'
+exec sh -c '. ./lib.sh; mrun 0 story $(sid "Reword by hand")'
+stdout '^checked: 9 stages, 0 design reviews$'
+
+# an intake whose design changed and that has no design story is not planned
+exec machinery intake new 'Word it last' --intent 'The machine says it last'
+exec sh -c '. ./lib.sh; bd create --title "Demonstrate by hand" --body-file capstone.txt --parent $(sid "Word it last") --silent'
+exec sed -i.bak 's/An order, placed to done/An order: placed, then done/' design/machines/Order.machine.json
+exec rm design/machines/Order.machine.json.bak
+exec machinery gen
+gitcommit 'design: last'
+exec sh -c '. ./lib.sh; mrun 1 intake status $(sid "Word it last")'
+stdout '^  planned         missing  no design story; run machinery intake plan shop-[a-z0-9]+ --apply$'
+
+-- named.txt --
+machinery:intake-design
+machinery:scope design/machines/** design/gen/**
+-- capstone.txt --
+machinery:capstone
+-- want-plan.md --
+## Land the design: Word the lifecycle
+
+### Type
+task
+
+### Priority
+2
+
+### Labels
+machinery, tier:routine
+
+### Description
+Intent:
+Land the design change of the requirement alone, before the stories that build on it.
+Requirement INTAKE: The machine says what an order is
+
+Acceptance:
+- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.
+- The checker approved the design change: machinery review design INTAKE.
+
+Ids:
+machinery:intake-design
+machinery:scope contracts/openapi.yaml design/failure-modes.yaml design/gen/** design/machines/Order.machine.json design/model/shop.modelith.yaml
+machinery:intake INTAKE
+
+Excludes:
+- No code and no test: the stories of the intake build on this design.
+
+Needs:
+- none
+
+### Acceptance Criteria
+- The design sources are committed, sound and generated: machinery lint and machinery gen --check pass.
+- The checker approved the design change: machinery review design INTAKE.
+- machinery story passes for this story.
+
+## Demonstrate: Word the lifecycle
+
+### Type
+task
+
+### Priority
+1
+
+### Labels
+machinery, tier:consequential
+
+### Description
+Intent:
+Show the requirement on the running system through its real interface.
+Requirement INTAKE: The machine says what an order is
+
+Acceptance:
+- The intent is observed: The machine says what an order is
+
+Ids:
+machinery:capstone
+machinery:intake INTAKE
+
+Excludes:
+- No new behavior: the capstone shows what the other stories built.
+- No design change: a design change is its own story.
+
+Needs:
+- Land the design: Word the lifecycle: the behavior shown
+
+### Acceptance Criteria
+- The intent is shown on the running system through its real interface: The machine says what an order is
+- The commands that show it are recorded on this story, one machinery:demo <command> line each.
+- Every other story of the intake is closed.
+- machinery story passes for this story.
+-- lib.sh --
+# sid <title>: the id of the item with that title
+sid() {
+  bd list --all --json --limit 0 | grep -B1 "^    \"title\": \"$1\"" | sed -n 's/^    "id": "\([^"]*\)".*/\1/p'
+}

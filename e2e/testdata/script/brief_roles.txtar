@@ -28,7 +28,7 @@ cmp stdout want-r1.txt
 # builder and verifier briefs name the agent to export; the run section starts with the export
 exec machinery brief shop-r1
 stdout '^agent: shop-r1-builder$'
-stdout '^run:\n  export MACHINERY_AGENT=shop-r1-builder\n  machinery check --base main\n'
+stdout '^run:\n  export MACHINERY_AGENT=shop-r1-builder\n  machinery check --base main --story shop-r1\n'
 
 # a critical builder brief: the machine, its table, the failure modes, the tier and its route
 exec machinery brief shop-k1
@@ -153,7 +153,7 @@ scope:
   internal/domain/**
 run:
   export MACHINERY_AGENT=shop-r1-builder
-  machinery check --base main
+  machinery check --base main --story shop-r1
   machinery run --affected --base main -- sh e2e/orders.sh
   machinery verify --story shop-r1
   machinery proof --story shop-r1 --post

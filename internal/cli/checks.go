@@ -33,6 +33,7 @@ func runChecks(e *Env, args []string) int {
 	}
 	onDemand := map[string]string{
 		"ratchet": "on demand: machinery check --base <ref>",
+		"scope":   "on demand: machinery check --base <ref> --story <id>",
 		"verify":  "on demand: machinery verify",
 		"probe":   "on demand: machinery probe -- <command>",
 		"story":   "on demand: machinery story <id>",

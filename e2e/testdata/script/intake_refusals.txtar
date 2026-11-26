@@ -108,7 +108,7 @@ exec sh -c 'bd list --all --json --limit 0 | grep -c "^    \"title\":"'
 stdout '^3$'
 exec machinery waves --thaw
 exec sh -c '. ./lib.sh; machinery intake plan $(iid) --apply'
-stdout '^plan: 4 created, 0 existing, 4 edge\(s\)$'
+stdout '^plan: 5 created, 0 existing, 8 edge\(s\)$'
 
 -- machinery-risk.yaml --
 version: 2
