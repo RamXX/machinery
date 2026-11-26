@@ -1,7 +1,7 @@
 # rule event-action: a failure event arrives from outside, so it counts as external
 cp failure-event.json design/machines/Order.machine.json
 exec machinery lint --stage xref-model-machine
-stdout 'checked: 1 machines, 3 domain states, 3 events, 2 actions'
+stdout 'checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 3 events, 2 actions, 1 entities with actions'
 ! stdout 'event-action'
 stdout '^passed$'
 

@@ -1,6 +1,6 @@
 # rule state-enum: the domain states of a lifecycle machine are the values of exactly one enum of its entity
 exec machinery lint --stage xref-model-machine
-stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout 'checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions'
 stdout '^passed$'
 
 # a state the enum does not have
@@ -22,7 +22,7 @@ stdout 'ERROR  state-enum: order: domain states differ from enum Status \(missin
 # lower-case states are transient overlays and are not domain states
 cp overlay.json design/machines/Order.machine.json
 exec machinery lint --stage xref-model-machine
-stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout 'checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions'
 stdout '^passed$'
 cp extra-state.json design/machines/Order.machine.json
 

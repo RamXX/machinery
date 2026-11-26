@@ -1,37 +1,78 @@
-# rule machine-binding: a machine is a lifecycle machine of a model entity, or operational
+# rule machine-binding: every machine binds to the model, as the lifecycle machine of an entity or
+# as an operational machine that names in _serves what it exists for (docs/formats.md section 6.4)
 exec machinery lint --stage xref-model-machine
-stdout 'checked: 1 machines, 3 domain states, 2 events, 2 actions'
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
 stdout '^passed$'
 
 # a machine named after no entity and not operational
 cp stray.json design/machines/Stray.machine.json
 exec mrun 1 lint --stage xref-model-machine
-stdout 'ERROR  machine-binding: stray: not a lifecycle machine of a model entity and not operational; set _lifecycle_of, name the file after an entity, or set _role: operational'
-stdout 'failed: 1 finding\(s\)'
+stdout '^  ERROR  machine-binding: stray: not a lifecycle machine of a model entity and not operational; set _lifecycle_of or name the file after an entity, or set _role: operational and name what it serves in _serves$'
+stdout '^failed: 1 finding\(s\)$'
 rm design/machines/Stray.machine.json
 
 # _lifecycle_of naming an entity that is not in the model
 cp ghost.json design/machines/Other.machine.json
 exec mrun 1 lint --stage xref-model-machine
-stdout 'ERROR  machine-binding: other: _lifecycle_of names entity Ghost, which is not in the model'
+stdout '^  ERROR  machine-binding: other: _lifecycle_of names entity Ghost, which is not in the model$'
 rm design/machines/Other.machine.json
 
-# an operational machine needs no entity
+# an operational machine that names what it serves
 cp ops.json design/machines/Ops.machine.json
 exec machinery lint --stage xref-model-machine
-stdout 'checked: 2 machines, 3 domain states, 2 events, 2 actions'
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
 stdout '^passed$'
+
+# _role: operational alone binds nothing: the machine serves nothing in the model
+cp ops-bare.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: ops: operational and serves nothing in the model; bind it to an entity as its lifecycle \(_lifecycle_of\), or name what it serves in _serves \(entity:<Name> or act:<Entity>\.<action>\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an empty _serves serves nothing either
+cp ops-empty.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: ops: operational and serves nothing in the model; '
+stdout '^failed: 1 finding\(s\)$'
+
+# every id in _serves must be an entity or an action of the model, each reported
+cp ops-unknown.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: ops: _serves names act:Order\.refund, which is not an entity or an action of the model$'
+stdout '^  ERROR  machine-binding: ops: _serves names entity:Ghost, which is not an entity or an action of the model$'
+! stdout 'names act:Order\.pay'
+stdout '^failed: 2 finding\(s\)$'
 
 # both at once
 cp both.json design/machines/Ops.machine.json
 exec mrun 1 lint --stage xref-model-machine
-stdout 'ERROR  machine-binding: ops: _lifecycle_of and _role: operational are both set; a machine is one or the other'
+stdout '^  ERROR  machine-binding: ops: _lifecycle_of and _role: operational are both set; a machine is one or the other$'
+
+# a lifecycle machine serves its entity: _serves on it is an error
+cp lifecycle-serves.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: ops: _serves is set on the lifecycle machine of Order; a lifecycle machine serves its entity: remove _serves, or set _role: operational$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a binding finding is waivable by machine id, and the waived machine is still unbound
+cp ops-bare.json design/machines/Ops.machine.json
+exec sh -c 'cat waiver.yaml >> machinery.yaml'
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: machine-binding: ops: operational and serves nothing in the model; .* \(the envelope is bound when its commands are modeled\)$'
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
+stdout '^passed$'
+
+# binding it makes the waiver stale
+cp ops.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  stale waiver: machine-binding ops$'
+cp base.yaml machinery.yaml
 
 # _lifecycle_of binds a machine whose file name is not the entity name
 rm design/machines/Ops.machine.json
 cp alt.json design/machines/Alt.machine.json
 exec machinery lint --stage xref-model-machine
-stdout 'checked: 2 machines, 6 domain states, 4 events, 4 actions'
+stdout '^checked: 2 machines, 2 lifecycle machines, 0 operational machines, 6 domain states, 4 events, 4 actions, 1 entities with actions$'
 stdout '^passed$'
 
 -- machinery.yaml --
@@ -40,50 +81,15 @@ design:
   models:
     - design/model/mini.modelith.yaml
   machines: design/machines
--- design/model/mini.modelith.yaml --
-kind: DomainModel
-version: v1
-title: Mini
-enums:
-  Status:
-    values:
-      - {name: Pending, definition: "Placed."}
-      - {name: Paid, definition: "Paid."}
-      - {name: Cancelled, definition: "Dropped."}
-entities:
-  Order:
-    definition: "An order."
-    attributes:
-      - {name: status, type: Status}
-    actions:
-      - {name: pay, actor: Customer}
-      - {name: cancel, actor: Customer}
--- design/machines/Order.machine.json --
-{
-  "id": "order",
-  "initial": "Pending",
-  "states": {
-    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
-    "Paid": { "type": "final" },
-    "Cancelled": { "type": "final" }
-  }
-}
--- stray.json --
-{ "id": "stray", "initial": "A", "states": { "A": { "type": "final" } } }
--- ghost.json --
-{ "id": "other", "_lifecycle_of": "Ghost", "initial": "A", "states": { "A": { "type": "final" } } }
--- ops.json --
-{ "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
--- both.json --
-{ "id": "ops", "_role": "operational", "_lifecycle_of": "Order", "initial": "idle", "states": { "idle": { "type": "final" } } }
-
-
--- machinery.yaml --
+-- base.yaml --
 version: 2
 design:
   models:
     - design/model/mini.modelith.yaml
   machines: design/machines
+-- waiver.yaml --
+waivers:
+  - {rule: machine-binding, id: ops, reason: "the envelope is bound when its commands are modeled"}
 -- design/model/mini.modelith.yaml --
 kind: DomainModel
 version: v1
@@ -117,11 +123,25 @@ entities:
 -- ghost.json --
 { "id": "other", "_lifecycle_of": "Ghost", "initial": "A", "states": { "A": { "type": "final" } } }
 -- ops.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- ops-bare.json --
 { "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- ops-empty.json --
+{ "id": "ops", "_role": "operational", "_serves": [], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- ops-unknown.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "act:Order.refund", "entity:Ghost"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
 -- both.json --
 { "id": "ops", "_role": "operational", "_lifecycle_of": "Order", "initial": "idle", "states": { "idle": { "type": "final" } } }
--- lifecycle-of.json --
-{ "id": "ops", "_lifecycle_of": "Order", "initial": "idle", "states": { "idle": { "type": "final" } } }
+-- lifecycle-serves.json --
+{
+  "id": "ops", "_lifecycle_of": "Order", "_serves": ["entity:Order"],
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
 -- alt.json --
 {
   "id": "alt", "_lifecycle_of": "Order",

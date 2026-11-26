@@ -1,0 +1,265 @@
+# import.machines.bind gives a binding to machines kept in a project's own format; the translation
+# never invents one (docs/formats.md section 5.2.1)
+fixture empty
+cp config.yaml machinery.yaml
+exec machinery lint --stage machines --stage xref-model-machine
+stdout '(?s)== machines ==\nchecked: 3 machines, 6 states, 6 transitions\npassed\n'
+stdout '(?s)== xref-model-machine ==\nchecked: 3 machines, 2 lifecycle machines, 1 operational machines, 4 domain states, 4 events, 4 actions, 1 entities with actions\npassed\n'
+
+# a glob binds the lifecycle, a machine id binds the operational machine, and the keys come
+# last, before the tag; a machine that binds itself is kept as it is
+exec machinery gen
+cmp design/gen/imported/machines/hold_queue.machine.json want-hold.json
+grep '"_lifecycle_of": "Loan",' design/gen/imported/machines/loan_desk.machine.json
+! grep '_role' design/gen/imported/machines/loan_desk.machine.json
+grep '"_lifecycle_of": "Loan"' design/gen/imported/machines/annex.machine.json
+! grep '_role' design/gen/imported/machines/annex.machine.json
+
+# a machine with no binding, from its source or from bind, is reported like any other
+cp stray.json machines/stray.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: stray: not a lifecycle machine of a model entity and not operational; '
+exec machinery gen
+! grep '_role' design/gen/imported/machines/stray.machine.json
+rm machines/stray.json
+
+# what bind serves is held to the model like a native _serves
+exec sh -c 'sed "s/act:Loan.lend/act:Loan.renew/" config.yaml > machinery.yaml'
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: hold_queue: _serves names act:Loan\.renew, which is not an entity or an action of the model$'
+exec sh -c 'sed "s/act:Loan.lend/Loan/" config.yaml > machinery.yaml'
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/hold-queue\.json: _serves entry ''Loan'' is not an entity:<Name> or act:<Entity>\.<action> id$'
+
+# a machine bound in its source and by an entry
+cp config-self.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/loans/annex\.json: bound in the source and by import.machines.bind machines/loans/annex\.json; keep one$'
+
+# a machine two entries match gets neither
+cp config-two.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/hold-queue\.json: import.machines.bind hold_queue and machines/h\*\.json both match; keep one$'
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: hold_queue: not a lifecycle machine of a model entity and not operational; '
+
+# an entry that matches nothing is stale
+cp config-ghost.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  import.machines.bind ghost_desk: matches no machine file and no machine id$'
+stdout '^failed: 1 finding\(s\)$'
+
+# a malformed entry is a config error
+cp config-both.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.bind.hold_queue: set lifecycle_of or serves, not both$'
+cp config-neither.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.bind.hold_queue: set lifecycle_of or serves$'
+cp config-empty-id.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.bind.hold_queue.serves: an id must not be empty$'
+cp config-glob.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.bind: "machines/\[\.json" is not a valid glob$'
+cp config-key.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: .*lifecycle'
+
+-- config.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    states: capitalize
+    rename:
+      root: {entity: _lifecycle_of}
+      state: {skip: _ignores}
+    bind:
+      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
+-- config-self.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    states: capitalize
+    rename:
+      root: {entity: _lifecycle_of}
+      state: {skip: _ignores}
+    bind:
+      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      "machines/loans/annex.json": {lifecycle_of: Loan}
+      hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
+-- config-two.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    states: capitalize
+    rename:
+      root: {entity: _lifecycle_of}
+      state: {skip: _ignores}
+    bind:
+      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      "machines/h*.json": {serves: ["entity:Loan"]}
+      hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
+-- config-ghost.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    states: capitalize
+    rename:
+      root: {entity: _lifecycle_of}
+      state: {skip: _ignores}
+    bind:
+      "machines/loans/desk-*.json": {lifecycle_of: Loan}
+      hold_queue: {serves: ["act:Loan.lend", "entity:Loan"]}
+      ghost_desk: {lifecycle_of: Loan}
+-- config-both.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    bind:
+      hold_queue: {lifecycle_of: Loan, serves: ["entity:Loan"]}
+-- config-neither.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    bind:
+      hold_queue: {}
+-- config-empty-id.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    bind:
+      hold_queue: {serves: ["entity:Loan", ""]}
+-- config-glob.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    bind:
+      "machines/[.json": {serves: ["entity:Loan"]}
+-- config-key.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/**/*.json"]
+    bind:
+      hold_queue: {lifecycle: Loan}
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  LoanStatus:
+    values:
+      - {name: Shelved, definition: "On the shelf."}
+      - {name: Lent, definition: "With a member."}
+entities:
+  Loan:
+    definition: "One copy lent to one member."
+    attributes:
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian}
+      - {name: giveBack, actor: Member}
+-- machines/loans/desk-main.json --
+{
+  "id": "loan-desk",
+  "initial": "shelved",
+  "states": {
+    "shelved": {
+      "on": {"lend": {"target": "lent"}},
+      "skip": {"giveBack": "nothing is lent; the desk refuses with NOT_LENT"}
+    },
+    "lent": {
+      "on": {"giveBack": {"target": "shelved"}},
+      "skip": {"lend": "already lent; the desk refuses with ALREADY_LENT"}
+    }
+  }
+}
+-- machines/loans/annex.json --
+{
+  "id": "annex",
+  "entity": "Loan",
+  "initial": "shelved",
+  "states": {
+    "shelved": {
+      "on": {"lend": {"target": "lent"}},
+      "skip": {"giveBack": "nothing is lent; the desk refuses with NOT_LENT"}
+    },
+    "lent": {
+      "on": {"giveBack": {"target": "shelved"}},
+      "skip": {"lend": "already lent; the desk refuses with ALREADY_LENT"}
+    }
+  }
+}
+-- machines/hold-queue.json --
+{
+  "id": "hold-queue",
+  "initial": "idle",
+  "states": {
+    "idle": {"on": {"notify": {"target": "sending"}}, "skip": {"sent": "nothing is being sent"}},
+    "sending": {"on": {"sent": {"target": "idle"}}, "skip": {"notify": "a notice is already on its way"}}
+  }
+}
+-- stray.json --
+{
+  "id": "stray",
+  "initial": "idle",
+  "states": {
+    "idle": {"on": {"notify": {"target": "sending"}}, "skip": {"sent": "nothing is being sent"}},
+    "sending": {"on": {"sent": {"target": "idle"}}, "skip": {"notify": "a notice is already on its way"}}
+  }
+}
+-- want-hold.json --
+{
+  "id": "hold_queue",
+  "initial": "Idle",
+  "states": {
+    "Idle": {
+      "on": {
+        "notify": {
+          "target": "Sending"
+        }
+      },
+      "_ignores": {
+        "sent": "nothing is being sent"
+      }
+    },
+    "Sending": {
+      "on": {
+        "sent": {
+          "target": "Idle"
+        }
+      },
+      "_ignores": {
+        "notify": "a notice is already on its way"
+      }
+    }
+  },
+  "_role": "operational",
+  "_serves": [
+    "act:Loan.lend",
+    "entity:Loan"
+  ],
+  "_oracle_tag": "HOLD6E55"
+}

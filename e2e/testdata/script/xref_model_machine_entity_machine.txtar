@@ -1,0 +1,100 @@
+# rule entity-machine: every entity that declares an action has a lifecycle machine
+# (docs/formats.md section 6.4); an entity with no state of its own is waived, with the reason
+exec mrun 1 lint --stage xref-model-machine
+stdout '^checked: 1 machines, 1 lifecycle machines, 0 operational machines, 3 domain states, 2 events, 2 actions, 2 entities with actions$'
+stdout '^  ERROR  entity-machine: entity:Customer: declares 1 action\(s\) and no machine is its lifecycle; write its lifecycle machine \(_lifecycle_of: Customer\), or waive the rule with the reason it has no state$'
+! stdout 'entity:Note'
+! stdout 'entity:Order'
+stdout '^failed: 1 finding\(s\)$'
+
+# an operational machine that serves the entity is not its lifecycle
+cp notifier.json design/machines/Notifier.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 2 entities with actions$'
+stdout '^  ERROR  entity-machine: entity:Customer: declares 1 action\(s\) and no machine is its lifecycle; '
+stdout '^failed: 1 finding\(s\)$'
+
+# a waiver names the entity and says why it has no state
+exec sh -c 'cat waiver.yaml >> machinery.yaml'
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   waived: entity-machine: entity:Customer: declares 1 action\(s\) and no machine is its lifecycle; .* \(a customer is closed by deleting the record; it has no status\)$'
+stdout '^passed$'
+
+# a lifecycle machine for it makes the waiver stale, so the list only shrinks
+cp customer.json design/machines/Customer.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^checked: 3 machines, 2 lifecycle machines, 1 operational machines, 5 domain states, 3 events, 3 actions, 2 entities with actions$'
+stdout '^  ERROR  stale waiver: entity-machine entity:Customer$'
+stdout '^failed: 1 finding\(s\)$'
+cp base.yaml machinery.yaml
+exec machinery lint --stage xref-model-machine
+stdout '^passed$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  machines: design/machines
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  machines: design/machines
+-- waiver.yaml --
+waivers:
+  - {rule: entity-machine, id: "entity:Customer", reason: "a customer is closed by deleting the record; it has no status"}
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+  CustomerStatus:
+    values:
+      - {name: Active, definition: "May order."}
+      - {name: Closed, definition: "Gone; terminal."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+  Customer:
+    definition: "Who orders."
+    attributes:
+      - {name: status, type: CustomerStatus}
+    actions:
+      - {name: close, actor: Customer}
+  Note:
+    definition: "A remark on an order; it has no actions."
+    attributes:
+      - {name: text, type: string}
+-- design/machines/Order.machine.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}
+-- notifier.json --
+{ "id": "notifier", "_role": "operational", "_serves": ["entity:Customer", "act:Customer.close"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- customer.json --
+{
+  "id": "customer",
+  "initial": "Active",
+  "states": {
+    "Active": { "on": { "close": { "target": "Closed" } } },
+    "Closed": { "type": "final" }
+  }
+}

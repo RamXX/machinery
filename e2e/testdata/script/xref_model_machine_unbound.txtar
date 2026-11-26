@@ -1,0 +1,90 @@
+# a stage that bound no machine to a model entity compared no state, event or action: it is not
+# demonstrated, never passed (docs/formats.md section 6.4)
+
+# only an operational machine, every finding waived: still nothing compared
+exec mrun 1 lint --stage xref-model-machine
+stdout '^checked: 1 machines, 0 lifecycle machines, 1 operational machines, 0 domain states, 0 events, 0 actions, 1 entities with actions$'
+stdout '^  warn   waived: entity-machine: entity:Order: '
+stdout '^not demonstrated: no machine is bound to a model entity$'
+stdout 'machinery lint: 0 passed, 0 failed, 1 not demonstrated, 0 not applicable'
+
+# a waived unbound machine is not bound either
+cp stray.json design/machines/Stray.machine.json
+exec sh -c 'cat stray-waiver.yaml >> machinery.yaml'
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  warn   waived: machine-binding: stray: not a lifecycle machine of a model entity and not operational; '
+stdout '^not demonstrated: no machine is bound to a model entity$'
+
+# a finding makes the stage failed, as always
+rm design/machines/Ops.machine.json
+cp ops-bare.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  machine-binding: ops: operational and serves nothing in the model; '
+stdout '^failed: 1 finding\(s\)$'
+! stdout '^not demonstrated'
+
+# check holds it too
+exec mrun 1 check --stage xref-model-machine
+stdout '^failed: 1 finding\(s\)$'
+
+# one lifecycle machine is enough to compare something
+cp base.yaml machinery.yaml
+rm design/machines/Stray.machine.json
+cp ops.json design/machines/Ops.machine.json
+cp order.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^checked: 2 machines, 1 lifecycle machines, 1 operational machines, 3 domain states, 2 events, 2 actions, 1 entities with actions$'
+stdout '^passed$'
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+waivers:
+  - {rule: entity-machine, id: "entity:Order", reason: "the order lifecycle is not modeled yet"}
+-- stray-waiver.yaml --
+  - {rule: machine-binding, id: stray, reason: "a spike, deleted next week"}
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/mini.modelith.yaml
+  machines: design/machines
+-- design/model/mini.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Mini
+enums:
+  Status:
+    values:
+      - {name: Pending, definition: "Placed."}
+      - {name: Paid, definition: "Paid."}
+      - {name: Cancelled, definition: "Dropped."}
+entities:
+  Order:
+    definition: "An order."
+    attributes:
+      - {name: status, type: Status}
+    actions:
+      - {name: pay, actor: Customer}
+      - {name: cancel, actor: Customer}
+-- design/machines/Ops.machine.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- ops.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay"], "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- ops-bare.json --
+{ "id": "ops", "_role": "operational", "initial": "idle", "states": { "idle": { "on": { "tick": { "target": "idle" } } } } }
+-- stray.json --
+{ "id": "stray", "initial": "A", "states": { "A": { "type": "final" } } }
+-- order.json --
+{
+  "id": "order",
+  "initial": "Pending",
+  "states": {
+    "Pending": { "on": { "pay": { "target": "Paid" }, "cancel": { "target": "Cancelled" } } },
+    "Paid": { "type": "final" },
+    "Cancelled": { "type": "final" }
+  }
+}

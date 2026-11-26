@@ -85,6 +85,7 @@ failure_modes:
 {
   "id": "ops",
   "_role": "operational",
+  "_serves": ["entity:Order"],
   "initial": "idle",
   "states": {
     "idle": { "on": { "sync": { "target": "syncing" } } },

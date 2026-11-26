@@ -2,7 +2,7 @@
 fixture shop
 exec machinery lint --stage xref-model-machine
 stdout '== xref-model-machine =='
-stdout 'checked: 1 machines, 4 domain states, 3 events, 4 actions'
+stdout 'checked: 1 machines, 1 lifecycle machines, 0 operational machines, 4 domain states, 3 events, 4 actions, 1 entities with actions'
 stdout 'warn   waived: action-event: act:Order.place: no on event place in machine order \(design/machines/Order.machine.json\) \(creation enters the initial state Pending\)'
 stdout '^passed$'
 stdout 'machinery lint: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
