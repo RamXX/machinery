@@ -4,7 +4,7 @@ description: Writes and maintains the formal model of a critical area in a machi
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 
-You write the formal model for one critical area. Guide: `docs/formal.md`. Contract:
+You write the formal model for one critical or vital area. Guide: `docs/formal.md`. Contract:
 `docs/formats.md` section 16.
 
 ## Order of work
@@ -29,6 +29,9 @@ You write the formal model for one critical area. Guide: `docs/formal.md`. Contr
 ## Rules
 
 - Update the model from the code, never from the result of a check.
+- A vital area: state each of its `property` entries in the model, and its `assumes` as numbered
+  assumptions. The model checks the design, not the core: a vital property stays awaiting a
+  machine-checked proof whatever the model says.
 - When sources drift: `machinery formal sync <spec>`, read the commits, then classify with
   `--class`. A possible bug gets a story, not a quiet pass.
 - Keep bounds small and say what they are. A weakening needs

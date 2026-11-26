@@ -5,8 +5,8 @@ is `docs/formats.md` section 16; this page is the working order.
 
 ## When
 
-Only for areas the risk file marks `critical` (section 23): promises whose break harms users and
-that tests rarely reach. Everything else is covered by generated transition cases and end-to-end
+Only for areas the risk file marks `critical` or `vital` (section 23): promises whose break harms
+users and that tests rarely reach. Everything else is covered by generated transition cases and end-to-end
 evidence. The area's `questions` pick the tool:
 
 | You are asking | Tool |
@@ -79,3 +79,31 @@ receipt. The trace says which is expected:
 | A passing run that was violated | undetermined | Reproduced: fix the code. Refuted: fix the model. |
 
 Nobody weakens the property to make the run pass.
+
+## Beyond model checking
+
+A model check answers questions about the design: given these states and these steps, can two
+callers both charge? It says nothing about the code that runs. The tests close part of that gap.
+For the few paths that must never go wrong (a customer charged twice, an audit record lost, a
+signature attributed to the wrong person) the risk file marks the area `vital`
+(`docs/formats.md` section 23). A vital area keeps everything above and adds:
+
+- **Properties.** Each states exactly what must hold, over inputs and stored state, and names the
+  design ids it is about (`over`). Each is a proof obligation `pf:<area>:<name>`. Nothing in this
+  version proves one: it prints as awaiting proof, is never owed and no test may claim it.
+- **A core.** The files where the path lives and its entry points. Stage `arch` keeps the core
+  small, free of the packages `constraints.cores.deny_imports` names, and the only implementation
+  of the actions its properties are over.
+- **Assumptions.** What the core takes on trust from its surroundings (the database enforces a
+  unique key; the caller is authenticated), each with the obligation that is its evidence. While
+  that evidence is owed the assumption prints as `assumed, unproven`, and a story of the area is
+  not accepted.
+
+`machinery gen` writes `design/gen/vital/<area>.json`: the properties, the core files with their
+hashes, the assumptions and the status of every id, the hand-off a machine-checked proof of the
+core will start from. Until a later version requires that proof, every report that calls an id of
+a vital property proven says how far the proof goes: `(by test and model; proof awaited)`.
+
+`machinery vital candidates` lists the ids that look vital and are in no vital area, from the
+names and texts of the design alone. Make each one vital, or dismiss it under `not_vital` in the
+risk file with the reason.

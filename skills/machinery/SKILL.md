@@ -42,8 +42,9 @@ restate its rules from memory, and do not read the long documents unless a step 
    before any story or code. Change the design first (Design above), commit it, and read
    `machinery intake status <id>` until only `planned` is missing.
 2. Assign risk tiers in `design/risk.yaml`: routine by default, consequential for authorization,
-   money, published contracts and migrations, critical for races, recovery and structural rules.
-   When unsure, the higher tier.
+   money, published contracts and migrations, critical for races, recovery and structural rules,
+   vital for the few paths that must never go wrong. When unsure, the higher tier.
+   `machinery vital candidates` lists what looks vital; make it vital or dismiss it under `not_vital`.
 3. `machinery intake plan <id> --apply` writes all the stories of the change at once, with the
    capstone that demonstrates it. Owed ids without a requirement: `machinery plan --apply`.
 4. `machinery waves` gives the parallel schedule. Before fan-out: `machinery waves --freeze`.

@@ -21,8 +21,12 @@ stories, are how a model drifts away from the system; the tool refuses that orde
   refuses until the design steps are done and while a wave is frozen, then creates every story
   and the capstone at once.
 - Tiers: consequential for authorization, tenant isolation, money, audit, published contract
-  semantics, migrations; critical for races, lost or repeated work, structural rules. Unsure
+  semantics, migrations; critical for races, lost or repeated work, structural rules; vital for
+  the few paths that must never go wrong (properties, a core, assumptions with evidence). Unsure
   means higher. Read the `routine by default` line of `intake status` before planning.
+- Before a plan: `machinery vital candidates`. Make each candidate vital, or dismiss it under
+  `not_vital` in `design/risk.yaml` with the reason. Never report a vital id as more than
+  proven by test and model.
 - Owed ids without a requirement (skeleton, adoption): `machinery plan --apply`.
 - A candidate the owner has not committed to goes in `design/status.yaml` as `proposed`; a
   promise withdrawn is `retired` with a reason. Never propose what is owed or proven.

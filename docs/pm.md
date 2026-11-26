@@ -14,8 +14,13 @@ story is accepted with the formality of its tier. The backlog tool is `bd`. The 
 | routine | Cheap to see and undo. | Generated transition cases, end-to-end evidence. |
 | consequential | Authorization, money, audit, published contracts, migrations. | An abuse case per action; a fresh verifier who predicts before reading the proof. |
 | critical | Races, lost or repeated work, structural rules. | A formal model (`docs/formal.md`). |
+| vital | A path that must never go wrong: a double charge, a lost audit record, a signature on the wrong person. | The formal model, plus exact properties over its ids, a core shaped for a later machine-checked proof, and its assumptions with evidence (`docs/formal.md`, "Beyond model checking"). |
 
-Choose the tier at planning. When unsure, the higher one. Lowering a tier later fails the
+Choose the tier at planning. When unsure, the higher one. Keep vital for the few paths whose
+break cannot be undone: each vital area is a promise that its core will one day be proven, and
+its proof obligations are counted until then. At planning, run `machinery vital candidates`: it
+lists the ids that look vital from the design alone. Make each one vital, or dismiss it under
+`not_vital` in the risk file with the reason; the list only shrinks. Lowering a tier later fails the
 ratchet unless the risk file records it under `lowered:` with a reason.
 
 ## Statuses: proposed and retired
@@ -102,9 +107,11 @@ machinery accept <id> --verdict accept --observed "..." --close
 machinery story <id>                     # the gate, by tier
 ```
 
-Routine stories pass on evidence. Consequential and critical ones need a verifier who is not the
-builder, a prediction for the same commit, and then the verdict. Critical ones also need their
-formal model proven and its counterexamples replayed.
+Routine stories pass on evidence. Consequential, critical and vital ones need a verifier who is
+not the builder, a prediction for the same commit, and then the verdict. Critical and vital ones
+also need their formal model proven and its counterexamples replayed; vital ones also need the
+evidence of every assumption proven. A proof obligation never blocks a story and never counts as
+proven.
 
 The builder posts the proof with what it does not prove and what it learned:
 `--limit "<claim still unproven>"`, `--learning "<rule for the next story>"`,

@@ -25,7 +25,10 @@ Three rules shape it:
 
 - **Formality follows risk.** Routine work gets machines and generated end-to-end cases.
   Consequential work adds a fresh verifier who predicts before reading the proof. Critical work
-  adds a formal model: TLA+ for ordering, concurrency and recovery, Alloy for structure.
+  adds a formal model: TLA+ for ordering, concurrency and recovery, Alloy for structure. Vital
+  work, the few paths that must never go wrong, adds exact properties over its ids, a small core
+  shaped for a later machine-checked proof, and its assumptions with evidence; nothing reports
+  it as more proven than its tests and model make it.
 - **Evidence comes from the real system.** No unit tests and no test doubles, in machinery or in
   a project that uses it. Test quality is measured by `machinery probe`, which gives the system
   a wrong transition table and expects the tests to notice.
@@ -47,7 +50,7 @@ make tools && make build        # in this repository: pinned tools into .bin/, t
 | A new project | [docs/getting-started.md](docs/getting-started.md) |
 | Existing code and a backlog | [docs/brownfield.md](docs/brownfield.md): assess read-only first, then adopt one area at a time, no rewrite |
 | A backlog to plan and schedule | [docs/pm.md](docs/pm.md) |
-| A critical area to model | [docs/formal.md](docs/formal.md) |
+| A critical or vital area to model | [docs/formal.md](docs/formal.md) |
 | A deterministic checker of your own | [docs/external-checkers.md](docs/external-checkers.md) |
 | A question about any format or output line | [docs/formats.md](docs/formats.md), the contract |
 
