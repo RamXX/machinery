@@ -45,9 +45,14 @@ func (a *assessment) inventory(s *section) {
 	}
 }
 
-// design: every lint stage.
+// design: every lint stage, and how many machines bind to the model.
 func (a *assessment) design(s *section) {
 	s.stages = stages.Run(a.ctx, stages.LintStages)
+	if len(a.ctx.Design().Machines) > 0 {
+		bound, unbound := stages.BindingCounts(a.ctx)
+		s.own.Count(bound, "bound machines").Count(unbound, "unbound machines")
+		s.facts = map[string]any{"bound_machines": bound, "unbound_machines": unbound}
+	}
 }
 
 func stageSection(name string) func(a *assessment, s *section) {

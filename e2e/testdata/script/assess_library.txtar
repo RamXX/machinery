@@ -13,7 +13,7 @@ stdout '^project: proj at [0-9a-f]{7}$'
 ! stdout '^dirty:'
 ! stdout '^outside links:'
 stdout '^inventory: passed; checked: 10 files$'
-stdout '^design: failed: 1 finding\(s\); checked: 8 stages$'
+stdout '^design: failed: 1 finding\(s\); checked: 8 stages, 2 bound machines, 0 unbound machines$'
 stdout '^generation: passed; checked: 7 generated files, 8 written$'
 stdout '^trace: passed; checked: 1 code files, 1 test files, 3 act ids, 19 obligations$'
 stdout '^tests: passed; checked: 0 test files, 1 files under e2e roots, 12 markers$'
@@ -39,6 +39,7 @@ grep '^\| design \| failed: 1 finding\(s\) \| 1 \|$' out/report.md
 grep '^\| model \| failed \| 1 models, 1 entities, 3 actions, 2 invariants, 2 scenarios \| 1 \| stages/model.txt \|$' out/report.md
 grep '^- 1 drift: model: missing$' out/report.md
 grep '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$' out/report.md
+grep '^checked: 8 stages, 2 bound machines, 0 unbound machines$' out/report.md
 grep '^loan: 4 states, 4 distinct states found, passed$' out/report.md
 grep '^hold_queue: 2 states, 2 distinct states found, passed$' out/report.md
 grep '^design/model/library.modelith.yaml: instance found$' out/report.md
@@ -51,6 +52,8 @@ grep '^  "outside_links": \[\],$' out/report.json
 grep '^  "project": "proj",$' out/report.json
 grep '"rule": "model: missing",' out/report.json
 grep '"code_files": 1,' out/report.json
+grep '"bound_machines": 2,' out/report.json
+grep '"unbound_machines": 0' out/report.json
 grep '"distinct": 4,' out/report.json
 grep '^    "sections": 10$' out/report.json
 grep '^  "version": 1$' out/report.json
@@ -76,3 +79,10 @@ exists out/formal/models/library/Sanity.als
 exec machinery -C proj assess --out out2
 cmp out/report.json out2/report.json
 cmp out/report.md out2/report.md
+
+# a machine that binds to nothing counts as unbound, and its finding has a rule
+exec sh -c 'grep -v -e "^    bind:$" -e "hold_queue: {serves" proj/machinery.yaml > unbound.yaml'
+exec machinery -C proj assess --config unbound.yaml --out out3
+stdout '^design: failed: 2 finding\(s\); checked: 8 stages, 1 bound machines, 1 unbound machines$'
+grep '"unbound_machines": 1' out3/report.json
+grep '^- 1 error: xref-model-machine: machine-binding$' out3/report.md

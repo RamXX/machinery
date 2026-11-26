@@ -189,13 +189,14 @@ func (s *section) findings() int {
 }
 
 // checked is the checked line of a section: the stage's own for a section
-// of one stage, the number of stages for a longer list.
+// of one stage, the number of stages for a longer list followed by the
+// section's own counts.
 func (s *section) checked() []report.Count {
 	switch {
 	case len(s.stages) == 1:
 		return s.stages[0].Checked
 	case len(s.stages) > 1:
-		return []report.Count{{N: len(s.stages), Noun: "stages"}}
+		return append([]report.Count{{N: len(s.stages), Noun: "stages"}}, s.own.Checked...)
 	}
 	return s.own.Checked
 }
