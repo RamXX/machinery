@@ -48,6 +48,13 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
   generation.
 
+- Claims beside owed: `adopt` owes an id a test already claims as `claimed at adoption` and an
+  id the project marked planned (`import.planned`) as `planned at adoption` with its story;
+  `status`, `assess` and the rehearsal count ids by claim; `plan` gives the claimed ones one
+  `Wire evidence` story per test file (per directory past `plan.wire_max_files`).
+- `trace.markers.scenarios_exact`: a marker that claims only when its text is a scenario name.
+  A serves tag that names an id which is not an action is a warn, counted by stage `trace`.
+
 ### Carried forward from v1
 
 - Modelith integration (now 0.6.0), through the real executable.
