@@ -33,6 +33,14 @@ stdout 'ERROR  unknown-id: e2e/orders.sh:6: tc:NOPE-\*'
 ! stdout 'Order.nope'
 ! stdout 'nosuch-in-prose'
 
+# a file that trace.code and trace.tests both match is read once
+cp machinery.yaml cfg.keep
+cp both-globs.yaml machinery.yaml
+exec mrun 1 trace
+stdout -count=1 'unknown-id: e2e/orders.sh:3: nosuch'
+stdout -count=1 'unknown-id: e2e/orders.sh:4: inv:nosuch-either'
+cp cfg.keep machinery.yaml
+
 # serves markers are read in trace.code, verifies markers in trace.tests
 cp orders-wrongplace.sh.in e2e/orders.sh
 exec mrun 1 trace
@@ -145,6 +153,20 @@ failure_modes:
     failure: "The payment provider does not answer or answers with an error."
     required: surface
     behavior: "The order returns to Pending and the caller sees PAYMENT_UNAVAILABLE."
+-- both-globs.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+trace:
+  code: ["internal/**/*.go", "e2e/**"]
+  tests: ["e2e/**"]
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios: ["Scenario:"]
 -- empty-marker.yaml --
 version: 2
 trace:

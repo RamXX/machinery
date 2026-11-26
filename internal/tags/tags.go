@@ -76,7 +76,12 @@ func Scan(p *project.Project, files []string) ([]Tag, error) {
 		mk = &project.Markers{}
 	}
 	var res []Tag
+	seen := map[string]bool{}
 	for _, f := range files {
+		if seen[f] {
+			continue // matched by both trace.code and trace.tests: read once
+		}
+		seen[f] = true
 		code := project.Match(p.Cfg.Trace.Code, f) && p.InScope(f)
 		test := project.Match(p.Cfg.Trace.Tests, f)
 		if !code && !test {

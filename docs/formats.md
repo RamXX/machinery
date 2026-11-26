@@ -831,7 +831,8 @@ machinery:verifies tc:ORDE-*
   the first token that does not.
 - A token may end with `*` and then matches every id with that prefix (`tc:ORDE-*`).
 - `machinery:serves` is read from files matched by `trace.code`. `machinery:verifies` is read
-  from files matched by `trace.tests`.
+  from files matched by `trace.tests`. A file both match is read once, so a finding in it is
+  reported once.
 
 Stage `trace` rules:
 
