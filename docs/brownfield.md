@@ -107,6 +107,17 @@ its entity, and an operational machine lists in `_serves` the entities and actio
 `import.machines.bind` when the source does not say. `adopt --write` waives the machines that
 bind to nothing yet and the entities that have actions and no lifecycle machine, with the reason
 `unbound at adoption`; a waiver goes stale when its machine is bound or its lifecycle written.
+An entity whose state lives in two attributes (an order's payment and its delivery) gets one
+lifecycle machine per attribute, each an aspect with its own `_aspect` name
+(`{lifecycle_of, aspect}` in `import.machines.bind`). An operational machine's events are held to what it serves: an action
+it serves, or an event it lists in `_external_events`.
+
+**Read your machines as they are.** `import.machines` (`docs/formats.md` section 5.2.1) takes
+globs anywhere in the project, so a lifecycle file kept beside its service is read with the
+rest. `states: pascal` turns `on_hold` into the domain state `OnHold`;
+`terminal: {from_root: <key>}` turns a root note that a machine never ends into `_terminal` on
+the states it is never left in; and a register that lists the transitions your code makes
+(`import.machines.register`) is checked both ways against the machines.
 
 ## 5. Turn what is owed into stories, beside the ones you have
 
