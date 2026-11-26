@@ -1681,7 +1681,7 @@ A run is one configuration of the model.
 | `reach` | Predicates the model must be able to satisfy. TLA+: a state predicate, reached when its negation is violated as an invariant. Alloy: a predicate, reached when `run <name> for <scope>` finds an instance. |
 | `expect` | `pass` or `finding`. |
 | `assumption` / `story` | Required with `expect: finding`: the assumption the run negates, or the tracker id of the known bug it records. Exactly one. |
-| `timeout_seconds` | Default 300. |
+| `timeout_seconds` | Default 300. A tool run that reaches it did not complete (section 16.9). |
 
 **Reach.** A property that holds because the interesting state is never reached proves nothing.
 Every run with `expect: pass` lists at least one reach predicate, and each must be reached:
@@ -1712,14 +1712,19 @@ must catch it.
 - `origin` is optional: the commit of a bug fix, which must exist. A past bug becomes a mutation
   that puts the old behavior back, so the model is shown to catch what already went wrong once.
 
-`machinery formal check` runs each mutation with only the named property and records `detected`
-(the property is violated), `missed` (it is not) or `inapplicable` (`from` does not occur exactly
-once, or the mutated spec does not parse).
+`machinery formal check` first applies each mutation. When `from` does not occur exactly once in
+its file, the mutation is `inapplicable`: that is decided before any tool runs, and it is the only
+way a mutation is inapplicable. Otherwise the mutated spec runs with only the named property, and
+the mutation is `detected` (the run completed and the property is violated) or `missed` (the run
+completed and the property holds). When the run did not complete (section 16.9), a mutated spec
+the tool cannot parse included, the mutation is `incomplete` with its `reason`, never detected,
+missed or inapplicable.
 
 Stage `formal`: `ERROR  <spec> mutation <id> missed: <detects> does not catch "<bug>"`,
 `ERROR  <spec> mutation <id> does not apply`, and for every invariant and property of an
 `expect: pass` run that no mutation names:
-`ERROR  <spec>: <property> has no mutation it must catch`. `TypeOK` is exempt.
+`ERROR  <spec>: <property> has no mutation it must catch`. `TypeOK` is exempt. An `incomplete`
+mutation makes the stage not demonstrated (section 16.9).
 
 ### 16.6 Baseline
 
@@ -1808,7 +1813,7 @@ the jar of each tool it runs and a Java runtime (`tools.java`); when one is miss
 
 `machinery formal check [<spec>...] [--workers <n>]` (all specs when none is named; workers
 default 2), for each spec: verifies the skeleton is current (else `ERROR  run machinery formal gen
-first`), copies the spec's files to a temporary directory, runs every run, then every reach
+first`), copies the spec's files to a private temporary directory, runs every run, then every reach
 predicate, then every mutation, writes trace files (section 16.10), writes
 `<spec>.result.json`, and regenerates `obligations.json` so new `cx` ids appear. It prints stage
 `formal` for the specs it ran.
@@ -1832,12 +1837,34 @@ predicate, then every mutation, writes trace files (section 16.10), writes
 named `formal-verify` with `ERROR  <path>: a fresh run of the tools does not reproduce the
 committed file` for every result or trace file that differs. Committed results are data anyone
 can edit; `machinery landing` runs this step, so a result that the tools did not produce does not
-land.
+land. When a fresh run does not complete, nothing is compared and the block is
+`not demonstrated: <spec> run <run> did not complete: <reason>` (or `mutation <id>`): a run with
+no verdict neither confirms nor refutes a committed file.
 
-`outcome` is `passed`, `violated` or `error` (the tool could not check the spec; `violated` then
-holds the tool's first error line). `input_sha256` is the sha256 over the manifest without its
-`sources` block (canonical JSON), the skeleton bytes and the property file bytes. The file has no
-timestamps and no durations.
+`outcome` is `passed`, `violated` or `incomplete`. `violated` names the violated property;
+`reason`, present only when the outcome is `incomplete`, says why the run did not complete. A
+mutation's `outcome` is one of section 16.5, with `reason` when it is `incomplete`. `input_sha256`
+is the sha256 over the manifest without its `sources` block (canonical JSON), the skeleton bytes
+and the property file bytes. The file has no timestamps and no durations.
+
+**Runs that did not complete.** A tool run completes when the tool ends on its own with a
+verdict: TLC exits 0 after `Model checking completed. No error has been found.`, or exits with a
+violation status (10 to 14) after naming the violation; Alloy exits 0 and writes a receipt that
+holds every command machinery gave it. Anything else did not complete: the run reached
+`timeout_seconds`, the tool could not start, crashed or was killed, reported an error (a spec it
+cannot parse included), or left output that cannot be read. Such a run gives no verdict. When a
+run's own check, one of its reach predicates, the check that isolates the violated property or
+the one-worker trace (16.4) did not complete, the run is `incomplete`; when a mutation's run did
+not complete, the mutation is `incomplete`. `reason` says why, naming files relative to the
+spec's directory: `timed out after 300s`, `TLC was killed: signal: killed`, or the tool's first
+error line. An incomplete run is never judged passed, violated, reached or not reached, and its
+trace file is left as it was; an incomplete mutation is never detected, missed or inapplicable.
+
+Every tool run has a private working directory and a private Java temporary directory
+(`java.io.tmpdir`), so runs at the same time, of one command or of several, share no file. TLC
+unpacks its standard modules (`Naturals.tla` and the others) into the Java temporary directory
+and deletes them when it exits; with a shared one, a run can delete or truncate the modules
+another run is reading.
 
 Stage `formal` applies when the formal directory holds a manifest or the risk file has a critical
 area. With no manifest at all and every critical area owed it is
@@ -1849,12 +1876,19 @@ no tool:
   missing; `DRIFT  <spec>.result.json: stale` when `input_sha256` does not match;
 - the run, reach and finding rules of 16.4, the mutation rules of 16.5, the baseline rules of
   16.6, the sync rules of 16.7, the assumption warnings of 16.3, the coverage rule of 16.1;
-- `ERROR  <spec>: unknown area <name>`.
+- `ERROR  <spec>: unknown area <name>`;
+- `warn   <spec> run <run> did not complete: <reason>` and
+  `warn   <spec> mutation <id> did not complete: <reason>` for every incomplete run and
+  mutation, and the stage is `not demonstrated: <the first of them>; fix the cause and run
+  machinery formal check`. There is no verdict to judge, so the stage neither passes nor fails on
+  that account; when it also has an ERROR or DRIFT it is failed (section 3.2), and the warn lines
+  still say what did not complete.
 
-An `fv:<area>` obligation is proven when the area is covered (16.1) and no ERROR or DRIFT names a
-spec that lists the area. When `fv:<area>` is in the owed list, findings about specs whose areas
-are all owed print as `warn   owed: <message>`: a model under construction does not block
-unrelated work.
+An `fv:<area>` obligation is proven when the area is covered (16.1), no ERROR or DRIFT names a
+spec that lists the area, and every such spec has a result in which every run and mutation
+completed. When `fv:<area>` is in the owed list, findings about specs whose areas are all owed
+print as `warn   owed: <message>`, and such a spec's missing result or incomplete runs do not make
+the stage not demonstrated: a model under construction does not block unrelated work.
 
 `checked:` counts specs, runs, reach predicates, mutations and assumptions.
 
