@@ -13,8 +13,8 @@ import (
 // key is an ERROR, never silently skipped.
 var (
 	rootKeys = setOf("id", "initial", "context", "states", "description", "meta", "version",
-		"_comment", "_delays", "_lifecycle_of", "_role", "_oracle_tag", "_guards", "_external_events",
-		"_failure_events", "_entries")
+		"_comment", "_delays", "_lifecycle_of", "_role", "_serves", "_oracle_tag", "_guards",
+		"_external_events", "_failure_events", "_entries")
 	stateKeys = setOf("on", "after", "always", "invoke", "entry", "exit", "states", "initial",
 		"type", "id", "meta", "description", "tags", "onDone", "output", "_comment",
 		"_exhaustive", "_ignores", "_refusal", "_terminal")
@@ -78,6 +78,7 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 	}
 	errs = append(errs, lintExternalEvents(base, ro, states)...)
 	errs = append(errs, lintEntries(base, ro)...)
+	errs = append(errs, lintServes(base, ro)...)
 	declaredDelays, usedDelays := map[string]bool{}, map[string]bool{}
 	if dv := ro.Get2("_delays"); dv != nil && dv.Kind == ir.KindObject {
 		for _, k := range dv.AsObject().Keys() {

@@ -1,0 +1,91 @@
+# _serves, the model ids an operational machine exists for: stage machines holds its shape, and
+# whether each id is in the model is stage xref-model-machine (docs/formats.md sections 6.2 and 6.4)
+exec machinery lint --stage machines
+stdout '^checked: 1 machines, 2 states, 2 transitions$'
+stdout '^passed$'
+
+# not a list
+cp serves-string.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves must be a non-empty list of model ids \(entity:<Name> or act:<Entity>\.<action>\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an empty list
+cp serves-empty.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves must be a non-empty list of model ids \(entity:<Name> or act:<Entity>\.<action>\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# entries that are not entity or act ids, each reported
+cp serves-bad.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry ''act:Order'' is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry ''inv:paid-before-shipped'' is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry 42 is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry '''' is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^failed: 4 finding\(s\)$'
+
+# an id named twice
+cp serves-twice.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves names ''act:Order\.pay'' twice$'
+stdout '^failed: 1 finding\(s\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- design/machines/Ops.machine.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order"], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-string.json --
+{ "id": "ops", "_role": "operational", "_serves": "act:Order.pay", "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-empty.json --
+{ "id": "ops", "_role": "operational", "_serves": [], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-bad.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order", "inv:paid-before-shipped", 42, "", "entity:Order"], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-twice.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order", "act:Order.pay"], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+
+stdout '^passed$'
+
+# not a list
+cp serves-string.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves must be a non-empty list of model ids \(entity:<Name> or act:<Entity>\.<action>\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# an empty list
+cp serves-empty.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves must be a non-empty list of model ids \(entity:<Name> or act:<Entity>\.<action>\)$'
+stdout '^failed: 1 finding\(s\)$'
+
+# entries that are not entity or act ids, each reported
+cp serves-bad.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry ''act:Order'' is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry ''inv:paid-before-shipped'' is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry 42 is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves entry '''' is not an entity:<Name> or act:<Entity>\.<action> id$'
+stdout '^failed: 4 finding\(s\)$'
+
+# an id named twice
+cp serves-twice.json design/machines/Ops.machine.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  design/machines/Ops\.machine\.json: _serves names ''act:Order\.pay'' twice$'
+stdout '^failed: 1 finding\(s\)$'
+
+-- machinery.yaml --
+version: 2
+design:
+  machines: design/machines
+-- design/machines/Ops.machine.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order"], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-string.json --
+{ "id": "ops", "_role": "operational", "_serves": "act:Order.pay", "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-empty.json --
+{ "id": "ops", "_role": "operational", "_serves": [], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-bad.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order", "inv:paid-before-shipped", 42, "", "entity:Order"], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
+-- serves-twice.json --
+{ "id": "ops", "_role": "operational", "_serves": ["act:Order.pay", "entity:Order", "act:Order.pay"], "initial": "Idle", "states": { "Idle": { "on": { "start": { "target": "Busy" } }, "_ignores": { "stop": "nothing runs" } }, "Busy": { "on": { "stop": { "target": "Idle" } }, "_ignores": { "start": "already running" } } } }
