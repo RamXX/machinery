@@ -347,7 +347,8 @@ type Mark struct {
 type Proof struct {
 	Commit  string
 	Actor   string
-	Session string // the session=<value> last word, "" when none
+	Session string // the session=<value> word, "" when none
+	Agent   string // the agent=<value> word, "" when none
 	Seq     int    // position among all tag lines of the story
 }
 
@@ -482,8 +483,16 @@ func ParseTags(is *Issue) Tags {
 				continue
 			}
 			pr := Proof{Commit: f[0], Seq: seq}
-			if last := f[len(f)-1]; len(f) >= 3 && strings.HasPrefix(last, "session=") {
-				pr.Session, f = strings.TrimPrefix(last, "session="), f[:len(f)-1]
+			for len(f) >= 3 {
+				last := f[len(f)-1]
+				if v, ok := strings.CutPrefix(last, "session="); ok && pr.Session == "" {
+					pr.Session = v
+				} else if v, ok := strings.CutPrefix(last, "agent="); ok && pr.Agent == "" {
+					pr.Agent = v
+				} else {
+					break
+				}
+				f = f[:len(f)-1]
 			}
 			pr.Actor = strings.Join(f[1:], " ")
 			t.Proofs = append(t.Proofs, pr)
@@ -535,23 +544,50 @@ func Value(s string) string {
 // (section 15.1).
 const SessionEnv = "MACHINERY_SESSION"
 
+// AgentEnv names the environment variable that holds the agent, the worker
+// context within a session (section 15.1).
+const AgentEnv = "MACHINERY_AGENT"
+
 // Session returns the session of section 15.1, "" when it is unset or empty.
 // A value that is not one word is an error that names it.
-func Session() (string, error) {
-	v := strings.TrimSpace(os.Getenv(SessionEnv))
+func Session() (string, error) { return oneWord(SessionEnv) }
+
+// Agent returns the agent of section 15.1, read like the session.
+func Agent() (string, error) { return oneWord(AgentEnv) }
+
+func oneWord(env string) (string, error) {
+	v := strings.TrimSpace(os.Getenv(env))
 	if strings.ContainsAny(v, " \t\r\n\"") {
-		return "", fmt.Errorf("%s must be one word, got %q", SessionEnv, v)
+		return "", fmt.Errorf("%s must be one word, got %q", env, v)
 	}
 	return v, nil
 }
 
-// SessionPart renders the session part of a tag line: " session=<value>", or
-// "" without a session.
-func SessionPart(session string) string {
-	if session == "" {
-		return ""
+// Who is the session and the agent a tag line records.
+type Who struct{ Session, Agent string }
+
+// WhoFromEnv reads the session and the agent; the first value that is not
+// one word is the error.
+func WhoFromEnv() (Who, error) {
+	s, err := Session()
+	if err != nil {
+		return Who{}, err
 	}
-	return " session=" + session
+	a, err := Agent()
+	return Who{s, a}, err
+}
+
+// Part renders the tag line part: " session=<value> agent=<value>", each only
+// when set, "" when neither is.
+func (w Who) Part() string {
+	var s string
+	if w.Session != "" {
+		s += " session=" + w.Session
+	}
+	if w.Agent != "" {
+		s += " agent=" + w.Agent
+	}
+	return s
 }
 
 // Quote renders a value for a key="value" tag field.

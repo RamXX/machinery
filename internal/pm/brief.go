@@ -45,6 +45,10 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []
 	fmt.Fprintf(w, "title: %s\n", is.Title)
 	fmt.Fprintf(w, "tier: %s%s\n", tier, areaWhy(d, areas))
 	fmt.Fprintf(w, "route: %s\n", Route(d, tier))
+	agent := fmt.Sprintf("%s-%s", is.ID, role)
+	if role != Modeler {
+		fmt.Fprintf(w, "agent: %s\n", agent)
+	}
 	head := "none"
 	if h, err := gitx.Head(p.Root); err == nil {
 		head = gitx.Short(h)
@@ -69,6 +73,7 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []
 	case Verifier:
 		read = idRead(d, mine, ids)
 		run = []string{
+			"export MACHINERY_AGENT=" + agent,
 			fmt.Sprintf("machinery predict %s --observation \"...\" --expect \"...\"", is.ID),
 			"machinery proof --story " + is.ID,
 			fmt.Sprintf("machinery accept %s --verdict accept|reject --observed \"...\"", is.ID),
@@ -80,6 +85,7 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []
 			e2e = strings.Join(p.Cfg.Commands.E2E, " ")
 		}
 		run = []string{
+			"export MACHINERY_AGENT=" + agent,
 			"machinery check --base " + base,
 			fmt.Sprintf("machinery run --affected --base %s -- %s", base, e2e),
 			"machinery verify --story " + is.ID,

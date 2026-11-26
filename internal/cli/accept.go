@@ -38,7 +38,7 @@ func runAccept(e *Env, args []string) int {
 	case *repair && !*closeIt:
 		return e.Usage("--repair needs --close")
 	}
-	session, err := backlog.Session()
+	who, err := backlog.WhoFromEnv()
 	if err != nil {
 		return e.Usage("%v", err)
 	}
@@ -76,7 +76,7 @@ func runAccept(e *Env, args []string) int {
 			return e.Fail(err)
 		}
 	}
-	line := fmt.Sprintf("machinery:verdict %s commit=%s actor=%s%s observed=%s", *verdict, head, c.Actor, backlog.SessionPart(session), backlog.Quote(*observed))
+	line := fmt.Sprintf("machinery:verdict %s commit=%s actor=%s%s observed=%s", *verdict, head, c.Actor, who.Part(), backlog.Quote(*observed))
 	if err := c.Note(is.ID, line); err != nil {
 		return e.Fail(err)
 	}

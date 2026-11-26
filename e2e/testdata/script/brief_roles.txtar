@@ -25,6 +25,11 @@ exec sh -c 'test $(machinery brief shop-r1 | wc -l) -le 40'
 exec sh -c 'machinery brief shop-r1 --role builder | sed -E "s/^contract: .*/contract: X/"'
 cmp stdout want-r1.txt
 
+# builder and verifier briefs name the agent to export; the run section starts with the export
+exec machinery brief shop-r1
+stdout '^agent: shop-r1-builder$'
+stdout '^run:\n  export MACHINERY_AGENT=shop-r1-builder\n  machinery check --base main\n'
+
 # a critical builder brief: the machine, its table, the failure modes, the tier and its route
 exec machinery brief shop-k1
 stdout '^BRIEF shop-k1 \(builder\)$'
@@ -49,7 +54,8 @@ stdout '^tier: consequential \(shipping-permission: authorization: only a Clerk 
 stdout '^route: standard model; fresh verifier$'
 stdout '^  act:Order.ship  action ship of Order$'
 stdout '^read:\n  design/failure-modes.yaml\n  design/model/shop.modelith.yaml\n  docs/formats.md\n'
-stdout '^run:\n  machinery predict shop-c1 --observation "..." --expect "..."\n  machinery proof --story shop-c1\n  machinery accept shop-c1 --verdict accept\|reject --observed "..."\n'
+stdout '^agent: shop-c1-verifier$'
+stdout '^run:\n  export MACHINERY_AGENT=shop-c1-verifier\n  machinery predict shop-c1 --observation "..." --expect "..."\n  machinery proof --story shop-c1\n  machinery accept shop-c1 --verdict accept\|reject --observed "..."\n'
 stdout '^weakened since main:\n  order-payment: run strict: constant Instances lowered from 2 to 1 \(a smaller bound for the suite\)\n'
 ! stdout 'an accepted weakening older than the base'
 stdout '^done when: machinery accept shop-c1 --verdict accept exits 0$'
@@ -64,6 +70,11 @@ cmp stdout want-k1-modeler.txt
 exec machinery brief shop-m1 --role modeler
 stdout '^read:\n  design/formal/order-payment.spec.yaml\n  design/machines/Order.machine.json\n'
 stdout '^done when: machinery check --stage formal passes and fv:order-payment is proven$'
+
+# a modeler brief has no agent line and no export
+exec machinery brief shop-k1 --role modeler
+! stdout 'agent'
+! stdout 'MACHINERY_AGENT'
 
 # the modeler role is for a story with an id in a critical area
 exec mrun 2 brief shop-r1 --role modeler
@@ -127,6 +138,7 @@ BRIEF shop-r1 (builder)
 title: Prove the terminal invariant and the happy path
 tier: routine
 route: small model
+agent: shop-r1-builder
 contract: X
 ids:
   inv:terminal-is-final  A shipped or cancelled Order never changes status again.
@@ -140,6 +152,7 @@ scope:
   e2e/orders.sh
   internal/domain/**
 run:
+  export MACHINERY_AGENT=shop-r1-builder
   machinery check --base main
   machinery run --affected --base main -- sh e2e/orders.sh
   machinery verify --story shop-r1

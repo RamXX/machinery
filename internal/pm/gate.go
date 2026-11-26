@@ -150,36 +150,47 @@ func judgeVital(s *report.Stage, d *design.Design, ev *evidence.Evaluation, ids 
 	evidence.VitalOf(ev, areas, setOf(ids)).Warn(s, false)
 }
 
-// judgeSessions compares the sessions of the proofs the evidence is valid for
-// with those of the fresh predictions (section 15.6). A missing session is a
-// warning, never an error.
+// judgeSessions compares the sessions and agents of the proofs the evidence is
+// valid for with those of the fresh predictions (section 15.6). Different
+// sessions are no finding. In one session, equal agents are an error, different
+// agents are no finding, and a missing agent or session is a warning.
 func judgeSessions(s *report.Stage, proofs []backlog.Proof, fresh []backlog.Stamp) {
-	built := map[string]bool{}
 	proofWithout := false
 	for _, pr := range proofs {
 		if pr.Session == "" {
 			proofWithout = true
-			continue
 		}
-		built[pr.Session] = true
 	}
 	predWithout := false
-	shared := map[string]bool{}
-	for _, pr := range fresh {
-		switch ss := pr.Fields["session"]; {
-		case ss == "":
+	shared := map[string]bool{}  // "<session> <agent>"
+	noAgent := map[string]bool{} // "<session> proof|prediction"
+	for _, pd := range fresh {
+		ss, pa := pd.Fields["session"], pd.Fields["agent"]
+		if ss == "" {
 			predWithout = true
-		case built[ss]:
-			shared[ss] = true
+			continue
+		}
+		for _, pr := range proofs {
+			if pr.Session != ss {
+				continue
+			}
+			if pr.Agent == "" {
+				noAgent[ss+" proof"] = true
+			}
+			if pa == "" {
+				noAgent[ss+" prediction"] = true
+			}
+			if pr.Agent != "" && pr.Agent == pa {
+				shared[ss+" "+pa] = true
+			}
 		}
 	}
-	var ss []string
-	for k := range shared {
-		ss = append(ss, k)
+	for _, k := range sortedKeys(shared) {
+		s.Errorf("verifier shares a session and an agent with the builder: %s", k)
 	}
-	sort.Strings(ss)
-	for _, k := range ss {
-		s.Errorf("verifier shares a session with the builder: %s", k)
+	for _, k := range sortedKeys(noAgent) {
+		ss, kind, _ := strings.Cut(k, " ")
+		s.Warnf("verifier and builder share session %s and no agent is recorded for %s: independence rests on the actor name", ss, kind)
 	}
 	if proofWithout {
 		s.Warnf("no session recorded for proof: independence rests on the actor name")

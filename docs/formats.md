@@ -1680,9 +1680,9 @@ syntax of section 8:
 ```
 machinery:ids tc:ORDE-2e883d tc:ORDE-70d94f
 machinery:scope internal/api/** e2e/orders_test.go
-machinery:proof <full sha> <actor> [session=<session>]
-machinery:prediction commit=<full sha> actor=<actor> [session=<session>] observation="<text>" expect="<text>"
-machinery:verdict <accept|reject> commit=<full sha> actor=<actor> [session=<session>] observed="<text>"
+machinery:proof <full sha> <actor> [session=<session>] [agent=<agent>]
+machinery:prediction commit=<full sha> actor=<actor> [session=<session>] [agent=<agent>] observation="<text>" expect="<text>"
+machinery:verdict <accept|reject> commit=<full sha> actor=<actor> [session=<session>] [agent=<agent>] observed="<text>"
 machinery:intake
 machinery:intake <intake id>
 machinery:intake-base <full sha> <contract hash>
@@ -1720,8 +1720,16 @@ machinery:answer <n|refuse|hold> actor=<actor> [clause=<clause id>] reason="<tex
   or a `"`) is a usage error, before anything is written:
   `usage: MACHINERY_SESSION must be one word, got "<value>"`. In Claude Code the `session-start`
   hook exports the harness's session id as `MACHINERY_SESSION` (section 21.1); another harness sets
-  it or leaves it unset. The last word of a proof line is its session when it starts with
-  `session=`; the words between the sha and it are the actor.
+  it or leaves it unset. The last words of a proof line are its session and its agent when they
+  start with `session=` and `agent=`; the words between the sha and them are the actor.
+- The agent is the environment variable `MACHINERY_AGENT`, read like the session: white space at
+  either end removed, one word or else `usage: MACHINERY_AGENT must be one word, got "<value>"`
+  before anything is written, and `agent=<value>` on the same three lines (after the session)
+  only when it is set and not empty. It names the worker context within a session. A harness
+  gives the subagents of a session the session's id, so the session alone cannot tell a builder
+  from a verifier run as a subagent: whoever spawns a worker sets `MACHINERY_AGENT` for it to a
+  value no other worker of the session has. `machinery brief` prints that value for a builder
+  and a verifier (section 15.5): `<story id>-<role>`.
 - `machinery:intake` with nothing after it marks an intake item; `machinery:intake <id>` marks a
   story of that intake. The other intake lines are described in section 15.7.
 - `machinery:repair` records that a story was closed while the integration branch was red, as
@@ -1907,6 +1915,7 @@ BRIEF <story id> (<role>)
 title: <story title>
 tier: <tier> (<area>: <why>)
 route: <routing text for the tier>
+agent: <story id>-<role>                  # builder and verifier only
 contract: <first 12 hex> at <short sha>
 ids:
   <id>  <title>
@@ -1933,6 +1942,9 @@ done when: <one line>
   `machinery predict <id> --observation "..." --expect "..."`, then
   `machinery proof --story <id>`, then `machinery accept <id> --verdict accept|reject --observed
   "..."`. The brief also lists every formal weakening accepted since the base (section 16.6).
+- For a builder and a verifier, the line `agent: <story id>-<role>` follows `route`, and the first
+  line of `run` is `export MACHINERY_AGENT=<story id>-<role>` (section 15.1): the worker exports it
+  before it runs the other lines. A modeler brief has neither.
 - For a modeler, `read` is the machine or model the formal model is derived from and the manifest;
   `run` is `machinery formal gen`, `machinery formal check <spec>`, `machinery formal baseline`.
 
@@ -1961,10 +1973,20 @@ An `act` id of the story only has to be not owed. A reject verdict is recorded a
 (`machinery accept --verdict reject` itself exits 0; `--close` with `reject` is a usage error).
 The verifier must differ from every actor who posted a proof the evidence is valid for.
 
-When the tier asks for a verifier, the sessions of section 15.1 are compared as well. A prediction
-for the commit, by an actor who posted no such proof, whose session is the session of a proof the
-evidence is valid for is `ERROR  verifier shares a session with the builder: <session>`, once per
-session. When such a proof records no session the gate prints
+When the tier asks for a verifier, the sessions and agents of section 15.1 are compared as well.
+Take a prediction for the commit, by an actor who posted no such proof, and a proof the evidence
+is valid for. They are compared only when their sessions are equal; different sessions are no
+finding. In the same session:
+
+- both record an agent and the agents are equal: `ERROR  verifier shares a session and an agent
+  with the builder: <session> <agent>`, once per session and agent;
+- both record an agent and the agents differ: no finding (the harness gave subagents their
+  parent's session, and the worker contexts are distinct);
+- either records no agent: `warn   verifier and builder share session <session> and no agent is
+  recorded for <proof|prediction>: independence rests on the actor name`, once per session and
+  line kind, naming each line kind that lacks an agent.
+
+When such a proof records no session the gate prints
 `warn   no session recorded for proof: independence rests on the actor name`, and when such a
 prediction records none, `warn   no session recorded for prediction: independence rests on the actor name`.
 A missing session is never an error: harnesses that give none exist.
@@ -2009,7 +2031,8 @@ The verifier is a fresh context that did not build the change. It receives the v
 predicts, and only then reads the proof. machinery cannot see what an agent read, and an actor
 name is only as trustworthy as the backlog's own record of who wrote a note. What the gate
 checks is what is recorded: that a prediction exists for this commit, under another name than
-the proof's and, where both record one, from another session, before the verdict.
+the proof's and, where both record a session and an agent, not from the same session and agent,
+before the verdict.
 
 ### 15.7 Intake: `machinery intake`
 

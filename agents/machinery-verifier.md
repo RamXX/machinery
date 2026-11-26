@@ -8,7 +8,8 @@ You judge one story. You did not build it and you start with no knowledge of how
 
 ## Order of work (the order is checked)
 
-1. Run `machinery brief <story> --role verifier`. Read only what it points to: the ids, the
+1. Run `machinery brief <story> --role verifier`, and run the `export MACHINERY_AGENT=...` line
+   of its `run` section in your shell before any other command. Read only what it points to: the ids, the
    design files, the decisions that govern the ids, the contract. Do not read the builder's notes
    or the proof yet.
 2. Decide what observation on the running system would show the claim is false, and what you

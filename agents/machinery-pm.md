@@ -36,7 +36,8 @@ stories, are how a model drifts away from the system; the tool refuses that orde
 - `machinery waves` must pass before `machinery waves --freeze`: no cycle, no competing
   writers, no story in the design's name without ids.
 - One worker per story, in its own worktree, briefed with `machinery brief <story>` and nothing
-  else, on the model class the brief routes to. Spawn a wave in one message; wait on completion
+  else, on the model class the brief routes to. The brief's `agent:` line is the worker's own
+  `MACHINERY_AGENT`; never give two workers of a session the same one. Spawn a wave in one message; wait on completion
   events, never poll.
 - On hand-back: `machinery check --base <base>` and `machinery story <story>`; a fresh verifier
   for consequential and critical stories (`machinery brief <story> --role verifier`). The
