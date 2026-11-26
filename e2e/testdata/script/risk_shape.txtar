@@ -1,4 +1,4 @@
-# the shape rules of section 22
+# the shape rules of section 23
 fixture shop
 cp machinery-risk.yaml machinery.yaml
 cp no-why.yaml design/risk.yaml

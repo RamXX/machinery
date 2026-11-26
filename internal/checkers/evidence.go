@@ -10,7 +10,7 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 )
 
-// Finding is one finding of a checker (section 21.4).
+// Finding is one finding of a checker (section 22.4).
 type Finding struct {
 	Severity string `json:"severity"`
 	Subject  string `json:"subject"`
@@ -18,7 +18,7 @@ type Finding struct {
 	Message  string `json:"message"`
 }
 
-// ObligationDecl is an obligation a checker declares (section 21.5).
+// ObligationDecl is an obligation a checker declares (section 22.5).
 type ObligationDecl struct {
 	Name    string `json:"name"`
 	Title   string `json:"title"`

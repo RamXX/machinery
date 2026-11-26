@@ -1,4 +1,4 @@
-# --ids, --prefix and --max choose what to probe (section 19)
+# --ids, --prefix and --max choose what to probe (section 20)
 fixture shop
 exec machinery gen
 gitinit

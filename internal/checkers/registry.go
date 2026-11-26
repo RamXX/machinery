@@ -28,7 +28,7 @@ type Entry struct {
 	TimeoutSeconds int      `yaml:"timeout_seconds,omitempty"`
 }
 
-// Registry is the content of the registry file (section 21.6).
+// Registry is the content of the registry file (section 22.6).
 type Registry struct {
 	Version  int              `yaml:"version"`
 	Checkers map[string]Entry `yaml:"checkers"`

@@ -144,7 +144,7 @@ func TierRank(t string) int {
 	return 0
 }
 
-// Area is one entry of risk.yaml (section 22).
+// Area is one entry of risk.yaml (section 23).
 type Area struct {
 	Name      string   `yaml:"name"`
 	Tier      string   `yaml:"tier"`
@@ -153,7 +153,7 @@ type Area struct {
 	Questions []string `yaml:"questions,omitempty"`
 }
 
-// Lowering records a deliberate lowering of a tier (section 22).
+// Lowering records a deliberate lowering of a tier (section 23).
 type Lowering struct {
 	IDs    []string `yaml:"ids"`
 	From   string   `yaml:"from"`

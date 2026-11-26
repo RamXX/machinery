@@ -7,7 +7,7 @@ import (
 
 func init() { Bind("risk", Risk) }
 
-// tierable are the id kinds a risk area may name (section 22).
+// tierable are the id kinds a risk area may name (section 23).
 var tierable = map[string]bool{"act": true, "inv": true, "sc": true, "tc": true, "fm": true}
 
 func kindOf(id string) string {
@@ -19,7 +19,7 @@ func kindOf(id string) string {
 	return ""
 }
 
-// Risk is stage risk (section 22).
+// Risk is stage risk (section 23).
 func Risk(ctx *Context) *report.Stage {
 	s := report.New("risk")
 	d := ctx.Design()

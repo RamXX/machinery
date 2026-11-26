@@ -1,5 +1,5 @@
 // Package probe mutates the generated tables and checks that the tests notice
-// (docs/formats.md section 19).
+// (docs/formats.md section 20).
 package probe
 
 import (

@@ -1,4 +1,4 @@
-# a suite whose system ignores MACHINERY_TABLES_DIR survives every mutation (section 19)
+# a suite whose system ignores MACHINERY_TABLES_DIR survives every mutation (section 20)
 fixture shop
 exec machinery gen
 gitinit

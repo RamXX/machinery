@@ -3,7 +3,7 @@
 The planner (the PM role) owns the backlog and the risk file. machinery bridges the design to the
 backlog so that planning is data: what is owed becomes stories, the graph becomes waves, and a
 story is accepted with the formality of its tier. The backlog tool is `bd`. The contract is
-`docs/formats.md` sections 15 and 22.
+`docs/formats.md` sections 15 and 23.
 
 ## Tiers: formality follows risk
 

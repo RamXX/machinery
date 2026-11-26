@@ -16,7 +16,7 @@ func FindingLine(checker string, f Finding) string {
 	return s
 }
 
-// Judge is stage checkers (section 21.7). It is pure: it reads only committed
+// Judge is stage checkers (section 22.7). It is pure: it reads only committed
 // files and the design, runs no tool and reads no registry.
 func Judge(d *design.Design) *report.Stage {
 	s := report.New("checkers")

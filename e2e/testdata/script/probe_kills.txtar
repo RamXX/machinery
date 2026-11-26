@@ -1,4 +1,4 @@
-# a suite whose system follows MACHINERY_TABLES_DIR kills every mutation (section 19)
+# a suite whose system follows MACHINERY_TABLES_DIR kills every mutation (section 20)
 fixture shop
 exec machinery gen
 gitinit

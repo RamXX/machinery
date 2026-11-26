@@ -7,5 +7,5 @@ import (
 
 func init() { Bind("checkers", Checkers) }
 
-// Checkers is stage checkers (section 21.7).
+// Checkers is stage checkers (section 22.7).
 func Checkers(ctx *Context) *report.Stage { return checkers.Judge(ctx.Design()) }

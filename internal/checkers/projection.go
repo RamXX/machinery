@@ -1,5 +1,5 @@
 // Package checkers connects external deterministic checkers to machinery
-// (docs/formats.md section 21): the declared facts, the projection a checker
+// (docs/formats.md section 22): the declared facts, the projection a checker
 // reads, the evidence it writes, the machine-local registry that holds its
 // command, and the pure judgment of the evidence.
 package checkers
@@ -157,7 +157,7 @@ type Dependency struct {
 	Posture string `json:"posture"`
 }
 
-// Projection is the whole design as one document (section 21.3).
+// Projection is the whole design as one document (section 22.3).
 type Projection struct {
 	Version      int           `json:"version"`
 	Entities     []Entity      `json:"entities"`

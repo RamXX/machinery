@@ -11,7 +11,7 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 )
 
-// Fact is one declared fact (docs/formats.md section 21.2).
+// Fact is one declared fact (docs/formats.md section 22.2).
 type Fact struct {
 	Subject   string `json:"subject"`
 	Predicate string `json:"predicate"`

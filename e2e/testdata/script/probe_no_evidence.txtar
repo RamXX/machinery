@@ -1,4 +1,4 @@
-# the probe needs evidence valid for this commit and a clean tree (section 19)
+# the probe needs evidence valid for this commit and a clean tree (section 20)
 fixture shop
 exec machinery gen
 gitinit

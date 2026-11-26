@@ -28,12 +28,12 @@ reads them and:
 
 Three rules shape everything below:
 
-- **Formality follows risk.** Each area of the design has a tier chosen at planning (section 22):
+- **Formality follows risk.** Each area of the design has a tier chosen at planning (section 23):
   routine (machines and generated end-to-end cases), consequential (plus a fresh verifier who
   predicts before reading the proof), critical (plus a formal model).
 - **Evidence comes from the real system.** There are no unit tests and no test doubles, in
   machinery or in a project that uses it (section 9.4). Test quality is measured by probing
-  (section 19), not by counting tests.
+  (section 20), not by counting tests.
 - **A blocking check protects a named product behavior.** Every finding names a design id or a
   file that carries one. No check exists only to confirm that a sequence of steps was followed
   (section 3.4).
@@ -53,9 +53,9 @@ design:
     - design/model/shop.modelith.yaml
   machines: design/machines     # optional: directory holding *.machine.json
   failure_modes: design/failure-modes.yaml   # optional
-  risk: design/risk.yaml        # optional: risk tiers (section 22)
+  risk: design/risk.yaml        # optional: risk tiers (section 23)
   formal: design/formal         # optional, this is the default; used when the directory exists
-  facts: design/facts.yaml      # optional: facts the design declares about itself (section 21.2)
+  facts: design/facts.yaml      # optional: facts the design declares about itself (section 22.2)
   owed: design/owed.yaml        # optional, this is the default
   gen: design/gen               # optional, this is the default
 import:                         # optional: design sources kept in the project's own formats
@@ -76,7 +76,7 @@ import:                         # optional: design sources kept in the project's
 contracts:                      # optional
   - kind: openapi               # openapi | proto
     path: contracts/openapi.yaml
-checkers:                       # optional: external checkers (section 21)
+checkers:                       # optional: external checkers (section 22)
   - id: rules
     covers: ["act:*", "inv:*"]
 dependencies:                   # optional: external dependencies of the system
@@ -177,7 +177,7 @@ Rules:
 | `machinery owed sync` | Rewrites `owed.yaml` from the current evidence (section 11.2). `--prune-only` never adds. |
 | `machinery proof` | Prints a proof block (section 13). `--story <id> --post` writes it to the story. |
 | `machinery status` | Prints a summary (section 14). A report, never a gate. |
-| `machinery probe -- <command...>` | Stage `probe`: mutates the generated tables and expects the tests to notice (section 19). Never part of `check`. |
+| `machinery probe -- <command...>` | Stage `probe`: mutates the generated tables and expects the tests to notice (section 20). Never part of `check`. |
 | `machinery formal new <spec>` | Scaffolds a spec manifest and a property module (section 16.2). |
 | `machinery formal gen` | Writes the generated skeletons of the formal models (section 16.2). `--check` reports drift. |
 | `machinery formal check [<spec>...]` | Runs the model checkers and records results (section 16.9). |
@@ -190,7 +190,7 @@ Rules:
 | `machinery predict <story>` | Records a verifier's prediction (section 15.6). |
 | `machinery accept <story>` | Records a verifier's verdict and runs the story gate (section 15.6). |
 | `machinery story <story>` | Stage `story`: the tier gate of one story (section 15.6). |
-| `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 21). |
+| `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
 | `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). |
@@ -293,9 +293,9 @@ list refer to the design. An id is `<kind>:<name>`.
 | `sc` | `sc:<slug>` | Each model scenario, slug of its `name` | Obligation. |
 | `tc` | `tc:<TAG>-<hex>` | Each transition case of each machine (section 7.2) | Obligation. |
 | `fm` | `fm:<failure-mode-id>` | Each failure mode (section 5.4) | Obligation. |
-| `fv` | `fv:<area>` | Each critical area of the risk file (section 22) | Obligation, proven by the formal stage. |
+| `fv` | `fv:<area>` | Each critical area of the risk file (section 23) | Obligation, proven by the formal stage. |
 | `cx` | `cx:<spec>:<run>` | Each counterexample trace of a formal model (section 16.10) | Obligation, proven by replay. |
-| `ck` | `ck:<checker id>:<name>` | Each obligation an external checker's evidence declares (section 21.5) | Obligation. |
+| `ck` | `ck:<checker id>:<name>` | Each obligation an external checker's evidence declares (section 22.5) | Obligation. |
 
 - The scenario slug is the scenario name lowercased, every run of characters outside `[a-z0-9]`
   replaced by one `-`, with leading and trailing `-` removed. Example: `Customer pays and the
@@ -305,7 +305,7 @@ list refer to the design. An id is `<kind>:<name>`.
   `owed.yaml`. The obligation kinds are `inv`, `sc`, `tc`, `fm`, `fv`, `cx` and `ck`.
 - An id pattern is a full id or a prefix ending in `*` (`tc:ORDE-*`, `act:Order.*`).
 - An `fv` id has the tier of its area, and a `cx` id the highest tier among the areas its formal
-  model lists (section 22).
+  model lists (section 23).
 
 ## 5. Design sources
 
@@ -501,7 +501,7 @@ prefixed `<links file>: <id>`. An id that is not an imported row is
 
 ### 5.5 Risk file
 
-`risk.yaml` assigns risk tiers to areas of the design. See section 22.
+`risk.yaml` assigns risk tiers to areas of the design. See section 23.
 
 ## 6. Lint stages
 
@@ -586,7 +586,7 @@ Operations without a binding are counted and are not an error (reads and queries
 | `subject-resolves` | Every failure-mode subject names an existing invoke, a configured dependency, a model action, a model entity, a state of the named machine that is tagged `failure`, or an event in the named machine's `_failure_events`. |
 | `invoke-failure-mode` | Every `invoke` `src` of every machine is the subject of at least one failure mode. |
 | `dependency-failure-mode` | Every configured dependency is the subject of at least one failure mode. |
-| `tiered-action-abuse` | Every action that belongs to a consequential or critical area (section 22) is the subject of at least one failure mode of kind `abuse`. |
+| `tiered-action-abuse` | Every action that belongs to a consequential or critical area (section 23) is the subject of at least one failure mode of kind `abuse`. |
 | `failure-state-mode` | Every state tagged `failure` of every machine is the subject (`state:<machine id>.<State>`) of at least one failure mode. |
 | `failure-event-mode` | Every `_failure_events` entry of every machine is the subject (`event:<machine id>.<event>`) of at least one failure mode. |
 
@@ -648,7 +648,7 @@ machines and cases compared. Not applicable when `tools.xstate` is false or abse
 `machinery gen` writes, under the gen directory:
 
 - `obligations.json` (section 7.1);
-- `projection.json` (section 21.3), only when `checkers:` or `design.facts` is configured;
+- `projection.json` (section 22.3), only when `checkers:` or `design.facts` is configured;
 - `tables/<machine id>.table.json` for each machine (section 7.3);
 - `tables/<machine id>.table.md`, a readable rendering of the same table;
 - `imported/machines/<machine id>.machine.json` for each imported machine (section 5.2.1): the
@@ -813,7 +813,7 @@ transitions up in this table; it does not hard-code them.
   declaration).
 
 A service loads its tables from the directory named by `MACHINERY_TABLES_DIR` when that variable
-is set, and from its own configured location otherwise. Section 19 depends on this.
+is set, and from its own configured location otherwise. Section 20 depends on this.
 
 ## 8. Trace
 
@@ -1074,7 +1074,7 @@ that was established at the base may quietly stop being established:
 | `scope-narrowed` | A scope glob of the base is missing now: `ERROR  ratchet: scope narrowed: <glob>`. |
 | `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`, and stage `failure-modes` with `design.failure_modes` or `import.failure_modes`: moving from one to the other keeps it on. |
 | `obligation-removed` | An obligation of the base does not exist now: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
-| `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 22), which prints as `warn` with the recorded reason. |
+| `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 23), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
 
@@ -1173,7 +1173,7 @@ Runs, in order and stopping at the first that does not pass: `machinery check --
 `machinery formal check --verify` when the project has formal models (section 16.9); the
 project's whole end-to-end suite through `machinery run` (the command after `--`, else
 `commands.e2e`); `machinery verify`; and with `--probe` (optionally `--probe-max <n>`) stage
-`probe` over the proven transition cases (section 19). It prints the stage blocks of each and one final line:
+`probe` over the proven transition cases (section 20). It prints the stage blocks of each and one final line:
 
 ```
 landing: <passed|failed> at <short sha> (attempt <n>, fix-forward <k> of 2)
@@ -1268,7 +1268,7 @@ machinery:verdict <accept|reject> commit=<full sha> actor=<actor> observed="<tex
 
 - `machinery:ids` lists the design ids the story delivers. Several lines add up.
 - `machinery:scope` lists the path globs the story writes.
-- The tier of a story is the highest tier among its ids (section 22). The label `tier:<tier>` on
+- The tier of a story is the highest tier among its ids (section 23). The label `tier:<tier>` on
   the story mirrors it for people and for routing; when label and ids disagree the ids win.
 - The actor is `--actor`, else the environment variable `BEADS_ACTOR`, else `git config user.name`.
 
@@ -1453,7 +1453,7 @@ the proof's, before the verdict.
 
 ## 16. Formal models
 
-A critical area (section 22) gets a formal model. A model is worth nothing when it is vacuous,
+A critical area (section 23) gets a formal model. A model is worth nothing when it is vacuous,
 out of date, quietly weakened, or built on unstated assumptions, so every model carries the
 mechanical checks below. `machinery formal check` runs the tools and records results; stage
 `formal` is pure and reads only committed files, so `machinery check` needs no Java.
@@ -1932,7 +1932,7 @@ anything new in scope is held to the rules. From there:
 The ratchet (section 11.3) holds each step: scope does not narrow, baselines do not grow without
 a wider scope, and nothing proven becomes owed.
 
-## 18. The order of work this supports
+## 19. The order of work this supports
 
 **Plan.** The planner (the PM role) owns the backlog and the risk file. For new work it: changes
 the model and machines first (`machinery lint`, `machinery gen`); assigns tiers in `risk.yaml`;
@@ -1963,7 +1963,7 @@ that point `verify` passes with a long owed list. The work that remains is the o
 An existing project starts with `machinery adopt` (section 17.2): the first owed list is whatever
 the first modeled area declares, and everything outside the scope is left alone.
 
-## 19. Probe
+## 20. Probe
 
 A receipt is a claim made by a test. `machinery probe` checks that the tests would notice if the
 system were wrong, by giving the system a wrong table on purpose:
@@ -2020,7 +2020,7 @@ not per story, and it is never part of `machinery check` or `machinery verify`.
 The probe is the measure of test quality in this method. There are no unit tests to count; a
 suite is good when it kills the mutations of the behavior it claims.
 
-## 20. Agent surfaces
+## 21. Agent surfaces
 
 Agents use machinery through its commands. The checks are tools, not prose: an agent is told
 which command to run and reads its findings, and is never asked to remember a rule.
@@ -2039,14 +2039,14 @@ model that fits routine stories, a stronger one where a wrong result costs more,
 only for formal models. A brief gives pointers and commands; context is read from the files it
 names, in the worker's own session.
 
-## 21. External checkers
+## 22. External checkers
 
 A project can plug its own deterministic checker into `machinery check`: a static analyzer, a
 logic solver, or a rule engine that encodes a standard, a control catalog or a regulation.
 machinery never learns what the checker is. It defines one input file, one output file and where
 the command that connects them is kept.
 
-### 21.1 The parts
+### 22.1 The parts
 
 | Part | Who writes it | Where | Committed |
 |---|---|---|---|
@@ -2073,7 +2073,7 @@ A `covers` entry is a full id or a prefix ending in `*`. It selects among the id
 projection: `act`, `inv`, `sc`, `tc` (every transition, ignore, refusal and guard-clause case of every
 machine), `fm` and `entity:<Name>`.
 
-### 21.2 Declared facts
+### 22.2 Declared facts
 
 Some things a checker needs are true of the system but are in no other design source: that an
 action handles payment data, that the system makes automated decisions about people. The optional
@@ -2090,7 +2090,7 @@ facts:
 Unknown keys, an unknown subject, and two facts with the same subject and predicate are ERRORs in
 stage `checkers`. machinery gives facts no meaning; it carries them to the checkers.
 
-### 21.3 The projection
+### 22.3 The projection
 
 `projection.json` is the whole design as one deterministic JSON document. It is the only thing a
 checker reads; a checker never reads the project's sources. Every list is sorted by id or name.
@@ -2129,7 +2129,7 @@ linked (section 5.4.1) has an empty `subject` and `required`. A machine's `role`
 each with its `tc` id. Lists that have nothing are empty lists, never absent. The projection does not
 contain `ck` obligations: it is the input of the checkers, not their output.
 
-### 21.4 The evidence
+### 22.4 The evidence
 
 A checker writes one JSON document:
 
@@ -2163,7 +2163,7 @@ A checker writes one JSON document:
 
 Anything else in the document, or a document that breaks one of these rules, is invalid evidence.
 
-### 21.5 Obligations from a checker
+### 22.5 Obligations from a checker
 
 A checker can do more than judge the design. It can say what the running system must be shown to
 do: "an operator can halt processing", "every automated decision is logged with its inputs". Each
@@ -2172,7 +2172,7 @@ there it is an obligation like any other: it appears in `obligations.json`, a te
 `machinery:verifies`, a receipt proves it, and until then it is in `owed.yaml`. This is how a
 requirement that comes from outside the design reaches the same proof loop as the rest.
 
-### 21.6 The registry and `machinery checkers run`
+### 22.6 The registry and `machinery checkers run`
 
 `.machinery/checkers.local.yaml`, or the file named by `--registry` or by the environment variable
 `MACHINERY_CHECKERS_REGISTRY`:
@@ -2196,7 +2196,7 @@ directly, without a shell.
 3. runs it in the project directory with `{evidence}` pointing at a temporary file;
 4. a non-zero exit, a timeout or no file written is `ERROR  checker <id> did not run: <reason>`;
    the committed evidence is left as it was;
-5. validates the document (section 21.4), including that `input_sha256` is the hash of the
+5. validates the document (section 22.4), including that `input_sha256` is the hash of the
    projection it was given; invalid evidence is an ERROR and is not installed;
 6. moves the document to the evidence path, and prints its findings and
    `checker <id>: <verdict>, <n> finding(s), <n> obligation(s), <n> covered`.
@@ -2204,14 +2204,14 @@ directly, without a shell.
 After the last checker it regenerates `obligations.json`, so new `ck` obligations appear at once.
 Exit 1 when any checker has an ERROR or the verdict `fail`, else 0.
 
-### 21.7 Stage `checkers`
+### 22.7 Stage `checkers`
 
 Part of `machinery check`, after `formal`. It runs no tool and reads no registry. Not
 applicable when neither `checkers:` nor `design.facts` is present.
 
 | Finding | When |
 |---|---|
-| `ERROR  <facts path>: <problem>` | The facts file is invalid (section 21.2). |
+| `ERROR  <facts path>: <problem>` | The facts file is invalid (section 22.2). |
 | `ERROR  <id>: no evidence; run machinery checkers run <id>` | The evidence file does not exist. |
 | `ERROR  <evidence path>: <problem>` | The evidence is invalid. |
 | `DRIFT  <evidence path>: stale` | `input_sha256` is not the hash of the current `projection.json`. |
@@ -2225,7 +2225,7 @@ applicable when neither `checkers:` nor `design.facts` is present.
 Stale evidence still has its findings reported, so a person sees both that it is stale and what
 it said.
 
-## 22. Risk tiers
+## 23. Risk tiers
 
 Formality follows risk. The planner decides, per area of the design and before work starts, how
 much formality the area gets, and writes it down as data:

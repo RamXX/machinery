@@ -5,7 +5,7 @@ is `docs/formats.md` section 16; this page is the working order.
 
 ## When
 
-Only for areas the risk file marks `critical` (section 22): promises whose break harms users and
+Only for areas the risk file marks `critical` (section 23): promises whose break harms users and
 that tests rarely reach. Everything else is covered by generated transition cases and end-to-end
 evidence. The area's `questions` pick the tool:
 

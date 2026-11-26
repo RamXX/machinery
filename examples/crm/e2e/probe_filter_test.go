@@ -6,7 +6,7 @@ import (
 	"regexp"
 )
 
-// probeFilter narrows a probe run (docs/formats.md section 19) to the one
+// probeFilter narrows a probe run (docs/formats.md section 20) to the one
 // case it mutated, named by MACHINERY_PROBE_CASE. machinery probe mutates
 // transition cases only, and every transition case is proven by its own
 // subtest of TestTransitions, so only that subtest runs: every other test is

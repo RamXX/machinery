@@ -1,5 +1,5 @@
 # The plugin manifests are valid JSON and every path they name exists; the
-# agent surfaces stay small (docs/formats.md section 20).
+# agent surfaces stay small (docs/formats.md section 21).
 exec node check.cjs $REPO
 stdout 'manifests ok'
 exists $REPO/skills/machinery/SKILL.md
@@ -8,7 +8,7 @@ exists $REPO/agents/machinery-verifier.md
 exists $REPO/agents/machinery-modeler.md
 ! exists $REPO/hooks
 
-# size limits of section 20
+# size limits of section 21
 exec sh -c 'test $(wc -l < $REPO/skills/machinery/SKILL.md) -le 120'
 exec sh -c 'for f in $REPO/agents/*.md; do test $(wc -l < $f) -le 60 || exit 1; done'
 

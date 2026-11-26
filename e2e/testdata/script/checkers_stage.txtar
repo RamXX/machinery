@@ -1,4 +1,4 @@
-# stage checkers: each finding of section 21.7, and the checked line
+# stage checkers: each finding of section 22.7, and the checked line
 fixture shop
 cp machinery.ck.yaml machinery.yaml
 cp facts.yaml design/facts.yaml

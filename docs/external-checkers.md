@@ -2,7 +2,7 @@
 
 A project can add a deterministic checker of its own to `machinery check`: a static analyzer, a
 logic solver, or a rule engine that encodes a standard, a control catalog or a regulation.
-machinery never learns what the checker is. The contract is `docs/formats.md` section 21.
+machinery never learns what the checker is. The contract is `docs/formats.md` section 22.
 
 ## The four parts
 
@@ -52,7 +52,7 @@ changed since the checker ran), reports an error, or does not cover what the man
 
 Some things a checker needs are true of the system but appear in no design source: that an
 action handles payment data, that the system decides about people automatically. State them in
-`design/facts.yaml` (section 21.2); machinery gives them no meaning and carries them to the
+`design/facts.yaml` (section 22.2); machinery gives them no meaning and carries them to the
 checkers.
 
 ## Requirements that come from the checker

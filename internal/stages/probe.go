@@ -11,7 +11,7 @@ func init() {
 	})
 }
 
-// Probe is stage probe (section 19) for one test command.
+// Probe is stage probe (section 20) for one test command.
 func Probe(ctx *Context, opts probe.Options) *report.Stage {
 	return probe.Stage(ctx.P, ctx.Design(), opts)
 }
