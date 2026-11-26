@@ -19,7 +19,7 @@ var xrefModelRules = []string{"machine-binding", "state-enum", "event-action", "
 func XrefModelMachine(ctx *Context) *report.Stage {
 	s := report.New("xref-model-machine")
 	p := ctx.P
-	if p.Cfg.Design.Machines == "" {
+	if !p.Cfg.HasMachines() {
 		return s.NotApplicable("no design.machines configured")
 	}
 	if len(p.Cfg.Design.Models) == 0 {

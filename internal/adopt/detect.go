@@ -16,10 +16,15 @@ type Sources struct {
 	Contracts []string
 }
 
-// discover finds the design sources among the project files, sorted.
-func discover(files []string) Sources {
+// discover finds the design sources among the project files, sorted. Files
+// under the gen directory are generated, never sources.
+func discover(files []string, genDir string) Sources {
 	var s Sources
+	gen := strings.TrimSuffix(genDir, "/") + "/"
 	for _, f := range files {
+		if strings.HasPrefix(f, gen) {
+			continue
+		}
 		base := path.Base(f)
 		switch {
 		case strings.HasSuffix(base, ".modelith.yaml"):

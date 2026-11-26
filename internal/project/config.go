@@ -22,6 +22,7 @@ type Config struct {
 	Version      int               `yaml:"version"`
 	Scope        []string          `yaml:"scope,omitempty"`
 	Design       Design            `yaml:"design"`
+	Import       *Import           `yaml:"import,omitempty"`
 	Contracts    []Contract        `yaml:"contracts,omitempty"`
 	Checkers     []Checker         `yaml:"checkers,omitempty"`
 	Dependencies []Dependency      `yaml:"dependencies,omitempty"`
@@ -46,6 +47,42 @@ type Design struct {
 	Owed         string   `yaml:"owed,omitempty"`
 	Gen          string   `yaml:"gen,omitempty"`
 }
+
+// Import names design sources kept in the project's own formats (section 2).
+type Import struct {
+	Machines *ImportMachines `yaml:"machines,omitempty"`
+}
+
+// ImportMachines reads machines written in a JSON dialect (section 5.2.1).
+type ImportMachines struct {
+	Files  []string `yaml:"files"`
+	States string   `yaml:"states,omitempty"`
+	Rename Rename   `yaml:"rename,omitempty"`
+}
+
+// Rename maps the project's keys to machinery keys, per level of a machine.
+type Rename struct {
+	Root       map[string]string `yaml:"root,omitempty"`
+	State      map[string]string `yaml:"state,omitempty"`
+	Transition map[string]string `yaml:"transition,omitempty"`
+}
+
+// The states values of import.machines.
+const (
+	StatesKeep       = "keep"
+	StatesCapitalize = "capitalize"
+)
+
+// ImportedMachines returns the import.machines block, or nil.
+func (c *Config) ImportedMachines() *ImportMachines {
+	if c.Import == nil {
+		return nil
+	}
+	return c.Import.Machines
+}
+
+// HasMachines reports whether the project has machines, native or imported.
+func (c *Config) HasMachines() bool { return c.Design.Machines != "" || c.ImportedMachines() != nil }
 
 type Contract struct {
 	Kind string `yaml:"kind"`
@@ -315,6 +352,9 @@ func (c *Config) validate() error {
 		}
 		steps = append(steps, check("constraints.baseline", c.Constraints.Baseline))
 	}
+	if err := c.validateImport(); err != nil {
+		return err
+	}
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
 	}
@@ -332,6 +372,42 @@ func (c *Config) validate() error {
 		}
 	}
 	return errors.Join(steps...)
+}
+
+// validateImport holds the import block to section 2.
+func (c *Config) validateImport() error {
+	im := c.ImportedMachines()
+	if im == nil {
+		return nil
+	}
+	if c.Design.Machines != "" {
+		return Errf("import.machines: design.machines is also set; read the machines from one of them")
+	}
+	if len(im.Files) == 0 {
+		return Errf("import.machines.files is required")
+	}
+	for _, g := range im.Files {
+		if err := CheckPath("import.machines.files", g); err != nil {
+			return err
+		}
+		if !ValidGlob(g) {
+			return Errf("import.machines.files: %q is not a valid glob", g)
+		}
+	}
+	if im.States != "" && im.States != StatesKeep && im.States != StatesCapitalize {
+		return Errf("import.machines.states must be capitalize or keep, got %q", im.States)
+	}
+	for _, lv := range []struct {
+		name string
+		m    map[string]string
+	}{{"root", im.Rename.Root}, {"state", im.Rename.State}, {"transition", im.Rename.Transition}} {
+		for k, v := range lv.m {
+			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
+				return Errf("import.machines.rename.%s: a key and its new name must not be empty", lv.name)
+			}
+		}
+	}
+	return nil
 }
 
 // Default routing texts (section 2).

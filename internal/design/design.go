@@ -76,7 +76,7 @@ type Design struct {
 func Load(p *project.Project) *Design {
 	d := &Design{P: p}
 	d.Models, d.ModelProblems = LoadModels(p)
-	ms, probs, err := machine.LoadDir(p)
+	ms, probs, err := machine.Load(p)
 	if err != nil {
 		probs = append(probs, err.Error())
 	}

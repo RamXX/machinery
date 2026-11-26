@@ -1,0 +1,187 @@
+# what import.machines refuses, and with which message
+fixture empty
+mkdir machines
+cp shelf.json machines/shelf.json
+
+# import.machines beside design.machines, or without files, is a config error
+cp both.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.machines: design.machines is also set; read the machines from one of them'
+cp nofiles.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.machines.files is required'
+cp badstates.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.machines.states must be capitalize or keep, got "upper"'
+cp emptyname.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.machines.rename.state: a key and its new name must not be empty'
+cp badglob.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.machines.files: "machines/\[" is not a valid glob'
+cp outside.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: import.machines.files: "../machines/\*.json" must stay inside the project root'
+cp badkey.yaml machinery.yaml
+exec mrun 2 lint
+stderr 'config: machinery.yaml: .*field folder not found'
+
+# a file that is not JSON, or not an object, is an error naming it
+cp good.yaml machinery.yaml
+exec machinery lint --stage machines
+stdout 'checked: 1 machines'
+cp broken.json.in machines/broken.json
+cp list.json.in machines/list.json
+exec mrun 1 lint --stage machines
+stdout 'ERROR  machines/broken.json: invalid JSON in machines/broken.json: line 3: '
+stdout 'ERROR  machines/list.json: machine must be a JSON object'
+stdout 'checked: 1 machines'
+rm machines/broken.json machines/list.json
+
+# two files that translate to the same id: the second is not read
+cp noid.json.in machines/shelf_2.json
+exec sh -c 'sed "s/\"shelf\"/\"shelf-2\"/" machines/shelf.json > machines/shelf-2.json'
+exec mrun 1 lint --stage machines
+stdout 'ERROR  machines/shelf_2.json: translates to machine id shelf_2, as machines/shelf-2.json does; give one of them another id'
+stdout 'checked: 2 machines'
+rm machines/shelf_2.json machines/shelf-2.json
+
+# two keys of one node that land on the same key
+cp collide.json.in machines/shelf.json
+exec mrun 1 lint --stage machines
+stdout 'ERROR  machines/shelf.json: state empty on:stock: keys allowed and _requires both become _requires'
+stdout 'ERROR  machines/shelf.json: state full: keys skip and _ignores both become _ignores'
+stdout 'ERROR  machines/shelf.json: root: keys begin and initial both become initial'
+
+# two sibling states that capitalize to one name
+cp twins.json.in machines/shelf.json
+exec mrun 1 lint --stage machines
+stdout 'ERROR  machines/shelf.json: states full and Full both become Full with states: capitalize'
+
+# gen refuses while the translation has an error
+exec mrun 1 gen
+! exists design/gen/obligations.json
+
+-- both.yaml --
+version: 2
+design:
+  machines: design/machines
+import:
+  machines:
+    files: ["machines/*.json"]
+-- nofiles.yaml --
+version: 2
+import:
+  machines:
+    states: keep
+-- badstates.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: upper
+-- emptyname.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    rename:
+      state: {skip: ""}
+-- badglob.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/["]
+-- outside.yaml --
+version: 2
+import:
+  machines:
+    files: ["../machines/*.json"]
+-- badkey.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    folder: machines
+-- good.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {begin: initial}
+      state: {skip: _ignores}
+      transition: {allowed: _requires}
+-- shelf.json --
+{
+  "id": "shelf",
+  "initial": "empty",
+  "states": {
+    "empty": {
+      "on": {"stock": {"target": "full"}},
+      "skip": {"clear": "nothing to clear"}
+    },
+    "full": {
+      "on": {"clear": {"target": "empty"}},
+      "skip": {"stock": "already stocked"}
+    }
+  }
+}
+-- noid.json.in --
+{
+  "initial": "empty",
+  "states": {
+    "empty": {
+      "on": {"stock": {"target": "full"}},
+      "skip": {"clear": "nothing to clear"}
+    },
+    "full": {
+      "on": {"clear": {"target": "empty"}},
+      "skip": {"stock": "already stocked"}
+    }
+  }
+}
+-- broken.json.in --
+{
+  "id": "broken",
+  "initial": ,
+}
+-- list.json.in --
+["not", "a", "machine"]
+-- collide.json.in --
+{
+  "id": "shelf",
+  "begin": "empty",
+  "initial": "empty",
+  "states": {
+    "empty": {
+      "on": {"stock": {"target": "full", "allowed": ["Clerk"], "_requires": ["Clerk"]}},
+      "skip": {"clear": "nothing to clear"}
+    },
+    "full": {
+      "on": {"clear": {"target": "empty"}},
+      "skip": {"stock": "already stocked"},
+      "_ignores": {"stock": "already stocked"}
+    }
+  }
+}
+-- twins.json.in --
+{
+  "id": "shelf",
+  "initial": "empty",
+  "states": {
+    "empty": {
+      "on": {"stock": {"target": "full"}},
+      "skip": {"clear": "nothing to clear"}
+    },
+    "full": {
+      "on": {"clear": {"target": "empty"}},
+      "skip": {"stock": "already stocked"}
+    },
+    "Full": {
+      "on": {"clear": {"target": "empty"}},
+      "skip": {"stock": "already stocked"}
+    }
+  }
+}

@@ -82,6 +82,10 @@ func Run(o Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	genDir := "design/gen"
+	if oldP != nil {
+		genDir = oldP.Cfg.Design.Gen
+	}
 	exe := "bd"
 	if oldP != nil {
 		exe = oldP.Cfg.Tools.BD
@@ -97,7 +101,7 @@ func Run(o Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	applyEdits(ed, existing, o, discover(files), res.Backlog.Found)
+	applyEdits(ed, existing, o, discover(files, genDir), res.Backlog.Found)
 	newBytes, err := ed.bytes()
 	if err != nil {
 		return nil, err
@@ -177,6 +181,15 @@ func describe(res *Result, p *project.Project, files []string) error {
 		ms, _ := p.Glob([]string{strings.TrimSuffix(dir, "/") + "/*.machine.json"})
 		res.Machines = len(ms)
 	}
+	if im := p.Cfg.ImportedMachines(); im != nil {
+		gen := strings.TrimSuffix(p.Cfg.Design.Gen, "/") + "/"
+		ms, _ := p.Glob(im.Files)
+		for _, f := range ms {
+			if !strings.HasPrefix(f, gen) {
+				res.Machines++
+			}
+		}
+	}
 	return nil
 }
 
@@ -213,7 +226,8 @@ func applyEdits(ed *editor, existing bool, o Options, src Sources, backlogFound 
 	if len(newModels) > 0 {
 		ed.addSeq(ed.mapping(root, "design"), "models", newModels, false, "design.models")
 	}
-	if len(src.Machines) > 0 && get(get(root, "design"), "machines") == nil {
+	imported := get(get(root, "import"), "machines") != nil
+	if len(src.Machines) > 0 && get(get(root, "design"), "machines") == nil && !imported {
 		dir := src.machinesDir()
 		ed.set(ed.mapping(root, "design"), "machines", dir, "design.machines +"+dir)
 	}
@@ -224,7 +238,7 @@ func applyEdits(ed *editor, existing bool, o Options, src Sources, backlogFound 
 		}
 	}
 	design := get(root, "design")
-	hasDesign := len(seqValues(get(design, "models"))) > 0 || get(design, "machines") != nil
+	hasDesign := len(seqValues(get(design, "models"))) > 0 || get(design, "machines") != nil || imported
 
 	traceExisted := get(root, "trace") != nil
 	tests := get(root, "tests")

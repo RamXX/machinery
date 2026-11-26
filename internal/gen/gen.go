@@ -77,6 +77,12 @@ func TablePath(d *design.Design, m *machine.Machine) string {
 	return Dir(d) + "/tables/" + m.ID + ".table.json"
 }
 
+// ImportedPath is the path of the translated file of an imported machine
+// (section 5.2.1).
+func ImportedPath(d *design.Design, m *machine.Machine) string {
+	return Dir(d) + "/imported/machines/" + m.Base + machine.Suffix
+}
+
 // Files returns every file of the gen directory, sorted by path.
 func Files(d *design.Design) ([]File, error) {
 	var files []File
@@ -92,6 +98,9 @@ func Files(d *design.Design) ([]File, error) {
 		}
 		files = append(files, File{TablePath(d, m), tj})
 		files = append(files, File{Dir(d) + "/tables/" + m.ID + ".table.md", TableMarkdown(m.Table)})
+		if m.Imported {
+			files = append(files, File{ImportedPath(d, m), m.Bytes})
+		}
 	}
 	for _, extra := range Extra {
 		f, ok, err := extra(d)

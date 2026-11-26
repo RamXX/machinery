@@ -13,7 +13,7 @@ func init() { Bind("machines", Machines) }
 // Machines is stage machines (section 6.2).
 func Machines(ctx *Context) *report.Stage {
 	s := report.New("machines")
-	if ctx.P.Cfg.Design.Machines == "" {
+	if !ctx.P.Cfg.HasMachines() {
 		return s.NotApplicable("no design.machines configured")
 	}
 	d := ctx.Design()

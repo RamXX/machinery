@@ -92,7 +92,11 @@ func runFormalNew(e *Env, args []string) int {
 			}
 		}
 		if source == "" {
-			return e.Fail(project.Errf("no machine file %s.machine.json in %s", *machineName, p.Cfg.Design.Machines))
+			where := p.Cfg.Design.Machines
+			if p.Cfg.ImportedMachines() != nil {
+				where = "the imported machines"
+			}
+			return e.Fail(project.Errf("no machine file %s.machine.json in %s", *machineName, where))
 		}
 		props = *machineName + "Props"
 		propsText = formal.TLAPropsTemplate(props, *machineName)

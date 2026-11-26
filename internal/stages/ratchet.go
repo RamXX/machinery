@@ -123,7 +123,7 @@ type stageKey struct {
 func stageKeys(c *project.Config) []stageKey {
 	return []stageKey{
 		{"model", "design.models", len(c.Design.Models) > 0},
-		{"machines", "design.machines", c.Design.Machines != ""},
+		{"machines", machinesKey(c), c.HasMachines()},
 		{"failure-modes", "design.failure_modes", c.Design.FailureModes != ""},
 		{"risk", "design.risk", c.Design.Risk != ""},
 		{"xref-contract", "contracts", len(c.Contracts) > 0},
@@ -133,6 +133,14 @@ func stageKeys(c *project.Config) []stageKey {
 		{"tests", "tests or trace.tests", c.Tests != nil || (c.Trace != nil && len(c.Trace.Tests) > 0)},
 		{"trace", "trace", c.Trace != nil},
 	}
+}
+
+// machinesKey names the key that makes stage machines apply.
+func machinesKey(c *project.Config) string {
+	if c.ImportedMachines() != nil {
+		return "import.machines"
+	}
+	return "design.machines"
 }
 
 func stageOn(c *project.Config, stage string) bool {

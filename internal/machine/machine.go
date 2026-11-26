@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/RamXX/machinery/internal/dialect"
 	"github.com/RamXX/machinery/internal/ir"
 	"github.com/RamXX/machinery/internal/project"
 )
@@ -28,9 +29,14 @@ type Machine struct {
 	LifecycleOf string // from _lifecycle_of ("" when absent)
 	Role        string // from _role ("" when absent)
 	Root        *ir.Value
-	Bytes       []byte
+	Bytes       []byte // the machine as stage xstate loads it
 	Resolver    *ir.Resolver
 	Table       *Table
+	// Imported is true for a machine translated from a project's own format
+	// (section 5.2.1): Path is then the source file and Bytes the translation.
+	Imported bool
+
+	sourceSum string // sha256 of the bytes of the file Path names
 }
 
 // State is a row of the table's states list.
@@ -124,6 +130,24 @@ func Trigger(kind, event string) string {
 	return kind + ":" + event
 }
 
+// Load loads the project's machines: the files of design.machines, or the
+// translated files of import.machines (section 5.2.1).
+func Load(p *project.Project) (ms []*Machine, problems []string, err error) {
+	if p.Cfg.ImportedMachines() == nil {
+		return LoadDir(p)
+	}
+	tms, problems := dialect.Machines(p)
+	for _, tm := range tms {
+		m, perr := Imported(tm.Source, tm.ID, tm.Bytes, tm.SourceBytes)
+		if perr != nil {
+			problems = append(problems, fmt.Sprintf("%s: %v", tm.Source, perr))
+			continue
+		}
+		ms = append(ms, m)
+	}
+	return ms, problems, nil
+}
+
 // LoadDir loads every machine file of the project's machines directory, sorted
 // by path. A file that cannot be parsed is reported in problems and skipped.
 func LoadDir(p *project.Project) (ms []*Machine, problems []string, err error) {
@@ -153,6 +177,21 @@ func LoadDir(p *project.Project) (ms []*Machine, problems []string, err error) {
 
 // Parse reads one machine document and builds its table.
 func Parse(rel string, data []byte) (*Machine, error) {
+	return parse(rel, strings.TrimSuffix(path.Base(rel), Suffix), data, data)
+}
+
+// Imported builds a machine from its translated bytes. rel is the source
+// file findings name, base the translated file name without the suffix, and
+// source the source bytes the table's source_sha256 covers.
+func Imported(rel, base string, data, source []byte) (*Machine, error) {
+	m, err := parse(rel, base, data, source)
+	if m != nil {
+		m.Imported = true
+	}
+	return m, err
+}
+
+func parse(rel, base string, data, source []byte) (*Machine, error) {
 	root, err := ir.LoadMachineJSONBytes(rel, data)
 	if err != nil {
 		return nil, err
@@ -161,8 +200,8 @@ func Parse(rel string, data []byte) (*Machine, error) {
 	if ro == nil {
 		return nil, fmt.Errorf("machine must be a JSON object")
 	}
-	base := strings.TrimSuffix(path.Base(rel), Suffix)
-	m := &Machine{Path: rel, Base: base, Root: root, Bytes: data}
+	sum := sha256.Sum256(source)
+	m := &Machine{Path: rel, Base: base, Root: root, Bytes: data, sourceSum: hex.EncodeToString(sum[:])}
 	m.ID = ro.GetString("id")
 	if m.ID == "" {
 		m.ID = base
@@ -224,10 +263,9 @@ func stringsOrEmpty(s []string) []string {
 
 func buildTable(m *Machine) *Table {
 	ro := m.Root.AsObject()
-	sum := sha256.Sum256(m.Bytes)
 	t := &Table{
 		Version: 1, Machine: m.ID, Tag: m.Tag, Source: m.Path,
-		SourceSHA256: hex.EncodeToString(sum[:]), Initial: ro.GetString("initial"),
+		SourceSHA256: m.sourceSum, Initial: ro.GetString("initial"),
 		States: []State{}, Transitions: []Transition{}, Ignores: []Ignore{}, Refusals: []Refusal{},
 		Clauses: []Clause{}, Delays: map[string]int{}, Entries: sortedCopy(m.Entries()),
 	}

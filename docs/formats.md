@@ -58,6 +58,14 @@ design:
   facts: design/facts.yaml      # optional: facts the design declares about itself (section 21.2)
   owed: design/owed.yaml        # optional, this is the default
   gen: design/gen               # optional, this is the default
+import:                         # optional: design sources kept in the project's own formats
+  machines:                     # optional, instead of design.machines (section 5.2.1)
+    files: ["machines/*.json"]  # required: globs of the project's machine files
+    states: capitalize          # optional: capitalize | keep; default keep
+    rename:                     # optional: the project's key -> the machinery key, per level
+      root: {notes: _comment, startable: _entries}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
 contracts:                      # optional
   - kind: openapi               # openapi | proto
     path: contracts/openapi.yaml
@@ -110,6 +118,12 @@ Rules:
 
 - Unknown keys anywhere are a config error. A config error prints `config: <message>` on stderr
   and exits 2.
+- `import` reads design sources that a project keeps in its own formats, so an existing project
+  can be assessed and adopted before anything is converted. machinery never writes those sources.
+  `design.machines` and `import.machines` together are a config error
+  (`import.machines: design.machines is also set; read the machines from one of them`), and so
+  are an empty `import.machines.files` (`import.machines.files is required`), a `states` value
+  other than `capitalize` or `keep`, and an empty key or name in `rename`.
 - Globs use doublestar syntax: `**` matches any number of directories, `*` matches inside one path
   segment, `{a,b}` alternates.
 - `scope` bounds the static stages that read code (`arch`, `tests`, `trace`): a file outside every
@@ -316,6 +330,65 @@ A machine also declares, with annotations XState ignores and a tag XState carrie
 
 `docs/machine-format.md` has their rules; stage `machines` (section 6.2) holds them.
 
+#### 5.2.1 Machines in a project's own format
+
+A project that already keeps state machines in a JSON dialect of its own names them in
+`import.machines` instead of `design.machines` (section 2). machinery translates each file in
+memory, the same way every time, and never writes it. Every stage (`machines`, the
+cross-reference stages, `xstate`, `gen`, `formal gen`, `trace`, `verify`) reads the translated
+machine exactly as if it were a native file, and every finding names the source file, so the
+team sees where to look.
+
+Each file the `files` globs match is translated, in path order (a file under the gen directory
+is generated, never a source, and is not read):
+
+1. **Parsing.** A file that is not valid JSON is `ERROR  <file>: invalid JSON in <file>: <error>`,
+   and one whose top level is not an object is `ERROR  <file>: machine must be a JSON object`.
+2. **Keys.** The keys of the root object, of every state object (under `states`, at any depth)
+   and of every transition branch (under `on`, `after`, `always`, a state's `onDone`, and an
+   invoke's `onDone` and `onError`) are renamed by the `rename` map of their level (`root`,
+   `state`, `transition`); every other key is kept as written. Then:
+   - A value that lands on `_comment` from a renamed key is prefixed `<source key>: ` (a value
+     that is not a string is written as compact JSON). When several values land on `_comment` at
+     one node, they are joined with ` | ` in key order; a native `_comment` joins unprefixed.
+   - A transition key renamed to `_refusal` is removed from the branch and added to its state's
+     `_refusal`, keyed by the handler name of `docs/machine-format.md` ("Guard-false
+     dispositions"): the event for an `on` branch, `after:<delay>`, `onDone` for a state's own
+     completion, `<src>.onDone` and `<src>.onError` for an invoke, and `always` for an
+     `always` branch, which the lint then reports as a stale disposition. Dispositions that land
+     on one handler are joined with ` | ` in document order.
+   - Two keys of one node that land on the same other key are
+     `ERROR  <file>: <node>: keys <a> and <b> both become <key>`, and the first is kept. The node is `root`,
+     `state <path>`, or `state <path> <trigger>` (the trigger of section 7.2) with ` branch <n>`
+     for a branch of a list; paths are in source names and `<n>` counts from 1.
+3. **States.** With `states: capitalize` the first letter of every state name is upper-cased:
+   the keys under every `states`, every `initial`, every target (a bare name, and each path
+   segment after the head of a `#<id>.<path>` target), and the values of `_entries`, native or
+   renamed. Two sibling states that become one name are
+   `ERROR  <file>: states <a> and <b> both become <name> with states: capitalize`, and the first is
+   kept.
+4. **Id.** The original id is the root `id`, or the file name without its extension when there
+   is none. The machine id is the original id with every character outside `[A-Za-z0-9_]`
+   replaced by `_`. It is the translated root `id` (written first when the source has no `id`),
+   and a target head `#<original id>` becomes `#<machine id>`. The translated file name is
+   `<machine id>.machine.json`, so a lifecycle binding by file name (above) uses the machine id.
+   Two files that translate to the same id are
+   `ERROR  <second file>: translates to machine id <id>, as <first file> does; give one of them another id`,
+   and the second is not read.
+5. **Role.** `_role: "operational"` is added when the result has neither `_lifecycle_of` nor
+   `_role`.
+6. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
+   the machine id, upper-cased, followed by the first four hex digits, upper-cased, of the SHA-256
+   of the original id. Dozens of machines whose ids share a prefix get different tags, and a tag
+   does not change while the id does not.
+
+An added `_role` or `_oracle_tag` comes last in the root; every other key keeps its place. A
+key that is still unknown after renaming is a finding of stage `machines`, as in a native file:
+nothing is dropped silently. The runtime table of an imported machine names the source file in `source`, and its
+`source_sha256` is the SHA-256 of the source bytes (section 7.3). The translated bytes are what
+`machinery gen` writes under `<gen>/imported/machines/` (section 7) and what stage `xstate`
+loads.
+
 ### 5.3 Contracts
 
 - `kind: openapi`: an OpenAPI 3.x document in YAML or JSON. An operation binds to a model action
@@ -378,8 +451,8 @@ For each configured model file:
 
 ### 6.2 `machines`
 
-Lints every `*.machine.json` in the machines directory with the rules in
-`docs/machine-format.md`: subset conformance, name patterns, strict target resolution, declared
+Lints every `*.machine.json` in the machines directory, or every imported machine
+(section 5.2.1), with the rules in `docs/machine-format.md`: subset conformance, name patterns, strict target resolution, declared
 delays, reachability from the initial state and from every entry state (`_entries`), dead ends,
 absorbing states unless declared `_terminal`, every invoke has `onError` and a timeout, event
 completeness on resting states (`_ignores`), guard-false dispositions (`_refusal`, `_exhaustive`),
@@ -394,8 +467,9 @@ dotted path). An event the machine handles or ignores whose name contains one of
 that is neither in `_failure_events` nor an action of the machine's lifecycle entity, prints
 `warn   <file>: event <e> looks like a failure event and is not in _failure_events`.
 
-`checked:` counts machines, states and transitions. Not applicable when `design.machines` is
-absent.
+`checked:` counts machines, states and transitions. Not applicable when neither `design.machines`
+nor `import.machines` is configured. With `import.machines` the translation findings of section
+5.2.1 are findings of this stage.
 
 ### 6.3 `failure-modes`
 
@@ -497,6 +571,9 @@ machines and cases compared. Not applicable when `tools.xstate` is false or abse
 - `projection.json` (section 21.3), only when `checkers:` or `design.facts` is configured;
 - `tables/<machine id>.table.json` for each machine (section 7.3);
 - `tables/<machine id>.table.md`, a readable rendering of the same table;
+- `imported/machines/<machine id>.machine.json` for each imported machine (section 5.2.1): the
+  translated machine, so that people and XState tooling can read it. It is generated like every
+  file here; the source file stays the one to change;
 
 and beside each model its `<name>.modelith.md`.
 
@@ -506,8 +583,9 @@ indentation, keys in the order given in this document, and a trailing newline. W
 `machines` or `failure-modes` stage has an ERROR.
 
 `machinery gen --check` regenerates in memory and reports `DRIFT  <path>: stale`, `DRIFT  <path>:
-missing`, and `ERROR  <path>: unexpected file in gen directory`. A project with no design source
-configured and an empty gen directory is `not applicable: no design sources configured`.
+missing`, and `ERROR  <path>: unexpected file in gen directory`, the translated machines
+included. A project with no design source configured (under `design` or `import`) and an empty
+gen directory is `not applicable: no design sources configured`.
 
 ### 7.1 `obligations.json`
 
@@ -634,6 +712,8 @@ transitions up in this table; it does not hard-code them.
 }
 ```
 
+- For an imported machine (section 5.2.1) `source` is the source file and `source_sha256` the
+  SHA-256 of its bytes.
 - `entries`, the key after `initial`, lists the `_entries` states, sorted. It is present only
   when the machine declares `_entries`.
 - `states` lists every state in document order, nested states by dotted path. `kind` is `atomic`,
@@ -879,7 +959,7 @@ that was established at the base may quietly stop being established:
 |---|---|
 | `proven-to-owed` | An id that was an obligation at the base and was not owed there is owed now: `ERROR  ratchet: <id> was proven at <ref> and is owed now`. New obligations may be owed. |
 | `scope-narrowed` | A scope glob of the base is missing now: `ERROR  ratchet: scope narrowed: <glob>`. |
-| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. |
+| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`: moving from one to the other keeps it on. |
 | `obligation-removed` | An obligation of the base does not exist now: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
 | `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 22), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
@@ -1684,7 +1764,12 @@ next:
   <one line per suggested step>
 ```
 
-`backlog:` is `none found` when the project has no `.beads` directory. With `--write`:
+`backlog:` is `none found` when the project has no `.beads` directory. Files under the gen
+directory are generated, never design sources: adopt does not find models, machines or contracts
+there. An `import` section is configured by hand (section 2); adopt detects nothing for it, but
+it works with an existing `machinery.yaml` that has one: `design:` counts the files
+`import.machines.files` matches as machines, and adopt never adds `design.machines` beside
+`import.machines`. With `--write`:
 
 1. **Config.** Without a `machinery.yaml`, writes one: `scope` from `--paths`, `tests.e2e` from
    `--e2e` (default `e2e/**`), and, once design sources exist, `trace.code` equal to the scope

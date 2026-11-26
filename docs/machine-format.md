@@ -7,7 +7,8 @@ code; the file describes structure only. A file in this subset can be pasted int
 visualizer after its `_`-prefixed keys are removed.
 
 `docs/formats.md` is the contract: section 5.2 (what a machine is), 6.2 (the `machines` stage), 7.2
-(cases) and 7.3 (runtime tables). This guide is the working reference for authors. `machinery lint`
+(cases) and 7.3 (runtime tables). Machines kept in a JSON dialect of the project's own are read
+through `import.machines` and translated into this format in memory (section 5.2.1). This guide is the working reference for authors. `machinery lint`
 enforces everything below, and an unknown key is an error, never silently skipped.
 
 ## What the lint enforces

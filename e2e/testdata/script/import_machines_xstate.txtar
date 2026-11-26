@@ -1,0 +1,77 @@
+# stage xstate loads the translated machines: the tables have the capitalized state names, so
+# XState agrees with them only because it runs the translation, not the source
+fixture empty
+cp config.yaml machinery.yaml
+mkdir machines
+cp loan-desk.json machines/loan-desk.json
+cp hold.json machines/hold.json
+exec machinery lint --stage machines --stage xstate
+stdout '(?s)== machines ==\nchecked: 2 machines, 7 states, 8 transitions\npassed\n'
+stdout '(?s)== xstate ==\nchecked: 2 machines, 4 cases\npassed\n'
+stdout 'machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+
+-- config.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: capitalize
+    rename:
+      root: {notes: _comment, remark: _comment, startable: _entries, entity: _lifecycle_of}
+      state: {skip: _ignores}
+      transition: {allowed: _requires, denied: _refusal}
+tools:
+  xstate: true
+-- loan-desk.json --
+{
+  "id": "loan-desk",
+  "notes": "the circulation desk",
+  "remark": {"since": 2019},
+  "startable": ["lent"],
+  "initial": "shelved",
+  "states": {
+    "shelved": {
+      "on": {
+        "lend": {"target": "lent", "guard": "memberInGoodStanding", "allowed": ["Librarian"], "denied": "a member with fines is refused with MEMBER_BLOCKED"}
+      },
+      "skip": {"giveBack": "nothing is lent; the desk refuses with NOT_LENT"}
+    },
+    "lent": {
+      "on": {
+        "giveBack": {"target": "#loan-desk.shelved", "allowed": ["Member", "Librarian"]}
+      },
+      "skip": {"lend": "already lent; the desk refuses with ALREADY_LENT"}
+    }
+  }
+}
+-- hold.json --
+{
+  "id": "hold.queue",
+  "entity": "Hold",
+  "initial": "waiting",
+  "_delays": {
+    "holdExpiry": "604800000 ms - a hold lasts seven days",
+    "noticeTimeout": "30000 ms - upper bound on the notice service"
+  },
+  "states": {
+    "waiting": {
+      "on": {"notify": {"target": "notifying"}},
+      "after": {"holdExpiry": [{"target": "expired", "guard": "nobodyNotified", "denied": "a notified hold waits for pickup"}]},
+      "skip": {"collect": "nothing to collect yet; the desk refuses with HOLD_NOT_READY"}
+    },
+    "notifying": {
+      "invoke": {
+        "src": "sendNotice",
+        "onDone": {"target": "ready", "guard": "noticeDelivered", "denied": "an undelivered notice keeps the hold waiting"},
+        "onError": {"target": "waiting"}
+      },
+      "after": {"noticeTimeout": {"target": "waiting"}}
+    },
+    "ready": {
+      "on": {"collect": {"target": "collected"}},
+      "skip": {"notify": "already notified"}
+    },
+    "expired": {"type": "final"},
+    "collected": {"type": "final"}
+  }
+}
