@@ -1338,8 +1338,7 @@ A test writes each line with a single append so that parallel tests do not inter
 `MACHINERY_RECEIPTS` is not set, the test emits nothing and still runs. When `MACHINERY_ONLY` is
 set, a suite may run only the tests for those ids; a suite that ignores it is still correct.
 The Go helper `pkg/receipt` implements all of this for Go suites (`receipt.Test` builds the
-`test` of the calling file); other languages append the
-JSON line themselves.
+`test` of the calling file); other languages append the JSON line themselves.
 
 A receipt is a claim made by a test. A test asserts first and emits afterwards: it emits `pass`
 only after its assertions held. Section 10.2 says which receipts are read at all.
@@ -1380,7 +1379,10 @@ entry of its name:
 | `ERROR  receipts: <file>: changed after the run; delete the file and run the tests again through machinery run` | The file does not have the digest of the entry; or the file has an end line and the entry has no digest (the run never ended and an end line was added). |
 
 Nothing in such a file counts: it is not a run, none of its receipts is read, a failure in it
-included, and nothing else about it is reported. `machinery status` names it (section 14). A
+included, and nothing else about it is reported. So that the failure cannot vanish with the
+file, the refusal itself is carried everywhere a result is given: the ERROR by `verify`,
+`verify --story` and the tier gates (section 15.6), a `refused` line by `machinery status`
+(section 14), and the result line of `machinery proof` (section 13). A
 file with no end line whose entry has no digest is the incomplete run of section 12. An entry
 that is not such a line is no entry.
 
@@ -1607,7 +1609,9 @@ tests observe the target state and no effects: the case is `partial`, therefore 
 makes the effect real and the test observes it, the case becomes `proven` and leaves the list.
 
 `--story <id>` judges only the ids of that backlog story (section 15.1); every other obligation is
-ignored except for `failed` ones, which always print.
+ignored except for `failed` ones, which always print. The findings about evidence that is not
+used always print too, whatever id they name: a refused receipts file, an incomplete run, and
+`receipt: <id>: <test> does not claim it` (section 10.2).
 
 ### 12.1 Targeted runs: `machinery affected`
 
@@ -1725,7 +1729,10 @@ observations:
 `usage: --ids: <id> is a proof obligation: it awaits a machine-checked proof and has no evidence to show`. Without evidence the block
 has no `command:` line and `result:   no evidence at <short sha>`. The `, against <stack>` part is
 left out when no run names a stack. An owed id prints under `not proven` as
-`<id> (<state>, owed)`.
+`<id> (<state>, owed)`. When a receipts file is not used and may hide a failure (one that
+section 10.2 refuses, or an incomplete run), no count stands: the line is
+`result:   <n> receipts file(s) refused: delete them and run the tests through machinery run`
+and the exit code is 1, whatever the other runs prove. `--post` posts that block as it is.
 
 `criteria` lists one line per selected obligation that has a receipt, sorted by id; an `fv` id
 prints as `<id> -> formal -> pass: <n> run(s), <n> mutation(s) detected`. The `pass` line of an
@@ -1763,7 +1770,7 @@ proofs awaiting: <n>
 vital: <id> proven (by test and model; proof awaited)
 assumed, unproven: <area> <name>: <statement>
 owed without a story: <n>
-refused: <receipts file>: <not produced by machinery run|changed after the run>
+refused: <receipts file>: <not produced by machinery run|changed after the run|incomplete run>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
 ```
 
@@ -1776,9 +1783,9 @@ The `tiers` line counts obligations by the tier of their area and is omitted whe
 risk file; its `vital` part, and the three lines after the `proven` line, print only when the
 risk file has a vital area (section 23.2): the number of proof obligations, one `vital` line per
 id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
-whose evidence is owed, each group sorted. One `refused` line prints per receipts file that
-section 10.2 refuses, sorted by file. When there is no evidence the line is
-`evidence: none at <short sha>`. When
+whose evidence is owed, each group sorted. One `refused` line prints per receipts file that is
+not used and may hide a failure: a file section 10.2 refuses, or an incomplete run (section 12);
+sorted by file. When there is no evidence the line is `evidence: none at <short sha>`. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
 `intake <id>: <n> of 7 steps done; next: <step>`; then the latest review of each kind (section 15.10):
@@ -2137,7 +2144,10 @@ A missing session is never an error: harnesses that give none exist.
 
 Findings name what is missing, for example `ERROR  no prediction for <short sha>: a verifier runs
 machinery predict before reading the proof`, `ERROR  verifier is the builder: <actor>`,
-`ERROR  unproven: <id>`. `checked:` counts ids, proofs, predictions and verdicts. A story without
+`ERROR  unproven: <id>`. A receipts file that is not used fails the gate of every story with the
+finding `verify` has for it (`ERROR  receipts: <file>: ...`, `ERROR  incomplete run: <file>`;
+sections 10.2 and 12): the failure of the story may be in it. `checked:` counts ids, proofs,
+predictions and verdicts. A story without
 a `machinery:ids` line is `not demonstrated: story names no design ids`.
 
 **The design story.** A story that carries `machinery:intake-design` lands the design change of its
