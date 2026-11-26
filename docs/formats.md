@@ -123,6 +123,10 @@ tools:
   xstate: false                 # optional: true enables stage xstate (section 6.8)
 waivers:                        # optional, see section 6.7
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state"}
+assess:                         # optional: read only by machinery assess (section 18)
+  decisions:                    # optional: the project's own decision records (section 18.7)
+    files: ["docs/adr/*.md"]   # required: globs of the files that hold them
+    record: "^# ADR-[0-9]+: "  # required: a regular expression matching the heading line of one record
 ```
 
 Rules:
@@ -142,6 +146,10 @@ Rules:
   It may be set beside `design.failure_modes`.
 - An empty marker in `trace.markers` is a config error
   (`trace.markers.verifies: a marker must not be empty`).
+- `assess.decisions` needs a non-empty `files` list of valid globs
+  (`assess.decisions.files is required`) and a `record` that is a regular expression
+  (`assess.decisions.record is required`,
+  `assess.decisions.record is not a regular expression: <error>`).
 - Globs use doublestar syntax: `**` matches any number of directories, `*` matches inside one path
   segment, `{a,b}` alternates.
 - `scope` bounds the static stages that read code (`arch`, `tests`, `trace`): a file outside every
@@ -194,6 +202,7 @@ Rules:
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
 | `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). |
+| `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). |
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
 | `machinery version` | Prints `machinery <version>`. |
 
@@ -201,7 +210,8 @@ Rules:
 order, and the exit code depends on them alone. An unknown stage name is a usage error (exit 2).
 
 `machinery` with no arguments prints help and exits 0. `version`, `init`, `adopt`,
-`formal tools` and help work without a `machinery.yaml`; every other command needs one.
+`formal tools` and help work without a `machinery.yaml`, and `assess` with `--config`; every
+other command needs one.
 
 ### 3.2 Stage output
 
@@ -1936,6 +1946,223 @@ anything new in scope is held to the rules. From there:
 The ratchet (section 11.3) holds each step: scope does not narrow, baselines do not grow without
 a wider scope, and nothing proven becomes owed.
 
+## 18. Assessing: `machinery assess`
+
+Before a team decides to adopt, `machinery assess` gives a deterministic account of where an
+existing project stands against its own design. It is read-only: nothing is written inside the
+project, ever, including its `.git` directory and its tracker.
+
+```
+machinery assess [--config <file>] [--out <dir>] [--since <git-ref>]...
+```
+
+### 18.1 Inputs and refusals
+
+- The project is the directory `-C` names. Without it, the nearest directory upward from the
+  current one that holds `machinery.yaml`, else the top of the git work tree that holds the
+  current directory. It must be a git repository with a commit: assess reads `HEAD`.
+- `--config` names the `machinery.yaml` to use. It may live outside the project; its paths are
+  relative to the project root as always (section 2). Without it the project's own
+  `machinery.yaml` is used. Either is read from the file, never from `HEAD`. A relative
+  `tools.dir` is resolved against the project, which assess reads and never writes.
+- `--out` is the directory for everything assess produces. It must be absent or an empty
+  directory, outside the project and outside the git work tree that holds it. Default: a new
+  directory `machinery-assess-*` under the system temp directory, which must then be outside the
+  project too.
+- `--since` (repeatable) names commits for the history section (section 18.6).
+
+Each refusal exits 2 before anything is written:
+
+| Case | stderr |
+|---|---|
+| Neither `--config` nor a `machinery.yaml` | `config: no machinery.yaml in <dir> and no --config: write one by hand (docs/brownfield.md, step 1) and pass it with --config` |
+| An invalid config | `config: <message>` (section 2) |
+| No commit | `usage: <dir> is not a git repository with a commit; assess reads its HEAD` |
+| `--out` inside the project or its work tree | `usage: --out <dir> is inside <root>; assess never writes in the project: name a directory outside it` |
+| `--out` not empty, or not a directory | `usage: --out <dir> is not empty; name an absent or empty directory` |
+| An unknown `--since` | `usage: --since <ref>: not a commit of the project` |
+
+### 18.2 The snapshot
+
+assess pipes `git archive HEAD`, run in the project root (a project inside a larger repository
+is archived alone), into an extraction at `<out>/snapshot`: no worktree and no checkout. It
+writes the config there as `machinery.yaml`, runs `git init` and one commit inside the snapshot
+(hooks and signing off) so that stages that need a commit work, and runs every section there.
+
+What assess reads of the project itself: `git` commands that write nothing (`archive`, `show`,
+`log`, `rev-parse`, `for-each-ref`, and `status` with optional locks off, so the index is
+not refreshed), the config file and the tracker export (section 18.8). When the work tree
+differs from `HEAD` the report says `dirty: <n> changed, <n> untracked file(s) are not
+assessed`: changed counts the tracked files that differ, untracked the files git neither tracks
+nor ignores. They are not in the snapshot.
+
+### 18.3 Sections
+
+In this order. Each has a result (`passed`, `failed`, `not demonstrated`, `not applicable`,
+decided as for a stage, section 3.2), its `checked:` counts and the count of its findings per
+rule, most frequent first. A section made of stages fails when one of them fails, else is not
+demonstrated when one is, else passes when one passes, else is not applicable. A section that
+crashes is failed with `ERROR  crashed: <error>`, and the others still run. The full output of
+each section is saved under `<out>/stages/`.
+
+| Section | What runs | Saved as |
+|---|---|---|
+| `inventory` | The facts of the adopt report (section 17.2) for the snapshot: scope, languages, code files, test files (under e2e roots, elsewhere, with test doubles), design sources. `checked:` counts the files. | `inventory.txt` |
+| `design` | The stages of `machinery lint` (section 3.1). | `<stage>.txt` each |
+| `generation` | `machinery gen` (section 7). When gen refuses, not demonstrated: `gen refused: <stages> have errors`. | `generation.txt` |
+| `trace`, `tests`, `arch` | The stage of that name. | `<stage>.txt` |
+| `formal` | The sanity run, section 18.5. | `formal.txt` |
+| `history` | Section 18.6. | `history.txt` |
+| `decisions` | Section 18.7. | `decisions.txt` |
+| `backlog` | Section 18.8. | `backlog.txt` |
+
+### 18.4 The rule of a finding
+
+A finding's rule is the name of its stage or section and the leading rule word of its message,
+when it has one that is not a design name (`trace: unserved`,
+`xref-failure: invoke-failure-mode`). Otherwise the message is reduced to a pattern: leading file
+names (`<path>:` or `<path>:<line>:`, and JSON pointers) are dropped, the text is cut at the
+first `; ` or ` (`, and every word that is not plain lower-case text, or is a name the design
+declares (a machine, state, event, entity, enum value, action, invariant or failure-mode id),
+becomes `*` (`machines: dead-end non-final leaf state *`). A rule counts its findings of one
+severity.
+
+### 18.5 Formal sanity
+
+Not the formal models of section 16: those carry hand-written properties, and their manifests and
+results record no state counts, so the sanity run is kept separate and writes nothing under
+`design/formal`.
+
+**Machines.** For every machine, assess writes `<out>/formal/machines/<machine id>/Sanity.tla`
+from its runtime table (section 7.3): one variable `st` over the leaf states; the initial leaf
+and the leaves of the entry states (`_entries`) as the initial states; one action per
+transition row, from each leaf of its source to the leaf its target reaches (an internal row
+leaves `st` unchanged; guards are not modeled, any branch may fire); and a stutter step in final
+leaves and in the leaves of states declared `_terminal`. It holds no hand-written property. TLC
+runs it with one worker and deadlock checking on, dumping the states it found; after a deadlock it
+runs again with deadlock checking off for the full set of reachable states. Findings:
+
+- `ERROR  <machine>: unreachable state <state>`: no behavior from the initial or an entry state
+  reaches the leaf.
+- `ERROR  <machine>: deadlock in state <state>: neither final nor _terminal, and no transition
+  applies`. TLC reports the first deadlock it reaches.
+- `ERROR  <machine>: TLC could not check the sanity spec: <first error line>`.
+
+**Models.** For every model, assess writes `<out>/formal/models/<module>/<module>.als` (the
+skeleton of section 16.2) and `Sanity.als`, which opens it and runs `Inhabited` (an atom of every
+entity signature at once; `some univ` when there is none) `for 4`. Alloy must find an instance:
+otherwise `ERROR  <model>: no instance in which every entity exists (for 4)`, or
+`ERROR  <model>: Alloy could not check the skeleton: <first error line>`.
+
+The tools are the pinned jars and the Java runtime, found as `machinery formal check` finds them
+(section 16.8). When one the project needs is missing the section is not demonstrated with the
+reason, never passed. Lines: `<machine>: <n> states, <n> distinct states found, passed` (or
+`failed`) per machine, `<model>: instance found` (or `no instance`) per model. `checked:`
+counts machines, states and models.
+
+### 18.6 History
+
+For each `--since` ref, or by default for each configured model file the first commit that adds
+it (one comparison per distinct commit), assess compares the ids of the models at that commit,
+read with `git show <ref>:<path>` on the project, with those at `HEAD`:
+
+| Kind | Id | Its text |
+|---|---|---|
+| `inv` | `inv:<id>` | the statement |
+| `sc` | `sc:<slug>` | the steps |
+| `entity` | the entity name | the definition |
+| `act` | `act:<Entity>.<action>` | the description |
+
+An id is added, removed, or reworded when its text differs once runs of whitespace are collapsed.
+A model file absent at a ref has no ids there. Per comparison and kind, the lines give the
+counts, then the removed and the reworded ids in full; added ids only as a count. Not applicable
+without a configured model; not demonstrated when no model file has a commit. History has no
+findings.
+
+### 18.7 Decisions
+
+`assess.decisions` (section 2) names a project's own decision records. For each file its globs
+match in the snapshot: `<file>: <n> records, <n> lines, <n> words`, where a record is a line the
+`record` expression matches. `ERROR  assess.decisions.files matches no file`;
+`warn   <file>: no line matches assess.decisions.record`.
+
+The agent instruction files at the root of the snapshot, `CLAUDE.md` and `AGENTS.md`, are
+counted too: `<file>: <n> lines, <n> words`. When one is a symbolic link to the other, or holds a
+single non-empty line that names the other, it is counted once, under the file it points at, with
+`(<file> links to it)`. Not applicable when `assess.decisions` is not configured and neither file
+exists.
+
+### 18.8 Backlog
+
+assess reads the tracker's export, `.beads/issues.jsonl` in the project work tree, and never runs
+the tracker. Each line is a JSON object; `id`, `title`, `status` and `issue_type` are read, and
+`title`, `description`, `design`, `notes` and `acceptance_criteria` are searched for ids. A
+line whose `_type` is present and is not `issue` is skipped. Lines: issues by status and by type;
+the issues in progress (status `in_progress`), id and title; how many open issues (every status
+but `closed`, `deferred` and `tombstone`) name an obligation id of the design (the full id, or
+for an imported failure mode the project's own id, in any case); and the local branches other
+than the current one (`git for-each-ref refs/heads`). A line that is not a JSON object is
+`ERROR  .beads/issues.jsonl:<n>: not a JSON object`. Without the file the section is
+`not applicable: none found (no .beads/issues.jsonl)`, and the branches line still prints.
+
+### 18.9 Output and exit codes
+
+`<out>/report.md` (for people) and `<out>/report.json` hold the same content: the project
+directory name, the short `HEAD` sha, where the config came from, the dirty counts, and per
+section its result, reason, `checked:` counts, number of blocking findings, rules, lines and,
+for a section made of several stages, each stage's result. `report.json` also gives the numbers
+of the lines as facts. Neither has a timestamp or an absolute path.
+
+```json
+{
+  "config": "machinery.yaml",
+  "dirty": {"changed": 0, "untracked": 0},
+  "head": "<short sha>",
+  "project": "<directory name>",
+  "sections": [
+    {"checked": [{"n": 9, "noun": "files"}], "facts": {"code_files": 1}, "findings": 0,
+     "lines": ["code files: 1 in scope"], "name": "inventory", "output": "stages/inventory.txt",
+     "reason": "", "result": "passed", "stages": [],
+     "rules": [{"count": 2, "rule": "machines: dead-end non-final leaf state *", "severity": "error"}]}
+  ],
+  "summary": {"failed": 0, "not_applicable": 0, "not_demonstrated": 0, "passed": 10, "sections": 10},
+  "version": 1
+}
+```
+
+Keys are sorted. `config` is `machinery.yaml` or `--config <file name>`. `result` is `passed`,
+`failed`, `not demonstrated` or `not applicable`, and `reason` holds the reason of the last two.
+A stage entry has `checked`, `findings`, `name`, `output`, `reason` and `result`. The facts:
+
+| Section | Keys of `facts` |
+|---|---|
+| `inventory` | `code_files`, `contracts`, `double_test_files`, `e2e_test_files`, `languages`, `machines`, `models`, `scope`, `unit_test_files` |
+| `generation` | `files` (generated files), `written` |
+| `formal` | `machines`: `{deadlock, distinct, machine, result, states, unreachable}`; `models`: `{model, result}` |
+| `history` | `comparisons`: `{commit, kinds, since}`, `kinds` mapping `inv`, `sc`, `entity`, `act` to `{added, removed, reworded}` |
+| `decisions` | `files`: `{lines, path, records, words}`; `instructions`: `{linked, lines, path, words}` |
+| `backlog` | `branches`, `by_status`, `by_type`, `export`, `in_progress` (`{id, title}`), `issues`, `open`, `open_naming_obligations` |
+
+stdout:
+
+```
+out: <absolute path of the out directory>
+project: <directory name> at <short sha>
+dirty: <n> changed, <n> untracked file(s) are not assessed
+<section>: <outcome>; checked: <counts>
+assess: <n> sections, <p> passed, <f> failed, <d> not demonstrated, <a> not applicable
+```
+
+The dirty line prints only when the tree is dirty. `<outcome>` is the last line of a stage block
+(section 3.2); a not applicable section has no `checked:` part. The out path is the only
+absolute path assess prints.
+
+| Code | Meaning |
+|---|---|
+| 0 | The assessment ran, whatever it found. |
+| 1 | The snapshot could not be taken; nothing was assessed. |
+| 2 | A usage or config error; nothing was written. |
+
 ## 19. The order of work this supports
 
 **Plan.** The planner (the PM role) owns the backlog and the risk file. For new work it: changes
@@ -1964,8 +2191,9 @@ A new project starts with a full-breadth skeleton: every action has an operation
 handler, every machine moves state through its generated table, and effects do nothing yet. At
 that point `verify` passes with a long owed list. The work that remains is the owed list.
 
-An existing project starts with `machinery adopt` (section 17.2): the first owed list is whatever
-the first modeled area declares, and everything outside the scope is left alone.
+An existing project starts with `machinery assess` (section 18), then `machinery adopt`
+(section 17.2): the first owed list is whatever the first modeled area declares, and everything
+outside the scope is left alone.
 
 ## 20. Probe
 

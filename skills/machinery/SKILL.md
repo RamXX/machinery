@@ -22,7 +22,7 @@ restate its rules from memory, and do not read the long documents unless a step 
 | Situation | Start with |
 |---|---|
 | No `machinery.yaml`, new project | `machinery init`, then "Design" below. Guide: `docs/getting-started.md`. |
-| No `machinery.yaml`, existing code and backlog | `machinery adopt --paths '<area>/**'` (dry run), then `--write`. Guide: `docs/brownfield.md`. |
+| No `machinery.yaml`, existing code and backlog | `machinery assess --config <hand-written yaml outside the project>` (read-only report), then `machinery adopt --paths '<area>/**'` (dry run), then `--write`. Guide: `docs/brownfield.md`. |
 | You are planning work (PM) | "Plan" below. Guide: `docs/pm.md`. |
 | You were handed a story | `machinery brief <story>` and follow it. |
 | You are verifying a story | `machinery brief <story> --role verifier` and follow it, in order. |

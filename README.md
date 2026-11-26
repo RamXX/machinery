@@ -44,7 +44,7 @@ make tools && make build        # in this repository: pinned tools into .bin/, t
 | You have | Read |
 |---|---|
 | A new project | [docs/getting-started.md](docs/getting-started.md) |
-| Existing code and a backlog | [docs/brownfield.md](docs/brownfield.md): adopt one area at a time, no rewrite |
+| Existing code and a backlog | [docs/brownfield.md](docs/brownfield.md): assess read-only first, then adopt one area at a time, no rewrite |
 | A backlog to plan and schedule | [docs/pm.md](docs/pm.md) |
 | A critical area to model | [docs/formal.md](docs/formal.md) |
 | A deterministic checker of your own | [docs/external-checkers.md](docs/external-checkers.md) |
