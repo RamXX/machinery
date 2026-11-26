@@ -61,7 +61,7 @@ design:
 import:                         # optional: design sources kept in the project's own formats
   machines:                     # optional, instead of design.machines (section 5.2.1)
     files: ["machines/*.json"]  # required: globs of the project's machine files
-    states: capitalize          # optional: capitalize | keep; default keep
+    states: pascal              # optional: capitalize | pascal | keep; default keep (section 5.2.1)
     rename:                     # optional: the project's key -> the machinery key, per level
       root: {notes: _comment, startable: _entries}
       state: {skip: _ignores}
@@ -142,7 +142,9 @@ Rules:
   `design.machines` and `import.machines` together are a config error
   (`import.machines: design.machines is also set; read the machines from one of them`), and so
   are an empty `import.machines.files` (`import.machines.files is required`), a `states` value
-  other than `capitalize` or `keep`, and an empty key or name in `rename`.
+  other than `capitalize`, `pascal` or `keep`
+  (`import.machines.states must be capitalize, pascal or keep, got "<value>"`), and an empty key
+  or name in `rename`.
   `import.machines.bind` maps a glob of source files or a machine id to exactly one of
   `lifecycle_of` (an entity name, with an optional `aspect`, section 5.2) and `serves` (a
   non-empty list of model ids): an `aspect` without `lifecycle_of`
@@ -412,11 +414,20 @@ is generated, never a source, and is not read):
      `ERROR  <file>: <node>: keys <a> and <b> both become <key>`, and the first is kept. The node is `root`,
      `state <path>`, or `state <path> <trigger>` (the trigger of section 7.2) with ` branch <n>`
      for a branch of a list; paths are in source names and `<n>` counts from 1.
-3. **States.** With `states: capitalize` the first letter of every state name is upper-cased:
-   the keys under every `states`, every `initial`, every target (a bare name, and each path
-   segment after the head of a `#<id>.<path>` target), and the values of `_entries`, native or
-   renamed. Two sibling states that become one name are
-   `ERROR  <file>: states <a> and <b> both become <name> with states: capitalize`, and the first is
+3. **States.** `states` says how every state name is written, so that the project's names
+   become domain states (section 5.2):
+   - `capitalize` upper-cases the first letter of the name and keeps the rest as written:
+     `on_hold` becomes `On_hold`, `inReview` becomes `InReview`;
+   - `pascal` reads the name as words separated by `_` or `-`, upper-cases the first letter of
+     each word, keeps its other letters as written and drops the separators: `on_hold` and
+     `on-hold` become `OnHold`, `in_review` becomes `InReview`, `v2_draft` becomes `V2Draft`
+     (a name made of separators only is kept as written);
+   - `keep` (the default) changes nothing.
+
+   The change applies to the keys under every `states`, every `initial`, every target (a bare
+   name, and each path segment after the head of a `#<id>.<path>` target), and the values of
+   `_entries`, native or renamed. Two sibling states that become one name are
+   `ERROR  <file>: states <a> and <b> both become <name> with states: <value>`, and the first is
    kept.
 4. **Id.** The original id is the root `id`, or the file name without its extension when there
    is none. The machine id is the original id with every character outside `[A-Za-z0-9_]`

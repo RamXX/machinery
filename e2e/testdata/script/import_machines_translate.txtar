@@ -78,6 +78,30 @@ stdout 'checked: 2 machines'
 exec machinery gen
 grep '"_oracle_tag": "LOAN5619"' design/gen/imported/machines/loan_desk_annex.machine.json
 grep '"_oracle_tag": "LOAN0E11"' design/gen/imported/machines/loan_desk.machine.json
+rm machines/annex.json
+
+# states: capitalize upper-cases the first letter only and keeps the rest as written, so a
+# kebab-case name keeps its hyphen and is no valid state name
+cp review.json machines/review.json
+cp config.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/review.json: state name ''On-hold'' must match '
+stdout '^failed: 1 finding\(s\)$'
+
+# states: pascal reads snake_case and kebab-case as words: every state key, initial, target
+# segment and entry becomes PascalCase
+exec sh -c 'sed "s/capitalize/pascal/" config.yaml > machinery.yaml'
+exec machinery lint --stage machines
+stdout 'checked: 2 machines'
+exec machinery gen
+exec sh -c 'tr -d " \n" < design/gen/imported/machines/review_flow.machine.json > review.flat'
+grep '"_entries":\["InReview"\],"initial":"DraftOpen"' review.flat
+grep '"DraftOpen":\{"on":\{"submit":\{"target":"InReview"\}\},"_ignores":' review.flat
+grep '"target":"#review_flow.OnHold.HeldBack"' review.flat
+grep '"reject":\{"target":"DraftOpen"\}' review.flat
+grep '"OnHold":\{"initial":"HeldBack","states":\{"HeldBack":' review.flat
+grep '"target":"#review_flow.DraftOpen"' review.flat
+grep '"initial": "Shelved"' design/gen/imported/machines/loan_desk.machine.json
 
 -- config.yaml --
 version: 2
@@ -184,6 +208,29 @@ import:
     }
   },
   "_oracle_tag": "LOAN0E11"
+}
+-- review.json --
+{
+  "id": "review-flow",
+  "startable": ["in_review"],
+  "initial": "draft_open",
+  "states": {
+    "draft_open": {
+      "on": {"submit": {"target": "in_review"}},
+      "skip": {"approve": "not submitted", "reject": "not submitted", "release": "nothing is held"}
+    },
+    "in_review": {
+      "on": {"approve": {"target": "#review-flow.on-hold.held_back"}, "reject": {"target": "draft_open"}},
+      "skip": {"submit": "already submitted", "release": "nothing is held"}
+    },
+    "on-hold": {
+      "initial": "held_back",
+      "states": {"held_back": {
+        "on": {"release": {"target": "#review-flow.draft_open"}},
+        "skip": {"submit": "held", "approve": "held", "reject": "held"}
+      }}
+    }
+  }
 }
 -- loan-colour.json --
 {

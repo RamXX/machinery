@@ -65,7 +65,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 			problems = append(problems, f+": machine must be a JSON object")
 			continue
 		}
-		t := &translator{src: f, rename: im.Rename, capital: im.States == project.StatesCapitalize, im: im, used: used}
+		t := &translator{src: f, rename: im.Rename, mode: im.States, im: im, used: used}
 		out := t.machine(root.AsObject())
 		problems = append(problems, t.problems...)
 		if first, dup := byID[t.id]; dup {
@@ -92,7 +92,7 @@ func Machines(p *project.Project) (ms []Machine, problems []string) {
 type translator struct {
 	src      string
 	rename   project.Rename
-	capital  bool
+	mode     string // the states setting: how state names are written
 	im       *project.ImportMachines
 	used     map[string]bool // bind keys that matched a machine, shared by all files
 	origID   string
@@ -282,12 +282,32 @@ func capitalize(s string) string {
 	return string(unicode.ToUpper(r)) + s[n:]
 }
 
-func (t *translator) stateName(s string) string {
-	if t.capital {
+// pascal reads a name as words separated by "_" or "-" and upper-cases the
+// first letter of each, dropping the separators: on_hold becomes OnHold. A name of separators only is kept as written.
+func pascal(s string) string {
+	var b strings.Builder
+	for _, w := range strings.FieldsFunc(s, func(r rune) bool { return r == '_' || r == '-' }) {
+		b.WriteString(capitalize(w))
+	}
+	if b.Len() == 0 {
+		return s
+	}
+	return b.String()
+}
+
+// StateName writes a state name as the states setting of import.machines
+// says (section 5.2.1).
+func StateName(mode, s string) string {
+	switch mode {
+	case project.StatesCapitalize:
 		return capitalize(s)
+	case project.StatesPascal:
+		return pascal(s)
 	}
 	return s
 }
+
+func (t *translator) stateName(s string) string { return StateName(t.mode, s) }
 
 func (t *translator) capitalizeValue(o *ir.Object, key string) {
 	if v := o.Get2(key); v != nil && v.Kind == ir.KindString {
@@ -296,7 +316,8 @@ func (t *translator) capitalizeValue(o *ir.Object, key string) {
 }
 
 // target rewrites a transition target: the head of a #<original id> target
-// becomes the machine id, and state names are capitalized when asked.
+// becomes the machine id, and state names are written as the states setting
+// says.
 func (t *translator) target(s string) string {
 	rest, ok := strings.CutPrefix(s, "#")
 	if !ok {
@@ -331,7 +352,7 @@ func (t *translator) states(sv *ir.Value, parent string) *ir.Value {
 	for _, name := range o.Keys() {
 		nn := t.stateName(name)
 		if first, dup := from[nn]; dup {
-			t.fail("states %s and %s both become %s with states: capitalize", first, name, nn)
+			t.fail("states %s and %s both become %s with states: %s", first, name, nn, t.mode)
 			continue
 		}
 		from[nn] = name

@@ -140,6 +140,7 @@ type Rename struct {
 const (
 	StatesKeep       = "keep"
 	StatesCapitalize = "capitalize"
+	StatesPascal     = "pascal"
 )
 
 // ImportedMachines returns the import.machines block, or nil.
@@ -516,8 +517,10 @@ func (c *Config) validateImport() error {
 			return Errf("import.machines.files: %q is not a valid glob", g)
 		}
 	}
-	if im.States != "" && im.States != StatesKeep && im.States != StatesCapitalize {
-		return Errf("import.machines.states must be capitalize or keep, got %q", im.States)
+	switch im.States {
+	case "", StatesKeep, StatesCapitalize, StatesPascal:
+	default:
+		return Errf("import.machines.states must be capitalize, pascal or keep, got %q", im.States)
 	}
 	for _, lv := range []struct {
 		name string

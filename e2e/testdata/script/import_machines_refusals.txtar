@@ -12,7 +12,7 @@ exec mrun 2 lint
 stderr 'config: import.machines.files is required'
 cp badstates.yaml machinery.yaml
 exec mrun 2 lint
-stderr 'config: import.machines.states must be capitalize or keep, got "upper"'
+stderr 'config: import.machines.states must be capitalize, pascal or keep, got "upper"'
 cp emptyname.yaml machinery.yaml
 exec mrun 2 lint
 stderr 'config: import.machines.rename.state: a key and its new name must not be empty'
@@ -57,6 +57,15 @@ stdout 'ERROR  machines/shelf.json: root: keys begin and initial both become ini
 cp twins.json.in machines/shelf.json
 exec mrun 1 lint --stage machines
 stdout 'ERROR  machines/shelf.json: states full and Full both become Full with states: capitalize'
+
+# with states: pascal, names that differ only in their separators or their case collide too
+cp pascal.yaml machinery.yaml
+cp pascal-twins.json.in machines/shelf.json
+exec mrun 1 lint --stage machines
+stdout 'ERROR  machines/shelf.json: states sold_out and sold-out both become SoldOut with states: pascal'
+stdout 'ERROR  machines/shelf.json: states sold_out and soldOut both become SoldOut with states: pascal'
+cp good.yaml machinery.yaml
+cp twins.json.in machines/shelf.json
 
 # gen refuses while the translation has an error
 exec mrun 1 gen
@@ -103,6 +112,24 @@ import:
   machines:
     files: ["machines/*.json"]
     folder: machines
+-- pascal.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores}
+-- pascal-twins.json.in --
+{
+  "id": "shelf",
+  "initial": "sold_out",
+  "states": {
+    "sold_out": {"on": {"stock": {"target": "sold_out"}}},
+    "sold-out": {"on": {"stock": {"target": "sold-out"}}},
+    "soldOut": {"on": {"stock": {"target": "soldOut"}}}
+  }
+}
 -- good.yaml --
 version: 2
 import:
