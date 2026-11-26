@@ -176,7 +176,11 @@ func Judge(d *design.Design, recs []Receipt) *Judgment {
 	}
 	for _, r := range recs {
 		if d.Obligation(r.ID) == nil {
-			errorf("unknown id in receipt: %s", r.ID)
+			if st := d.Status(r.ID); st != "" {
+				errorf("%s id in receipt: %s; a %s id yields no obligation: drop the receipt, or take the id out of %s", st, r.ID, st, d.P.Cfg.Design.Status)
+			} else {
+				errorf("unknown id in receipt: %s", r.ID)
+			}
 			continue
 		}
 		j.Receipts[r.ID] = append(j.Receipts[r.ID], r)

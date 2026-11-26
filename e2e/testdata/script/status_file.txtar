@@ -36,7 +36,7 @@ stdout '^failed: 2 finding\(s\)$'
 ! stdout 'unverified'
 
 # the claims gone, trace passes; a wildcard that also matches a proposed case claims none of it
-exec sh -c 'sed -i.bak "s/ inv:customer-email-unique//" e2e/orders.sh && sed -i.bak "s/ act:Order.cancel//" internal/domain/order.go && rm e2e/orders.sh.bak internal/domain/order.go.bak'
+exec sh -c 'sed -i.bak "/machinery:verifies/s/ inv:customer-email-unique//" e2e/orders.sh && sed -i.bak "/machinery:serves/s/ act:Order.cancel//" internal/domain/order.go && rm e2e/orders.sh.bak internal/domain/order.go.bak'
 cp status-tc.yaml design/status.yaml
 exec machinery gen
 exec machinery trace
@@ -47,6 +47,14 @@ stdout '^passed$'
 exec machinery status
 stdout '^obligations: 14 \(tc 9, sc 2, inv 2, fm 1\)$'
 stdout '^ids: 2 proposed, 2 owed, 15 proven, 1 retired$'
+
+# verify judges no proposed id: a receipt that names one is a finding
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 verify --allow-dirty
+stdout '^  ERROR  proposed id in receipt: inv:customer-email-unique; a proposed id yields no obligation: drop the receipt, or take the id out of design/status.yaml$'
+stdout '^  ERROR  proposed id in receipt: tc:ORDE-507e4f; '
+! stdout 'unknown id in receipt'
+! stdout 'unproven: inv:customer-email-unique'
 
 # a proposed or retired id may not be owed
 cp status.yaml design/status.yaml

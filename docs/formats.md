@@ -1347,7 +1347,9 @@ Findings:
 
 - `ERROR  malformed receipts file: <file>: line <n>: <what>`. A file whose first line is not a
   run header is not a receipts file and is ignored.
-- `ERROR  unknown id in receipt: <id>` (an `act` id is not an obligation).
+- `ERROR  unknown id in receipt: <id>` (an `act` id is not an obligation), and for a proposed or
+  retired id (section 4.1) `ERROR  proposed id in receipt: <id>; a proposed id yields no obligation:
+  drop the receipt, or take the id out of <status file>` (`retired`).
 - `ERROR  unexpected effect: <id> observed <name>` when a receipt lists an effect the case does
   not have.
 - `ERROR  failed: <id> (<test>)`.
