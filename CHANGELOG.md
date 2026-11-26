@@ -35,6 +35,18 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   what the tool verifies about each, and the judgment rules with the failure each prevents).
   Default routing by role: design roles on the strongest class of model, builders on a standard
   class, a verifier at least at its builder's.
+- The checker's review is recorded (`machinery review backlog|design <id>|intake <id>`) and gates
+  dispatch: `waves --freeze` and `intake plan --apply` wait for an approved review from another
+  context than the planner (`review` in `machinery.yaml`; the ratchet reports one switched off).
+- Stage `scope` (`machinery check --base <ref> --story <id>`, and the commit hook on a branch
+  named after a story): a story changes only files of its scope, and design sources only as the
+  design story that `intake plan` now creates first.
+- An answer on the owner's behalf comes from a `*-delegate` agent that did not ask the question.
+- `decisions import`: the records of an existing decision file become backlog decisions, once
+  each.
+- `adopt --rehearse`: adoption on a snapshot outside the project, with what it writes and owes,
+  the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
+  generation.
 
 ### Carried forward from v1
 
