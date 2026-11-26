@@ -178,10 +178,13 @@ type Node struct {
 	ParentID    string   `json:"parent_id,omitempty"`
 }
 
-// Edge says that From is blocked by To.
+// Edge says that From is blocked by To. An end is a key of the plan, or the
+// id of an issue that exists already.
 type Edge struct {
-	FromKey string `json:"from_key"`
-	ToKey   string `json:"to_key"`
+	FromKey string `json:"from_key,omitempty"`
+	ToKey   string `json:"to_key,omitempty"`
+	FromID  string `json:"from_id,omitempty"`
+	ToID    string `json:"to_id,omitempty"`
 	Type    string `json:"type"`
 }
 
@@ -220,6 +223,26 @@ func (c *Client) CreateGraph(g Graph) (map[string]string, error) {
 	return res.IDs, nil
 }
 
+// Create creates one issue and returns its id.
+func (c *Client) Create(title, typ, description, parent string, labels []string) (string, error) {
+	args := []string{"create", "--title", title, "--type", typ, "--description", description, "--silent"}
+	if len(labels) > 0 {
+		args = append(args, "--labels", strings.Join(labels, ","))
+	}
+	if parent != "" {
+		args = append(args, "--parent", parent)
+	}
+	out, err := c.run(args...)
+	if err != nil {
+		return "", err
+	}
+	id := strings.TrimSpace(string(out))
+	if id == "" {
+		return "", fmt.Errorf("bd create: no id returned")
+	}
+	return firstLine(id), nil
+}
+
 // Tags are the machine-readable lines of a story (section 15.1).
 type Tags struct {
 	IDs         []string
@@ -227,6 +250,22 @@ type Tags struct {
 	Proofs      []Proof
 	Predictions []Stamp
 	Verdicts    []Stamp
+
+	// intake (section 15.7)
+	Intake         bool     // a bare machinery:intake line: the item is an intake item
+	IntakeOf       string   // machinery:intake <id>: the intake a story belongs to
+	Base           *Mark    // machinery:intake-base
+	Planned        []Mark   // machinery:intake-planned
+	NoDesignChange string   // machinery:no-design-change <reason>
+	Capstone       bool     // machinery:capstone
+	Demos          []string // machinery:demo <command>
+}
+
+// Mark is a commit and a contract hash (machinery:intake-base and
+// machinery:intake-planned).
+type Mark struct {
+	Commit   string
+	Contract string
 }
 
 // Proof is a machinery:proof line.
@@ -270,6 +309,33 @@ func ParseTags(is *Issue) Tags {
 			}
 		case "scope":
 			t.Scope = append(t.Scope, strings.Fields(args)...)
+		case "intake":
+			if f := strings.Fields(args); len(f) == 0 {
+				t.Intake = true
+			} else if t.IntakeOf == "" {
+				t.IntakeOf = f[0]
+			}
+		case "intake-base", "intake-planned":
+			f := strings.Fields(args)
+			if len(f) < 2 {
+				continue
+			}
+			m := Mark{Commit: f[0], Contract: f[1]}
+			if word == "intake-planned" {
+				t.Planned = append(t.Planned, m)
+			} else if t.Base == nil {
+				t.Base = &m
+			}
+		case "no-design-change":
+			if r := strings.TrimSpace(args); r != "" && t.NoDesignChange == "" {
+				t.NoDesignChange = r
+			}
+		case "capstone":
+			t.Capstone = true
+		case "demo":
+			if cmd := strings.TrimSpace(args); cmd != "" {
+				t.Demos = append(t.Demos, cmd)
+			}
 		case "proof":
 			f := strings.Fields(args)
 			if len(f) >= 2 {
