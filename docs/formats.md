@@ -453,7 +453,10 @@ A project that already keeps its failure modes as tables in a Markdown document 
 - **Tables.** A table is a header row, a delimiter row (cells of `-`, with an optional `:` at
   either end) and the rows after it, up to the first line that is not a table row. Leading and
   trailing pipes are optional, and `\|` is a pipe inside a cell. A table inside a fenced code
-  block is not read.
+  block is not read. A row line outside every table whose first cell matches `id` (a blank line
+  ended its table, or it never had a header) is
+  `ERROR  <file>:<line>: <cell>: the row is in no table (a table needs a header row and a delimiter row above its rows, and a blank line ends it)`,
+  and it is not read.
 - **Rows.** A row whose first cell, trimmed, matches `id` in full is a failure mode. A row whose
   first cell does not match is ignored, and so is a table with no such row.
 - **Columns.** The header row of a row's own table decides its columns, by name and never by

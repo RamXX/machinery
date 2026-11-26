@@ -46,7 +46,15 @@ func Catalog(rel string, data []byte, id *regexp.Regexp, cols Columns) (rows []R
 			}
 			continue
 		}
-		if fence != "" || i+1 >= len(lines) || !strings.Contains(lines[i], "|") || !isDelimiter(lines[i+1]) {
+		if fence != "" || !isRow(lines[i]) {
+			continue
+		}
+		if i+1 >= len(lines) || !isDelimiter(lines[i+1]) {
+			// a row outside every table: a blank line ended its table, or
+			// it never had a header
+			if cells := splitRow(lines[i]); len(cells) > 0 && id.MatchString(cells[0]) {
+				problems = append(problems, fmt.Sprintf("%s:%d: %s: the row is in no table (a table needs a header row and a delimiter row above its rows, and a blank line ends it)", rel, i+1, cells[0]))
+			}
 			continue
 		}
 		header := splitRow(lines[i])
