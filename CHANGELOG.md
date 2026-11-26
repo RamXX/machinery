@@ -102,10 +102,14 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `status`, `verify` and `proof` count adapter evidence apart, by granularity. The policy
   `evidence.adapter` (kinds, tiers, minimum granularity, a map for test packages built from
   copies) decides what it proves; by default never an id of a critical or vital area.
-  A pass counts for a claiming file only when `go list` shows the run built that file; with
+  A verdict goes to the file under `trace.tests` in its package's directory that defines the
+  function, and to none when another Go file of that directory defines the same name, whatever
+  the build constraints: a same-named function behind another tag never lends its pass. With
   `--streams` (a wrapper that starts `go test` itself and leaves the streams in
-  `MACHINERY_GO_TEST_JSON`) only through `evidence.adapter.sources`. The ratchet names a widened
-  adapter policy (`adapter-widened`), an error for a critical or vital tier.
+  `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
+  mode only. A pass replayed from the cache counts nothing, and a fail is never dropped. A
+  receipt a test appends with the adapter's fields is refused. The ratchet compares the policy
+  by what it admits (`adapter-widened`), an error for a critical or vital tier.
 
 ### Carried forward from v1
 

@@ -262,9 +262,11 @@ machinery adds `-json`, reads the event stream and writes the receipts itself
 (`docs/formats.md` section 10.3). An id gets a pass when every test function its marker belongs
 to passed and the package ended ok: the function under the marker when the marker is in the
 comment directly above it, every test function of the file otherwise. A failed function writes
-a fail, a skipped one a skip, and one that did not run writes nothing; a package answered from
-the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. The summary of the run says how many ids
-were claimed and not run.
+a fail, a skipped one a skip, and one that did not run writes nothing; a pass answered from
+the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
+verdict belongs to a file only when no other Go file of its directory defines a test function of
+the same name, whatever their build tags: rename such a twin, or neither counts. The summary of
+the run says how many ids were claimed and not run.
 
 This evidence is weaker than a receipt, and every report says so. It shows that a test which
 names the id passed, not that the test checked the id. `status`, `verify` and `proof` count it
@@ -280,7 +282,7 @@ and have it write each `go test -json` output to a file in the directory machine
 cannot see what such a run built, every package it tests needs an entry in
 `evidence.adapter.sources` naming the files it is built from. If you build your tests from
 copies staged in another directory, `evidence.adapter.sources` maps the staged package back to
-the files that carry the markers.
+the files that carry the markers; it is read only with `--streams`.
 
 `owed sync --prune-only` removes exactly the ids the run proved. `verify` passes: everything is
 proven or still owed. `story` is the gate for that one story; a consequential or critical story
