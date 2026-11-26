@@ -54,8 +54,23 @@ func Trace(ctx *Context) *report.Stage {
 	scenarios := d.ScenarioIDs()
 	served, verified := map[string]bool{}, map[string]bool{}
 	claimedHeld := map[string]bool{}
+	proofs := d.ProofIDs()
 	for _, t := range found {
 		for _, tok := range t.IDs {
+			if !t.Scenario && strings.HasPrefix(tok, "pf:") {
+				// a proof obligation is matched against the proof obligations alone (section 8)
+				hits := tags.Expand(tok, proofs)
+				if len(hits) == 0 {
+					s.Errorf("unknown-id: %s:%d: %s", t.File, t.Line, tok)
+				}
+				for _, id := range hits {
+					if key := id + " " + t.File; !claimedHeld[key] {
+						claimedHeld[key] = true
+						s.Errorf("proof: %s is claimed by %s; tests do not discharge a proof obligation: it awaits a machine-checked proof", id, t.File)
+					}
+				}
+				continue
+			}
 			hits := tags.Resolve(t, tok, ids, scenarios)
 			if len(hits) == 0 {
 				if t.Scenario {

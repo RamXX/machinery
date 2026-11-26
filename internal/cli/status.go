@@ -53,9 +53,14 @@ func runStatus(e *Env, args []string) int {
 	} else {
 		fmt.Fprintf(w, "obligations: 0\n")
 	}
+	vas := d.VitalAreas()
 	if d.HasRisk {
-		fmt.Fprintf(w, "tiers: routine %d, consequential %d, critical %d\n",
+		line := fmt.Sprintf("tiers: routine %d, consequential %d, critical %d",
 			tiers[design.Routine], tiers[design.Consequential], tiers[design.Critical])
+		if len(vas) > 0 {
+			line += fmt.Sprintf(", vital %d", tiers[design.Vital])
+		}
+		fmt.Fprintln(w, line)
 	}
 	proposed, owed, proven, retired := d.StatusCounts()
 	fmt.Fprintf(w, "ids: %d proposed, %d owed, %d proven, %d retired\n", proposed, owed, proven, retired)
@@ -65,6 +70,11 @@ func runStatus(e *Env, args []string) int {
 	}
 	fmt.Fprintf(w, "proven: %d  partial: %d  failed: %d  owed: %d  unproven and not owed: %d\n",
 		ev.NProven, ev.NPartial, ev.NFailed, ev.NOwed, ev.NUnowed)
+	if len(vas) > 0 {
+		for _, l := range evidence.VitalOf(ev, vas, nil).Lines() { // section 23.2
+			fmt.Fprintln(w, l)
+		}
+	}
 	noStory := 0
 	for _, o := range d.Owed {
 		if o.Story == "" {

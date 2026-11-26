@@ -93,11 +93,11 @@ func StoryGate(d *design.Design, is *backlog.Issue, issues []backlog.Issue) (*re
 	if len(fresh) > 0 {
 		judgeVerdict(s, t, fresh, valid, short, is.ID)
 	}
-	if tier != design.Critical {
+	if !design.Modeled(tier) {
 		return s, nil
 	}
 
-	// critical: the formal models of the story's areas and their replays
+	// critical and vital: the formal models of the story's areas and their replays
 	areas := CriticalAreas(d, ids)
 	proven := formal.ProvenAreas(d)
 	specs, err := formal.Load(p)
@@ -128,7 +128,23 @@ func StoryGate(d *design.Design, is *backlog.Issue, issues []backlog.Issue) (*re
 			}
 		}
 	}
+	if tier == design.Vital {
+		judgeVital(s, d, ev, ids)
+	}
 	return s, nil
+}
+
+// judgeVital adds what the vital tier asks on top of the critical gate
+// (section 15.6): the evidence of every assumption of the story's vital areas
+// is not owed. Its proof obligations never block and are never proven.
+func judgeVital(s *report.Stage, d *design.Design, ev *evidence.Evaluation, ids []string) {
+	areas := d.VitalAreasOf(ids)
+	for _, u := range d.Unevidenced(areas) {
+		for _, id := range u.Owed {
+			s.Errorf("%s: %s %s: %s is owed; a story of a vital area needs the evidence of every assumption proven", design.AssumedUnproven, u.Area, u.Assumption.Name, id)
+		}
+	}
+	evidence.VitalOf(ev, areas, setOf(ids)).Warn(s, false)
 }
 
 // judgeCapstone adds what a capstone needs on top of its tier (section
@@ -156,6 +172,9 @@ func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed ma
 		return
 	case d.Status(id) == design.Retired:
 		s.Errorf("retired: %s yields no obligation; take it out of the story", id)
+		return
+	case d.IsProof(id):
+		s.Errorf("proof: %s awaits a machine-checked proof; a story does not discharge it: take it out of the story", id)
 		return
 	case !d.Known(id):
 		s.Errorf("unknown id: %s", id)
@@ -263,6 +282,9 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 		receipts += len(ev.Receipts(id))
 	}
 	s.Count(n, "obligations").Count(proven, "proven").Count(partial, "partial").Count(nOwed, "owed").Count(receipts, "receipts")
+	if areas := d.VitalAreasOf(ids); len(areas) > 0 {
+		evidence.VitalOf(ev, areas, sel).Warn(s, true) // section 12
+	}
 	if n == 0 {
 		s.NotDemonstrated("story names no obligation")
 	}

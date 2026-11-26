@@ -1,0 +1,45 @@
+# no test discharges a proof obligation: a tag naming one is an error, and so is owing one
+# (docs/formats.md sections 8, 11.1 and 23.2)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+rm e2e/replay.sh
+exec machinery gen
+exec machinery trace
+stdout '^passed$'
+
+# a verifies tag: by id, by a pattern among the proof obligations, and a pf token that names none
+cp claims-proof.sh e2e/proof.sh
+exec mrun 1 trace
+stdout '^  ERROR  proof: pf:order-payment:charged-once is claimed by e2e/proof.sh; tests do not discharge a proof obligation: it awaits a machine-checked proof$'
+stdout '^  ERROR  proof: pf:order-payment:shipped-only-paid is claimed by e2e/proof.sh; tests do not discharge a proof obligation: it awaits a machine-checked proof$'
+stdout '^  ERROR  unknown-id: e2e/proof.sh:5: pf:order-payment:no-such-property$'
+stdout '^failed: 3 finding\(s\)$'
+rm e2e/proof.sh
+
+# a serves tag in code
+cp serves-proof.go internal/domain/proof.go
+exec mrun 1 trace
+stdout '^  ERROR  proof: pf:order-payment:charged-once is claimed by internal/domain/proof.go; tests do not discharge a proof obligation: it awaits a machine-checked proof$'
+stdout '^failed: 1 finding\(s\)$'
+rm internal/domain/proof.go
+
+# a proof obligation is never owed
+exec sh -c 'printf "  - id: pf:order-payment:charged-once\n    reason: \"no proof yet\"\n" >> design/owed.yaml'
+exec mrun 1 trace
+stdout '^  ERROR  proof: pf:order-payment:charged-once is in design/owed.yaml; a proof obligation is not owed: it awaits a machine-checked proof, which this version cannot give; remove the entry$'
+exec mrun 1 owed list
+stderr '^ERROR  proof: pf:order-payment:charged-once is in design/owed.yaml; a proof obligation is not owed'
+
+-- claims-proof.sh --
+#!/bin/sh
+# machinery:verifies pf:order-payment:charged-once
+# machinery:verifies pf:*
+#
+# machinery:verifies pf:order-payment:no-such-property
+true
+-- serves-proof.go --
+package domain
+
+// machinery:serves pf:order-payment:charged-once
+func proof() {}

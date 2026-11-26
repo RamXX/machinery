@@ -1,0 +1,60 @@
+# the vital tier gate: the critical gate, and the evidence of every assumption proven; a proof
+# obligation never blocks it and is never counted as proven (docs/formats.md sections 15.6 and 23.2)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+exec shopformal
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-v1 --title 'Prove order shipping' --body-file v1.txt --silent
+exec bd create --id shop-v2 --title 'Prove a charge once' --body-file v2.txt --silent
+
+# the real model checkers run and are baselined: the formal models of both areas are proven
+exec mrun 1 formal check
+exec machinery formal baseline
+gitcommit 'formal results'
+exec machinery check --stage formal
+stdout '^passed$'
+exec machinery run -- sh e2e/orders.sh
+exec machinery run -- sh e2e/replay.sh
+exec machinery proof --story shop-v1 --post
+stdout '^tier:     vital \(order-payment\)$'
+stdout '^  tc:ORDE-e6d28f -> orders.sh -> pass: Paid -> Shipped \(by test and model; proof awaited\)$'
+env BEADS_ACTOR=verifier
+exec machinery predict shop-v1 --observation 'an unpaid order ships' --expect 'refused'
+exec mrun 1 accept shop-v1 --verdict accept --observed 'refused'
+stdout '^  ERROR  assumed, unproven: order-payment provider-charges-once: fm:payment-provider-down is owed; a story of a vital area needs the evidence of every assumption proven$'
+stdout '^  warn   proofs awaiting: 2$'
+stdout '^  warn   vital: tc:ORDE-e6d28f proven \(by test and model; proof awaited\)$'
+! stdout 'unproven: fv:'
+! stdout 'unproven: cx:'
+stdout '^failed: 1 finding\(s\)$'
+env BEADS_ACTOR=builder
+
+# verify --story keeps to the story's area and ids
+exec machinery verify --story shop-v1
+stdout '^  warn   vital: tc:ORDE-e6d28f proven \(by test and model; proof awaited\)$'
+! stdout 'vital: inv:paid-before-shipped'
+stdout '^  warn   proofs awaiting: 2$'
+
+# the evidence of the assumption is proven and the owed list pruned: the gate passes, the proofs still await
+exec machinery run -- sh e2e/outage.sh
+exec machinery owed sync --prune-only
+stdout ' 1 removed$'
+exec machinery gen
+gitcommit 'prune the owed list'
+exec machinery story shop-v1
+stdout '^  warn   proofs awaiting: 2$'
+stdout '^  warn   vital: tc:ORDE-e6d28f proven \(by test and model; proof awaited\)$'
+! stdout 'ERROR'
+stdout '^passed$'
+
+# a story does not discharge a proof obligation
+exec mrun 1 story shop-v2
+stdout '^  ERROR  proof: pf:order-payment:charged-once awaits a machine-checked proof; a story does not discharge it: take it out of the story$'
+
+-- v1.txt --
+machinery:ids tc:ORDE-e6d28f
+machinery:scope internal/domain/**
+-- v2.txt --
+machinery:ids pf:order-payment:charged-once

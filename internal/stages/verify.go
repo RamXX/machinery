@@ -22,6 +22,9 @@ func Verify(ctx *Context, allowDirty bool) *report.Stage {
 func VerifyStage(ev *evidence.Evaluation) *report.Stage {
 	s := report.New("verify")
 	s.Findings = append(s.Findings, ev.Findings...)
+	if vas := ev.Design().VitalAreas(); len(vas) > 0 {
+		evidence.VitalOf(ev, vas, nil).Warn(s, true) // section 23.2
+	}
 	if !ev.HasEvidence {
 		return s.NotDemonstrated(ev.NoEvidence())
 	}

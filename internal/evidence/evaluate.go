@@ -53,6 +53,9 @@ type Evaluation struct {
 // State returns the state of an obligation id, or "" when it is not one.
 func (e *Evaluation) State(id string) string { return e.states[id] }
 
+// Design returns the design the evaluation judged.
+func (e *Evaluation) Design() *design.Design { return e.d }
+
 // Receipts returns the receipts of an id, in file and line order.
 func (e *Evaluation) Receipts(id string) []Receipt { return e.receipts[id] }
 
@@ -178,6 +181,8 @@ func Judge(d *design.Design, recs []Receipt) *Judgment {
 		if d.Obligation(r.ID) == nil {
 			if st := d.Status(r.ID); st != "" {
 				errorf("%s id in receipt: %s; a %s id yields no obligation: drop the receipt, or take the id out of %s", st, r.ID, st, d.P.Cfg.Design.Status)
+			} else if d.IsProof(r.ID) {
+				errorf("proof id in receipt: %s; tests do not discharge a proof obligation: drop the receipt", r.ID)
 			} else {
 				errorf("unknown id in receipt: %s", r.ID)
 			}

@@ -1,0 +1,34 @@
+# the proof block of a vital area: its ids proven by test and model, its proofs awaiting and its
+# assumptions without evidence (docs/formats.md sections 13 and 23.2)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"no formal result yet\"\n  - id: fv:order-payment\n    reason: \"no formal result yet\"\n" >> design/owed.yaml'
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+
+# ids a property is over carry the wording; the area's proof obligations are not proven
+exec machinery proof --ids tc:ORDE-e6d28f,inv:paid-before-shipped
+stdout '^tier:     vital \(order-payment\)$'
+stdout '^  inv:paid-before-shipped -> orders.sh -> pass: ship from Pending refused \(by test and model; proof awaited\)$'
+stdout '^  tc:ORDE-e6d28f -> orders.sh -> pass: Paid -> Shipped \(by test and model; proof awaited\)$'
+stdout '^  pf:order-payment:charged-once \(awaiting proof\)$'
+stdout '^  pf:order-payment:shipped-only-paid \(awaiting proof\)$'
+stdout '^  assumed, unproven: order-payment provider-charges-once: The payment provider charges a payment at most once, however often it is asked\.$'
+
+# an id of the area that no property is over: proven without the wording, the area's lines still there
+exec machinery proof --ids tc:ORDE-2e883d
+stdout '^  tc:ORDE-2e883d -> orders.sh -> pass: Pending -> paying$'
+stdout '^  pf:order-payment:charged-once \(awaiting proof\)$'
+
+# an id outside every vital area has none of it
+exec machinery proof --ids tc:ORDE-1ded14
+stdout '^tier:     routine$'
+! stdout 'awaiting proof'
+! stdout 'proof awaited'
+! stdout 'assumed, unproven'
+
+# a proof obligation has no evidence to select
+exec mrun 2 proof --ids pf:order-payment:charged-once
+stderr '^usage: --ids: pf:order-payment:charged-once is a proof obligation: it awaits a machine-checked proof and has no evidence to show$'

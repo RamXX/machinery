@@ -23,6 +23,9 @@ func SelectIDs(d *design.Design, ids, prefixes []string) ([]string, error) {
 	}
 	set := map[string]bool{}
 	for _, id := range ids {
+		if d.IsProof(id) {
+			return nil, fmt.Errorf("--ids: %s is a proof obligation: it awaits a machine-checked proof and has no evidence to show", id)
+		}
 		if d.Obligation(id) == nil {
 			return nil, fmt.Errorf("--ids: %s is not an obligation", id)
 		}
@@ -216,7 +219,11 @@ func criterion(d *design.Design, ev *Evaluation, id, st string) string {
 		return ""
 	}
 	r, label := pick(d, o, st, rs)
-	return fmt.Sprintf("%s -> %s -> %s: %s", id, r.Test, label, r.Observed)
+	line := fmt.Sprintf("%s -> %s -> %s: %s", id, r.Test, label, r.Observed)
+	if st == Proven && d.IsOver(id) {
+		line += " " + design.ProofAwaited // section 23.2
+	}
+	return line
 }
 
 // pick chooses the receipt that best explains the state.

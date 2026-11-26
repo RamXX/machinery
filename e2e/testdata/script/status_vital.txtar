@@ -1,0 +1,37 @@
+# status on a vital area: its tier, the proofs awaiting, what is proven by test and model and
+# what is assumed without evidence (docs/formats.md sections 14 and 23.2)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"no formal result yet\"\n  - id: fv:order-payment\n    reason: \"no formal result yet\"\n" >> design/owed.yaml'
+exec machinery gen
+gitinit
+exec machinery status
+stdout '^tiers: routine 12, consequential 0, critical 1, vital 9$'
+stdout '^proofs awaiting: 2$'
+stdout '^assumed, unproven: order-payment provider-charges-once: The payment provider charges a payment at most once, however often it is asked\.$'
+! stdout '^vital: '
+
+exec machinery run -- sh e2e/orders.sh
+exec machinery status
+stdout '^vital: inv:paid-before-shipped proven \(by test and model; proof awaited\)$'
+stdout '^vital: tc:ORDE-e6d28f proven \(by test and model; proof awaited\)$'
+! stdout 'vital: tc:ORDE-8bd6e7'
+stdout -count=2 '^vital: '
+
+# a risk file without a vital area prints none of it
+cp critical.yaml design/risk.yaml
+exec machinery status
+stdout '^tiers: routine \d+, consequential 0, critical \d+$'
+! stdout 'proofs awaiting'
+! stdout '^vital: '
+! stdout 'assumed'
+
+-- critical.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+    questions: [concurrency]

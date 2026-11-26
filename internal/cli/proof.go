@@ -86,7 +86,8 @@ func runProof(e *Env, args []string) int {
 	if tierIDs == nil {
 		tierIDs = sel
 	}
-	code := evidence.ProofFor(io.MultiWriter(e.Stdout, &block), d, ev, sel, tierIDs, assumptionLines(d, sel), notes)
+	extra := append(assumptionLines(d, sel), vitalLines(d, tierIDs)...)
+	code := evidence.ProofFor(io.MultiWriter(e.Stdout, &block), d, ev, sel, tierIDs, extra, notes)
 	if *post {
 		if c.Actor == "" {
 			return e.Usage("no actor: pass --actor or set BEADS_ACTOR")
@@ -166,6 +167,21 @@ func assumptionLines(d *design.Design, ids []string) []string {
 		}
 	}
 	sort.Strings(res)
+	return res
+}
+
+// vitalLines lists, for the vital areas the ids belong to, the proof
+// obligations awaiting proof and the assumptions whose evidence is owed
+// (section 13).
+func vitalLines(d *design.Design, ids []string) []string {
+	areas := d.VitalAreasOf(ids)
+	var res []string
+	for _, id := range design.ProofsOf(areas) {
+		res = append(res, id+" ("+design.AwaitingProof+")")
+	}
+	for _, u := range d.Unevidenced(areas) {
+		res = append(res, u.Line())
+	}
 	return res
 }
 

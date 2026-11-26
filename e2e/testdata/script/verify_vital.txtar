@@ -1,0 +1,49 @@
+# verify on a vital area: proofs awaiting, ids proven by test and model, assumptions without
+# evidence, and a receipt that claims a proof (docs/formats.md sections 12 and 23.2)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+exec sh -c 'printf "  - id: fv:order-ownership\n    reason: \"no formal result yet\"\n  - id: fv:order-payment\n    reason: \"no formal result yet\"\n" >> design/owed.yaml'
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^  warn   assumed, unproven: order-payment provider-charges-once: The payment provider charges a payment at most once, however often it is asked\.$'
+! stdout 'final-stays-final'
+stdout '^  warn   proofs awaiting: 2$'
+stdout '^  warn   vital: inv:paid-before-shipped proven \(by test and model; proof awaited\)$'
+stdout '^  warn   vital: tc:ORDE-e6d28f proven \(by test and model; proof awaited\)$'
+! stdout 'vital: tc:ORDE-8bd6e7'
+! stdout 'vital: act:'
+stdout '^passed$'
+
+# a receipt that names a proof obligation
+exec machinery run -- sh proof-receipt.sh
+exec mrun 1 verify
+stdout '^  ERROR  proof id in receipt: pf:order-payment:charged-once; tests do not discharge a proof obligation: drop the receipt$'
+
+# without a vital area there is nothing of it
+cp critical.yaml design/risk.yaml
+exec machinery gen
+gitcommit 'no vital area'
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+! stdout 'proofs awaiting'
+! stdout 'proof awaited'
+stdout '^passed$'
+
+-- proof-receipt.sh --
+printf '{"v":1,"type":"receipt","id":"pf:order-payment:charged-once","outcome":"pass","test":"proof-receipt.sh","observed":"a test that claims a proof"}\n' >> "$MACHINERY_RECEIPTS"
+-- critical.yaml --
+version: 1
+areas:
+  - name: order-payment
+    tier: critical
+    why: "money moves"
+    ids: ["act:Order.pay", "tc:ORDE-2e883d"]
+    questions: [concurrency]
+  - name: order-ownership
+    tier: critical
+    why: "an order belongs to exactly one customer, whatever the data looks like"
+    ids: ["act:Order.place"]
+    questions: [structure]
