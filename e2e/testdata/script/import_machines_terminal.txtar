@@ -1,0 +1,177 @@
+# import.machines.terminal: a root key that says a machine never ends gives its reason to the
+# absorbing states as _terminal, or stays a _comment when there is none; rename.state may map a
+# key to _terminal directly (docs/formats.md section 5.2.1)
+fixture empty
+mkdir machines
+cp account.json machines/account.json
+cp ledger.json machines/ledger.json
+cp tally.json machines/tally.json
+cp gate.json machines/gate.json
+
+# without it the closed account is an absorbing state, an ERROR, and the reason is lost
+cp plain.yaml machinery.yaml
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/account.json: unsupported root key ''forever'''
+stdout '^  ERROR  machines/account.json: absorbing non-final leaf state Closed '
+
+# with it the reason becomes _terminal on that state, and the key leaves the root
+cp config.yaml machinery.yaml
+exec machinery lint --stage machines
+stdout 'checked: 4 machines'
+stdout '^passed$'
+exec machinery gen
+cmp design/gen/imported/machines/account.machine.json want-account.json
+! grep forever design/gen/imported/machines/account.machine.json
+
+# a machine with the key and no absorbing state keeps the reason as _comment, as a rename would
+grep '"_comment": "forever: the ledger is kept for good"' design/gen/imported/machines/ledger.machine.json
+! grep '_terminal' design/gen/imported/machines/ledger.machine.json
+
+# a machine without the key is not changed; a state that already has _terminal keeps its own
+grep '"_terminal": "a frozen tally is read, never changed"' design/gen/imported/machines/tally.machine.json
+! grep 'kept for good' design/gen/imported/machines/tally.machine.json
+
+# rename.state maps a state key to _terminal directly, as written
+grep '"_terminal": "a shut gate is never opened again"' design/gen/imported/machines/gate.machine.json
+! grep 'never_left' design/gen/imported/machines/gate.machine.json
+
+# what stage machines holds still applies: a reason that is not a string, through the rename
+cp gate-flag.json machines/gate.json
+exec mrun 1 lint --stage machines
+stdout '^  ERROR  machines/gate.json: state Shut _terminal must be a non-empty reason string saying why the state is never left$'
+cp gate.json machines/gate.json
+
+# the refusals
+cp no-key.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.terminal.from_root is required$'
+cp renamed-too.yaml machinery.yaml
+exec mrun 2 lint
+stderr '^config: import.machines.terminal.from_root: forever is also renamed by import.machines.rename.root; keep one$'
+
+-- plain.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores, never_left: _terminal}
+-- config.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores, never_left: _terminal}
+    terminal: {from_root: forever}
+-- no-key.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    terminal: {from_root: ""}
+-- renamed-too.yaml --
+version: 2
+import:
+  machines:
+    files: ["machines/*.json"]
+    rename:
+      root: {forever: _comment}
+    terminal: {from_root: forever}
+-- account.json --
+{
+  "id": "account",
+  "forever": "a closed account is kept for audit; every later request is refused with ACCOUNT_CLOSED",
+  "initial": "open",
+  "states": {
+    "open": {
+      "on": {"deposit": {"target": "open"}, "close": {"target": "closed"}}
+    },
+    "closed": {
+      "on": {"deposit": {"actions": ["recordRefusal"]}},
+      "skip": {"close": "already closed"}
+    }
+  }
+}
+-- want-account.json --
+{
+  "id": "account",
+  "initial": "Open",
+  "states": {
+    "Open": {
+      "on": {
+        "deposit": {
+          "target": "Open"
+        },
+        "close": {
+          "target": "Closed"
+        }
+      }
+    },
+    "Closed": {
+      "on": {
+        "deposit": {
+          "actions": [
+            "recordRefusal"
+          ]
+        }
+      },
+      "_ignores": {
+        "close": "already closed"
+      },
+      "_terminal": "a closed account is kept for audit; every later request is refused with ACCOUNT_CLOSED"
+    }
+  },
+  "_oracle_tag": "ACCO9AF2"
+}
+-- ledger.json --
+{
+  "id": "ledger",
+  "forever": "the ledger is kept for good",
+  "initial": "open",
+  "states": {
+    "open": {"on": {"seal": {"target": "sealed"}}},
+    "sealed": {"type": "final"}
+  }
+}
+-- tally.json --
+{
+  "id": "tally",
+  "initial": "counting",
+  "states": {
+    "counting": {"on": {"count": {"target": "counting"}, "freeze": {"target": "frozen"}}},
+    "frozen": {
+      "_terminal": "a frozen tally is read, never changed",
+      "on": {"count": {"actions": ["recordRefusal"]}},
+      "skip": {"freeze": "already frozen"}
+    }
+  }
+}
+-- gate.json --
+{
+  "id": "gate",
+  "initial": "open",
+  "states": {
+    "open": {"on": {"pass": {"target": "open"}, "shut": {"target": "shut"}}},
+    "shut": {
+      "never_left": "a shut gate is never opened again",
+      "on": {"pass": {"actions": ["recordRefusal"]}},
+      "skip": {"shut": "already shut"}
+    }
+  }
+}
+-- gate-flag.json --
+{
+  "id": "gate",
+  "initial": "open",
+  "states": {
+    "open": {"on": {"pass": {"target": "open"}, "shut": {"target": "shut"}}},
+    "shut": {
+      "never_left": true,
+      "on": {"pass": {"actions": ["recordRefusal"]}},
+      "skip": {"shut": "already shut"}
+    }
+  }
+}

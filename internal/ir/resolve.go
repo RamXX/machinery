@@ -134,6 +134,50 @@ func (r *Resolver) Resolve(tgt, srcPath string) (string, string) {
 }
 
 // Leaf follows initial children from a state path down to a leaf state.
+// Exits reports whether a transition on the state at path p, or on one of
+// its ancestors, leaves it: its target resolves to another state, or does
+// not resolve at all.
+func (r *Resolver) Exits(p string) bool {
+	chain := []string{p}
+	for q := p; strings.Contains(q, "."); {
+		q = q[:strings.LastIndex(q, ".")]
+		chain = append(chain, q)
+	}
+	for _, q := range chain {
+		for _, tr := range TransitionsOf(r.NodeOf[q], nil, q) {
+			if !tr.HasTgt {
+				continue
+			}
+			if dest, why := r.Resolve(tr.Target, q); why != "" || dest != p {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Absorbing returns the absorbing states of a machine, in document order:
+// non-final leaf states without _terminal that have transitions of their own
+// and none that leaves them (docs/machine-format.md, "Reachability").
+func Absorbing(m *Value) []string {
+	ro := m.AsObject()
+	if ro == nil {
+		return nil
+	}
+	r := NewResolver(m)
+	var res []string
+	for _, s := range WalkStates(ro.Get2("states"), "") {
+		o := s.Node.AsObject()
+		if o == nil || o.GetString("type") == "final" || o.Get2("states") != nil || o.Has("_terminal") {
+			continue
+		}
+		if len(TransitionsOf(s.Node, nil, s.Path)) > 0 && !r.Exits(s.Path) {
+			res = append(res, s.Path)
+		}
+	}
+	return res
+}
+
 func (r *Resolver) Leaf(path string) string {
 	for depth := 0; depth < 64; depth++ {
 		n := r.NodeOf[path]

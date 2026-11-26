@@ -134,8 +134,43 @@ func OracleTag(id, orig string) string {
 	return b.String() + strings.ToUpper(hex.EncodeToString(sum[:])[:4])
 }
 
+// machine translates the root of a source machine. With
+// import.machines.terminal, the reason its root key holds becomes _terminal
+// on every absorbing state of the result; with none, it stays as _comment,
+// as a rename to _comment would keep it (section 5.2.1).
 func (t *translator) machine(root *ir.Object) *ir.Object {
-	out := t.keys(root, t.rename.Root, "root", nil)
+	key := t.im.TerminalKey()
+	if key == "" || !root.Has(key) {
+		return t.translate(root, t.rename.Root)
+	}
+	reason := ir.StringValue(textOf(root.Get2(key)))
+	without := ir.NewObject()
+	for _, k := range root.Keys() {
+		if k != key {
+			without.Set(k, root.Get2(k))
+		}
+	}
+	before := len(t.problems)
+	out := t.translate(without, t.rename.Root)
+	absorbing := ir.Absorbing(ir.ObjectValue(out))
+	if len(absorbing) == 0 {
+		t.problems = t.problems[:before]
+		names := map[string]string{key: "_comment"}
+		for k, v := range t.rename.Root {
+			names[k] = v
+		}
+		return t.translate(root, names)
+	}
+	nodes := ir.NewResolver(ir.ObjectValue(out)).NodeOf
+	for _, p := range absorbing {
+		nodes[p].AsObject().Set("_terminal", reason)
+	}
+	return out
+}
+
+// translate renames the root keys with names, then translates the rest.
+func (t *translator) translate(root *ir.Object, names map[string]string) *ir.Object {
+	out := t.keys(root, names, "root", nil)
 	t.origID = out.GetString("id")
 	if t.origID == "" {
 		base := path.Base(t.src)

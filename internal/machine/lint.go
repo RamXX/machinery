@@ -147,25 +147,7 @@ func (m *Machine) Lint() (errs []string, counts Counts) {
 		// dead end or absorbing: a non-final leaf needs a transition that
 		// leaves it, on itself or on an ancestor
 		if !isFinal && o.Get2("states") == nil {
-			exits := false
-			for _, q := range ancestorChain(p) {
-				qtrs := trs
-				if q != p {
-					qtrs = ir.TransitionsOf(nodeOf[q], nil, q)
-				}
-				for _, tr := range qtrs {
-					if !tr.HasTgt {
-						continue
-					}
-					if dest, why := resolve(tr.Target, q); why != "" || dest != p {
-						exits = true
-						break
-					}
-				}
-				if exits {
-					break
-				}
-			}
+			exits := res.Exits(p)
 			_, terminal := o.Get("_terminal")
 			switch {
 			case !exits && len(trs) == 0 && terminal:

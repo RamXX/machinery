@@ -66,6 +66,8 @@ import:                         # optional: design sources kept in the project's
       root: {notes: _comment, startable: _entries}
       state: {skip: _ignores}
       transition: {allowed: _requires, denied: _refusal}
+    terminal:                   # optional: a root key whose reason marks the states never left (section 5.2.1)
+      from_root: forever
     bind:                       # optional: what a machine binds to in the model (section 5.2.1)
       "machines/loan*.json": {lifecycle_of: Loan}       # a glob of source files, or
       "machines/loan-fines.json": {lifecycle_of: Loan, aspect: fines}   # one aspect of a lifecycle
@@ -143,8 +145,10 @@ Rules:
   (`import.machines: design.machines is also set; read the machines from one of them`), and so
   are an empty `import.machines.files` (`import.machines.files is required`), a `states` value
   other than `capitalize`, `pascal` or `keep`
-  (`import.machines.states must be capitalize, pascal or keep, got "<value>"`), and an empty key
-  or name in `rename`.
+  (`import.machines.states must be capitalize, pascal or keep, got "<value>"`), an empty key
+  or name in `rename`, and an `import.machines.terminal` without `from_root`
+  (`import.machines.terminal.from_root is required`) or whose key `rename.root` also maps
+  (`import.machines.terminal.from_root: <key> is also renamed by import.machines.rename.root; keep one`).
   `import.machines.bind` maps a glob of source files or a machine id to exactly one of
   `lifecycle_of` (an entity name, with an optional `aspect`, section 5.2) and `serves` (a
   non-empty list of model ids): an `aspect` without `lifecycle_of`
@@ -429,7 +433,17 @@ is generated, never a source, and is not read):
    `_entries`, native or renamed. Two sibling states that become one name are
    `ERROR  <file>: states <a> and <b> both become <name> with states: <value>`, and the first is
    kept.
-4. **Id.** The original id is the root `id`, or the file name without its extension when there
+4. **Terminal states.** A project may say once, at the root, that a machine never ends: with
+   `terminal: {from_root: <key>}`, the value of that root key is the reason (a value that is not
+   a string is written as compact JSON). The key is taken out of the root, and the reason becomes
+   `_terminal` on every absorbing state of the translated machine: a non-final leaf state with
+   no `_terminal` of its own that has transitions and none that leaves it, on itself or on an
+   ancestor (`docs/machine-format.md`, "Reachability"). A machine that has the key and no such
+   state keeps the reason as `_comment`, exactly as `rename.root: {<key>: _comment}` would. A
+   machine without the key is not changed. A state key that `rename.state` maps to `_terminal`
+   gives its state the reason directly, as written; stage `machines` holds either to the rules of
+   `_terminal` (a non-empty reason on a non-final leaf state that is never left).
+5. **Id.** The original id is the root `id`, or the file name without its extension when there
    is none. The machine id is the original id with every character outside `[A-Za-z0-9_]`
    replaced by `_`. It is the translated root `id` (written first when the source has no `id`),
    and a target head `#<original id>` becomes `#<machine id>`. The translated file name is
@@ -437,7 +451,7 @@ is generated, never a source, and is not read):
    Two files that translate to the same id are
    `ERROR  <second file>: translates to machine id <id>, as <first file> does; give one of them another id`,
    and the second is not read.
-5. **Binding.** The translation never invents a binding. A result that has `_lifecycle_of`,
+6. **Binding.** The translation never invents a binding. A result that has `_lifecycle_of`,
    `_role` or `_serves` binds itself and is kept as it is. Any other is bound by the entry of
    `import.machines.bind` whose key is its machine id or a glob that matches its source file:
    `lifecycle_of: <Entity>` adds `_lifecycle_of` (and `aspect: <name>` adds `_aspect` after it),
@@ -453,7 +467,7 @@ is generated, never a source, and is not read):
      keys, in sorted order), and none is applied.
    - An entry that matches no machine is
      `ERROR  import.machines.bind <key>: matches no machine file and no machine id`.
-6. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
+7. **Tag.** `_oracle_tag` is added when the result has none: the first four letters or digits of
    the machine id, upper-cased, followed by the first four hex digits, upper-cased, of the SHA-256
    of the original id. Dozens of machines whose ids share a prefix get different tags, and a tag
    does not change while the id does not.

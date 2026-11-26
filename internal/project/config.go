@@ -105,10 +105,25 @@ func (c *Config) HasFailureModes() bool {
 
 // ImportMachines reads machines written in a JSON dialect (section 5.2.1).
 type ImportMachines struct {
-	Files  []string        `yaml:"files"`
-	States string          `yaml:"states,omitempty"`
-	Rename Rename          `yaml:"rename,omitempty"`
-	Bind   map[string]Bind `yaml:"bind,omitempty"`
+	Files    []string        `yaml:"files"`
+	States   string          `yaml:"states,omitempty"`
+	Rename   Rename          `yaml:"rename,omitempty"`
+	Terminal *Terminal       `yaml:"terminal,omitempty"`
+	Bind     map[string]Bind `yaml:"bind,omitempty"`
+}
+
+// Terminal names the root key whose reason says that a machine is never
+// left in its absorbing states (section 5.2.1).
+type Terminal struct {
+	FromRoot string `yaml:"from_root"`
+}
+
+// TerminalKey returns the root key of import.machines.terminal, or "".
+func (im *ImportMachines) TerminalKey() string {
+	if im.Terminal == nil {
+		return ""
+	}
+	return im.Terminal.FromRoot
 }
 
 // Bind is what an imported machine binds to in the model (section 5.2.1):
@@ -530,6 +545,14 @@ func (c *Config) validateImport() error {
 			if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
 				return Errf("import.machines.rename.%s: a key and its new name must not be empty", lv.name)
 			}
+		}
+	}
+	if t := im.Terminal; t != nil {
+		if strings.TrimSpace(t.FromRoot) == "" {
+			return Errf("import.machines.terminal.from_root is required")
+		}
+		if _, renamed := im.Rename.Root[t.FromRoot]; renamed {
+			return Errf("import.machines.terminal.from_root: %s is also renamed by import.machines.rename.root; keep one", t.FromRoot)
 		}
 	}
 	for _, k := range im.BindKeys() {
