@@ -50,10 +50,18 @@ type Evaluation struct {
 	NFailed     int
 	NOwed       int // owed entries
 	NUnowed     int // unproven or partial and not owed
+	// NByFunction and NByFile count the proven ids that adapter evidence
+	// alone proves, by granularity (section 10.3).
+	NByFunction int
+	NByFile     int
 
 	d        *design.Design
 	states   map[string]string
 	receipts map[string][]Receipt
+	// adapter: a proven id -> the granularity it is proven by adapter at;
+	// notCounted: an id that is not proven -> its adapter pass that does not count
+	adapter    map[string]string
+	notCounted map[string]NotCounted
 }
 
 // State returns the state of an obligation id, or "" when it is not one.
@@ -201,8 +209,16 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	if err != nil {
 		return nil, err
 	}
+	counted, held := admitted(p, d, counted) // section 10.3
 	j := Judge(d, counted)
 	ev.states, ev.receipts = j.States, j.Receipts
+	ev.adapter, ev.notCounted = map[string]string{}, map[string]NotCounted{}
+	for id, n := range held {
+		if ev.states[id] != Proven {
+			ev.notCounted[id] = n
+			add(report.Warn, "adapter: %s not counted: a test that names it passed (%s granularity); %s", id, n.Granularity, n.Why)
+		}
+	}
 	if ev.HasEvidence {
 		ev.Findings = append(ev.Findings, j.Findings...)
 	}
@@ -212,6 +228,16 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		switch st {
 		case Proven:
 			ev.NProven++
+			if o.Kind != "fv" && o.Kind != "cx" {
+				switch g := byAdapter(&o, ev.receipts[o.ID]); g {
+				case project.GranularityFunction:
+					ev.NByFunction++
+					ev.adapter[o.ID] = g
+				case project.GranularityFile:
+					ev.NByFile++
+					ev.adapter[o.ID] = g
+				}
+			}
 			if isOwed && ev.HasEvidence {
 				add(report.Error, "stale owed entry: %s is proven", o.ID)
 			}

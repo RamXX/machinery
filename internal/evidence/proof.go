@@ -151,6 +151,9 @@ func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra
 	} else {
 		fmt.Fprintf(w, "result:   no evidence at %s\n", gitx.Short(ev.Head))
 	}
+	if parts := adapterProven(ev, ids); len(parts) > 0 { // section 10.3
+		fmt.Fprintf(w, "adapter:  %s\n", strings.Join(parts, ", "))
+	}
 	owed := d.OwedSet()
 	fmt.Fprintln(w, "criteria:")
 	var notProven []string
@@ -167,6 +170,9 @@ func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra
 			label := st
 			if isOwed {
 				label += ", owed"
+			}
+			if _, held := ev.AdapterNotCounted(id); held {
+				label += ", adapter pass not counted"
 			}
 			notProven = append(notProven, fmt.Sprintf("%s (%s)", id, label))
 		}
@@ -222,8 +228,14 @@ func criterion(d *design.Design, ev *Evaluation, id, st string) string {
 	if len(rs) == 0 {
 		return ""
 	}
+	// a receipt a test emitted explains the state before one the adapter wrote
+	rs = append([]Receipt(nil), rs...)
+	sort.SliceStable(rs, func(i, j int) bool { return rs[i].Source == "" && rs[j].Source != "" })
 	r, label := pick(d, o, st, rs)
 	line := fmt.Sprintf("%s -> %s -> %s: %s", id, r.Test, label, r.Observed)
+	if g := ev.ByAdapter(id); g != "" && st == Proven {
+		line += fmt.Sprintf(" (by adapter at %s granularity)", g)
+	}
 	if st == Proven && d.IsOver(id) {
 		line += " " + design.ProofAwaited // section 23.2
 	}
@@ -258,4 +270,10 @@ func pick(d *design.Design, o *design.Obligation, st string, rs []Receipt) (Rece
 		}
 	}
 	return rs[0], rs[0].Outcome
+}
+
+// adapterProven renders how many of the ids are proven by adapter.
+func adapterProven(ev *Evaluation, ids []string) []string {
+	function, file := ev.AdapterCounts(ids)
+	return AdapterParts(function, file, "proven ")
 }

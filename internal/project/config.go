@@ -32,6 +32,7 @@ type Config struct {
 	Tests        *Tests            `yaml:"tests,omitempty"`
 	Constraints  *Constraints      `yaml:"constraints,omitempty"`
 	Receipts     Receipts          `yaml:"receipts"`
+	Evidence     *Evidence         `yaml:"evidence,omitempty"`
 	Commands     Commands          `yaml:"commands,omitempty"`
 	Backlog      *Backlog          `yaml:"backlog,omitempty"`
 	Plan         *PlanConfig       `yaml:"plan,omitempty"`
@@ -341,6 +342,177 @@ type Vital struct {
 
 type Receipts struct {
 	Dir string `yaml:"dir,omitempty"`
+}
+
+// Evidence holds the policy for evidence machinery writes itself.
+type Evidence struct {
+	Adapter *Adapter `yaml:"adapter,omitempty"`
+}
+
+// Adapter is the policy for adapter evidence (section 10.3). A list that is
+// set replaces its default, even when empty.
+type Adapter struct {
+	Allow          *[]string       `yaml:"allow,omitempty"`
+	Tiers          *[]string       `yaml:"tiers,omitempty"`
+	MinGranularity Granularity     `yaml:"min_granularity,omitempty"`
+	Sources        []AdapterSource `yaml:"sources,omitempty"`
+}
+
+// AdapterSource maps test packages built from copies to the test files
+// under trace.tests they are built from (section 10.3).
+type AdapterSource struct {
+	Package string   `yaml:"package"`
+	Files   []string `yaml:"files"`
+}
+
+// Granularities of an adapter receipt, the weaker first.
+const (
+	GranularityFile     = "file"
+	GranularityFunction = "function"
+)
+
+// Granularity is evidence.adapter.min_granularity: one value, or a mapping
+// from default, a kind or a tier to a value.
+type Granularity struct {
+	Default string
+	By      map[string]string
+}
+
+// UnmarshalYAML reads the scalar and the mapping form.
+func (g *Granularity) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode {
+		g.Default = n.Value
+		return nil
+	}
+	by := map[string]string{}
+	if err := n.Decode(&by); err != nil {
+		return err
+	}
+	g.Default = by["default"]
+	delete(by, "default")
+	g.By = by
+	return nil
+}
+
+// MarshalYAML prints the form that was written.
+func (g Granularity) MarshalYAML() (any, error) {
+	if len(g.By) == 0 {
+		return g.Default, nil
+	}
+	out := map[string]string{}
+	for k, v := range g.By {
+		out[k] = v
+	}
+	if g.Default != "" {
+		out["default"] = g.Default
+	}
+	return out, nil
+}
+
+// IsZero reports an unset value, which config does not print.
+func (g Granularity) IsZero() bool { return g.Default == "" && len(g.By) == 0 }
+
+// AdapterKinds are the kinds an adapter pass can prove, and the default of
+// evidence.adapter.allow; AdapterTiers is the default of evidence.adapter.tiers.
+var (
+	AdapterKinds = []string{"inv", "sc", "fm", "ck"}
+	AdapterTiers = []string{"routine", "consequential"}
+	tierNames    = []string{"routine", "consequential", "critical", "vital"}
+)
+
+// AdapterPolicy returns the effective policy for adapter evidence: the
+// kinds and tiers an adapter pass may prove.
+func (c *Config) AdapterPolicy() (kinds, tiers []string, min Granularity) {
+	kinds, tiers = AdapterKinds, AdapterTiers
+	if c.Evidence == nil || c.Evidence.Adapter == nil {
+		return kinds, tiers, min
+	}
+	a := c.Evidence.Adapter
+	if a.Allow != nil {
+		kinds = *a.Allow
+	}
+	if a.Tiers != nil {
+		tiers = *a.Tiers
+	}
+	return kinds, tiers, a.MinGranularity
+}
+
+// AdapterSources returns evidence.adapter.sources.
+func (c *Config) AdapterSources() []AdapterSource {
+	if c.Evidence == nil || c.Evidence.Adapter == nil {
+		return nil
+	}
+	return c.Evidence.Adapter.Sources
+}
+
+// validateEvidence holds the evidence block to section 2.
+func (c *Config) validateEvidence() error {
+	if c.Evidence == nil || c.Evidence.Adapter == nil {
+		return nil
+	}
+	a := c.Evidence.Adapter
+	in := func(list []string, s string) bool {
+		for _, v := range list {
+			if v == s {
+				return true
+			}
+		}
+		return false
+	}
+	if a.Allow != nil {
+		for _, k := range *a.Allow {
+			if !in(AdapterKinds, k) {
+				return Errf("evidence.adapter.allow: %s: the adapter proves only inv, sc, fm and ck ids", k)
+			}
+		}
+	}
+	if a.Tiers != nil {
+		for _, t := range *a.Tiers {
+			if !in(tierNames, t) {
+				return Errf("evidence.adapter.tiers: %q is not a tier: routine, consequential, critical or vital", t)
+			}
+		}
+	}
+	g := a.MinGranularity
+	if g.Default != "" && g.Default != GranularityFunction && g.Default != GranularityFile {
+		key := "evidence.adapter.min_granularity"
+		if g.By != nil {
+			key += ".default"
+		}
+		return Errf("%s must be function or file, got %q", key, g.Default)
+	}
+	keys := make([]string, 0, len(g.By))
+	for k := range g.By {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if !in(AdapterKinds, k) && !in(tierNames, k) {
+			return Errf("evidence.adapter.min_granularity: %q is not default, a kind (inv, sc, fm, ck) or a tier", k)
+		}
+		if v := g.By[k]; v != GranularityFunction && v != GranularityFile {
+			return Errf("evidence.adapter.min_granularity.%s must be function or file, got %q", k, v)
+		}
+	}
+	for i, s := range a.Sources {
+		switch {
+		case strings.TrimSpace(s.Package) == "":
+			return Errf("evidence.adapter.sources: entry %d: package is required", i+1)
+		case !ValidGlob(s.Package):
+			return Errf("evidence.adapter.sources: entry %d: package %q is not a valid glob", i+1, s.Package)
+		case len(s.Files) == 0:
+			return Errf("evidence.adapter.sources: entry %d: files is required", i+1)
+		}
+		for _, f := range s.Files {
+			if err := CheckPath("evidence.adapter.sources.files", f); err != nil {
+				return err
+			}
+			if strings.TrimSpace(f) == "" || !ValidGlob(f) {
+				return Errf("evidence.adapter.sources: entry %d: files %q is not a valid glob", i+1, f)
+			}
+		}
+	}
+	return nil
 }
 
 type Commands struct {
@@ -679,6 +851,9 @@ func (c *Config) validate() error {
 		return err
 	}
 	if err := c.validateAssess(); err != nil {
+		return err
+	}
+	if err := c.validateEvidence(); err != nil {
 		return err
 	}
 	if c.Plan != nil && c.Plan.WireMaxFiles < 0 {

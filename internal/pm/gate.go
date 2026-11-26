@@ -277,6 +277,10 @@ func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed ma
 	case evidence.Failed:
 		s.Errorf("failed: %s", id)
 	default:
+		if n, held := ev.AdapterNotCounted(id); held { // section 10.3
+			s.Errorf("unproven: %s; adapter evidence does not count: %s", id, n.Why)
+			return
+		}
 		s.Errorf("unproven: %s", id)
 	}
 }
@@ -356,6 +360,7 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 	}
 	owed := d.OwedSet()
 	var n, proven, partial, nOwed, receipts int
+	byFunction, byFile := ev.AdapterCounts(ObligationIDs(d, ids))
 	for _, id := range ObligationIDs(d, ids) {
 		n++
 		switch ev.State(id) {
@@ -369,7 +374,9 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 		}
 		receipts += len(ev.Receipts(id))
 	}
-	s.Count(n, "obligations").Count(proven, "proven").Count(partial, "partial").Count(nOwed, "owed").Count(receipts, "receipts")
+	s.Count(n, "obligations").Count(proven, "proven")
+	evidence.CountAdapter(s, byFunction, byFile)
+	s.Count(partial, "partial").Count(nOwed, "owed").Count(receipts, "receipts")
 	if areas := d.VitalAreasOf(ids); len(areas) > 0 {
 		evidence.VitalOf(ev, areas, sel).Warn(s, true) // section 12
 	}
@@ -380,7 +387,7 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 }
 
 // per-id findings of stage verify; failed ones always print
-var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: "}
+var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: ", "adapter: "}
 
 func keepFinding(msg string, sel map[string]bool) bool {
 	for _, pre := range idFindings {

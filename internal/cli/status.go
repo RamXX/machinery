@@ -69,8 +69,15 @@ func runStatus(e *Env, args []string) int {
 	if err != nil {
 		return e.Fail(err)
 	}
-	fmt.Fprintf(w, "proven: %d  partial: %d  failed: %d  owed: %d  unproven and not owed: %d\n",
-		ev.NProven, ev.NPartial, ev.NFailed, ev.NOwed, ev.NUnowed)
+	byAdapter := "" // section 10.3: adapter evidence is a class of its own
+	if parts := evidence.AdapterParts(ev.NByFunction, ev.NByFile, ""); len(parts) > 0 {
+		byAdapter = " (" + strings.Join(parts, ", ") + ")"
+	}
+	fmt.Fprintf(w, "proven: %d%s  partial: %d  failed: %d  owed: %d  unproven and not owed: %d\n",
+		ev.NProven, byAdapter, ev.NPartial, ev.NFailed, ev.NOwed, ev.NUnowed)
+	if ids := ev.AdapterNotCountedIDs(); len(ids) > 0 {
+		fmt.Fprintf(w, "adapter, not counted: %s\n", tags.TallyOf(ids))
+	}
 	if len(vas) > 0 {
 		for _, l := range evidence.VitalOf(ev, vas, nil).Lines() { // section 23.2
 			fmt.Fprintln(w, l)

@@ -34,7 +34,13 @@ type Receipt struct {
 	Effects  []string
 	Observed string
 	Replay   string
-	File     string // project-relative receipts file
+	// Source is "adapter" for a receipt a run adapter wrote, with its
+	// Granularity (function or file) and the build Tags of the run
+	// (section 10.3); "" for a receipt a test emitted.
+	Source      string
+	Granularity string
+	Tags        []string
+	File        string // project-relative receipts file
 }
 
 // RunInfo describes one complete receipts file that was used as evidence.
@@ -63,6 +69,10 @@ type line struct {
 	Observed string   `json:"observed"`
 	Replay   string   `json:"replay"`
 	Exit     *int     `json:"exit"`
+
+	Source      string   `json:"source"`
+	Granularity string   `json:"granularity"`
+	Tags        []string `json:"tags"`
 }
 
 // fileData is a parsed receipts file.
@@ -118,7 +128,8 @@ func parseFile(abs, rel string) (*fileData, error) {
 				continue
 			}
 			fd.Receipts = append(fd.Receipts, Receipt{ID: l.ID, Outcome: l.Outcome, Test: l.Test,
-				Effects: l.Effects, Observed: l.Observed, Replay: l.Replay, File: rel})
+				Effects: l.Effects, Observed: l.Observed, Replay: l.Replay,
+				Source: l.Source, Granularity: l.Granularity, Tags: l.Tags, File: rel})
 		case "end":
 			if l.Exit == nil {
 				fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: end line without exit", n))
@@ -143,6 +154,12 @@ func checkReceipt(l *line) string {
 		return fmt.Sprintf("%s: receipt without test: name the test file in test", l.ID)
 	case l.Replay != "" && l.Replay != Reproduced && l.Replay != Refuted:
 		return fmt.Sprintf("%s: replay must be reproduced or refuted, got %q", l.ID, l.Replay)
+	case l.Source != "" && l.Source != SourceAdapter:
+		return fmt.Sprintf("%s: source must be adapter or absent, got %q", l.ID, l.Source)
+	case l.Source == SourceAdapter && l.Granularity != project.GranularityFunction && l.Granularity != project.GranularityFile:
+		return fmt.Sprintf("%s: granularity must be function or file, got %q", l.ID, l.Granularity)
+	case l.Source == "" && l.Granularity != "":
+		return fmt.Sprintf("%s: granularity without source: adapter", l.ID)
 	}
 	return ""
 }

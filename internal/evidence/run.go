@@ -28,6 +28,20 @@ type RunOptions struct {
 	// directory, and no receipts file is deleted. The probe uses it.
 	ReceiptsFile   string
 	Stdout, Stderr io.Writer
+	// Adapter, when set, reads the command's standard output and gives the
+	// receipts machinery writes itself (section 10.3).
+	Adapter RunAdapter
+}
+
+// RunAdapter writes receipts from what a test command prints.
+type RunAdapter interface {
+	// Name is recorded in the run header.
+	Name() string
+	// Consume reads the command's standard output to its end and prints
+	// what the user should see of it.
+	Consume(stream io.Reader, out io.Writer) error
+	// Receipts returns the receipt lines to write, once the command is done.
+	Receipts() [][]byte
 }
 
 // ExitNotStarted is the exit code when the command could not be started.
@@ -44,6 +58,7 @@ type header struct {
 	Command []string `json:"command"`
 	Stack   string   `json:"stack"`
 	Started string   `json:"started"`
+	Adapter string   `json:"adapter,omitempty"`
 }
 
 type endLine struct {
@@ -100,8 +115,12 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	if err != nil {
 		return 1, "", err
 	}
-	head1 := jsonLine(header{V: 1, Type: "run", Commit: head, Dirty: dirty, Command: argv,
-		Stack: opts.Stack, Started: now.Format(time.RFC3339)})
+	h := header{V: 1, Type: "run", Commit: head, Dirty: dirty, Command: argv,
+		Stack: opts.Stack, Started: now.Format(time.RFC3339)}
+	if opts.Adapter != nil {
+		h.Adapter = opts.Adapter.Name()
+	}
+	head1 := jsonLine(h)
 	_, err = f.Write(head1)
 	f.Close()
 	if err != nil {
@@ -117,7 +136,10 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = p.Root
-	cmd.Stdout, cmd.Stderr = opts.Stdout, opts.Stderr
+	cmd.Stderr = opts.Stderr
+	if opts.Adapter == nil {
+		cmd.Stdout = opts.Stdout
+	}
 	env := []string{}
 	for _, kv := range os.Environ() {
 		if !isOwn(kv) {
@@ -129,6 +151,16 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		env = append(env, "MACHINERY_ONLY="+strings.Join(opts.Only, ","))
 	}
 	cmd.Env = append(env, opts.Env...)
+	var stream io.ReadCloser
+	if opts.Adapter != nil {
+		if stream, err = cmd.StdoutPipe(); err != nil {
+			os.Remove(file)
+			if ledger {
+				forget(p, file)
+			}
+			return 1, "", err
+		}
+	}
 	if err := cmd.Start(); err != nil {
 		os.Remove(file)
 		if ledger {
@@ -136,10 +168,24 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		}
 		return ExitNotStarted, "", fmt.Errorf("cannot start %s: %v", argv[0], err)
 	}
+	var streamErr error
+	if stream != nil {
+		streamErr = opts.Adapter.Consume(stream, opts.Stdout)
+		io.Copy(io.Discard, stream) // never leave the command blocked on a full pipe
+	}
 	exit = exitCode(cmd.Wait())
 	f, err = os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		return exit, file, err
+	}
+	if opts.Adapter != nil && streamErr == nil {
+		// the adapter's receipts go in before the end line, each in one write
+		for _, l := range opts.Adapter.Receipts() {
+			if _, err = f.Write(l); err != nil {
+				f.Close()
+				return exit, file, err
+			}
+		}
 	}
 	_, err = f.Write(jsonLine(endLine{V: 1, Type: "end", Exit: exit, Finished: time.Now().UTC().Format(time.RFC3339)}))
 	if cerr := f.Close(); err == nil {
@@ -147,6 +193,9 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	}
 	if err == nil && ledger {
 		err = finishEntry(p, file, ledgerEntry{Commit: head, Dir: ledgerDir(p)})
+	}
+	if err == nil && streamErr != nil {
+		err = fmt.Errorf("reading the event stream: %v", streamErr)
 	}
 	return exit, file, err
 }

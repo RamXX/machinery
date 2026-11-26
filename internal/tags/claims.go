@@ -84,6 +84,16 @@ func (t *Tally) add(kind string) {
 	t.Total++
 }
 
+// TallyOf counts ids by their kind.
+func TallyOf(ids []string) Tally {
+	var t Tally
+	for _, id := range ids {
+		kind, _, _ := strings.Cut(id, ":")
+		t.add(kind)
+	}
+	return t
+}
+
 // String renders "<n> (<kind> <n>, ...)", or "0".
 func (t Tally) String() string {
 	if t.Total == 0 {
