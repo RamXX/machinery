@@ -56,7 +56,7 @@ stdout 'warn   baselined: test-double: e2e/legacy_test.go: gomock'
 # --e2e names the end-to-end roots
 rm -rf design machinery.yaml e2e/legacy_test.go
 exec machinery adopt --paths 'internal/**' --e2e 'smoke/**' --e2e 'e2e/**' --write
-grep 'e2e: \["smoke/\*\*", "e2e/\*\*"\]' machinery.yaml
+grep '^  e2e:\n    - "smoke/\*\*"\n    - "e2e/\*\*"\n' machinery.yaml
 grep -count=2 'unit-test' design/tests-baseline.yaml
 
 -- want-wrote.txt --
@@ -68,9 +68,11 @@ adopt: wrote 3 file(s)
 adopt: wrote 0 file(s)
 -- want-machinery.yaml --
 version: 2
-scope: ["internal/shipping/**"]
+scope:
+  - "internal/shipping/**"
 tests:
-  e2e: ["e2e/**"]
+  e2e:
+    - "e2e/**"
   baseline: design/tests-baseline.yaml
 backlog:
   tool: bd

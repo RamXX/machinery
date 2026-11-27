@@ -95,6 +95,12 @@ command, output line and exit code.
 - `adopt --write` writes only `machinery.yaml`, files under `design/` and the gen directory, the
   owed list and the baselines: the rendering beside a model kept elsewhere is the project's file,
   and adopt says `<file> is stale; the project regenerates it` (or `is missing`) and leaves it.
+- `adopt` and an existing `machinery.yaml`: every byte stays. adopt adds a key that is absent as
+  a block at the end of its mapping and items to a key that holds a block list, in the file's
+  indentation and line endings (`\r\n` kept), and refuses every other shape before it writes,
+  exit 2, naming the key and the shape and printing the lines to add by hand: flow style, a key
+  with no value or a scalar, an anchor, an alias or a merge key, a block scalar whose value an
+  addition would change, more than one document. The lists it writes are block lists.
 - `import`: machines in a dialect of the project's own (`states`, `rename`, `terminal`,
   `register`, `bind`), and `import.machines.annotate` for what the dialect has no key for:
   `external_events`, `failure_events`, `failure_states`, `aliases`, `refusal_events` and

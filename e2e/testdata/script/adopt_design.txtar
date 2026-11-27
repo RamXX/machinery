@@ -27,8 +27,7 @@ exec machinery adopt --paths 'internal/shipping/**' --write
 cmp stdout want-wrote.txt
 grep 'design/model/depot.modelith.yaml' machinery.yaml
 grep 'machines: design/machines' machinery.yaml
-grep 'code: \["internal/shipping/\*\*"\]' machinery.yaml
-grep 'tests: \["e2e/\*\*"\]' machinery.yaml
+grep '^trace:\n  code:\n    - "internal/shipping/\*\*"\n  tests:\n    - "e2e/\*\*"\n' machinery.yaml
 grep 'tool: bd' machinery.yaml
 exists design/gen/tables/shipment.table.json
 exists design/model/depot.modelith.md

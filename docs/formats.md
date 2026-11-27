@@ -4647,7 +4647,7 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
 `import.machines.files` matches as machines, and adopt never adds `design.machines` beside
 `import.machines`. With `--write`:
 
-1. **Config.** Without a `machinery.yaml`, writes one: `scope` from `--paths`, `tests.e2e` from
+1. **Config.** Without a `machinery.yaml`, writes one, every list in it a block list: `scope` from `--paths`, `tests.e2e` from
    `--e2e` (default `e2e/**`), and, once design sources exist, `trace.code` equal to the scope
    and `trace.tests` equal to the e2e roots, with the model, machine and contract files found (`*.modelith.yaml`, `*.machine.json`, `openapi.{yaml,yml,json}`),
    `tests.baseline`, and `backlog.tool: bd` when a backlog was found. With an existing file it
@@ -4668,11 +4668,51 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    - the waivers of steps 4 and 5.
 
    What the file has stays byte for byte: comments, blank lines, the spacing before a comment,
-   the order of the keys and the flow or block style of each list and mapping; the additions
-   are spliced in. The one exception is an empty `waivers` (no value, `~` or `[]`), whose value
-   becomes a block list when step 4 or 5 adds to it. A file adopt cannot add to without changing what it
-   has is refused before anything is written, exit 2:
-   `config: machinery.yaml: adopt cannot add <additions> without changing what the file has (<reason>): add it by hand`.
+   the order of the keys, the style of each list and mapping, and the line endings. adopt adds
+   to a key in two shapes only:
+   - the key is absent: the key and its value go as a block at the end of the mapping that
+     holds it (at the end of the file for a key of the top level), at the column of that
+     mapping's keys;
+   - the key holds a block list: the items go after its last item, at the column of its dashes.
+
+   A nested value goes one indentation step of the file deeper (the step of the first block
+   nested under a key of the top level, 2 when there is none). Every line adopt adds ends as the
+   first line of the file does (`\r\n` in a file written with them), and a file whose last line
+   has no line break gets one before an addition at its end. The lists adopt writes, in a new
+   file too, are block lists, so that a later `adopt` can add to them. Every other shape is
+   refused before anything is written, with or without `--write`, exit 2:
+   - a list or a mapping in flow style, on one line or over several, `[]` and `{}` included;
+   - a key with no value, `~` or another scalar, where adopt adds to a list or a mapping;
+   - an anchor on the list or mapping adopt adds to or on one that holds it, an alias in its
+     place, and a merge key (`<<`) in the mapping adopt adds a key to: a merge at the top level
+     that supplies `waivers` is refused, never overridden by a `waivers` key of adopt's;
+   - a block scalar (`|` or `>`) that ends the list or mapping, when an addition after it would
+     change its value (one written last in a file without a final line break, say);
+   - a file with more than one YAML document, or with a document end marker (`...`).
+
+   The refusal names each key adopt would add to and what stands in its way, and prints the
+   lines to add by hand in the indentation they would take in the file:
+
+   ```
+   config: machinery.yaml: adopt adds to a key only where it is absent or holds a block list, and writes nothing: add these lines by hand, then run adopt again
+   <key>: <shape>; <place>:
+   <the lines>
+   ```
+
+   `<key>` is the key adopt adds to or adds (`waivers`, `trace.code`, `tests.baseline`), one
+   such group per key. `<shape>` is one of `<path> is a flow list`, `<path> is a flow mapping`
+   (`the top level is a flow mapping`), `<path> has the anchor &<name>`,
+   `<path> is the alias *<name>`, `<path> has a merge key (<<)`
+   (`the top level has a merge key (<<)`), `<path> has no value`,
+   `<path> holds the scalar <text>`, `<path> is a list`, `<path> is a mapping`,
+   `a block scalar ends <path>, and an addition after it would change its value`
+   (`ends the file` for the top level), `the file holds more than one YAML document` and
+   `the file has a document end marker (...)`, where `<path>` is the key that holds the list or
+   mapping. `<place>` is `as a block list under <key>` for items, and `under <path>` or
+   `at the top level` for a key. Before it writes, adopt also checks that the file it would
+   write holds one document that says what the edited configuration says, and that every value
+   the file had is unchanged; when not, it refuses the same way, with the shape
+   `an addition here would change what the file has`.
 2. **Baselines.** Writes the tests baseline with every unit test and test double now in scope
    (section 9.4), and the architecture baseline when `constraints` are configured. Existing
    entries are kept; entries are added only for paths newly in scope.

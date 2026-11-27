@@ -42,33 +42,39 @@ cmp machinery.yaml want-widened.yaml
 -- machinery-existing.yaml --
 # owned by the platform team
 version: 2
-scope: ["internal/shipping/**"]  # the riskiest area first
+scope:  # the riskiest area first
+  - "internal/shipping/**"
 constraints:
   size:
     max_func_lines: 8  # the team's own size rule
 -- want-first.yaml --
 # owned by the platform team
 version: 2
-scope: ["internal/shipping/**"]  # the riskiest area first
+scope:  # the riskiest area first
+  - "internal/shipping/**"
 constraints:
   size:
     max_func_lines: 8  # the team's own size rule
   baseline: design/arch-baseline.yaml
 tests:
-  e2e: ["e2e/**"]
+  e2e:
+    - "e2e/**"
   baseline: design/tests-baseline.yaml
 backlog:
   tool: bd
 -- want-widened.yaml --
 # owned by the platform team
 version: 2
-scope: ["internal/shipping/**", "internal/billing/**"]  # the riskiest area first
+scope:  # the riskiest area first
+  - "internal/shipping/**"
+  - "internal/billing/**"
 constraints:
   size:
     max_func_lines: 8  # the team's own size rule
   baseline: design/arch-baseline.yaml
 tests:
-  e2e: ["e2e/**"]
+  e2e:
+    - "e2e/**"
   baseline: design/tests-baseline.yaml
 backlog:
   tool: bd

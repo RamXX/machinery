@@ -30,9 +30,11 @@ where the end-to-end tests live. Then assess:
 ```sh
 cat > ../depot.machinery.yaml <<'EOF'
 version: 2
-scope: ["internal/**"]
+scope:
+  - "internal/**"
 tests:
-  e2e: ["e2e/**"]
+  e2e:
+    - "e2e/**"
 EOF
 machinery assess --config ../depot.machinery.yaml --out ../depot-assessment
 ```
@@ -208,7 +210,11 @@ a `stale waiver` ERROR, so the list only shrinks.
 
 Adopt writes only `machinery.yaml` and files under `design/` and the gen directory: when you
 keep a model elsewhere with a Markdown rendering of your own beside it, adopt leaves that file
-alone and says when it is stale (`machinery gen` rewrites it when you run it).
+alone and says when it is stale (`machinery gen` rewrites it when you run it). In a
+`machinery.yaml` you wrote, every byte stays: adopt adds a missing key as a block at the end of
+its mapping and items to a list in block style, in the file's indentation and line endings. Any
+other shape (flow style, a key with no value, an anchor, an alias, a merge key) is refused before
+anything is written, with the lines to add by hand.
 
 Mark failures where the code records them: tag the state `failure` and list the events in
 `_failure_events` (`docs/machine-format.md`, "Failure idioms"), or say it in
