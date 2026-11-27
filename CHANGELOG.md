@@ -87,19 +87,35 @@ command, output line and exit code.
   id, it is proven only when each claimant is satisfied at the commit, by a verdict of the
   adapter or by a pass receipt its own test emitted. Otherwise it is
   `partly run: <n> of <m> claimants passed` in `verify`, `status`, `proof` and the run
-  summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names the
-  first ten claimants without a pass, `verify --partly` every one, and says what to do; a file
-  the adapter cannot judge (not Go, not named `_test.go`, not a mapped staged source, not
-  parsing, without a test function) is named with why and with what it needs. A file under
+  summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names up
+  to three claimants without a pass for each of the first ten such ids, then how many more
+  there are, `verify --partly` every one, and says what to do; a file the adapter cannot judge
+  (not Go, not named `_test.go`, not a mapped staged source, not parsing, without a test
+  function and judged by no set) is named with why and with what it needs. A claiming file
+  with no test function of its own that is a candidate of a package of the run (a helper) is
+  judged by its set: it passes only when every test function of that package passed in one
+  run, a fail of the set fails it, and `verify` says `by its set`. A marker above a helper, a
+  method or `TestMain` is a marker of its file. A file under
   `trace.tests` that cannot be read fails the commands that read markers. An id with no
   counted adapter pass is judged as before: a receipt a test emits proves it. `claims: any` is
   the rule of one claimant, and the ratchet reports it.
 - `evidence.adapter.excused` leaves claimants that cannot run here out of that rule, each entry
   with globs of test files, optional function patterns and a one-line reason; a file-level
   claimant is excused by its file, never by a function. `verify` prints every entry with the
-  claimants it covers and an ERROR, with why, for each glob or pattern through which it covers
-  nothing; an id whose claimants are all excused is not proven; the ratchet names an entry
-  added or widened, an ERROR when it covers a claimant of a critical or vital id.
+  claimants it covers and how many globs it has (the globs under `verify --partly`), and an
+  ERROR, with why, for each glob or pattern through which it covers nothing; an id whose
+  claimants are all excused is not proven; the ratchet names an entry added or widened, an
+  ERROR when it covers a claimant of a critical or vital id. The entries may be kept in
+  `design/excused.yaml`, read with `machinery.yaml`, where a change keeps earlier runs valid.
+- Evidence across commits: a run of an earlier commit is valid at HEAD when its commit is an
+  ancestor of HEAD and every path changed since (renames by both paths) is the tool's own (the
+  owed list, the adoption and excused files, receipts, property records) or matches a glob of
+  `evidence.exempt`; `verify` and `status` say through how many exempt commits. A glob that
+  would exempt a test, the code, a design source, `machinery.yaml` or a build manifest is a
+  config error, and the ratchet reports every exempt glob added or widened.
+- `owed sync` writes nothing while `machinery.yaml`, the adoption or excused file, a design
+  source or a test file has uncommitted changes, and names them; `--allow-dirty` syncs as
+  `verify --allow-dirty` judges.
 - A `--streams` run that reads no stream exits 1 (the wrapper ran no `go test`, or cleared the
   environment with `env -i`); `--allow-no-streams` accepts a wrapper that may run nothing.
   `--keep-streams <dir>` copies every stream read into `<dir>/<run id>/` and records it in the
