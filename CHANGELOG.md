@@ -3,144 +3,137 @@
 ## Unreleased: 2.0.0 (experimental, branch `experimental/v2`)
 
 v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not listed under
-"Carried forward" remains in this tree.
+"Carried forward" remains in this tree. `docs/formats.md` is the contract for every format,
+command, output line and exit code.
 
-### New
+### Design
 
-- One contract for every format, output line and exit code: `docs/formats.md`.
-- Stage outcomes: passed, failed, not applicable, not demonstrated (which blocks like failed).
-  Exit codes 0, 1, 2.
+- Design sources as data: a Modelith 0.6.0 model, machines in the XState v5 JSON subset, OpenAPI
+  or proto contracts, failure modes and a risk file. `machinery lint` checks each and
+  cross-checks them (`xref-model-machine`, `xref-contract`, `xref-failure`).
 - Obligations with stable ids from the model (`inv`, `sc`), the machines (`tc`: transition,
-  ignore, refusal and guard-clause cases), failure modes (`fm`), formal models (`fv`, `cx`) and
-  external checkers (`ck`).
-- Evidence loop: `run` records receipts bound to a commit, `verify` joins them to the
-  obligations, `owed.yaml` is the single ratchet, `proof` and `status` report.
-- `probe`: mutation probing of the generated tables as the measure of test quality.
-- Stage `tests`: end-to-end only, no test doubles, with a baseline that only shrinks.
-- Stage `xstate`: generated tables are compared with what the real XState 5.33.4 executes.
-- Risk tiers (`design/risk.yaml`): routine, consequential, critical.
-- Formal models by question: TLA+ skeletons generated from machines, Alloy skeletons derived
-  from the Modelith model; reach predicates, numbered assumptions, mutations, a baseline,
-  a sync marker with drift classification, counterexample traces replayed as obligations.
-- Backlog bridge on `bd`: `plan` (stories and edges from what is owed), `waves`, contract freeze,
-  `brief` (by file pointer, with model routing), `predict`, `accept`, `story` (tier gates).
-- Shift-right testing: `affected`, targeted `run` and `verify`, and `landing` as the one full
-  verification with a count of fix-forwards.
-- `adopt`: bring an existing project under machinery one area at a time, without touching its
-  code; `scope` bounds the static stages.
-- `init`, `checks`, external checkers through a neutral projection and evidence file.
-- A reference project, `examples/crm`, on a real Postgres.
-- Roles for a many-agent run: one prompt each for the planner, the modeler, the builder, the
-  verifier, the checker and an experimental delegate, and `docs/roles.md` (who may write what,
-  what the tool verifies about each, and the judgment rules with the failure each prevents).
-  Default routing by role: design roles on the strongest class of model, builders on a standard
-  class, a verifier at least at its builder's.
-- The checker's review is recorded (`machinery review backlog|design <id>|intake <id>`) and gates
-  dispatch: `waves --freeze` and `intake plan --apply` wait for an approved review from another
-  context than the planner (`review` in `machinery.yaml`; the ratchet reports one switched off).
-- Stage `scope` (`machinery check --base <ref> --story <id>`, and the commit hook on a branch
-  named after a story): a story changes only files of its scope, and design sources only as the
-  design story that `intake plan` now creates first.
-- An answer on the owner's behalf comes from a `*-delegate` agent that did not ask the question.
-- `decisions import`: the records of an existing decision file become backlog decisions, once
-  each.
-- `adopt --rehearse`: adoption on a snapshot outside the project, with what it writes and owes,
-  the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
-  generation.
-- `import.machines.annotate`: for a dialect that has no key for them, the config says which
-  events arrive from outside, which report a failure, which states record one (names and `*`
-  patterns) and which event is a model action under another name. A pattern that matches nothing
-  is an error, and a pattern of `*` only is refused. The native annotation `_aliases` carries
-  the last one, and rules `event-action` and `action-event` read an aliased event as its action.
-  An alias hides nothing: an event that is an action takes none, an action with an event of its
-  own name is the action of none, and stage `xref-model-machine` prints and counts every alias.
-- Rule `event-action` reports an event listed in `_external_events` or `_failure_events` that is
-  an action of the model: an action is a caller's command. For an operational machine every
-  action of the entities behind what it serves counts, for a listed and for an aliased event.
-- The name hint about a failure-looking name is dismissed by name, with a reason, in the root
-  `_not_failures` (`not_failures` in `import.machines.annotate`). Listing an event as external
-  or giving it an alias does not stop it, and a dismissal that dismisses no hint is an error.
-- Claims beside owed: `adopt` owes an id a test already claims as `claimed at adoption` and an
-  id the project marked planned (`import.planned`) as `planned at adoption` with its story;
-  `status`, `assess` and the rehearsal count ids by claim; `plan` gives the claimed ones one
-  `Wire evidence` story per test file (per directory past `plan.wire_max_files`).
-- `trace.markers.scenarios_exact`: a marker that claims only when its text is a scenario name.
-  Serves tags that name ids which are not actions are one counted warn of stage `trace` for the
-  whole run; `machinery trace --non-action-serves` lists them.
-- Failure modes: a subject `machine:<id>` for a machine as a whole; `columns.required` in
-  `import.failure_modes` for a catalog that has the column; and stage `xref-failure` counts on
-  its own the failure modes that name a subject and no required value (still unlinked).
-- A links entry that names a subject and no required value is no error: `gen` and `adopt` go on
-  and the row is owed; a required value that is given and invalid stays an error. Stages
-  `failure-modes` and `xref-failure` print one account of linked, unlinked, subject-only and
-  subject-less failure modes, and a subject that names nothing is a `subject-resolves` finding
-  whatever its required value.
-- `import.planned` reads scenario descriptions (`in: scenario-description`).
-- `_refusal_events` (`refusal_events` in `import.machines.annotate`) declares the event by which
-  a machine writes that it refused a caller's command, with the action and a reason; rule
-  `event-action` accepts it unless the event moves the machine into a failure state it was not in
-  already (a transition that stays in its failure state is accepted; one from a state that is
-  not tagged failure, or from one failure state into another, is not), the stage prints it with
-  its reason and counts it, and it is neither hinted nor asked for a failure mode.
-- An aliased event may be listed in `_failure_events` when the action it stands for is itself
-  the failing outcome.
-- A rehearsal names the project's HEAD in every reason and waivable line it writes, never the
-  commit of its snapshot.
-- An owed file that does not parse is never read as empty: every command refuses with the
-  parse error, and machinery writes the file through a YAML encoder.
-- Stage `xref-failure` prints how many failure modes are linked and how many are not, and is
-  not demonstrated while one names no subject: one linked row among many no longer passes. A
-  failure mode says it has none with `no_subject: "<reason>"`, in the failure-mode file or the
-  links file.
-- Failure-mode subject `system:<name>` for the system as a whole or a named part of it, with the
-  names declared under `systems` in `machinery.yaml`; no waiver covers an unknown name.
-- Links entries that cover many rows: `ids` takes ids and inclusive ranges
-  (`FM-01..FM-23`); two entries that name the same row are a finding that names both.
-- Evidence cannot be typed by hand: a receipts file counts only when `machinery run` entered it
-  in the run ledger of the git directory and nothing changed it since, and a `pass` receipt
-  proves only when its `test` names a test file that claims the id (`receipt.Test` in
-  `pkg/receipt` builds it); a `fail` in a run that is used always fails. A refused receipts
-  file (typed, changed, or deleted after its run) or an incomplete run fails the story gate,
-  replaces the counts of `proof` and stops `owed sync`. A receipt needs a `test`. This guards
-  against mistakes and casual edits, not against a party who can run commands as the tool
-  (`docs/formats.md` section 10.2).
+  ignore, refusal and guard-clause cases), failure modes (`fm`), formal models (`fv`, `cx`),
+  external checkers (`ck`) and vital properties (`pf`). `machinery gen` writes them with the
+  runtime tables, and stage `gen-drift` keeps them current.
+- Stage `xstate`: the generated tables are compared with what the real XState 5.33.4 executes.
+- Machines bind to the model: a lifecycle machine per entity (one per `_aspect` when its state
+  lives in several attributes), or an operational machine that lists `_serves`. Also
+  `_entries`, `_terminal`, `_requires`, `_delays`, `_guards` with clause cases, and
+  fail-closed tags.
+- Failures are first class: states tagged `failure` and `_failure_events` ask for a failure
+  mode, as every invoke, dependency and tiered action does. A failure-looking name that is not
+  marked is hinted, and `_not_failures` dismisses a hint with a reason.
+- `_aliases` (an event that is a model action under another name) and `_refusal_events` (an
+  event by which a machine writes that it refused an action, with a reason). Stage
+  `xref-model-machine` prints and counts both. An alias hides nothing, an action is never
+  external, and an event that moves the machine into a failure state it was not in is no
+  refusal.
+- Failure-mode subjects `machine:<id>` (a machine as a whole) and `system:<name>` (declared
+  under `systems`), and `no_subject: "<reason>"` for a failure mode about nothing modeled.
+- Statuses in `design/status.yaml`: a proposed id is a candidate and yields no obligation; a
+  retired id is no longer promised.
+- Risk tiers in `design/risk.yaml`: routine, consequential, critical and vital. A vital area
+  states exact properties over its ids (proof obligations, awaiting proof), a core held to a
+  shape a later proof can use (stage `arch`), and assumptions with their evidence.
+  `machinery vital candidates` lists the ids that look vital.
+- Formal models by question: TLA+ skeletons generated from machines, Alloy skeletons from the
+  model; reach predicates, numbered assumptions, mutations, a baseline, a sync marker with
+  drift classification, and counterexample traces replayed as `cx` obligations.
+
+### Evidence
+
+- `machinery run` records receipts bound to a commit, `verify` joins them to the obligations,
+  `owed.yaml` is the single ratchet, and `proof` and `status` report.
+- A receipts file counts only when `machinery run` entered it in the run ledger of the git
+  directory and nothing changed it since, and a `pass` proves only when its `test` names a
+  test file that claims the id (`receipt.Test` in `pkg/receipt` builds it). A refused receipts
+  file (typed, changed or deleted after its run) or an incomplete run fails `verify` and the
+  story gate, replaces the counts of `proof` and stops `owed sync`. This guards against
+  mistakes and casual edits, not against a party who can run commands as the tool.
 - Run adapter `go-test-json`: `machinery run --adapter go-test-json -- go test ...` reads the
-  event stream of an existing Go suite and writes the receipts itself, joining each verdict to
-  the ids the test files already claim (the function under a marker, or every test function of
-  the file). Cached packages are refused, `tc` and `cx` ids are never proven this way, and
-  `status`, `verify` and `proof` count adapter evidence apart, by granularity. The policy
-  `evidence.adapter` (kinds, tiers, minimum granularity, a map for test packages built from
-  copies) decides what it proves; by default never an id of a critical or vital area.
-  A verdict goes to the file under `trace.tests` in its package's directory that defines the
-  function, and to none when another Go file of that directory defines a function of the same
-  name that begins with `Test` and takes one parameter, whatever the build constraints or the
-  way the parameter is written: a twin behind another tag never lends its pass. The direct form
-  accepts only a narrow `go test` (relative patterns, a list of test flags, the project's own
-  module, `GOOS` and `GOARCH` of the host), and refuses a module path that two `go.mod` files
-  declare and a workspace that leaves out the module of a claiming file, which stage `trace`
-  reports as well; everything else runs through `--streams`. The header of a direct run
-  records its go environment (version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH`, the
-  digests of `go.mod` and `go.work`), and `verify` and `proof` print it. Adapter evidence is
-  as trustworthy as the project's test code and the command: the rules catch mistakes, not
-  planted code or a controlled environment. With
-  `--streams` (a wrapper that starts `go test` itself and leaves the streams in
-  `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
-  mode only. A pass replayed from the cache counts nothing. A package that failed (a timeout,
-  `os.Exit`, a panic, a build failure) writes a fail for every claimed function without a
-  verdict and no pass; a stream without a package end leaves the run incomplete, and the error
-  names the receipts file. A stream file that holds several runs of one package is judged run by
-  run, so a fail, a crash or a missing verdict in any of them is a fail; a run that starts again
-  before the one before it ended (a killed run and its retry, two runs writing at once) leaves
-  the run incomplete. A marker directly above a
-  fuzz test, a benchmark or any other function that is no test counts nothing and is named in the
-  summary. A parent
-  with a skipped subtest is a skip, and direct mode refuses a `-run` or `-skip` that selects
-  subtests. Stage `trace` reports the module layout rules only for a project that configures
-  `evidence.adapter`, and they read only tracked `go.mod` and `go.work` files outside
-  `testdata` and `vendor`, with `GOWORK=off` honoured: a project without that block sees
-  no change. A
-  receipt a test appends with the adapter's fields is refused. The ratchet compares the policy
-  by what it admits (`adapter-widened`), an error for a critical or vital tier.
+  event stream of an existing Go suite and writes the receipts itself, for the ids the test
+  files already claim, by function or by file. Direct mode accepts a narrow `go test` in the
+  project's own module and records the go environment in the header; `--streams` reads the
+  streams a wrapper leaves in `MACHINERY_GO_TEST_JSON`, mapped by `evidence.adapter.sources`.
+- A verdict goes to the claiming file in its package's directory, never through a test of the
+  same name in another file. No fail is lost: a failed package fails its claims, and a stream
+  cut short or holding two interleaved runs leaves the run incomplete. A cached pass counts
+  nothing, and `tc` and `cx` ids are never proven this way. The rules aim at mistakes, not at
+  planted code or a controlled environment.
+- Policy `evidence.adapter` (kinds, tiers, minimum granularity): by default adapter evidence
+  never proves an id of a critical or vital area. `status`, `verify` and `proof` count it
+  apart, and the ratchet reports a policy that admits more (`adapter widened`, an ERROR for a
+  critical or vital tier).
+- Stage `tests`: end-to-end only, no test doubles, with a baseline that only shrinks.
+- `probe`: mutation probing of the generated tables as the measure of test quality.
+- Shift-right testing: `affected`, targeted `run` and `verify`, and `landing` as the one full
+  verification, with a count of fix-forwards and a red integration branch until it is repaired.
+- An owed file that does not parse, or has a problem of its own, is never read as empty: every
+  command refuses with the error, and machinery writes the file through a YAML encoder.
+
+### Brownfield
+
+- `machinery assess`: a read-only report on a snapshot of `HEAD`; nothing is written in the
+  project or its `.git`.
+- `machinery adopt`: one area at a time, without touching code; `scope` bounds the static
+  stages and only widens. Existing unit tests are baselined, and existing failures without a
+  failure mode and unbound machines are waived; a waiver goes stale when its cause is fixed.
+- `machinery adopt --rehearse`: adoption on a snapshot, with what it writes and owes, the check,
+  the plan and what blocks it. Every reason and waivable line names the project's HEAD.
+- `import`: machines in a dialect of the project's own (`states`, `rename`, `terminal`,
+  `register`, `bind`), and `import.machines.annotate` for what the dialect has no key for:
+  `external_events`, `failure_events`, `failure_states`, `aliases`, `refusal_events` and
+  `not_failures`, by name or `*` pattern. A pattern that matches nothing is an error, and a
+  pattern of `*` only is refused.
+- Failure catalogs kept as Markdown tables, with a links file: `ids` takes ranges
+  (`FM-01..FM-23`), two entries that name one row are a finding, and `columns.required` reads
+  the required value from the catalog. A row is linked when its subject resolves and it has a
+  required value. A row with a subject and no required value is counted apart and owed, and
+  stage `xref-failure` is not demonstrated while a row is unlinked.
+- `trace.markers`: the project's own markers, with `scenarios_exact` for a marker that also
+  carries other text. Serves tags that name ids which are not actions are one counted warn;
+  `machinery trace --non-action-serves` lists them.
+- Claims beside owed: `adopt` owes an id a test already claims as `claimed at adoption` and an
+  id the project marked planned (`import.planned`) as `planned at adoption`, with its story.
+  `status`, `assess` and the rehearsal count ids by claim, and `plan` gives the claimed ones
+  one `Wire evidence` story per test file (per directory past `plan.wire_max_files`).
+- `machinery decisions import`: the records of an existing decision file become backlog
+  decisions, once each.
+
+### Method
+
+- Stage outcomes: passed, failed, not applicable, not demonstrated (which blocks like failed).
+  Exit codes 0, 1, 2. `machinery checks` names what each stage protects.
+- Backlog bridge on `bd`: `plan` (stories and edges from what is owed), `waves`, the contract
+  freeze (stage `contract`), `brief` by file pointer with model routing, and tier gates
+  (`predict`, `accept`, `story`): from consequential up, a fresh verifier predicts before
+  reading the proof.
+- Intake (`machinery intake new`, `intake status`, `intake plan`): a requirement changes the
+  design first; `intake plan --apply` then writes every story at once, the design story first
+  and a capstone last.
+- Stage `scope` (`machinery check --base <ref> --story <id>`): a story changes only files of its
+  scope, and design sources only as the design story of an intake.
+- Roles for a many-agent run: planner, modeler, builder, verifier, checker and an experimental
+  delegate, described in `docs/roles.md`. Design roles run on the strongest class of model,
+  builders on a standard class, a verifier at least at its builder's.
+- The checker's reviews are recorded (`machinery review backlog|design <id>|intake <id>`) and
+  gate dispatch; the ratchet reports a review switched off.
+- Decisions (`decide`, `decisions`), observations and learnings of stories, and questions for
+  the owner (`ask`, `questions`, `answer`), answered on the owner's behalf only by a
+  `*-delegate` agent under a clause of the owner's policy (experimental).
+- `init`, `config`, and external checkers through a neutral projection and an evidence file.
+- A reference project, `examples/crm`, on a real Postgres.
+
+### Harness
+
+- A Claude Code plugin: one skill, six agent prompts and three hooks, each running
+  `machinery hook <event>`: the status when a session starts, the check before `git commit` and
+  `git push`, and the check after a turn that changed files. `hooks` in `machinery.yaml` sets
+  each to block, warn or off.
+- The session-start hook exports `MACHINERY_SESSION`. Proofs, predictions and verdicts record
+  it with `MACHINERY_AGENT`, and the story gate refuses a verifier from the builder's session
+  and agent.
+- A Codex plugin manifest with the skill; it wires no hooks.
 
 ### Carried forward from v1
 
