@@ -9,12 +9,13 @@ import (
 )
 
 func init() {
-	Register(&Command{Name: "plan", Summary: "Print backlog stories for owed ids; --apply creates them.", Run: runPlan})
+	Register(&Command{Name: "plan", Summary: "Print backlog stories for owed ids; --summary prints counts; --apply creates stories.", Run: runPlan})
 }
 
 func runPlan(e *Env, args []string) int {
 	fs := e.Flags("plan")
 	asJSON := fs.Bool("json", false, "print a bd create --graph plan")
+	summary := fs.Bool("summary", false, "print only story counts")
 	apply := fs.Bool("apply", false, "create the stories and edges in the backlog")
 	parent := fs.String("parent", "", "parent of the created stories (with --apply)")
 	link := fs.String("link", "", "attach the ids given as arguments to this existing story")
@@ -23,7 +24,7 @@ func runPlan(e *Env, args []string) int {
 		return 2
 	}
 	switch {
-	case *link != "" && (*apply || *asJSON || *parent != ""):
+	case *link != "" && (*apply || *asJSON || *summary || *parent != ""):
 		return e.Usage("machinery plan --link takes no other flag")
 	case *link != "" && len(pos) == 0:
 		return e.Usage("machinery plan --link <story> needs at least one id")
@@ -33,6 +34,10 @@ func runPlan(e *Env, args []string) int {
 		return e.Usage("--parent needs --apply")
 	case *apply && *asJSON:
 		return e.Usage("--apply and --json do not go together")
+	case *summary && *apply:
+		return e.Usage("--summary and --apply do not go together")
+	case *summary && *asJSON:
+		return e.Usage("--summary and --json do not go together")
 	}
 	p, ok := e.Project()
 	if !ok {
@@ -60,9 +65,7 @@ func runPlan(e *Env, args []string) int {
 			return e.Fail(err)
 		}
 		fmt.Fprintf(e.Stdout, "plan: %d created, %d existing, %d edge(s)\n", res.Created, res.Existing, res.Edges)
-		if line := plan.WireLine("wire-evidence story", "wire-evidence stories"); line != "" {
-			fmt.Fprintf(e.Stdout, "plan: %s\n", line)
-		}
+		plan.Summary(e.Stdout)
 		for _, x := range res.External {
 			fmt.Fprintf(e.Stdout, "plan: %s: external story %s, not in the backlog; nothing created\n", x.ID, x.Story)
 		}
@@ -75,7 +78,11 @@ func runPlan(e *Env, args []string) int {
 		e.Stdout.Write(pm.JSON(plan.Graph(nil, "")))
 		return 0
 	}
-	plan.Markdown(e.Stdout)
+	if !*summary {
+		plan.Markdown(e.Stdout)
+		fmt.Fprintln(e.Stdout)
+	}
+	plan.Summary(e.Stdout)
 	return 0
 }
 

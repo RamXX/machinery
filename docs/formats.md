@@ -443,7 +443,7 @@ waivers:
 | `machinery formal baseline` | Records the baseline of properties, fairness and bounds (section 16.6). |
 | `machinery formal sync [<spec>]` | Shows or classifies source drift (section 16.7). |
 | `machinery formal tools` | Fetches the pinned formal tools by checksum (section 16.8). |
-| `machinery plan` | Prints backlog stories for owed ids; `--apply` creates them in the backlog (section 15.2). |
+| `machinery plan` | Prints backlog stories for owed ids. `--summary` prints the counts alone and `--apply` creates the stories in the backlog (section 15.2). |
 | `machinery waves` | Prints the parallel waves of the backlog graph (section 15.3). `--freeze`, `--thaw` (section 15.4). |
 | `machinery brief <story>` | Prints a brief by file pointer (section 15.5). |
 | `machinery predict <story>` | Records a verifier's prediction (section 15.6). |
@@ -1946,7 +1946,7 @@ The command runs in the project root. The variables machinery sets for a run
 The file is JSON Lines. Three line types:
 
 ```json
-{"v":1,"type":"run","commit":"<40 hex>","dirty":false,"command":["go","test","./e2e/..."],"stack":"postgres 17 in docker","started":"2026-01-02T03:04:05Z","tool":{"version":"dev","commit":"<machinery build revision>"}}
+{"v":1,"type":"run","commit":"<40 hex>","tool":{"version":"dev","commit":"<machinery build revision>"},"dirty":false,"command":["go","test","./e2e/..."],"stack":"postgres 17 in docker","started":"2026-01-02T03:04:05Z"}
 {"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"order_test.go::TestOrder/ORDE-2e883d","effects":["stampAttempt"],"observed":"Pending -> paying; attempt row written"}
 {"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z"}
 ```
@@ -3377,10 +3377,14 @@ is also blocked by the stories its intake already has (section 15.7).
 `machinery plan --apply [--parent <id>]` creates the stories and edges in the backlog, skips a
 group whose ids all carry a `story` that exists in the backlog, writes the new story ids into the
 `story` field of the owed entries, and prints `plan: <n> created, <n> existing, <n> edge(s)`.
-When the plan has a wire-evidence story a second line follows, counting those of the plan,
-created or not:
-`plan: <n> wire-evidence stories for <n> claimed id(s), one per test <file|directory>`
-(`1 wire-evidence story`).
+The Markdown plan ends with the same count lines that `--apply` prints after its
+created/existing/edges line. The first is `stories by kind: <kind>: <n>, ...`, sorted by kind
+and listing only the kinds with stories, by obligation prefix or `wire` for wire-evidence
+stories. When the plan has wire-evidence stories, the next line is
+`wire evidence: <n> stories for <m> claimed id(s)`. The counts cover every story in the plan,
+including groups that `--apply` finds in the backlog.
+`machinery plan --summary` prints only these count lines and does not read or write the backlog.
+`--summary` cannot be combined with `--apply`, `--json` or `--link`.
 
 **A story the project supplied.** An entry planned at adoption carries the story of the
 project's own mark, and plan never replaces it. Such an id is in no group: the plan has no
@@ -3397,7 +3401,7 @@ all carry a story that `--apply` may find in the backlog and skip.
 `machinery:ids` note to the story, sets the `story` field of those owed entries and prints
 `plan: <n> id(s) linked to <story>`.
 
-Output is sorted and deterministic. With nothing owed it prints nothing and exits 0.
+Output is sorted and deterministic. With no stories, print modes produce no output and exit 0.
 
 ### 15.3 `machinery waves`
 
@@ -4887,7 +4891,7 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [
   `--write` is a usage error (`usage: --rehearse writes only in its out directory; it takes no --write`).
 - In the snapshot it runs `machinery adopt --write` with the `--paths` and `--e2e` given,
   commits the result (hooks and signing off), runs the stages of `machinery check`, and builds
-  what `machinery plan` would print, which it writes to `<out>/plan.md` and never applies.
+  the story text of `machinery plan`, which it writes to `<out>/plan.md` and never applies.
 - It never runs the backlog tool: adopt reports the backlog as `backlog: bd, not read in a
   rehearsal` when a `.beads` directory exists, and stage `intake` is
   `not applicable: a rehearsal never reads the backlog`.

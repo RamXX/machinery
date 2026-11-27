@@ -35,6 +35,12 @@ stdout '^## Prove sc:cancelled-order-refuses-payment$'
 # a planned id, though a test claims it, is not wired, and gets no story at all: it has the project's
 ! stdout 'sc:customer-pays-and-the-order-ships'
 ! stdout '^## Prove order'
+cp stdout print.md
+exec tail -n 2 print.md
+cmp stdout counts.want
+exec machinery plan --summary
+cmp stdout counts.want
+! exists .beads
 exec sh -c 'machinery plan | grep -A1 "^## Wire evidence e2e/orders.sh" >/dev/null && machinery plan > first.md && machinery plan | cmp - first.md'
 
 # a wire-evidence story with an id in a critical area waits for the model, like a Prove story
@@ -60,6 +66,9 @@ stdout '^## Wire evidence e2e/more/$'
 stdout '^The tests under e2e/more/ emit a receipt for each id they already claim\.$'
 stdout '^- tc:ORDE-2e883d: claimed by e2e/more/pay.sh; '
 stdout '^machinery:ids inv:paid-before-shipped tc:ORDE-2e883d tc:ORDE-e6d28f$'
+exec machinery plan --summary
+stdout '^stories by kind: fm: 1, fv: 1, inv: 1, sc: 1, wire: 2$'
+stdout '^wire evidence: 2 stories for 4 claimed id\(s\)$'
 # at the limit they stay one per file
 exec sh -c 'sed "s/wire_max_files: 2/wire_max_files: 3/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
 exec machinery plan
@@ -73,8 +82,10 @@ gitinit
 exec bd init --stealth --non-interactive -p shop
 exec machinery plan --apply
 stdout '^plan: 7 created, 0 existing, 1 edge\(s\)$'
-stdout '^plan: 3 wire-evidence stories for 4 claimed id\(s\), one per test file$'
 stdout '^plan: sc:customer-pays-and-the-order-ships: external story shop-9, not in the backlog; nothing created$'
+cp stdout apply.out
+exec grep -E '^(stories by kind|wire evidence):' apply.out
+cmp stdout counts.want
 grep '  - id: sc:customer-pays-and-the-order-ships\n    reason: "planned at adoption \(abc1234\)"\n    story: shop-9\n' design/owed.yaml
 exec bd list --all --json --limit 0
 stdout '"title": "Wire evidence e2e/more/ship.sh"'
@@ -84,6 +95,9 @@ stdout '^9$'
 exec machinery plan --apply
 stdout '^plan: 0 created, 7 existing, 0 edge\(s\)$'
 stdout '^plan: sc:customer-pays-and-the-order-ships: external story shop-9, not in the backlog; nothing created$'
+cp stdout apply.out
+exec grep -E '^(stories by kind|wire evidence):' apply.out
+cmp stdout counts.want
 
 # plan --link does not replace it either
 exec bd create --id shop-l1 --title 'Another story' --silent
@@ -124,6 +138,9 @@ owed:
     reason: "claimed at adoption (abc1234)"
   - id: tc:ORDE-e6d28f
     reason: "claimed at adoption (abc1234)"
+-- counts.want --
+stories by kind: fm: 1, fv: 1, inv: 1, sc: 1, wire: 3
+wire evidence: 3 stories for 4 claimed id(s)
 -- risk-cfg.yaml --
   risk: design/risk.yaml
 -- risk.yaml --

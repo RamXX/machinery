@@ -441,14 +441,7 @@ func (r *rehearsal) plan(out string, d *design.Design) error {
 	counts := map[[2]string]int{}
 	r.plannedIDs, r.mayExist = len(plan.Supplied), plan.MayExist(d)
 	for _, s := range plan.Stories {
-		kind := ""
-		if len(s.IDs) > 0 {
-			kind, _, _ = strings.Cut(s.IDs[0], ":")
-		}
-		if s.Wire() {
-			kind = wireKind
-		}
-		counts[[2]string{kind, s.Tier}]++
+		counts[[2]string{s.Kind(), s.Tier}]++
 	}
 	r.planWire = plan.WireLine("story", "stories")
 	r.wireStories, r.wireIDs = plan.WireCounts()

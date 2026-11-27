@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -37,6 +39,18 @@ type Story struct {
 
 // Wire reports a wire-evidence story (section 15.2).
 func (s *Story) Wire() bool { return s.wire != "" }
+
+// Kind reports the obligation kind of the story, or wire for a wire-evidence story.
+func (s *Story) Kind() string {
+	if s.Wire() {
+		return "wire"
+	}
+	if len(s.IDs) == 0 {
+		return ""
+	}
+	kind, _, _ := strings.Cut(s.IDs[0], ":")
+	return kind
+}
 
 type need struct {
 	key, title, output string
@@ -92,6 +106,25 @@ func (plan *Plan) WireLine(noun, plural string) string {
 		noun = plural
 	}
 	return fmt.Sprintf("%d %s for %d claimed id(s), one per test %s", stories, noun, ids, plan.WireBy)
+}
+
+// Summary writes the count lines shared by the print and apply modes.
+func (plan *Plan) Summary(w io.Writer) {
+	if len(plan.Stories) == 0 {
+		return
+	}
+	byKind := map[string]int{}
+	for _, s := range plan.Stories {
+		byKind[s.Kind()]++
+	}
+	var counts []string
+	for _, kind := range slices.Sorted(maps.Keys(byKind)) {
+		counts = append(counts, fmt.Sprintf("%s: %d", kind, byKind[kind]))
+	}
+	fmt.Fprintf(w, "stories by kind: %s\n", strings.Join(counts, ", "))
+	if stories, ids := plan.WireCounts(); stories > 0 {
+		fmt.Fprintf(w, "wire evidence: %d stories for %d claimed id(s)\n", stories, ids)
+	}
 }
 
 // Edge outputs (section 15.2).

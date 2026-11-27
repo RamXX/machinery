@@ -18,7 +18,16 @@ cp race.trace.json design/formal/traces/order-payment.race.trace.json
 exec machinery plan
 cmp stdout want.md
 
+# Summary mode prints only the counts, and keeps the empty plan quiet.
+exec machinery plan --summary
+cmp stdout want-summary.txt
+cp owed-none.yaml design/owed.yaml
+exec machinery plan --summary
+! stdout .
+cp owed-all.yaml design/owed.yaml
+
 # deterministic: the same bytes again
+exec machinery plan
 cp stdout first.md
 exec machinery plan
 cmp stdout first.md
@@ -60,9 +69,17 @@ exec mrun 2 plan --parent shop-1
 stderr '^usage: --parent needs --apply$'
 exec mrun 2 plan --apply --json
 stderr '^usage: --apply and --json do not go together$'
+exec mrun 2 plan --summary --apply
+stderr '^usage: --summary and --apply do not go together$'
+exec mrun 2 plan --summary --json
+stderr '^usage: --summary and --json do not go together$'
+exec mrun 2 plan --summary --link shop-1 inv:terminal-is-final
+stderr '^usage: machinery plan --link takes no other flag$'
 exec mrun 2 plan --link shop-1
 stderr '^usage: machinery plan --link <story> needs at least one id$'
 
+-- want-summary.txt --
+stories by kind: act: 1, cx: 1, fm: 2, fv: 2, inv: 1, sc: 1, tc: 4
 -- owed-none.yaml --
 version: 1
 owed: []
@@ -557,3 +574,5 @@ Needs:
 ### Acceptance Criteria
 - Each listed action is served by code (stage trace) and removed from owed.yaml.
 - machinery story passes for this story.
+
+stories by kind: act: 1, cx: 1, fm: 2, fv: 2, inv: 1, sc: 1, tc: 4

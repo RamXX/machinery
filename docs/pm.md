@@ -84,7 +84,8 @@ Obligations owed without a requirement behind them (a new project's skeleton, an
 
 ```
 machinery owed list            # what is unproven
-machinery plan                 # the stories it would create
+machinery plan                 # stories and counts by kind
+machinery plan --summary       # counts only
 machinery plan --apply         # create them in the backlog, with edges
 machinery plan --link <story> <id>...   # attach ids to a story that already exists
 ```
