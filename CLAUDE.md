@@ -31,6 +31,7 @@ behavior the contract does not describe is not built: change the contract first.
 | `make check` | Formatting, `go vet`, build. Run it before every commit. |
 | `make e2e-one S=<name>` | One script. Run the scripts your change affects. |
 | `make e2e` | The whole suite. Run it once, at the end, not per change. |
+| `make formal` | The `formal_` scripts, TLC and Alloy for real (CI's formal workflow). |
 | `make verify` | Full verification, including the reference project (needs Docker). |
 
 ## Testing

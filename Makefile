@@ -8,7 +8,7 @@ VERSION_PKG := github.com/RamXX/machinery/v2/internal/version
 TOOLS := $(CURDIR)/.bin
 export MACHINERY_TOOLS := $(TOOLS)
 
-.PHONY: help tools build check e2e e2e-one crm verify
+.PHONY: help tools build check e2e e2e-one formal crm verify
 
 help: ## List the targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "} {printf "  %-10s %s\n", $$1, $$2}'
@@ -32,6 +32,9 @@ e2e: build ## The whole end-to-end suite against the real binary
 
 e2e-one: build ## One script: make e2e-one S=<script name without .txtar>
 	GOMAXPROCS=$(JOBS) go test ./e2e/... -count=1 -run 'TestScripts/$(S)$$' -timeout 10m
+
+formal: build ## The formal_ scripts: TLC and Alloy run for real (needs make tools and Java)
+	GOMAXPROCS=$(JOBS) go test ./e2e/... -count=1 -run 'TestScripts/^formal_' -p $(JOBS) -parallel $(JOBS) -timeout 20m
 
 crm: build ## The reference project on a real Postgres: check, then its landing with the probe (needs Docker)
 	$(MAKE) -C examples/crm up

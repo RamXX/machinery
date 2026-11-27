@@ -1,0 +1,44 @@
+# nightly.yml: the full verification (make verify: check, the end-to-end suite
+# and the reference project) daily and by hand, so drift in the toolchain, the
+# pinned tools or the runner image shows the day it lands.
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 5 * * *"   # 05:00 UTC daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: make verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install bd (the backlog tool the bridge scripts drive)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libicu-dev
+          go install github.com/steveyegge/beads/cmd/bd@v1.3.4
+          bd --version
+      - name: Install the pinned tools
+        run: make tools
+      - name: Allow the browser sandbox (Ubuntu 24.04 runners restrict unprivileged user namespaces)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Full verification (the reference project runs a real Postgres in Docker)
+        run: make verify
