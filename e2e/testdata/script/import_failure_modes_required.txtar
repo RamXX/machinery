@@ -1,10 +1,11 @@
 # a catalog that has a column for the required value names it in columns.required: the cell is the
 # row's required value, validated, and a links entry may then leave required out
 # (docs/formats.md sections 2 and 5.4.1)
+# an entry that leaves required out for a row whose cell is empty names a subject and no required
+# value: no finding, and the row is unlinked and counted by both stages
 exec mrun 1 lint --stage failure-modes --stage xref-failure
-stdout '^checked: 5 failure modes, 1 abuse cases, 5 imported, 0 unlinked$'
-stdout '^  ERROR  design/links.yaml: RISK-3: required is not set and the required cell of RISK-3 is empty; set required in the entry or fill the cell$'
-stdout -count=1 'ERROR'
+! stdout 'ERROR'
+stdout '^checked: 5 failure modes, 1 abuse cases, 5 imported, 4 linked, 1 unlinked, 1 name a subject and no required value$'
 stdout '^checked: 5 failure modes, 4 linked, 1 unlinked, 1 name a subject and no required value, 0 invokes, '
 
 # the cell filled: every row is linked, by the cell (in any case), by the entry, or by both when they agree;
@@ -23,6 +24,7 @@ stdout '^  ERROR  docs/risks.md:5: RISK-1: the required cell "sometimes" must be
 # one cause, one finding: the cell is not empty, and nothing says it is
 ! stdout 'is empty'
 stdout -count=1 'ERROR'
+stdout '^checked: 5 failure modes, 1 abuse cases, 5 imported, 4 linked, 1 unlinked, 1 name a subject and no required value$'
 stdout '^checked: 5 failure modes, 4 linked, 1 unlinked, 1 name a subject and no required value, 0 invokes, '
 exec sh -c 'sed "s/| sometimes |/| retry-bounded |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
 
@@ -39,11 +41,15 @@ exec mrun 1 lint --stage failure-modes
 stdout '^  ERROR  design/links.yaml: RISK-4: required: refuse \(the required cell of RISK-4\) is only valid with kind: abuse$'
 stdout -count=1 'ERROR'
 
-# an entry for several rows says which of them have no value
+# an entry for several rows gives each the value of its own cell; the rows without one (an empty
+# cell, a table without the column) name a subject and no required value, and that is no finding
 cp links-range.yaml design/links.yaml
 exec sh -c 'sed "s/| RISK-3 | The shelf list is out of date. | fail-closed |/| RISK-3 | The shelf list is out of date. |  |/" docs/risks.md > r.tmp && mv r.tmp docs/risks.md'
-exec mrun 1 lint --stage failure-modes
-stdout '^  ERROR  design/links.yaml: RISK-1\.\.RISK-3, RISK-5: required is not set and the required cells of RISK-3, RISK-5 are empty; set required in the entry or fill the cells$'
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+! stdout 'ERROR'
+stdout '^checked: 5 failure modes, 1 abuse cases, 5 imported, 3 linked, 2 unlinked, 2 name a subject and no required value$'
+stdout '^checked: 5 failure modes, 3 linked, 2 unlinked, 2 name a subject and no required value, 0 invokes, '
+stdout '^passed$'
 
 # the column list is config
 exec sh -c 'sed "s/required: \[\"Required\", \"Class\"\]/required: [\" \"]/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'

@@ -1,0 +1,47 @@
+# a links entry that names a subject and no required value stops neither generation nor adoption:
+# the row is owed like any other, unlinked for stage xref-failure and counted; and every commit a
+# rehearsal writes is the project's HEAD (docs/formats.md sections 5.4.1, 17.2 and 17.3)
+fixture library proj
+cp links.yaml proj/design/risk-links.yaml
+cd proj
+gitinit
+
+# rehearsed: adoption runs, owes the row and waives the failure state it does not cover yet
+exec machinery adopt --rehearse --out ../reh
+stdout '^adopt: wrote [0-9]+ file\(s\), 1 waiver\(s\), [0-9]+ owed$'
+! stdout 'blocked'
+! stdout 'fix in the project first'
+grep -count=2 '^checked: .*, 1 name a subject and no required value' ../reh/stages/check.txt
+grep '^  - id: fm:risk-3$' ../reh/snapshot/design/owed.yaml
+grep '^  - \{rule: failure-state-mode, id: "state:loan\.Lost", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}$' ../reh/snapshot/machinery.yaml
+
+# what the rehearsal writes names the commit of the project's HEAD, never one of the snapshot's own
+exec sh -c 'h=$(git rev-parse HEAD | cut -c1-7); grep -c "unmodeled at adoption ($h)" ../reh/snapshot/machinery.yaml; grep -c "at adoption ($h)" ../reh/snapshot/design/owed.yaml; grep -c "at adoption" ../reh/snapshot/design/owed.yaml'
+stdout '^1\n18\n18$'
+exec sh -c 'for s in $(git -C ../reh/snapshot log --format=%H | cut -c1-7); do grep -rl --exclude-dir=.git "$s" ../reh; done; echo searched'
+stdout '^searched$'
+! stdout 'reh/'
+
+# adopted: the same, in the project
+exec machinery adopt --write
+! stdout 'blocked'
+grep '^  - id: fm:risk-3$' design/owed.yaml
+grep 'reason: "unmodeled at adoption \([0-9a-f]{7}\)"' machinery.yaml
+exists design/gen/obligations.json
+grep '"id": "fm:risk-3"' design/gen/obligations.json
+gitcommit 'adopted'
+exec machinery lint --stage failure-modes
+stdout '^checked: 4 failure modes, 1 abuse cases, 4 imported, 2 linked, 1 unlinked, 1 name a subject and no required value, 1 subject-less$'
+stdout '^passed$'
+exec mrun 1 lint --stage xref-failure
+stdout '^checked: 4 failure modes, 2 linked, 1 unlinked, 1 name a subject and no required value, 1 subject-less, '
+stdout '^  warn   waived: failure-state-mode: state:loan\.Lost: '
+stdout '^not demonstrated: 1 of 4 failure modes name no subject; link each in design/risk-links\.yaml or declare it there with no_subject and a reason; 1 of them name a subject and no required value: add required to each$'
+
+-- links.yaml --
+version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "invoke:hold_queue.sendNotice", required: retry-bounded}
+  - {id: RISK-3, subject: "state:loan.Lost"}
+  - {id: RISK-4, no_subject: "the shelf list is kept on paper, outside the system"}

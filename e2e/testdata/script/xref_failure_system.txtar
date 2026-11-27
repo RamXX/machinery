@@ -67,7 +67,7 @@ cd lib
 exec sh -c 'cat ../lib-systems.yaml >> machinery.yaml'
 cp ../lib-links.yaml design/risk-links.yaml
 exec machinery lint --stage failure-modes --stage xref-failure
-stdout '^checked: 4 failure modes, 1 abuse cases, 4 imported, 0 unlinked$'
+stdout '^checked: 4 failure modes, 1 abuse cases, 4 imported, 4 linked, 0 unlinked$'
 stdout '^checked: 4 failure modes, 4 linked, 0 unlinked, '
 stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
 

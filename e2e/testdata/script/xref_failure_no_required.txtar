@@ -1,35 +1,54 @@
-# a failure mode that names a subject which resolves and has no valid required value is counted on
-# its own, in the stage and in assess; it stays unlinked for the verdict (docs/formats.md section 6.6)
+# a links entry that names a subject which resolves and no required value is no finding of stage
+# failure-modes and stops nothing: the row is unlinked for the verdict of stage xref-failure and
+# counted on its own, by both stages, in the stage and in assess (docs/formats.md sections 5.4.1,
+# 6.3 and 6.6)
 exec mrun 1 lint --stage failure-modes --stage xref-failure
-stdout '^  ERROR  design/links.yaml: RISK-1: required must be fail-closed, retry-bounded, surface or refuse, got ""$'
+! stdout 'ERROR'
+stdout '^checked: 3 failure modes, 0 abuse cases, 3 imported, 1 linked, 2 unlinked, 1 name a subject and no required value$'
+stdout '^passed$'
 stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events$'
 stdout '^not demonstrated: 2 of 3 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason; 1 of them name a subject and no required value: add required to each$'
-! stdout '^passed$'
+exec machinery gen
+stdout '^gen: wrote [0-9]+ file\(s\)$'
+grep '"id": "fm:risk-1"' design/gen/obligations.json
 
-# a required value that is none of the four is no value
+# a required value that is given and is none of the four stays an error, and stops generation; the
+# row is still counted as naming a subject and no required value
 cp links-bogus.yaml design/links.yaml
-exec mrun 1 lint --stage xref-failure
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^  ERROR  design/links.yaml: RISK-3: required must be fail-closed, retry-bounded, surface or refuse, got "sometimes"$'
+stdout -count=1 'ERROR'
+stdout '^checked: 3 failure modes, 0 abuse cases, 3 imported, 1 linked, 2 unlinked, 2 name a subject and no required value$'
 stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 2 name a subject and no required value, 0 invokes, '
 stdout '; 2 of them name a subject and no required value: add required to each$'
+exec mrun 1 gen
+stdout '^gen: refused: the design has errors; nothing was written$'
 
-# a subject that names nothing in the design is not counted, and a row no entry names is not
+# a subject that names nothing in the design is a finding of subject-resolves, with a required value
+# or without one, and is not counted as naming a subject; nor is a row no entry names
 cp links-nothing.yaml design/links.yaml
-exec mrun 1 lint --stage xref-failure
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^checked: 3 failure modes, 0 abuse cases, 3 imported, 1 linked, 2 unlinked$'
+stdout '^passed$'
+stdout '^  ERROR  subject-resolves: act:Loan\.burn: failure mode risk-1: Loan\.burn is not an action of the model$'
+stdout -count=1 'ERROR'
 stdout '^checked: 3 failure modes, 1 linked, 2 unlinked, 0 invokes, '
-stdout '^not demonstrated: 2 of 3 failure modes name no subject; link each in design/links.yaml or declare it there with no_subject and a reason$'
+stdout '^failed: 1 finding\(s\)$'
 ! stdout 'no required value'
 
 # with the value the row is linked, and the count is gone
 cp links-full.yaml design/links.yaml
-exec mrun 1 lint --stage xref-failure
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^checked: 3 failure modes, 0 abuse cases, 3 imported, 2 linked, 1 unlinked$'
 stdout '^checked: 3 failure modes, 2 linked, 1 unlinked, 0 invokes, '
 ! stdout 'no required value'
 
-# a native failure mode is counted the same way
+# a native failure mode is counted the same way; in the failure-mode file required stays required
 cp native.yaml design/failure-modes.yaml
 cp with-native.yaml machinery.yaml
 exec mrun 1 lint --stage failure-modes --stage xref-failure
 stdout '^  ERROR  design/failure-modes.yaml: reader-down: required must be fail-closed, retry-bounded, surface or refuse, got ""$'
+stdout '^checked: 4 failure modes, 0 abuse cases, 3 imported, 2 linked, 2 unlinked, 1 name a subject and no required value$'
 stdout '^checked: 4 failure modes, 2 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, '
 
 # assess carries the count: in the stage output and in the report
@@ -42,6 +61,8 @@ cd proj
 gitinit
 cd $WORK
 exec machinery -C proj assess --out out
+grep '^checked: 3 failure modes, 0 abuse cases, 3 imported, 1 linked, 2 unlinked, 1 name a subject and no required value$' out/stages/failure-modes.txt
+grep '^passed$' out/stages/failure-modes.txt
 grep '^checked: 3 failure modes, 1 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, ' out/stages/xref-failure.txt
 grep '^\| xref-failure \| not demonstrated: 2 of 3 failure modes name no subject; .*; 1 of them name a subject and no required value: add required to each \| 3 failure modes, 1 linked, 2 unlinked, 1 name a subject and no required value, 0 invokes, ' out/report.md
 grep '"noun": "name a subject and no required value"' out/report.json

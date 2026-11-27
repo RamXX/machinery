@@ -70,6 +70,11 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - Failure modes: a subject `machine:<id>` for a machine as a whole; `columns.required` in
   `import.failure_modes` for a catalog that has the column; and stage `xref-failure` counts on
   its own the failure modes that name a subject and no required value (still unlinked).
+- A links entry that names a subject and no required value is no error: `gen` and `adopt` go on
+  and the row is owed; a required value that is given and invalid stays an error. Stages
+  `failure-modes` and `xref-failure` print one account of linked, unlinked, subject-only and
+  subject-less failure modes, and a subject that names nothing is a `subject-resolves` finding
+  whatever its required value.
 - `import.planned` reads scenario descriptions (`in: scenario-description`).
 - `_refusal_events` (`refusal_events` in `import.machines.annotate`) declares the event by which
   a machine writes that it refused a caller's command, with the action and a reason; rule

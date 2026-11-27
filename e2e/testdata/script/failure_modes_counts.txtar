@@ -1,0 +1,92 @@
+# stages failure-modes and xref-failure give the same account of the same failure modes: one
+# definition of linked, unlinked, naming a subject and no required value, and subject-less, computed
+# once and printed by both (docs/formats.md sections 6.3 and 6.6)
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^checked: 9 failure modes, 0 abuse cases, 6 imported, 2 linked, 5 unlinked, 2 name a subject and no required value, 2 subject-less$'
+stdout '^checked: 9 failure modes, 2 linked, 5 unlinked, 2 name a subject and no required value, 2 subject-less, 0 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events$'
+# a subject that names nothing is unlinked in both, and stage xref-failure says why
+stdout '^  ERROR  subject-resolves: act:Loan\.burn: failure mode lend-twice: Loan\.burn is not an action of the model$'
+stdout '^  ERROR  subject-resolves: act:Loan\.burn: failure mode risk-3: Loan\.burn is not an action of the model$'
+stdout -count=2 'ERROR'
+stdout '^passed$'
+stdout '^failed: 2 finding\(s\)$'
+
+# without an imported catalog both stages print the account once a failure mode is unaccounted for
+cp native-only.yaml machinery.yaml
+exec mrun 1 lint --stage failure-modes --stage xref-failure
+stdout '^checked: 3 failure modes, 0 abuse cases, 1 linked, 1 unlinked, 1 subject-less$'
+stdout '^checked: 3 failure modes, 1 linked, 1 unlinked, 1 subject-less, 0 invokes, '
+
+-- machinery.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  failure_modes: design/failure-modes.yaml
+import:
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure"]
+      behavior: ["Required behavior"]
+    links: design/links.yaml
+-- native-only.yaml --
+version: 2
+design:
+  models:
+    - design/model/desk.modelith.yaml
+  failure_modes: design/failure-modes.yaml
+-- design/failure-modes.yaml --
+version: 1
+failure_modes:
+  - id: reader-down
+    subject: entity:Loan
+    failure: "The card reader is down."
+    required: surface
+    behavior: "The desk says so and lends nothing."
+  - id: paper-list
+    no_subject: "the shelf list is kept on paper, outside the system"
+    failure: "The shelf list is out of date."
+    required: surface
+    behavior: "The desk recounts the shelf."
+  - id: lend-twice
+    subject: act:Loan.burn
+    failure: "A copy is lent twice."
+    required: fail-closed
+    behavior: "The second loan is refused."
+-- design/links.yaml --
+version: 1
+links:
+  - {id: RISK-1, subject: "act:Loan.lend", required: fail-closed}
+  - {id: RISK-2, subject: "act:Loan.lend"}
+  - {id: RISK-3, subject: "act:Loan.burn", required: surface}
+  - {id: RISK-5, no_subject: "the aisles are signed by hand, outside the system"}
+  - {id: RISK-6, subject: "entity:Loan"}
+-- docs/risks.md --
+# Risks
+
+| Risk | Failure | Required behavior |
+|------|---------|-------------------|
+| RISK-1 | The card reader is down. | The desk refuses the loan with READER_DOWN. |
+| RISK-2 | A loan is recorded twice. | The second record is refused. |
+| RISK-3 | A copy is burnt. | The desk writes it off. |
+| RISK-4 | The shelf list is out of date. | The desk recounts the shelf. |
+| RISK-5 | A copy is shelved in the wrong aisle. | The desk says where it was found. |
+| RISK-6 | A member leaves with an unlent copy. | The gate stops the member. |
+-- design/model/desk.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Desk
+enums:
+  LoanStatus:
+    values:
+      - {name: Shelved, definition: "On the shelf."}
+      - {name: Lent, definition: "With a member."}
+entities:
+  Loan:
+    definition: "One copy lent to one member."
+    attributes:
+      - {name: status, type: LoanStatus}
+    actions:
+      - {name: lend, actor: Librarian}

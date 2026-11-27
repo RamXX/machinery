@@ -1,7 +1,7 @@
 # a links entry covers many rows: ids takes a list of ids and of inclusive ranges of ids that
 # share a prefix and end in a number (docs/formats.md section 5.4.1)
 exec machinery lint --stage failure-modes --stage xref-failure
-stdout '^checked: 14 failure modes, 0 abuse cases, 14 imported, 0 unlinked$'
+stdout '^checked: 14 failure modes, 0 abuse cases, 14 imported, 10 linked, 0 unlinked, 4 subject-less$'
 stdout '^checked: 14 failure modes, 10 linked, 0 unlinked, 4 subject-less, 0 invokes, 1 dependencies, '
 stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
 
@@ -10,7 +10,7 @@ stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicabl
 cp wide.yaml design/links.yaml
 exec mrun 1 lint --stage failure-modes
 stdout '^  ERROR  design/links.yaml: FM-09..FM-101: no failure-mode row of docs/risks.md has the ids FM-13, FM-14, FM-15, FM-16, FM-17 and 82 more$'
-stdout '^checked: 14 failure modes, 0 abuse cases, 14 imported, 8 unlinked$'
+stdout '^checked: 14 failure modes, 0 abuse cases, 14 imported, 6 linked, 8 unlinked$'
 stdout '^failed: 1 finding\(s\)$'
 
 # an id of a list that is no row
