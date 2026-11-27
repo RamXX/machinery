@@ -4,7 +4,8 @@ This document is the contract between every part of machinery v2. Code, tests an
 documents cite it by section number. A change here is a design change: update this file first,
 then the code, then the tests.
 
-Status: experimental. v1 lives on the `main` branch and is unaffected.
+Status: released as 2.0.0. Later changes are listed in `CHANGELOG.md`. v1 lives on branch `v1`
+and is unaffected.
 
 Pinned upstream semantics: Modelith 0.6.0 (model format `v1`) and XState 5.33.4 (the v5
 JSON-serializable subset in `docs/machine-format.md`). Formal tools: tla2tools v1.7.4 and
@@ -493,10 +494,11 @@ waivers:
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
 | `machinery version`, `machinery --version` | Print one line, `machinery <version> (<commit>, <build date>)`. |
 
-The version defaults to `dev` and is set by `VERSION` when building with Make. The commit is
-`vcs.revision` from the binary's Go build information, with `-dirty` appended when
-`vcs.modified` is true, or `unknown` when the revision is unavailable. The Makefile records
-the UTC build date as `YYYY-MM-DD` by default. A build with no date recorded prints `unknown`.
+The version defaults to `dev`. `make build` sets it from `VERSION` in the Makefile, which holds
+the current release and changes only in a release commit. The commit is `vcs.revision` from
+the binary's Go build information, with `-dirty` appended when `vcs.modified` is true, or
+`unknown` when the revision is unavailable. The Makefile records the UTC build date as
+`YYYY-MM-DD` by default. A build with no date recorded prints `unknown`.
 
 `lint` and `check` accept `--stage <name>` (repeatable): only the named stages run, in their usual
 order, and the exit code depends on them alone. An unknown stage name is a usage error (exit 2).

@@ -2,9 +2,10 @@ name: ci
 
 on:
   push:
-    branches: [experimental/v2]
+    branches: [main, experimental/v2]
+    tags: ["v*"]
   pull_request:
-    branches: [experimental/v2]
+    branches: [main, experimental/v2]
 
 permissions:
   contents: read

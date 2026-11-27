@@ -3,13 +3,64 @@
 machinery joins a project's design to evidence from its running system, plans what is unproven
 as a backlog graph, and adds formality where the risk calls for it.
 
-This branch is **machinery v2**: a new tool, not an upgrade of v1. v1 is on `main`.
+This is **machinery 2.0.0**. It is a rewrite, not an in-place upgrade of v1: the design is data,
+evidence comes only from end-to-end runs, and the backlog lives in `bd`. v1, the 0.x releases
+(last 0.11.2), lives on branch [`v1`](https://github.com/RamXX/machinery/tree/v1).
+[CHANGELOG.md](CHANGELOG.md), "Upgrading from v1", says how to move a project.
 
-## Status
+## Install
 
-v2 is experimental and not released yet. `machinery --version` and `machinery version` print
-`machinery <version> (<commit>, <build date>)`. The version defaults to `dev`.
-See `CHANGELOG.md` for unreleased changes and `docs/formats.md` for the current contract.
+With Go 1.27.4 and git:
+
+```
+go install github.com/RamXX/machinery/v2/cmd/machinery@v2.0.0
+go install github.com/stacklok/modelith/cmd/modelith@v0.6.0   # the model linter it runs
+```
+
+Optional, by feature: Node and `xstate` 5.33.4 (stage `xstate`), Java 21 and the pinned TLA+
+and Alloy jars (`machinery formal tools` fetches them by checksum), and `bd` (the backlog
+bridge).
+
+`machinery --version` prints `machinery <version> (<commit>, <build date>)`. A `go install`
+build prints `machinery dev (unknown, unknown)`: Go records no revision in a build from the
+module cache, and `go version -m "$(command -v machinery)"` shows the module version. In a
+checkout of the tag, `make tools && make build` puts the pinned tools and a binary that prints
+`machinery 2.0.0 (<commit>, <build date>)` in `.bin/`.
+
+## Ten minutes
+
+A ticket desk, from an empty directory to a proven design. `MACHINERY_REPO` is a checkout of
+this repository at the tag (`git clone --branch v2.0.0 https://github.com/RamXX/machinery`);
+`docs/getting-started.md` explains each step. The test suite runs this block
+(`docs_readme.txtar`):
+
+```sh
+machinery init
+cp -R "$MACHINERY_REPO/e2e/testdata/fixtures/starter/." .
+machinery gen
+git init -q -b main
+git add -A
+git commit -q -m "ticket desk"
+machinery check
+machinery run -- sh e2e/tickets_test.sh
+machinery verify
+machinery status
+```
+
+`verify` ends with `machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable`:
+six obligations, each observed on the running system at that commit.
+
+## Limits and what v2 does not do
+
+| Area | Limit |
+|---|---|
+| Hooks | Wired in `hooks/hooks.json`, and `machinery hook` is tested with hook JSON on stdin. They are not yet confirmed in a live harness session: try them in one of yours before you rely on them. The Codex plugin wires no hooks. |
+| Vital cores | Denied imports, function sizes and entry symbols of a core are read in Go files only. A core in another language is not demonstrated. |
+| Adapter evidence | Weaker than a receipt a test emits: it shows that a test which names the id passed, not that the test checked it. It never proves a `tc` or `cx` id, and by default no id of a critical or vital area. |
+| Proof obligations | None is discharged. Each property of a vital area prints as awaiting proof, and an id it is over reads `(by test and model; proof awaited)`. |
+| Delegate | Experimental: its commands and the policy format may change in any release. |
+| Evidence rules | They catch mistakes and casual edits, not a party who can run commands as the tool or plant code in the project (`docs/formats.md` sections 10.2 and 10.3). |
+| Backlog | `bd` is the only backlog tool. |
 
 ## What it does
 
@@ -42,42 +93,6 @@ Three rules shape it:
 - **A blocking check protects a named product behavior.** `machinery checks` lists every stage
   and what it protects. Nothing checks that a ritual was followed.
 
-## Install
-
-From a checkout of this branch, with Go 1.27.4 and git:
-
-```
-go install ./cmd/machinery                                    # into your Go bin directory
-go install github.com/stacklok/modelith/cmd/modelith@v0.6.0   # the model linter it runs
-```
-
-Optional, by feature: Node and `xstate` 5.33.4 (stage `xstate`), Java 21 and the pinned TLA+
-and Alloy jars (`machinery formal tools` fetches them by checksum), and `bd` (the backlog
-bridge). In this repository, `make tools && make build` puts the pinned tools and the binary in
-`.bin/`.
-
-## Ten minutes
-
-A ticket desk, from an empty directory to a proven design. `MACHINERY_REPO` is your checkout;
-`docs/getting-started.md` explains each step. The test suite runs this block
-(`docs_readme.txtar`):
-
-```sh
-machinery init
-cp -R "$MACHINERY_REPO/e2e/testdata/fixtures/starter/." .
-machinery gen
-git init -q -b main
-git add -A
-git commit -q -m "ticket desk"
-machinery check
-machinery run -- sh e2e/tickets_test.sh
-machinery verify
-machinery status
-```
-
-`verify` ends with `machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable`:
-six obligations, each observed on the running system at that commit.
-
 ## Where to read next
 
 | You have | Read |
@@ -101,18 +116,6 @@ The plugin ships one small skill (`skills/machinery/SKILL.md`), one prompt per r
 [docs/hooks.md](docs/hooks.md)): the status when a session starts, the static check before
 `git commit` and `git push`, and after a turn that changed files. Checks are commands, not prose;
 the hooks only call them. Workers are briefed by pointer with `machinery brief <story>`.
-
-## Limits and what v2 does not do
-
-| Area | Limit |
-|---|---|
-| Hooks | Wired in `hooks/hooks.json`, and `machinery hook` is tested with hook JSON on stdin. They are not yet confirmed in a live harness session: try them in one of yours before you rely on them. The Codex plugin wires no hooks. |
-| Vital cores | Denied imports, function sizes and entry symbols of a core are read in Go files only. A core in another language is not demonstrated. |
-| Adapter evidence | Weaker than a receipt a test emits: it shows that a test which names the id passed, not that the test checked it. It never proves a `tc` or `cx` id, and by default no id of a critical or vital area. |
-| Proof obligations | None is discharged. Each property of a vital area prints as awaiting proof, and an id it is over reads `(by test and model; proof awaited)`. |
-| Delegate | Experimental: its commands and the policy format may change in any release. |
-| Evidence rules | They catch mistakes and casual edits, not a party who can run commands as the tool or plant code in the project (`docs/formats.md` sections 10.2 and 10.3). |
-| Backlog | `bd` is the only backlog tool. |
 
 ## Development
 

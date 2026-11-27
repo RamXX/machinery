@@ -1,10 +1,26 @@
 # Changelog
 
-## Unreleased: 2.0.0 (experimental, branch `experimental/v2`)
+Notable changes to machinery, newest first. v1, the 0.x releases, keeps its history in
+`CHANGELOG.md` on branch `v1`.
 
-v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not listed under
-"Carried forward" remains in this tree. `docs/formats.md` is the contract for every format,
-command, output line and exit code.
+## [Unreleased]
+
+## [2.0.0] - 2026-11-27
+
+### Upgrading from v1
+
+2.0.0 is a rewrite, not an in-place upgrade. The design is data: a Modelith model, XState
+machines, contracts, failure modes and a risk file. Evidence comes only from end-to-end runs on
+the real system, recorded as receipts. `design/owed.yaml` is the one list of what is not proven
+yet. The backlog is `bd`, planned by `machinery plan`, in place of v1's execution packets and
+slice maps. v2 reads no v1 artifact. v1 remains on branch `v1`, with its `install.sh`; its
+last release is 0.11.2. To move a project, install 2.0.0 (`README.md`, "Install"), then start
+with `docs/getting-started.md` for a new project or `docs/brownfield.md` for an existing one.
+The Go module path is now `github.com/RamXX/machinery/v2`, so a Go suite imports
+`github.com/RamXX/machinery/v2/pkg/receipt`.
+
+Nothing of v1 that is not listed under "Carried forward" remains in this tree. `docs/formats.md`
+is the contract for every format, command, output line and exit code.
 
 ### Design
 

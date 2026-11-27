@@ -1,6 +1,6 @@
 # Contributing
 
-This branch is machinery v2, experimental. v1 is on `main`.
+This is machinery v2. v1, the 0.x releases, lives on branch `v1`.
 
 ## Ground rules
 
@@ -35,6 +35,22 @@ throwaway database in its own work directory.
    `internal/stages`, one responsibility per package.
 4. `make check` and the scripts your change affects. Run `make e2e` once before you hand over.
 5. Commit: a short imperative subject, then what changed and why.
+
+## Releasing
+
+Versions are numeric, `MAJOR.MINOR.PATCH`; the tag is `vMAJOR.MINOR.PATCH`. Only a release commit
+changes the version, in all of these at once:
+
+- `VERSION` in the `Makefile`, which `make build` stamps (`machinery --version`);
+- `version` in `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json`, and the version
+  `e2e/testdata/script/plugins_manifest.txtar` expects;
+- the install and clone lines in `README.md` and `docs/hooks.md`;
+- `CHANGELOG.md`: the `[Unreleased]` section becomes `## [X.Y.Z] - YYYY-MM-DD`, with an empty
+  `## [Unreleased]` above it.
+
+`make verify` passes at the release commit. The tag goes on the commit `main` points to, and the
+GitHub release notes are that version's section of the changelog. A new major version also
+changes the module path suffix (`/v2`) in `go.mod` and in every import.
 
 ## Layout
 
