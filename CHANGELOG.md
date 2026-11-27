@@ -82,8 +82,13 @@ command, output line and exit code.
   critical or vital tier).
 - A symbolic link under `trace.tests` or `trace.code` (a linked file or a linked directory) is not
   read, while a test runner may build what it points to: every such link is an ERROR of stage
-  `trace` (`trace: <path> is a symbolic link; markers behind it are not read`), with no waiver, so a
-  failing test behind a linked directory never leaves the project passing `check`.
+  `trace` (`trace: <path> is a symbolic link; markers behind it are not read`), so a failing test
+  behind a linked directory never leaves the project passing `check`. Links are found at any
+  depth, a link inside a linked directory included (`e2e/linked/inner`), and a cycle of links
+  ends the walk. Nothing under `node_modules`, `.git` and the other directories the scan never
+  walks is a finding, nor is a link with one of those names. A waiver of rule `trace` is refused
+  with what to do instead, and `trace --non-action-serves` names on stderr each link it did not
+  read.
 - Every claimant must pass (`evidence.adapter.claims: all`, the default). The claimants of an
   id are every file under `trace.tests` that carries a marker for it, as stage `trace` reads
   markers, whatever its name or language: the test function a marker stands above in a Go test
@@ -94,8 +99,8 @@ command, output line and exit code.
   summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names the
   first ten claimants without a pass, `verify --partly` every one, and says what to do; a file
   the adapter cannot judge (not Go, not named `_test.go`, not a mapped staged source, not
-  parsing, without a test function) is named with why and with what it needs, among it removing
-  the marker when the file is no test (a README, a golden file). A file under
+  parsing, without a test function) is named with why and with what it needs: fixing the file when it does
+  not parse, and removing the marker when it is not Go and no test (a README, a golden file). A file under
   `trace.tests` that cannot be read fails the commands that read markers. An id with no
   counted adapter pass is judged as before: a receipt a test emits proves it. `claims: any` is
   the rule of one claimant, and the ratchet reports it.
