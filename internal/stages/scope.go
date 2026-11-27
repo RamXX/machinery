@@ -40,7 +40,7 @@ func Scope(ctx *Context) *report.Stage {
 	}
 	mb, err := gitx.MergeBase(p.Root, ctx.Base, "HEAD")
 	if err != nil {
-		s.Errorf("git merge-base: %v", err)
+		s.Errorf("%v", err)
 		return s
 	}
 	if mb == "" {
@@ -48,7 +48,7 @@ func Scope(ctx *Context) *report.Stage {
 	}
 	files, err := gitx.StagedSince(p.Root, mb)
 	if err != nil {
-		s.Errorf("git diff-index: %v", err)
+		s.Errorf("%v", err)
 		return s
 	}
 	sort.Strings(files)

@@ -337,7 +337,7 @@ func hookStop(e *Env, in *hook.Input) (*hook.Output, error) {
 func changedThisSession(p *project.Project, id string) (bool, error) {
 	paths, err := gitx.StatusPaths(p.Root)
 	if err != nil {
-		return false, fmt.Errorf("git status: %v", err)
+		return false, err
 	}
 	if len(paths) > 0 {
 		return true, nil

@@ -17,7 +17,7 @@ stdout '^passed$'
 exec sh -c 'tree=$(git rev-parse HEAD~1^{tree}) && rm .git/objects/$(echo $tree | cut -c1-2)/$(echo $tree | cut -c3-)'
 exec mrun 1 verify
 stdout '^  ERROR  git diff-tree -r -z --raw --relative --no-ext-diff --no-textconv --no-color --ignore-submodules=none --no-renames [0-9a-f]{40} [0-9a-f]{40} -- \. failed in /.*/script-verify_git_failure: fatal: unable to read tree \(?[0-9a-f]{40}\)?; the repository may be shallow or damaged: run git fsck there, and git fetch --unshallow if it is a shallow clone$'
-! stdout 'passed'
+! stdout '^passed$'
 exec mrun 1 status --no-backlog
 stderr '^machinery: git diff-tree .* failed in /.*/script-verify_git_failure: fatal: unable to read tree \(?[0-9a-f]{40}\)?; the repository may be shallow or damaged: run git fsck there, and git fetch --unshallow if it is a shallow clone$'
 

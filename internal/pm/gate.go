@@ -173,7 +173,7 @@ func DesignStoryGate(d *design.Design, is *backlog.Issue, intake *Intake, design
 	}
 	switch dirty, err := gitx.Dirty(d.P.Root, d.P.Cfg.Receipts.Dir+"/"); {
 	case err != nil:
-		s.Errorf("git status: %v", err)
+		s.Errorf("%v", err)
 	case dirty:
 		s.Errorf("working tree has uncommitted changes")
 	}

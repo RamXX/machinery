@@ -54,11 +54,11 @@ func (a *assessment) backlog(s *section) {
 	var branches []string
 	all, err := gitx.Branches(a.root)
 	if err != nil {
-		s.own.Errorf("git: %v", err)
+		s.own.Errorf("%v", err)
 	}
 	cur, err := gitx.Branch(a.root)
 	if err != nil {
-		s.own.Errorf("git: %v", err)
+		s.own.Errorf("%v", err)
 	}
 	for _, b := range all {
 		if b != cur {

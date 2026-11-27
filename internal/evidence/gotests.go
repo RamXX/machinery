@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -156,7 +157,11 @@ func constrainedHeader(tree *ast.File) bool {
 // with cgo off, whatever its other constraints say.
 func importsC(tree *ast.File) bool {
 	for _, im := range tree.Imports {
-		if im.Path != nil && im.Path.Value == `"C"` {
+		if im.Path == nil {
+			continue
+		}
+		// "C" or `C`: go reads the path however it is quoted
+		if p, err := strconv.Unquote(im.Path.Value); err == nil && p == "C" {
 			return true
 		}
 	}

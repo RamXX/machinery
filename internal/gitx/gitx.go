@@ -1,7 +1,7 @@
 // Package gitx runs every git command machinery runs, through one function
 // (git): plumbing where git has it, git status only as --porcelain=v2 -z,
-// and every setting a configuration could use to change an answer fixed on
-// the command line (docs/formats.md section 10.1, "How machinery reads git").
+// and the settings docs/formats.md section 10.1 lists ("How machinery reads
+// git") fixed on the command line; core.fileMode is honoured.
 package gitx
 
 import (
@@ -20,10 +20,13 @@ import (
 )
 
 // neutral comes before the arguments of every git command. Optional locks
-// are off, so a read never rewrites the index, and every setting that could
-// change what a query returns is fixed. The configuration is otherwise kept:
-// safe.directory (a repository another user owns), user.name, worktrees and
-// the ignore rules work as they do for git.
+// are off, so a read never rewrites the index, and these settings are fixed.
+// The configuration is otherwise kept: safe.directory (a repository another
+// user owns), user.name, worktrees, the ignore rules, line-ending conversion
+// and filters work as they do for git, and so does core.fileMode, which hides
+// a change of only a file's mode in the work tree where it is false. Fixing
+// it to true would make every file dirty on a filesystem without executable
+// bits.
 var neutral = []string{
 	"--no-optional-locks",
 	"-c", "core.quotepath=off",
@@ -47,15 +50,54 @@ var compared = []string{"--ignore-submodules=none", "--no-renames"}
 // no external diff, text conversion or color.
 var diffFlags = append([]string{"-r", "-z", "--raw", "--relative", "--no-ext-diff", "--no-textconv", "--no-color"}, compared...)
 
-// Error is a git command that failed: its arguments, its exit code (-1 when
-// it did not start) and what it said.
+// Error is a git command that failed: its arguments, the directory it ran
+// in, its exit code (-1 when it did not start) and what it said.
 type Error struct {
 	Args []string
+	Dir  string
 	Code int
 	Msg  string
 }
 
-func (e *Error) Error() string { return e.Msg }
+// repair is what to do when a git command fails in the repository.
+const repair = "the repository may be shallow or damaged: run git fsck there, and git fetch --unshallow if it is a shallow clone"
+
+// Error is one line: the command with its arguments, the directory, what git
+// said and what to do (section 10.1).
+func (e *Error) Error() string {
+	if e.Code == -1 {
+		return fmt.Sprintf("%s could not start in %s: %s", e.command(), e.dir(), e.said())
+	}
+	return fmt.Sprintf("%s failed in %s: %s; %s", e.command(), e.dir(), e.said(), repair)
+}
+
+// command is the git command as it can be typed again: its arguments, each
+// quoted when it is empty or holds a space, a quote or a control character.
+func (e *Error) command() string {
+	words := []string{"git"}
+	for _, a := range e.Args {
+		if a == "" || strings.ContainsFunc(a, func(r rune) bool { return r <= ' ' || r == '"' || r == '\'' || r == '\\' || r == 0x7f }) {
+			a = strconv.Quote(a)
+		}
+		words = append(words, a)
+	}
+	return strings.Join(words, " ")
+}
+
+func (e *Error) dir() string {
+	if e.Dir == "" {
+		return "."
+	}
+	return e.Dir
+}
+
+// said is what git said, its lines joined.
+func (e *Error) said() string {
+	if l := lines(e.Msg); len(l) > 0 {
+		return strings.Join(l, "; ")
+	}
+	return fmt.Sprintf("exit %d", e.Code)
+}
 
 // isNo reports whether err is the exit code 1 by which a yes-or-no query
 // (merge-base --is-ancestor, check-ignore, symbolic-ref --quiet,
@@ -93,30 +135,17 @@ func git(dir string, o options, args ...string) ([]byte, error) {
 	}
 	cmd.Stderr = &errb
 	if err := cmd.Run(); err != nil {
-		e := &Error{Args: args, Code: -1, Msg: strings.TrimSpace(errb.String())}
+		e := &Error{Args: args, Dir: dir, Code: -1, Msg: strings.TrimSpace(errb.String())}
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {
 			e.Code = exit.ExitCode()
 		}
 		if e.Msg == "" {
-			e.Msg = "git " + verb(args) + ": " + err.Error()
+			e.Msg = err.Error()
 		}
 		return out.Bytes(), e
 	}
 	return out.Bytes(), nil
-}
-
-// verb is the git command among args: the first that is no option.
-func verb(args []string) string {
-	for i := 0; i < len(args); i++ {
-		switch a := args[i]; {
-		case a == "-c":
-			i++
-		case !strings.HasPrefix(a, "-"):
-			return a
-		}
-	}
-	return ""
 }
 
 // run runs a git query in root and returns its output.
@@ -451,7 +480,7 @@ func Submodules(root string) ([]string, error) {
 	}
 	out, err := run(root, "config", "--file", file, "--null", "--list")
 	if err != nil {
-		return nil, fmt.Errorf("git config --file .gitmodules: %v", err)
+		return nil, err
 	}
 	prefix, err := showPrefix(root)
 	if err != nil {
@@ -781,7 +810,7 @@ func Archive(root, dest string) (files int, outside []string, err error) {
 	files, outside, xerr := extract(entries, br, dest)
 	io.Copy(io.Discard, br)
 	if werr := <-done; werr != nil {
-		return files, outside, fmt.Errorf("git cat-file: %v", werr)
+		return files, outside, werr
 	}
 	return files, outside, xerr
 }
@@ -986,7 +1015,12 @@ func snapshotGit(dir string, steps [][]string) error {
 		"-c", "user.name=machinery assess", "-c", "user.email=assess@machinery.invalid"}
 	for _, args := range steps {
 		if _, err := git(dir, options{env: env}, append(append([]string{}, base...), args...)...); err != nil {
-			return fmt.Errorf("git %s in the snapshot: %v", args[0], err)
+			var e *Error
+			if errors.As(err, &e) && e.Code != -1 {
+				// the snapshot is a repository of machinery's own: nothing to repair
+				return fmt.Errorf("git %s failed in the snapshot %s: %s", args[0], dir, e.said())
+			}
+			return err
 		}
 	}
 	return nil
