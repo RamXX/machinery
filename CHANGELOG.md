@@ -45,6 +45,22 @@ Notable changes to machinery, newest first. v1, the 0.x releases, keeps its hist
   `cat-file`, so `export-ignore` and filters change nothing. A git failure stops the command
   with one line that names the git command with its arguments, the directory, what git said and
   what to do; none reads as "nothing changed".
+- A helper with no test function is said to be judged `by its set` only when its set ran in full
+  in the run: a set cut by a `-run` or `-skip` filter, a build tag or a failed package leaves
+  it without a receipt, and `verify` says `cannot be judged by the adapter (no test function;
+  its set did not run in full)` of it, as the run summary says `its set did not run in full in
+  this run`.
+- The advice of a partly run id, and of an id no claimant of which can run here, names where
+  excused entries go: `design/excused.yaml` when the project has that file, the configuration
+  key `evidence.adapter.excused` otherwise.
+
+### Design
+
+- `design.rendering: tool|project|off` (default `tool`) says who keeps the Markdown beside a model.
+  With `project` (a house-style pass of the project's own) the tool neither compares nor writes
+  it and stage `model` says `rendering: kept by the project` once; with `off` it does neither and
+  says nothing. `gen` and `adopt` respect it, and the ratchet warns on a change from `tool` to
+  `project` or `off`.
 
 ## [2.0.0] - 2026-11-27
 

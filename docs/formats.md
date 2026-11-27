@@ -63,6 +63,7 @@ design:
   owed: design/owed.yaml        # optional, this is the default
   status: design/status.yaml    # optional, this is the default; used when present (section 4.1)
   gen: design/gen               # optional, this is the default
+  rendering: tool               # optional, this is the default: tool | project | off; who keeps the Markdown beside a model (section 5.1)
 import:                         # optional: design sources kept in the project's own formats
   machines:                     # optional, instead of design.machines (section 5.2.1)
     files: ["machines/*.json"]  # required: globs of the project's machine files
@@ -745,6 +746,22 @@ The committed rendering `<name>.modelith.md` sits beside each model. It is produ
 `modelith render --stdout <file>` with one mechanical change: every em dash (U+2014) is replaced
 by a hyphen-minus.
 
+**Who keeps the rendering: `design.rendering`.** A project may pass the Markdown through a filter
+of its own (a house-style pass), so that the tool's rendering never equals the committed file. The
+key says who keeps it, one of three values; any other is the configuration error
+`config: design.rendering must be tool, project or off, got "<value>"`:
+
+- `tool`, the default: the tool compares the rendering (section 6.1) and `machinery gen` writes it
+  (section 7), as above.
+- `project`: the project produces the file its own way. The tool neither compares it nor writes
+  it, whatever it holds, and whether it exists; stage `model` says `rendering: kept by the
+  project` (section 6.1). `machinery gen` does not write it, `machinery adopt` neither lists it
+  as stale or missing nor notes it in a rehearsal (section 17.2), and nothing else reads it.
+- `off`: no rendering is kept. The tool neither compares nor writes it, and says nothing.
+
+The model itself is linted whatever the value. The ratchet reports a change from `tool` to
+`project` or `off` (section 11.3).
+
 ### 5.2 Machines
 
 One file per machine, `<Name>.machine.json`, in the machines directory. The format is the XState
@@ -1230,8 +1247,10 @@ For each configured model file:
   github.com/stacklok/modelith/cmd/modelith@v0.6.0)`.
 - Run `<modelith> lint --format json <file>`. Each Modelith error becomes an ERROR, each warning a
   warn, both prefixed with the model path.
-- Compare the committed `<name>.modelith.md` with a fresh rendering (section 5.1). Missing or
-  different is a DRIFT.
+- With `design.rendering: tool` (section 5.1), compare the committed `<name>.modelith.md` with a
+  fresh rendering. Missing or different is a DRIFT. With `project` it compares nothing and the
+  stage prints one `warn   rendering: kept by the project`, once for the stage whatever the
+  number of models; with `off` it compares nothing and prints nothing.
 - Extract ids (section 4). A duplicate id is an ERROR.
 
 `checked:` counts models, entities, actions, invariants and scenarios.
@@ -1622,8 +1641,9 @@ machines and cases compared. Not applicable when `tools.xstate` is false or abse
   file here; the source file stays the one to change;
 - `vital/<area>.json` for each vital area of the risk file: the property record (section 23.4);
 
-and beside each model its `<name>.modelith.md`. `machinery adopt` runs this generation but
-writes a rendering beside a model only under `design/`, and names the others (section 17.2).
+and beside each model its `<name>.modelith.md`, with `design.rendering: tool` only (section 5.1).
+`machinery adopt` runs this generation but writes a rendering beside a model only under `design/`,
+and names the others (section 17.2).
 
 All generated files are committed and never edited by hand. JSON is written with two-space
 indentation, keys in the order given in this document, and a trailing newline. Writes are atomic
@@ -2820,7 +2840,7 @@ An adapter receipt is a receipt line with three more keys:
 Receipts are written sorted by id, then file, then function, the file-level one first. They and
 the end line are written in one append, after the command has exited, and the end line of an
 adapter run has one more key, `adapter_receipts`, the number of lines the adapter wrote right
-before it, and, when it judged a file by its set, `adapter_sets`, those files, sorted:
+before it, and, when a file with no test function is a candidate of a package it saw (the file is judged by its set, section 10.3), `adapter_sets`, those files, sorted, whether their sets ran in full in this run or not:
 
 ```json
 {"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z","adapter_receipts":6,"adapter_sets":["e2e/suite/helpers_test.go"]}
@@ -2970,6 +2990,7 @@ adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in pa
 adapter: <function>: failed in <where>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
 adapter: <file>: no test function; its claims are judged by its set: every test function of package <import path>
+adapter: <file>: no test function; its set did not run in full in this run: its claims count nothing
 adapter: <file>: no test function; it carries a build constraint, so no set judges it: its claims count nothing
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: cannot be read as Go (<first parse error>): its claims count as not passed; fix the file or remove its markers
@@ -3018,8 +3039,9 @@ name included. A claim in a file of no package of the run does not count there.
 replayed from the cache, a package that did not end with pass, or an ambiguous name. A claim
 above a function the adapter does not judge counts in neither. The `no test function` lines
 name only the candidate files of the packages the run saw: `its claims are judged by its set`
-for one the run judged by its set, with the packages of its set (`packages <a>, <b>` for
-several), `it carries a build constraint, so no set judges it` for one that carries a build
+for one whose set ran in full in this run (a receipt was written for it), with the packages of its
+set (`packages <a>, <b>` for several), `its set did not run in full in this run` for one whose set
+a filter, a build tag or a failure cut (it has no receipt), `it carries a build constraint, so no set judges it` for one that carries a build
 constraint, and `its claims count nothing` for the others. `in the whole project` counts the
 ids without a receipt with a claim whose function did not run, the claiming files with no
 test function, and the distinct file, id and function combinations of claims above functions
@@ -3106,9 +3128,13 @@ the function-granularity passes of its other claimants.
 *A file the adapter cannot judge.* The adapter writes a receipt for a file only when it reads
 the file, the file parses, a marker for the id claims the whole file, and it has a test function
 or a run judges it by its set ("Which receipt", above). A file with no test function is judged
-by its set at the commit when a run used at the commit names it in `adapter_sets`: it is then a
-claimant the adapter judges like any other, satisfied by that run's `pass` and otherwise
-without a verdict, and `verify` says `by its set` of it (section 12). A file claimant that lacks one of these never has (a):
+by its set at the commit when a run used at the commit saw its set (it names the file in
+`adapter_sets`) and judged it in full: a receipt of the run for the file, a `pass` that satisfies
+it, or a `skip` or a `fail` of a function of its set, a verdict of its set. `verify` says `by its set`
+(section 12) only of such a file. A run that saw the set and cut it (a `-run` or `-skip` filter, a
+build tag, a package that failed) left the file without a receipt: it is no claimant judged by its
+set, and `verify` names it with the `<why>` `no test function; its set did not run in full`
+(below). A file claimant that lacks one of these never has (a):
 it is satisfied by (b), or excused (below), and by nothing else. `verify` names it with why
 (section 12):
 
@@ -3119,10 +3145,13 @@ it is satisfied by (b), or excused (below), and by nothing else. `verify` names 
 | `cannot be read as Go: <first parse error>` | A file the adapter reads that the Go parser refuses, `<first parse error>` as in the run summary (above). The line scan of section 8 still finds its markers. It is the threat model's "a claiming file the run did not build", which the command could not have built either. |
 | `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above a fuzz test, a benchmark or an example and none at file level; the first such function in the file. |
 | `it carries a build constraint: it may not have been built` | A file the adapter reads, with a claim of the whole file for the id and no test function, that carries a build constraint ("A file with no test function: judged by its set", above). No run judges it by its set. |
-| `no test function` | A file the adapter reads, with a claim of the whole file for the id and no test function, that carries no build constraint and that no run used at the commit judged by its set. |
+| `no test function; its set did not run in full` | A file the adapter reads, with a claim of the whole file for the id and no test function, that carries no build constraint, that a run used at the commit saw as a candidate of a package, and that no run used at the commit judged in full: the set was cut. |
+| `no test function` | A file the adapter reads, with a claim of the whole file for the id and no test function, that carries no build constraint and that no run used at the commit saw as a candidate of any package. |
 
 The line `verify` prints for such a file (section 12) ends with what to do. For a file that cannot
-be read as Go: fix it so that it can be read as Go, or excuse it with a reason. For a file that
+be read as Go: fix it so that it can be read as Go, or excuse it with a reason. For a file whose set
+was cut: run its whole set, every test function of its package, in one run, emit a receipt from its
+own test, or excuse it with a reason. For a file that
 carries a build constraint: put its marker above a test function, emit a receipt from its own
 test, or excuse it with a reason. For any other:
 emit a receipt from its own test, name a staged Go source in `evidence.adapter.sources`, or
@@ -3170,7 +3199,10 @@ rule, and the claimants are not read; the ratchet reports `any` as a widening (s
 evidence is made (a test that needs a cluster, a sandbox the CI cannot reach) is left out of the
 rule by an entry of `evidence.adapter.excused` with a reason, written in `machinery.yaml` or in
 `design/excused.yaml` (section 2.2); every line below names an entry of that file
-`design/excused.yaml: entry <n>` in place of `entry <n>`. An entry covers a claimant when
+`design/excused.yaml: entry <n>` in place of `entry <n>`. The advice of a partly run id, and of an
+id no claimant of which can run here (section 12), names where entries go: `<excused place>` is
+`design/excused.yaml` when the project has that file, whatever it holds, and
+`evidence.adapter.excused` otherwise. An entry covers a claimant when
 the claimant's file matches one of its `tests` globs and, when the entry has `functions`, the
 claimant is a test function whose name matches one of its patterns. A file claimant is
 excused by its file, never by a function: only an entry without `functions` covers it, whatever
@@ -3327,6 +3359,7 @@ that was established at the base may quietly stop being established:
 | `tier-lowered` | An id has a lower tier than at the base: `ERROR  ratchet: tier lowered: <id> <old> -> <new>`, unless the risk file records the lowering under `lowered:` (section 23), which prints as `warn` with the recorded reason. |
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
+| `rendering-off` | The tool compared the rendering beside a model at the base (`design.rendering` `tool`, which a base without the key had) and does not now: `warn   ratchet: rendering switched off: design.rendering was tool at <ref> and is <project|off> now`. A project whose house-style pass rewrites the Markdown changes it on purpose; the ratchet makes the change seen. |
 | `review-off` | A review gate (section 15.10) that was required at the base is off now: `warn   ratchet: review switched off: review.<kind> was required at <ref> and is off now`. A project being adopted switches a gate off on purpose; the ratchet makes the change seen. |
 | `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it; an entry with `dir: true` is the pair of its pattern and `dir: true`, which prints in the place of the file globs. `evidence.adapter.claims` `all` at the base and `any` now lets one claimant prove an id several claim: one finding per tier for which adapter evidence may now prove some kind, `<kinds>` those kinds, `ERROR  ratchet: adapter widened: <tier> <kinds> ids: claims all -> any; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier and `warn   ratchet: adapter widened: <tier> <kinds> ids: claims all -> any` for the others. For `evidence.adapter.excused`, compared as pairs of a `tests` glob and a `functions` pattern (none for an entry without `functions`): an entry with a pair the base did not have is `ratchet: adapter widened: evidence.adapter.excused: entry <n> <added|widened>: <pairs>: <reason>`, `widened` when the base had a pair of one of its `tests` globs and `added` otherwise, `<pairs>` the new ones as `tests <glob>[, functions <pattern>]` joined by `; `; it is an ERROR, followed by `; it covers a claimant of <id>, in a <tier> area (<areas>)` (the first such id, sorted), when the new pairs cover a claimant (section 10.3) of an id of a critical or vital area, and a warn otherwise. An entry of `design/excused.yaml` (section 2.2) is named `design/excused.yaml: entry <n>` in place of `evidence.adapter.excused: entry <n>`, and the pairs of the base are those of both files at the base: moving an entry from one file to the other raises nothing. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
 | `exempt-widened` | A glob of `evidence.exempt` (section 10.1) that the base did not list, compared as written: `ratchet: evidence exempt widened: "<base glob>" -> "<glob>": a run stays valid across a change to the files it matches` when it takes the place of a glob the base listed and that is gone now, whose fixed prefix (the part before its first wildcard, up to the last `/` there) begins with the fixed prefix of the new one, and `ratchet: evidence exempt added: "<glob>": a run stays valid across a change to the files it matches` otherwise, one finding per glob in the order written. Each is a warn, and an ERROR followed by `; the risk file has a critical or vital area (<areas>)` while the risk file has one, `<areas>` in the order of the file. Removing or narrowing a glob raises nothing. |
@@ -3436,28 +3469,33 @@ Findings:
   for an id that is not proven, is neither partly run nor an id no claimant of which can run
   here, and has an adapter pass the policy does not let count (section 10.3, with the reasons).
   Owed or not, the id is unproven.
-- `ERROR  partly run: <id>: <n> of <m> claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence.adapter.excused`,
+- `ERROR  partly run: <id>: <n> of <m> claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in <excused place>`,
   with ` (<k> claimant(s) excused)` after `passed` when some are, for a partly run id that is
   not owed, in place of `unproven: <id>`, and the same line as a `warn` for one that is owed.
   Then one line per claimant that is not satisfied (section 10.3):
   `warn   partly run: <id>: no verdict: <claimant>` for one the adapter can judge
   (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
   `<file>::<function>` or `<file>`, followed by ` (by its set)` for a file with no test function
-  that a run judged by its set, and for a file the adapter cannot judge
+  whose set a run judged in full (section 10.3: a set cut by a filter, a build tag or a failure is
+  a file the adapter cannot judge), and for a file the adapter cannot judge
   `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); <what to do>`,
   `<why>` as in section 10.3 ("A file the adapter cannot judge"), `<what to do>` as
   `fix the file so that it can be read as Go, or give it an excused entry with a reason` for
   `cannot be read as Go: ...`,
   `put the marker above a test function, emit a receipt from its own test, or give it an excused entry with a reason`
-  for `it carries a build constraint: it may not have been built`, and otherwise as
+  for `it carries a build constraint: it may not have been built`,
+  `run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason`
+  for `no test function; its set did not run in full`, and otherwise as
   `it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
   followed for `not a Go file` by `; if the file is not a test (a README, a golden file), remove its marker for the id`.
+  `<excused place>` is `design/excused.yaml` when the project has that file and
+  `evidence.adapter.excused` otherwise (section 10.3).
   Without `--partly` they print for the first ten partly run ids, sorted, up to three for each
   id, the first in the order they print; when some are left out,
   `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`
   follows them, `<k>` counting every line left out, and it prints after every other line that
   begins `partly run: `. With `--partly` every one of them prints.
-- `ERROR  no claimant can run here: <id>: <k> claimant(s) excused: run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits`
+- `ERROR  no claimant can run here: <id>: <k> claimant(s) excused: run a claimant of it here and narrow <excused place>, or prove it with a receipt a test emits`
   for an id every claimant of which is excused and that is not proven otherwise, in place of
   `unproven: <id>`, and the same line as a `warn` for one that is owed (section 10.3).
 - For a partly run id and for an id no claimant of which can run here, the line of that state is
@@ -4184,10 +4222,10 @@ area: such an id needs a receipt its test emits after its own assertions. An id 
 that is not proven and has an adapter pass which does not count is
 `ERROR  unproven: <id>; adapter evidence does not count: <reason>`, with the reason of section
 10.3. A partly run id is
-`ERROR  partly run: <id>: <n> of <m> claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence.adapter.excused`
+`ERROR  partly run: <id>: <n> of <m> claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in <excused place>`
 (with ` (<k> claimant(s) excused)` after `passed` when some are), and an id that
 is not proven because every claimant of it is excused is
-`ERROR  unproven: <id>; no claimant can run here: <k> claimant(s) excused: run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits`
+`ERROR  unproven: <id>; no claimant can run here: <k> claimant(s) excused: run a claimant of it here and narrow <excused place>, or prove it with a receipt a test emits`
 (section 10.3). An id that a file the adapter cannot judge leaves partly run is partly run here
 too; `machinery verify` names the file and says what it needs. A refused receipts file or an incomplete run fails the gate of every
 story with the finding `verify` has for it (`ERROR  receipts: <file>: ...`,
@@ -5464,7 +5502,9 @@ writes it; `adopt`'s step 3 does not. When the rendering differs from the one ge
 write, adopt leaves it and prints `<file> is stale; the project regenerates it`, and
 `<file> is missing; the project generates it` when there is none, one line per model, sorted:
 after the `would write:` list without `--write`, and after the files written with `--write`.
-Stage `model` reports such a rendering as a DRIFT (section 6.1) until it is regenerated. That
+Stage `model` reports such a rendering as a DRIFT (section 6.1) until it is regenerated. With
+`design.rendering: project` or `off` (section 5.1) the project's own pass keeps the rendering or none
+is kept: adopt prints no such line, stage `model` reports no DRIFT, and a rehearsal has no note of it. That
 includes `.gitignore`: when the receipts directory is not ignored it prints
 `note: add .machinery/ to .gitignore` and leaves the edit to the team. It prints `adopt: wrote <n> file(s)` and the paths. Running it twice with the same
 arguments writes nothing the second time.
@@ -5540,7 +5580,7 @@ stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6
 `<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
 otherwise. A rendering beside a model kept outside `design/` that adopt left stale or missing
-is a DRIFT of stage `model` (sections 6.1 and 17.2), and in a rehearsal it is a note, not a
+(with `design.rendering: tool`, section 5.1) is a DRIFT of stage `model` (sections 6.1 and 17.2), and in a rehearsal it is a note, not a
 finding of `blocks`: `adopt --write` does not stop on it, and the project's own
 `machinery gen` writes the file. Stage `model` then blocks only when it has another ERROR or
 DRIFT or is not demonstrated, and the summary line of the check still counts it as failed. With

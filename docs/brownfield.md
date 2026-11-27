@@ -223,6 +223,13 @@ Besides those two files adopt writes only under `design/` and the gen directory:
 keep a model elsewhere with a Markdown rendering of your own beside it, adopt leaves that file
 alone and says when it is stale (`machinery gen` rewrites it when you run it).
 
+When the project passes the Markdown through its own filter (a house-style pass), the tool's
+rendering never equals the committed file and stage `model` reports a DRIFT for good. Say who
+keeps it with `design.rendering` in `machinery.yaml`: `project` leaves the file to your pass (the
+tool neither compares nor writes it, adopt does not mention it, and stage `model` says
+`rendering: kept by the project` once), and `off` keeps none and says nothing. The default,
+`tool`, is the behavior above. The ratchet reports a change from `tool` to either, as a warn.
+
 Mark failures where the code records them: tag the state `failure` and list the events in
 `_failure_events` (`docs/machine-format.md`, "Failure idioms"), or say it in
 `import.machines.annotate`. Bind every machine: a lifecycle machine names its entity, an
@@ -266,7 +273,8 @@ marker above no function, or above a helper, claims for every test function of t
 named in the summary (its file is then a claimant the adapter cannot judge, below). A file of
 helpers with no test function of its own is judged by its set: it passes when every test
 function of its package passed in the same run, and a `-run` filter or a build tag that leaves
-one out gives it nothing. A pass
+one out gives it nothing: `verify` then says `no test function; its set did not run in full` and
+says `by its set` only of a helper whose set ran in full. A pass
 through a parent test records how many subtests ran (`subtests: 2`).
 
 **Every claimant.** An id that several tests claim is proven by the adapter only when every one
@@ -282,7 +290,8 @@ at the commit (or, for a staged Go source, an entry in `evidence.adapter.sources
 file that quotes the marker), the fix is to remove its marker for the id; a Go test file that does
 not parse is to be fixed. An id with no counted adapter
 pass is not under this rule: a receipt a test emits proves it as before. A test that
-cannot run where you make the evidence goes into `evidence.adapter.excused` with a reason:
+cannot run where you make the evidence goes into `evidence.adapter.excused` with a reason (or
+into `design/excused.yaml`, which the advice of `verify` names when the project has that file):
 
 ```yaml
 evidence:
