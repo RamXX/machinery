@@ -2345,13 +2345,15 @@ it.
      built from copies staged elsewhere, gets every one. An entry whose `package` has no
      wildcard names one package and maps every file to it;
    - an entry with `dir: true` whose pattern matches the package (`...` matches any string,
-     slashes included, and `x/...` matches `x` too) maps to it the `_test.go` files of the
-     package's own directory, the candidates direct mode gives it.
+     slashes included, and `x/...` matches `x` too) maps to it the `_test.go` files under
+     `trace.tests` in the package's own directory, the candidates direct mode gives it; the
+     other Go files of that directory could have given a verdict all the same (item 2).
 
    A package that no entry matches has no candidate, also one tested in its own directory. A
-   file an entry with `files` names under `trace.tests` is a Go test source whatever its name:
-   a project may keep test sources that are not named `*_test.go` (under a `testdata`
-   directory, say) and copy them into place before `go test`. Its claims, its test functions
+   Go file (a name that ends in `.go`) that an entry with `files` names under `trace.tests` is
+   a test source whatever the rest of its name: a project may keep test sources that are not
+   named `*_test.go` (under a `testdata` directory, say) and copy them into place before
+   `go test`. Its claims, its test functions
    and the names it defines are read exactly as those of a `_test.go` file, for every rule of
    this section. Without `--streams` only `_test.go` files are read.
 2. **The files that could have given the verdict** are the candidates and every other Go file of
@@ -2559,8 +2561,9 @@ name included. A claim in a file of no package of the run does not count there.
 replayed from the cache, a package that did not end with pass, or an ambiguous name. A claim
 above a function the adapter does not judge counts in neither. The `no test function` lines
 name only the candidate files of the packages the run saw. `in the whole project` gives, once,
-the same two numbers over every claim of the project: the ids without a receipt with a claim
-whose function did not run, and the claiming files with no test function.
+the same two numbers over every claim the adapter reads, whatever package it is of: the ids
+without a receipt with a claim whose function did not run, and the claiming files with no test
+function.
 
 **What the evidence proves: `evidence.adapter`.** `verify`, and every command that judges
 evidence, reads an adapter receipt under sections 10.1 and 10.2 like any other. A `fail` fails

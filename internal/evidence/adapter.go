@@ -703,8 +703,9 @@ func (a *GoTest) Receipts() [][]byte {
 			state[file][fn] = st
 		}
 	}
-	// a fail that is no fail event: a function without a verdict in a package
-	// that failed (section 10.3), by file, and by package for the summary
+	// a fail that is no fail event: a function that started and gave no
+	// verdict in a run where its package failed (section 10.3), by file, and by
+	// package for the summary; explicit: a function with a fail event
 	silent, explicit := map[string]map[string]bool{}, map[string]map[string]bool{}
 	mark := func(m map[string]map[string]bool, file, fn string) {
 		if m[file] == nil {
