@@ -105,9 +105,9 @@ command, output line and exit code.
   golden file). A claiming file with no test function of its own that is a candidate of a
   package of the run (a helper) is judged by its set: it passes only when every test function
   of that package passed in one run, a fail of the set fails it, and `verify` says `by its
-  set`. A helper that carries a build constraint (a `//go:build` or `// +build` line, or a
-  `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` name, by the lists of `go/build`) is judged by no set:
-  go test may not have built it, and `verify` says so. A marker above a helper, a method or `TestMain` is a marker of its file. A file under
+  set`. A helper that carries a build constraint (a `//go:build` or `// +build` line, a
+  `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` name, by the lists of `go/build`, or an import of
+  `"C"`) is judged by no set: go test may not have built it, and `verify` says so. A marker above a helper, a method or `TestMain` is a marker of its file. A file under
   `trace.tests` that cannot be read fails the commands that read markers. An id with no
   counted adapter pass is judged as before: a receipt a test emits proves it. `claims: any` is
   the rule of one claimant, and the ratchet reports it.
@@ -130,9 +130,16 @@ command, output line and exit code.
   added or widened. The contract says what a glob cannot protect: the other files a test reads
   (fixtures, golden files, scripts, data), which the tool cannot know.
 - `owed sync` writes nothing while `machinery.yaml`, the adoption or excused file, a design
-  source or a test file has uncommitted changes, and names them, both paths of a rename or a
-  copy (a test file moved out of `trace.tests` by its old path); `--allow-dirty` syncs as
-  `verify --allow-dirty` judges.
+  source or a test file has uncommitted changes, and names them, each once, both paths of a
+  rename or a copy (a test file moved out of `trace.tests` by its old path); `--allow-dirty`
+  syncs as `verify --allow-dirty` judges.
+- Every git command goes through one place: plumbing (`diff-tree`, `diff-index`, `ls-tree`,
+  `cat-file`, `rev-list` and the like) and `git status --porcelain=v2 -z`, optional locks off,
+  `--ignore-submodules=none`, `--no-renames` and the settings a configuration could use to
+  change an answer fixed on the command line. A submodule pointer that `submodule.<name>.ignore`
+  or `diff.ignoreSubmodules` hides still voids earlier runs and still makes the tree dirty, and
+  `assess` writes its snapshot from `ls-tree` and `cat-file`, so `export-ignore` and filters
+  change nothing. A git failure stops the command; none reads as "nothing changed".
 - A `--streams` run that reads no stream exits 1 (the wrapper ran no `go test`, or cleared the
   environment with `env -i`); `--allow-no-streams` accepts a wrapper that may run nothing.
   `--keep-streams <dir>` copies every stream read into `<dir>/<run id>/` and records it in the

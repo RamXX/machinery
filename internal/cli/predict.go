@@ -51,7 +51,14 @@ func runPredict(e *Env, args []string) int {
 		return e.Fail(fmt.Errorf("cannot read the current commit: %v", err))
 	}
 	for _, pr := range backlog.ParseTags(is).Proofs {
-		if pr.Actor == c.Actor && evidence.ValidFor(p, head, pr.Commit) {
+		if pr.Actor != c.Actor {
+			continue
+		}
+		valid, err := evidence.ValidFor(p, head, pr.Commit)
+		if err != nil {
+			return e.Fail(err)
+		}
+		if valid {
 			fmt.Fprintf(e.Stderr, "machinery: refused: %s posted the proof for %s; a fresh verifier predicts\n", c.Actor, gitx.Short(head))
 			return 1
 		}

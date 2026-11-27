@@ -279,8 +279,13 @@ func judgeMutations(d *design.Design, s *Spec, res *Result, add adder) {
 	caught := map[string]bool{}
 	for _, m := range s.Mutations {
 		caught[m.Detects] = true
-		if m.Origin != "" && !gitx.Exists(d.P.Root, m.Origin) {
-			add(report.Error, s.Spec, "%s mutation %s: origin %s is not a commit", s.Spec, m.ID, m.Origin)
+		if m.Origin != "" {
+			switch ok, err := gitx.Exists(d.P.Root, m.Origin); {
+			case err != nil:
+				add(report.Error, s.Spec, "%s mutation %s: origin %s: %v", s.Spec, m.ID, m.Origin, err)
+			case !ok:
+				add(report.Error, s.Spec, "%s mutation %s: origin %s is not a commit", s.Spec, m.ID, m.Origin)
+			}
 		}
 		mr := res.mutation(m.ID)
 		if mr == nil {

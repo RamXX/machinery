@@ -152,7 +152,9 @@ func Run(o Options) (*Result, error) {
 	}
 	res := &Result{Name: filepath.Base(root), Write: o.Write, Sha: "no commit", Backlog: readBacklog(root, exe, o.NoBacklog, o.SkipBacklog)}
 	head := o.Commit
-	if h, herr := gitx.Head(root); herr == nil && head == "" {
+	if h, err := gitx.HeadIfAny(root); err != nil {
+		return nil, err
+	} else if head == "" {
 		head = gitx.Short(h)
 	}
 	if head != "" {
@@ -454,7 +456,10 @@ func (w *worker) addOwed(d *design.Design) error {
 	// Only what is new is owed: an id the committed obligation list already
 	// has was owed, or proven and pruned, before. Owing it again would undo
 	// the ratchet.
-	known := committedIDs(w.p)
+	known, err := committedIDs(w.p)
+	if err != nil {
+		return err
+	}
 	for _, o := range d.Obligations {
 		if _, ok := have[o.ID]; !ok && !known[o.ID] {
 			// what the project planned, what a test already claims, what no test names
@@ -488,12 +493,16 @@ func (w *worker) addOwed(d *design.Design) error {
 }
 
 // committedIDs returns the ids of the obligation list at HEAD (empty when
-// there is none, as on a first adoption).
-func committedIDs(p *project.Project) map[string]bool {
+// there is none, as on a first adoption, outside git or before the first
+// commit).
+func committedIDs(p *project.Project) (map[string]bool, error) {
 	res := map[string]bool{}
-	data, ok := gitx.Show(p.Root, "HEAD", strings.TrimSuffix(p.Cfg.Design.Gen, "/")+"/obligations.json")
-	if !ok {
-		return res
+	if head, err := gitx.HeadIfAny(p.Root); err != nil || head == "" {
+		return res, err
+	}
+	data, ok, err := gitx.Show(p.Root, "HEAD", strings.TrimSuffix(p.Cfg.Design.Gen, "/")+"/obligations.json")
+	if err != nil || !ok {
+		return res, err
 	}
 	var doc struct {
 		Obligations []struct {
@@ -504,7 +513,7 @@ func committedIDs(p *project.Project) map[string]bool {
 		} `json:"served"`
 	}
 	if json.Unmarshal(data, &doc) != nil {
-		return res
+		return res, nil
 	}
 	for _, o := range doc.Obligations {
 		res[o.ID] = true
@@ -512,7 +521,7 @@ func committedIDs(p *project.Project) map[string]bool {
 	for _, s := range doc.Served {
 		res[s.ID] = true
 	}
-	return res
+	return res, nil
 }
 
 func (w *worker) reasonSha() string {

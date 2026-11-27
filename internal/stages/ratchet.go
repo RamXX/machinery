@@ -38,18 +38,22 @@ func Ratchet(ctx *Context) *report.Stage {
 		return s.NotDemonstrated("no base ref; run machinery check --base <ref>")
 	}
 	p, ref := ctx.P, ctx.Base
-	raw, ok := gitx.Show(p.Root, ref, project.ConfigName)
+	raw, ok, err := gitx.Show(p.Root, ref, project.ConfigName)
+	if err != nil {
+		s.Errorf("cannot read %s at %s: %v", project.ConfigName, ref, err)
+		return s
+	}
 	if !ok {
 		// the project did not exist at the base: nothing was established there
 		return s.NotApplicable("no " + project.ConfigName + " at " + ref + ": nothing was established there")
 	}
 	// the configuration at the base is its two files merged (section 2.1)
-	bcfg, err := project.ParseWith(raw, project.Present(gitx.Show(p.Root, ref, project.AdoptionName)))
+	bcfg, err := project.ParseWith(raw, project.Present(show(s, p.Root, ref, project.AdoptionName)))
 	if err != nil {
 		s.Errorf("cannot read %s at %s: %v", project.ConfigName, ref, err)
 		return s
 	}
-	if data, ok := gitx.Show(p.Root, ref, project.ExcusedName); ok { // section 2.2
+	if data, ok := show(s, p.Root, ref, project.ExcusedName); ok { // section 2.2
 		if bcfg.ExcusedFile, err = project.ParseExcused(data); err != nil {
 			s.Errorf("cannot read %s at %s: %v", project.ExcusedName, ref, err)
 			return s
@@ -59,13 +63,13 @@ func Ratchet(ctx *Context) *report.Stage {
 	d := ctx.Design()
 
 	var inv baseInventory
-	if data, ok := gitx.Show(p.Root, ref, strings.TrimSuffix(bcfg.Design.Gen, "/")+"/obligations.json"); ok {
+	if data, ok := show(s, p.Root, ref, strings.TrimSuffix(bcfg.Design.Gen, "/")+"/obligations.json"); ok {
 		if err := json.Unmarshal(data, &inv); err != nil {
 			s.Errorf("obligations.json at %s: %v", ref, err)
 		}
 	}
 	baseOwed := map[string]bool{}
-	if data, ok := gitx.Show(p.Root, ref, bcfg.Design.Owed); ok {
+	if data, ok := show(s, p.Root, ref, bcfg.Design.Owed); ok {
 		entries, _ := design.ParseOwed(bcfg.Design.Owed, data)
 		for _, e := range entries {
 			baseOwed[e.ID] = true
@@ -128,7 +132,7 @@ func Ratchet(ctx *Context) *report.Stage {
 	}
 
 	// tier-lowered and vital-weakened
-	base := loadBaseRisk(bp, ref)
+	base := loadBaseRisk(s, bp, ref)
 	var lowered []design.Lowering
 	if rel := p.Cfg.Design.Risk; rel != "" {
 		if now, err := p.Read(rel); err == nil {
@@ -236,6 +240,17 @@ func set(xs []string) map[string]bool {
 	return m
 }
 
+// show reads a file at the base ref. A git failure is an ERROR of the stage,
+// so nothing it hides reads as "nothing was established" (section 10.1).
+func show(s *report.Stage, root, ref, rel string) ([]byte, bool) {
+	data, ok, err := gitx.Show(root, ref, rel)
+	if err != nil {
+		s.Errorf("cannot read %s at %s: %v", rel, ref, err)
+		return nil, false
+	}
+	return data, ok
+}
+
 // baseRisk is the risk file at the base: its areas and its dismissals.
 type baseRisk struct {
 	areas    []design.Area
@@ -243,11 +258,11 @@ type baseRisk struct {
 }
 
 // loadBaseRisk reads the risk file of the base; empty when it had none.
-func loadBaseRisk(bp *project.Project, ref string) baseRisk {
+func loadBaseRisk(s *report.Stage, bp *project.Project, ref string) baseRisk {
 	if bp.Cfg.Design.Risk == "" {
 		return baseRisk{}
 	}
-	data, ok := gitx.Show(bp.Root, ref, bp.Cfg.Design.Risk)
+	data, ok := show(s, bp.Root, ref, bp.Cfg.Design.Risk)
 	if !ok {
 		return baseRisk{}
 	}
@@ -316,7 +331,7 @@ func ratchetBaselines(s *report.Stage, p, bp *project.Project, ref string, widen
 		baseRel, nowRel := pair[0], pair[1]
 		had := map[baseline.Entry]bool{}
 		if baseRel != "" {
-			if data, ok := gitx.Show(p.Root, ref, baseRel); ok {
+			if data, ok := show(s, p.Root, ref, baseRel); ok {
 				es, _ := baseline.Parse(baseRel, data)
 				for _, e := range es {
 					had[e] = true
@@ -345,7 +360,7 @@ func ratchetBaselines(s *report.Stage, p, bp *project.Project, ref string, widen
 func ratchetSpecs(s *report.Stage, p, bp *project.Project, ref string) int {
 	var raw []byte
 	var rerr error = errors.New("missing")
-	if data, ok := gitx.Show(p.Root, ref, formal.BaselinePath(bp)); ok {
+	if data, ok := show(s, p.Root, ref, formal.BaselinePath(bp)); ok {
 		raw, rerr = data, nil
 	}
 	base, err := formal.ParseBaseline(raw, rerr)

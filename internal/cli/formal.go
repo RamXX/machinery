@@ -272,10 +272,11 @@ func runFormalBaseline(e *Env, args []string) int {
 	if err != nil {
 		return e.Fail(err)
 	}
-	at := ""
-	if head, herr := gitx.Head(p.Root); herr == nil {
-		at = gitx.Short(head)
+	head, err := gitx.HeadIfAny(p.Root)
+	if err != nil {
+		return e.Fail(err)
 	}
+	at := gitx.Short(head)
 	refused, recorded, err := formal.Record(p, specs, *accept, *reason, at)
 	if err != nil {
 		return e.Fail(err)
@@ -323,7 +324,10 @@ func runFormalSync(e *Env, args []string) int {
 		if cerr := formal.Classify(p, s, *class, *evidence, *story); cerr != nil {
 			return e.Fail(cerr)
 		}
-		head, _ := gitx.Head(p.Root)
+		head, err := gitx.Head(p.Root)
+		if err != nil {
+			return e.Fail(err)
+		}
 		if *class == "possible-bug" {
 			fmt.Fprintf(e.Stdout, "sync: %s: possible-bug recorded (%s); read_at stays at %s\n", s.Spec, *story, gitx.Short(old))
 		} else {
@@ -343,7 +347,10 @@ func runFormalSync(e *Env, args []string) int {
 		default:
 			fmt.Fprintf(e.Stdout, "%s: %d commit(s) touched its sources since %s\n", s.Spec, len(commits), gitx.Short(s.Sources.ReadAt))
 			for _, c := range commits {
-				files, _ := gitx.FilesOfCommit(p.Root, c)
+				files, err := gitx.FilesOfCommit(p.Root, c)
+				if err != nil {
+					return e.Fail(err)
+				}
 				var touched []string
 				for _, f := range files {
 					if project.Match(s.Sources.Paths, f) {

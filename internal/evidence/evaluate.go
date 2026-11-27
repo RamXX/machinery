@@ -220,6 +220,9 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 			missing = append(missing, name)
 		}
 	}
+	if v.err != nil { // a git failure decides nothing (section 10.1)
+		return nil, v.err
+	}
 	sort.Strings(missing)
 	for _, name := range missing {
 		refuse(Dir(p)+"/"+name, gone, "run the tests again through machinery run")

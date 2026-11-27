@@ -341,7 +341,11 @@ func pruneStale(p *project.Project, head string) error {
 		if err != nil {
 			return err
 		}
-		if fd.Header == nil || !v.valid(fd.Header.Commit) {
+		valid := fd.Header != nil && v.valid(fd.Header.Commit)
+		if v.err != nil { // a git failure deletes nothing (section 10.1)
+			return v.err
+		}
+		if !valid {
 			if err := os.Remove(p.Abs(rel)); err != nil {
 				return err
 			}

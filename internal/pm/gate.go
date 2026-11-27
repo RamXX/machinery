@@ -36,7 +36,27 @@ func StoryGate(d *design.Design, is *backlog.Issue, issues []backlog.Issue) (*re
 		return nil, err
 	}
 	s.Count(len(ids), "ids").Count(len(t.Proofs), "proofs").Count(len(t.Predictions), "predictions").Count(len(t.Verdicts), "verdicts")
-	valid := func(commit string) bool { return commit != "" && evidence.ValidFor(p, ev.Head, commit) }
+	// the evidence is valid for a commit of a proof, a prediction or a verdict
+	// when section 10.1 says so; a git failure stops the gate
+	validAt := map[string]bool{}
+	commits := []string{}
+	for _, pr := range t.Proofs {
+		commits = append(commits, pr.Commit)
+	}
+	for _, st := range append(append([]backlog.Stamp{}, t.Predictions...), t.Verdicts...) {
+		commits = append(commits, st.Commit)
+	}
+	for _, c := range commits {
+		if _, seen := validAt[c]; seen || c == "" {
+			continue
+		}
+		ok, err := evidence.ValidFor(p, ev.Head, c)
+		if err != nil {
+			return nil, err
+		}
+		validAt[c] = ok
+	}
+	valid := func(commit string) bool { return validAt[commit] }
 	short := gitx.Short(ev.Head)
 	if ev.Dirty {
 		s.Errorf("working tree has uncommitted changes")
@@ -151,7 +171,10 @@ func DesignStoryGate(d *design.Design, is *backlog.Issue, intake *Intake, design
 			s.Errorf("design: %s: %s", st.Name, OutcomeLine(st))
 		}
 	}
-	if dirty, err := gitx.Dirty(d.P.Root, d.P.Cfg.Receipts.Dir+"/"); err != nil || dirty {
+	switch dirty, err := gitx.Dirty(d.P.Root, d.P.Cfg.Receipts.Dir+"/"); {
+	case err != nil:
+		s.Errorf("git status: %v", err)
+	case dirty:
 		s.Errorf("working tree has uncommitted changes")
 	}
 	reviews := 0

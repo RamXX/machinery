@@ -40,11 +40,16 @@ func Scope(ctx *Context) *report.Stage {
 	}
 	mb, err := gitx.MergeBase(p.Root, ctx.Base, "HEAD")
 	if err != nil {
-		return s.NotDemonstrated(fmt.Sprintf("no merge base of %s and HEAD: %v", ctx.Base, err))
+		s.Errorf("git merge-base: %v", err)
+		return s
+	}
+	if mb == "" {
+		return s.NotDemonstrated(fmt.Sprintf("no merge base of %s and HEAD", ctx.Base))
 	}
 	files, err := gitx.StagedSince(p.Root, mb)
 	if err != nil {
-		return s.NotDemonstrated("git diff: " + err.Error())
+		s.Errorf("git diff-index: %v", err)
+		return s
 	}
 	sort.Strings(files)
 	// the owed list and the baselines are pruned by the builder and held by the ratchet

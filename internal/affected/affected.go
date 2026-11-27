@@ -43,7 +43,11 @@ func Compute(p *project.Project, d *design.Design, ref string) ([]string, error)
 
 	// 1. new or different entries of obligations.json
 	base := map[string]baseEntry{}
-	if data, ok := gitx.Show(p.Root, ref, strings.TrimSuffix(p.Cfg.Design.Gen, "/")+"/obligations.json"); ok {
+	data, ok, err := gitx.Show(p.Root, ref, strings.TrimSuffix(p.Cfg.Design.Gen, "/")+"/obligations.json")
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		var doc struct {
 			Obligations []baseEntry `json:"obligations"`
 		}

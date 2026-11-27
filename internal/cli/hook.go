@@ -120,7 +120,13 @@ func hookSessionStart(e *Env, in *hook.Input) (*hook.Output, error) {
 		}
 	}
 	lines = hook.Cap(lines, 30, "run machinery status")
-	if hook.SafeSession(in.SessionID) && gitx.IsRepo(p.Root) {
+	repo := false
+	if hook.SafeSession(in.SessionID) {
+		if repo, err = gitx.IsRepo(p.Root); err != nil {
+			return nil, err
+		}
+	}
+	if repo {
 		if err := recordSession(p, in.SessionID); err != nil {
 			return nil, err
 		}
@@ -157,7 +163,10 @@ func recordSession(p *project.Project, id string) error {
 	if _, err := os.Stat(path); err == nil {
 		return nil
 	}
-	head, _ := gitx.Head(p.Root)
+	head, _, err := gitx.Commit(p.Root, "HEAD") // "" before the first commit
+	if err != nil {
+		return err
+	}
 	sid, _ := json.Marshal(id)
 	sha, _ := json.Marshal(head)
 	return project.WriteFileAtomic(path, []byte(fmt.Sprintf("{\"version\": 1, \"session\": %s, \"head\": %s}\n", sid, sha)))
@@ -213,7 +222,11 @@ func hookPreTool(e *Env, in *hook.Input) (*hook.Output, error) {
 			findings = append(findings, redFinding(p, red, base))
 		}
 	}
-	findings = append(findings, hookCheck(p, base, branchStory(p))...)
+	story, err := branchStory(p)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, hookCheck(p, base, story)...)
 	if len(findings) == 0 {
 		return nil, nil
 	}
@@ -237,19 +250,19 @@ func redFinding(p *project.Project, red *landing.Red, base string) string {
 
 // branchStory returns the current branch when it names an item of the
 // backlog (section 21.1), else "".
-func branchStory(p *project.Project) string {
-	branch := gitx.Branch(p.Root)
-	if p.Cfg.Backlog == nil || branch == "" {
-		return ""
+func branchStory(p *project.Project) (string, error) {
+	branch, err := gitx.Branch(p.Root)
+	if err != nil || p.Cfg.Backlog == nil || branch == "" {
+		return "", err
 	}
 	c, err := backlog.New(p, "")
 	if err != nil {
-		return ""
+		return "", nil
 	}
 	if _, err := c.Show(branch); err != nil {
-		return ""
+		return "", nil
 	}
-	return branch
+	return branch, nil
 }
 
 // hookCheck runs the stages of machinery check, with the ratchet against base
@@ -265,15 +278,18 @@ func hookCheck(p *project.Project, base, story string) []string {
 	ctx := &stages.Context{P: p}
 	var tail []string
 	if base != "" {
-		if _, err := gitx.Head(p.Root); err == nil {
-			if _, err := gitx.Resolve(p.Root, base); err == nil {
-				names, ctx.Base = append(names, "ratchet"), base
-				if story != "" {
-					names, ctx.Story = append(names, "scope"), story
-				}
-			} else {
-				tail = append(tail, "ratchet: not demonstrated: base "+base+" is not a commit; set backlog.base to the integration branch")
+		// before the first commit there is nothing to compare
+		switch born, known, err := baseKnown(p, base); {
+		case err != nil:
+			tail = append(tail, "ratchet: ERROR  "+err.Error())
+		case !born:
+		case known:
+			names, ctx.Base = append(names, "ratchet"), base
+			if story != "" {
+				names, ctx.Story = append(names, "scope"), story
 			}
+		default:
+			tail = append(tail, "ratchet: not demonstrated: base "+base+" is not a commit; set backlog.base to the integration branch")
 		}
 	}
 	var findings []string
@@ -281,6 +297,15 @@ func hookCheck(p *project.Project, base, story string) []string {
 		findings = append(findings, hook.StageFindings(s)...)
 	}
 	return append(findings, tail...)
+}
+
+// baseKnown reports whether HEAD has a commit and whether base names one.
+func baseKnown(p *project.Project, base string) (born, known bool, err error) {
+	if _, born, err = gitx.Commit(p.Root, "HEAD"); err != nil || !born {
+		return born, false, err
+	}
+	_, known, err = gitx.Commit(p.Root, base)
+	return born, known, err
 }
 
 func hookStop(e *Env, in *hook.Input) (*hook.Output, error) {
@@ -335,6 +360,9 @@ func changedThisSession(p *project.Project, id string) (bool, error) {
 	if err := json.Unmarshal(data, &rec); err != nil {
 		return false, fmt.Errorf("%s: %v", filepath.Base(path), err)
 	}
-	head, _ := gitx.Head(p.Root)
+	head, _, err := gitx.Commit(p.Root, "HEAD")
+	if err != nil {
+		return false, err
+	}
 	return head != rec.Head, nil
 }

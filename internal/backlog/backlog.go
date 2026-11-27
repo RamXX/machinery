@@ -48,7 +48,11 @@ func New(p *project.Project, actor string) (*Client, error) {
 	if p.Cfg.Backlog == nil {
 		return nil, project.Errf("no backlog configured: set backlog.tool: bd in %s", project.ConfigName)
 	}
-	c := &Client{p: p, exe: p.Cfg.Tools.BD, Actor: ResolveActor(p, actor)}
+	who, err := ResolveActor(p, actor)
+	if err != nil {
+		return nil, err
+	}
+	c := &Client{p: p, exe: p.Cfg.Tools.BD, Actor: who}
 	if out, err := exec.Command(c.exe, "--version").CombinedOutput(); err != nil {
 		reason := err.Error()
 		if msg := strings.TrimSpace(string(out)); msg != "" {
@@ -60,12 +64,12 @@ func New(p *project.Project, actor string) (*Client, error) {
 }
 
 // ResolveActor implements the actor rule of section 15.1.
-func ResolveActor(p *project.Project, flag string) string {
+func ResolveActor(p *project.Project, flag string) (string, error) {
 	if flag != "" {
-		return flag
+		return flag, nil
 	}
 	if env := os.Getenv("BEADS_ACTOR"); env != "" {
-		return env
+		return env, nil
 	}
 	return gitx.UserName(p.Root)
 }

@@ -27,8 +27,12 @@ func runLearnings(e *Env, args []string) int {
 	}
 	sha := ""
 	if *since != "" {
+		var known bool
 		var err error
-		if sha, err = gitx.Resolve(p.Root, *since); err != nil {
+		if sha, known, err = gitx.Commit(p.Root, *since); err != nil {
+			return e.Fail(err)
+		}
+		if !known {
 			return e.Usage("--since %s: not a commit of the project", *since)
 		}
 	}
@@ -40,7 +44,10 @@ func runLearnings(e *Env, args []string) int {
 	if err != nil {
 		return e.Fail(err)
 	}
-	groups, stories := pm.Learnings(p.Root, issues, sha)
+	groups, stories, err := pm.Learnings(p.Root, issues, sha)
+	if err != nil {
+		return e.Fail(err)
+	}
 	for _, g := range groups {
 		switch {
 		case g.Intake == "":

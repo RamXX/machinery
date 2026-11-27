@@ -32,8 +32,9 @@ type goTestFile struct {
 	// parser, as <line>:<column>: <message>, or the error of the read
 	Err string
 	// Constrained: the file carries a build constraint, a //go:build or
-	// // +build line or a name go builds only for some systems, so a run
-	// may not have built it (section 10.3)
+	// // +build line, a name go builds only for some systems, or an import
+	// of "C" (cgo off leaves it out), so a run may not have built it
+	// (section 10.3)
 	Constrained bool
 }
 
@@ -116,7 +117,7 @@ func parseGoTest(name string, data []byte) *goTestFile {
 		f.Broken, f.Err = true, parseError(err)
 		return f
 	}
-	f.Constrained = constrainedName(path.Base(name)) || constrainedHeader(tree)
+	f.Constrained = constrainedName(path.Base(name)) || constrainedHeader(tree) || importsC(tree)
 	for _, decl := range tree.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok {
@@ -146,6 +147,17 @@ func constrainedHeader(tree *ast.File) bool {
 			if constraint.IsGoBuild(c.Text) || constraint.IsPlusBuild(c.Text) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// importsC reports a file that uses cgo: go leaves it out of every build
+// with cgo off, whatever its other constraints say.
+func importsC(tree *ast.File) bool {
+	for _, im := range tree.Imports {
+		if im.Path != nil && im.Path.Value == `"C"` {
+			return true
 		}
 	}
 	return false

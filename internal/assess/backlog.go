@@ -52,12 +52,17 @@ func joinCounts(m map[string]int) string {
 // the tracker, and lists the other local branches.
 func (a *assessment) backlog(s *section) {
 	var branches []string
-	if all, err := gitx.Branches(a.root); err == nil {
-		cur := gitx.Branch(a.root)
-		for _, b := range all {
-			if b != cur {
-				branches = append(branches, b)
-			}
+	all, err := gitx.Branches(a.root)
+	if err != nil {
+		s.own.Errorf("git: %v", err)
+	}
+	cur, err := gitx.Branch(a.root)
+	if err != nil {
+		s.own.Errorf("git: %v", err)
+	}
+	for _, b := range all {
+		if b != cur {
+			branches = append(branches, b)
 		}
 	}
 	if branches == nil {

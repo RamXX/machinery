@@ -420,18 +420,29 @@ func (st *IntakeStatus) planned(issues []backlog.Issue) Step {
 func (ds *DesignState) newIDs(commit string) ([]NewID, []string, string) {
 	d := ds.D
 	root := d.P.Root
-	if !gitx.Exists(root, commit) {
+	switch ok, err := gitx.Exists(root, commit); {
+	case err != nil:
+		return nil, nil, "git failed: " + err.Error()
+	case !ok:
 		return nil, nil, fmt.Sprintf("base commit %s is not in this repository", gitx.Short(commit))
+	}
+	var gitErr error
+	show := func(rel string) ([]byte, bool) {
+		data, ok, err := gitx.Show(root, commit, rel)
+		if err != nil && gitErr == nil {
+			gitErr = err
+		}
+		return data, ok
 	}
 	had := map[string]bool{}
 	genDir, statusFile := d.P.Cfg.Design.Gen, d.P.Cfg.Design.Status
-	if raw, ok := gitx.Show(root, commit, project.ConfigName); ok {
+	if raw, ok := show(project.ConfigName); ok {
 		if bcfg, err := project.Parse(raw); err == nil {
 			genDir, statusFile = bcfg.Design.Gen, bcfg.Design.Status
 		}
 	}
 	wasProposed := map[string]bool{}
-	if data, ok := gitx.Show(root, commit, statusFile); ok {
+	if data, ok := show(statusFile); ok {
 		l, _ := design.ParseStatus(statusFile, data)
 		for _, e := range l.Proposed {
 			for _, id := range d.DeclaredIDs() {
@@ -441,7 +452,7 @@ func (ds *DesignState) newIDs(commit string) ([]NewID, []string, string) {
 			}
 		}
 	}
-	if data, ok := gitx.Show(root, commit, strings.TrimSuffix(genDir, "/")+"/obligations.json"); ok {
+	if data, ok := show(strings.TrimSuffix(genDir, "/") + "/obligations.json"); ok {
 		var inv struct {
 			Obligations []struct {
 				ID string `json:"id"`
@@ -459,6 +470,9 @@ func (ds *DesignState) newIDs(commit string) ([]NewID, []string, string) {
 		for _, a := range inv.Served {
 			had[a.ID] = true
 		}
+	}
+	if gitErr != nil {
+		return nil, nil, "git failed: " + gitErr.Error()
 	}
 	var res []NewID
 	for _, id := range d.AllIDs() {

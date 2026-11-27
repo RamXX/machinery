@@ -96,7 +96,7 @@ type LearningGroup struct {
 // With since set (a full sha), a story counts only when one of its proof
 // commits is neither since nor an ancestor of it. stories counts the stories
 // that gave a line.
-func Learnings(root string, issues []backlog.Issue, since string) (groups []LearningGroup, stories int) {
+func Learnings(root string, issues []backlog.Issue, since string) (groups []LearningGroup, stories int, err error) {
 	byID := map[string]*backlog.Issue{}
 	for i := range issues {
 		byID[issues[i].ID] = &issues[i]
@@ -109,8 +109,17 @@ func Learnings(root string, issues []backlog.Issue, since string) (groups []Lear
 			continue
 		}
 		t := backlog.ParseTags(&is)
-		if len(t.Learnings) == 0 || (since != "" && !provenAfter(root, t.Proofs, since)) {
+		if len(t.Learnings) == 0 {
 			continue
+		}
+		if since != "" {
+			after, err := provenAfter(root, t.Proofs, since)
+			if err != nil {
+				return nil, 0, err
+			}
+			if !after {
+				continue
+			}
 		}
 		in := storyIntake(&is, t, byID)
 		i, ok := at[in]
@@ -135,7 +144,7 @@ func Learnings(root string, issues []backlog.Issue, since string) (groups []Lear
 		}
 		return a < b
 	})
-	return groups, stories
+	return groups, stories, nil
 }
 
 // CountLearnings counts the lines of the groups.
@@ -149,13 +158,27 @@ func CountLearnings(groups []LearningGroup) int {
 
 // provenAfter reports whether one of the proof commits is neither since nor
 // an ancestor of it; a commit this repository does not have counts.
-func provenAfter(root string, proofs []backlog.Proof, since string) bool {
+func provenAfter(root string, proofs []backlog.Proof, since string) (bool, error) {
 	for _, p := range proofs {
-		if p.Commit != since && !gitx.IsAncestor(root, p.Commit, since) {
-			return true
+		if p.Commit == since {
+			continue
+		}
+		have, err := gitx.Exists(root, p.Commit)
+		if err != nil {
+			return false, err
+		}
+		if !have {
+			return true, nil
+		}
+		before, err := gitx.IsAncestor(root, p.Commit, since)
+		if err != nil {
+			return false, err
+		}
+		if !before {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // storyIntake is the intake a story belongs to: the one its machinery:intake
@@ -172,7 +195,7 @@ func storyIntake(is *backlog.Issue, t backlog.Tags, byID map[string]*backlog.Iss
 
 // LastPlanned is the newest commit of a machinery:intake-planned line of any
 // intake item that this repository has, or "".
-func LastPlanned(root string, issues []backlog.Issue) string {
+func LastPlanned(root string, issues []backlog.Issue) (string, error) {
 	seen := map[string]bool{}
 	var shas []string
 	for i := range issues {
@@ -181,8 +204,15 @@ func LastPlanned(root string, issues []backlog.Issue) string {
 			continue
 		}
 		for _, m := range t.Planned {
-			if !seen[m.Commit] && gitx.Exists(root, m.Commit) {
-				seen[m.Commit] = true
+			if seen[m.Commit] {
+				continue
+			}
+			seen[m.Commit] = true
+			have, err := gitx.Exists(root, m.Commit)
+			if err != nil {
+				return "", err
+			}
+			if have {
 				shas = append(shas, m.Commit)
 			}
 		}
@@ -192,16 +222,22 @@ func LastPlanned(root string, issues []backlog.Issue) string {
 
 // LearningsReminder is the line intake plan prints when closed stories carry
 // learnings the planner has not read since the last plan (section 15.7), or "".
-func LearningsReminder(root string, issues []backlog.Issue) string {
-	since := LastPlanned(root, issues)
-	groups, _ := Learnings(root, issues, since)
+func LearningsReminder(root string, issues []backlog.Issue) (string, error) {
+	since, err := LastPlanned(root, issues)
+	if err != nil {
+		return "", err
+	}
+	groups, _, err := Learnings(root, issues, since)
+	if err != nil {
+		return "", err
+	}
 	n := CountLearnings(groups)
 	switch {
 	case n == 0:
-		return ""
+		return "", nil
 	case since == "":
-		return fmt.Sprintf("learnings: %d unread; machinery learnings", n)
+		return fmt.Sprintf("learnings: %d unread; machinery learnings", n), nil
 	}
 	short := gitx.Short(since)
-	return fmt.Sprintf("learnings: %d unread since %s; machinery learnings --since %s", n, short, short)
+	return fmt.Sprintf("learnings: %d unread since %s; machinery learnings --since %s", n, short, short), nil
 }

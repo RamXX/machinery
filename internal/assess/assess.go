@@ -147,8 +147,11 @@ func (a *assessment) inputs() error {
 		return err
 	}
 	for _, ref := range o.Since {
-		sha, rerr := gitx.Resolve(a.root, ref)
-		if rerr != nil || sha == "" {
+		sha, known, err := gitx.Commit(a.root, ref)
+		if err != nil {
+			return err
+		}
+		if !known {
 			return usagef("--since %s: not a commit of the project", ref)
 		}
 		a.since = append(a.since, sinceRef{label: ref, sha: sha})

@@ -18,13 +18,22 @@ var SyncClasses = map[string]bool{"no-effect": true, "model-drift": true, "promi
 // Drift lists the commits after read_at that touch a source path, newest
 // first. problem is non-empty when read_at cannot be used.
 func Drift(p *project.Project, s *Spec) (commits []string, problem string) {
-	if !gitx.IsRepo(p.Root) {
+	switch repo, err := gitx.IsRepo(p.Root); {
+	case err != nil:
+		return nil, "git failed: " + err.Error()
+	case !repo:
 		return nil, "sources.read_at needs a git repository"
 	}
-	if !gitx.Exists(p.Root, s.Sources.ReadAt) {
+	switch ok, err := gitx.Exists(p.Root, s.Sources.ReadAt); {
+	case err != nil:
+		return nil, "git failed: " + err.Error()
+	case !ok:
 		return nil, fmt.Sprintf("sources.read_at %s is not a commit", gitx.Short(s.Sources.ReadAt))
 	}
-	if !gitx.IsAncestor(p.Root, s.Sources.ReadAt, "HEAD") {
+	switch ok, err := gitx.IsAncestor(p.Root, s.Sources.ReadAt, "HEAD"); {
+	case err != nil:
+		return nil, "git failed: " + err.Error()
+	case !ok:
 		return nil, fmt.Sprintf("sources.read_at %s is not an ancestor of the current commit", gitx.Short(s.Sources.ReadAt))
 	}
 	var specs []string
@@ -37,7 +46,7 @@ func Drift(p *project.Project, s *Spec) (commits []string, problem string) {
 	specs = append(specs, ":(exclude,glob)"+s.Dir+"/traces/**", ":(exclude)"+BaselinePath(p))
 	cs, err := gitx.CommitsTouching(p.Root, s.Sources.ReadAt, specs)
 	if err != nil {
-		return nil, "git log failed: " + err.Error()
+		return nil, "git rev-list failed: " + err.Error()
 	}
 	return cs, ""
 }
@@ -51,25 +60,31 @@ func (s *Spec) PendingBug() (story string, pending bool) {
 }
 
 // changedSinceRead reports whether a file of the spec differs from its content at read_at.
-func changedSinceRead(p *project.Project, s *Spec) bool {
+func changedSinceRead(p *project.Project, s *Spec) (bool, error) {
 	for _, f := range []string{s.SkeletonPath(), s.PropsPath()} {
 		now, _ := p.Read(f)
-		then, ok := gitx.Show(p.Root, s.Sources.ReadAt, f)
+		then, ok, err := gitx.Show(p.Root, s.Sources.ReadAt, f)
+		if err != nil {
+			return false, err
+		}
 		if !ok || !bytes.Equal(now, then) {
-			return true
+			return true, nil
 		}
 	}
-	then, ok := gitx.Show(p.Root, s.Sources.ReadAt, s.Path)
+	then, ok, err := gitx.Show(p.Root, s.Sources.ReadAt, s.Path)
+	if err != nil {
+		return false, err
+	}
 	if !ok {
-		return true
+		return true, nil
 	}
 	var old Manifest
 	if yaml.Unmarshal(then, &old) != nil {
-		return true
+		return true, nil
 	}
 	a, _ := json.Marshal(old)
 	b, _ := json.Marshal(s.Manifest)
-	return !bytes.Equal(a, b)
+	return !bytes.Equal(a, b), nil
 }
 
 // Classify records a drift classification in the manifest (comments are kept).
@@ -83,7 +98,11 @@ func Classify(p *project.Project, s *Spec, class, evidence, story string) error 
 	}
 	switch class {
 	case "model-drift":
-		if !changedSinceRead(p, s) {
+		changed, err := changedSinceRead(p, s)
+		if err != nil {
+			return err
+		}
+		if !changed {
 			return fmt.Errorf("%s: model-drift needs a change to the spec since %s; the model is updated from the code first", s.Spec, gitx.Short(s.Sources.ReadAt))
 		}
 	case "promise-change":

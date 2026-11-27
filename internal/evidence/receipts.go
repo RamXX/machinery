@@ -285,9 +285,11 @@ func VerdictChanges(p *project.Project) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	seen := map[string]bool{}
 	var res []string
 	for _, rel := range paths {
-		if p.Cfg.VerdictFile(rel) {
+		if p.Cfg.VerdictFile(rel) && !seen[rel] {
+			seen[rel] = true
 			res = append(res, rel)
 		}
 	}
@@ -344,6 +346,16 @@ type validity struct {
 	// exempted: a valid commit -> each glob of evidence.exempt -> the paths
 	// changed since that commit that it matches
 	exempted map[string]map[string]int
+	// err: the first git failure; a commit it left undecided is not valid,
+	// and the caller stops on it (section 10.1)
+	err error
+}
+
+// fail records the first git failure.
+func (v *validity) fail(err error) {
+	if v.err == nil {
+		v.err = err
+	}
 }
 
 // through returns how many commits lead from a valid commit to the head.
@@ -354,7 +366,10 @@ func (v *validity) through(commit string) int {
 	if n, ok := v.count[commit]; ok {
 		return n
 	}
-	n, _ := gitx.CountCommits(v.p.Root, commit, v.head)
+	n, err := gitx.CountCommits(v.p.Root, commit, v.head)
+	if err != nil {
+		v.fail(err)
+	}
 	v.count[commit] = n
 	return n
 }
@@ -386,8 +401,10 @@ func (v *validity) Exempted(commit string) []int {
 }
 
 // ValidFor reports whether evidence from commit is valid for head (section 10.1).
-func ValidFor(p *project.Project, head, commit string) bool {
-	return newValidity(p, head).valid(commit)
+func ValidFor(p *project.Project, head, commit string) (bool, error) {
+	v := newValidity(p, head)
+	ok := v.valid(commit)
+	return ok, v.err
 }
 
 func newValidity(p *project.Project, head string) *validity {
@@ -398,34 +415,47 @@ func (v *validity) valid(commit string) bool {
 	if ok, seen := v.cache[commit]; seen {
 		return ok
 	}
-	ok := false
-	// a run of a commit that is not an ancestor of the head is never valid,
-	// whatever its tree (section 10.1)
-	if commit != "" && gitx.Exists(v.p.Root, commit) && gitx.IsAncestor(v.p.Root, commit, v.head) {
-		changes, err := gitx.DiffChanges(v.p.Root, commit, v.head)
-		if err == nil {
-			ok = true
-			seen, counts := map[string]bool{}, map[string]int{}
-			for _, c := range changes {
-				if !exemptAcross(v.p, c) {
-					ok = false
-					break
-				}
-				if seen[c.Path] || v.p.Cfg.ToolOwned(c.Path) {
-					continue
-				}
-				seen[c.Path] = true
-				for _, g := range v.p.Cfg.EvidenceExempt() {
-					if project.Match([]string{g}, c.Path) {
-						counts[g]++
-					}
-				}
-			}
-			if ok {
-				v.exempted[commit] = counts
-			}
-		}
+	ok, err := v.across(commit)
+	if err != nil {
+		v.fail(err)
+		return false // undecided: not cached, the caller stops on v.err
 	}
 	v.cache[commit] = ok
 	return ok
+}
+
+// across decides a commit other than the head: a run of a commit that is not
+// an ancestor of the head is never valid, whatever its tree, and one that is
+// is valid when every path changed since is exempt (section 10.1).
+func (v *validity) across(commit string) (bool, error) {
+	if commit == "" {
+		return false, nil
+	}
+	if ok, err := gitx.Exists(v.p.Root, commit); !ok || err != nil {
+		return false, err
+	}
+	if ok, err := gitx.IsAncestor(v.p.Root, commit, v.head); !ok || err != nil {
+		return false, err
+	}
+	changes, err := gitx.DiffChanges(v.p.Root, commit, v.head)
+	if err != nil {
+		return false, err
+	}
+	seen, counts := map[string]bool{}, map[string]int{}
+	for _, c := range changes {
+		if !exemptAcross(v.p, c) {
+			return false, nil
+		}
+		if seen[c.Path] || v.p.Cfg.ToolOwned(c.Path) {
+			continue
+		}
+		seen[c.Path] = true
+		for _, g := range v.p.Cfg.EvidenceExempt() {
+			if project.Match([]string{g}, c.Path) {
+				counts[g]++
+			}
+		}
+	}
+	v.exempted[commit] = counts
+	return true, nil
 }

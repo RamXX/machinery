@@ -219,7 +219,11 @@ func (p *Project) checkExempt() error {
 // records. Nothing outside git.
 func (p *Project) submodules() (links map[string]bool, subs []string, err error) {
 	links = map[string]bool{}
-	if !gitx.IsRepo(p.Root) {
+	repo, err := gitx.IsRepo(p.Root)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !repo {
 		return links, nil, nil
 	}
 	gl, err := gitx.Gitlinks(p.Root)
@@ -331,11 +335,17 @@ func splitAlternatives(s string) []string {
 // listed returns the files of the project git knows of and does not ignore,
 // sorted, or every file below the root when it is no git work tree.
 func (p *Project) listed() ([]string, error) {
-	if gitx.IsRepo(p.Root) {
-		if files, err := gitx.Listed(p.Root); err == nil {
-			sort.Strings(files)
-			return files, nil
-		}
+	repo, err := gitx.IsRepo(p.Root)
+	if err != nil {
+		return nil, err
 	}
-	return p.Files()
+	if !repo {
+		return p.Files()
+	}
+	files, err := gitx.Listed(p.Root)
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(files)
+	return files, nil
 }

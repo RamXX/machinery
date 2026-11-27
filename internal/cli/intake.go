@@ -152,7 +152,11 @@ func runIntakePlan(e *Env, args []string) int {
 		}
 	}
 	plan := st.Plan(ds.D)
-	if line := pm.LearningsReminder(p.Root, issues); line != "" {
+	line, err := pm.LearningsReminder(p.Root, issues)
+	if err != nil {
+		return e.Fail(err)
+	}
+	if line != "" {
 		fmt.Fprintln(e.Stdout, line)
 	}
 	if len(st.NewIDs) == 0 {

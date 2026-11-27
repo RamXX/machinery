@@ -63,7 +63,11 @@ func (a *assessment) history(s *section) {
 		seen := map[string]bool{}
 		for _, rel := range models {
 			sha, err := gitx.FirstAdd(a.root, rel)
-			if err != nil || sha == "" {
+			if err != nil {
+				s.own.Errorf("%s: %v", rel, err)
+				continue
+			}
+			if sha == "" {
 				s.lines = append(s.lines, rel+": no commit adds it")
 				continue
 			}
@@ -91,7 +95,11 @@ func (a *assessment) history(s *section) {
 	for _, ref := range refs {
 		old := map[string][]byte{}
 		for _, rel := range models {
-			if data, ok := gitx.Show(a.root, ref.sha, rel); ok {
+			data, ok, err := gitx.Show(a.root, ref.sha, rel)
+			if err != nil {
+				s.own.Errorf("at %s: %v", gitx.Short(ref.sha), err)
+			}
+			if ok {
 				old[rel] = data
 			}
 		}

@@ -75,11 +75,15 @@ func load(path string) (*store, error) {
 	return st, nil
 }
 
-func branchKey(p *project.Project) string {
-	if b := gitx.Branch(p.Root); b != "" {
-		return b
+func branchKey(p *project.Project) (string, error) {
+	b, err := gitx.Branch(p.Root)
+	if err != nil {
+		return "", err
 	}
-	return "(detached)"
+	if b == "" {
+		return "(detached)", nil
+	}
+	return b, nil
 }
 
 // Begin counts the attempt about to run at head: an attempt at a new head
@@ -93,7 +97,11 @@ func Begin(p *project.Project, head string) (Attempt, error) {
 	if err != nil {
 		return Attempt{}, err
 	}
-	rec, ok := st.Branches[branchKey(p)]
+	key, err := branchKey(p)
+	if err != nil {
+		return Attempt{}, err
+	}
+	rec, ok := st.Branches[key]
 	if !ok {
 		return Attempt{N: 1}, nil
 	}
@@ -114,7 +122,10 @@ func Finish(p *project.Project, a Attempt, head string, passed bool) error {
 	if err != nil {
 		return err
 	}
-	key := branchKey(p)
+	key, err := branchKey(p)
+	if err != nil {
+		return err
+	}
 	if passed {
 		delete(st.Branches, key)
 	} else {

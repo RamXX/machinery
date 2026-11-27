@@ -50,7 +50,9 @@ func Brief(w io.Writer, d *design.Design, is *backlog.Issue, role string, ids []
 		fmt.Fprintf(w, "agent: %s\n", agent)
 	}
 	head := "none"
-	if h, err := gitx.Head(p.Root); err == nil {
+	if h, err := gitx.HeadIfAny(p.Root); err != nil {
+		return err
+	} else if h != "" {
 		head = gitx.Short(h)
 	}
 	fmt.Fprintf(w, "contract: %s at %s\n", ContractOf(d).Short(), head)
@@ -252,7 +254,10 @@ func weakenedSince(d *design.Design, base string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	data, ok := gitx.Show(p.Root, base, formal.BaselinePath(p))
+	data, ok, err := gitx.Show(p.Root, base, formal.BaselinePath(p))
+	if err != nil {
+		return nil, err
+	}
 	var readErr error
 	if !ok {
 		readErr = fmt.Errorf("absent at %s", base)

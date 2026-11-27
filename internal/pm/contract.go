@@ -63,7 +63,11 @@ var ErrNoRepo = errors.New("the project is not in a git repository")
 
 // WavePath returns the absolute path of the wave file.
 func WavePath(p *project.Project) (string, error) {
-	if !gitx.IsRepo(p.Root) {
+	repo, err := gitx.IsRepo(p.Root)
+	if err != nil {
+		return "", err
+	}
+	if !repo {
 		return "", ErrNoRepo
 	}
 	dir, err := gitx.CommonDir(p.Root)

@@ -42,9 +42,12 @@ func runAffected(e *Env, args []string) int {
 // CheckRef reports whether ref names a commit; otherwise it prints the usage
 // error and the caller exits 2.
 func (e *Env) CheckRef(p *project.Project, ref string) bool {
-	if _, err := gitx.Resolve(p.Root, ref); err != nil {
+	_, known, err := gitx.Commit(p.Root, ref)
+	switch {
+	case err != nil:
+		e.Usage("git ref %s: %v", ref, err)
+	case !known:
 		e.Usage("unknown git ref %s", ref)
-		return false
 	}
-	return true
+	return err == nil && known
 }

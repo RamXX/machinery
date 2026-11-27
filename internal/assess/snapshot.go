@@ -21,12 +21,15 @@ func ResolveRoot(projectFlag string) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		root = wd
 		if r, ferr := project.Find(wd); ferr == nil {
 			root = r
-		} else if top, terr := gitx.TopLevel(wd); terr == nil {
-			root = top
-		} else {
-			root = wd
+		} else if repo, err := gitx.IsRepo(wd); err != nil {
+			return "", err
+		} else if repo {
+			if root, err = gitx.TopLevel(wd); err != nil {
+				return "", err
+			}
 		}
 	}
 	abs, err := filepath.Abs(root)
@@ -41,8 +44,11 @@ func ResolveRoot(projectFlag string) (string, error) {
 
 // HeadOf returns the short sha of HEAD, refusing a directory without a commit.
 func HeadOf(root, verb string) (string, error) {
-	head, err := gitx.Head(root)
-	if err != nil || head == "" {
+	head, err := gitx.HeadIfAny(root)
+	if err != nil {
+		return "", err
+	}
+	if head == "" {
 		return "", usagef("%s is not a git repository with a commit; %s reads its HEAD", root, verb)
 	}
 	return gitx.Short(head), nil
@@ -53,11 +59,20 @@ func HeadOf(root, verb string) (string, error) {
 // that holds it.
 func PrepareOut(root, out, verb string) (string, error) {
 	containers := []string{root}
-	if top, err := gitx.TopLevel(root); err == nil && top != "" {
-		containers = append(containers, gitx.RealPath(top))
+	repo, err := gitx.IsRepo(root)
+	if err != nil {
+		return "", err
 	}
-	if gd, err := gitx.CommonDir(root); err == nil {
-		containers = append(containers, gitx.RealPath(gd))
+	if repo {
+		top, err := gitx.TopLevel(root)
+		if err != nil {
+			return "", err
+		}
+		gd, err := gitx.CommonDir(root)
+		if err != nil {
+			return "", err
+		}
+		containers = append(containers, gitx.RealPath(top), gitx.RealPath(gd))
 	}
 	inside := func(p string) string {
 		rp := gitx.RealPath(p)
