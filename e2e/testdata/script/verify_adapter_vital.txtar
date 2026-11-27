@@ -1,0 +1,19 @@
+# by default adapter evidence never satisfies an id of a vital area (sections 10.3 and 23)
+fixture shop
+fixture shop-formal
+fixture shop-vital
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+exec mrun 1 verify
+stdout '^  warn   adapter: inv:paid-before-shipped not counted: a test that names it passed \(function granularity\); it is in a vital area \(order-payment\): it needs a receipt the test emits after its own assertions$'
+stdout '^  warn   adapter: fm:payment-provider-down not counted: a test that names it passed \(file granularity\); it is in a vital area \(order-payment\): it needs a receipt the test emits after its own assertions$'
+stdout -count=2 'not counted'
+stdout '^  ERROR  unproven: inv:paid-before-shipped$'
+! stdout 'vital: inv:paid-before-shipped proven'
+! stdout 'stale owed entry: fm:payment-provider-down'
+exec machinery status
+stdout '^adapter, not counted: 2 \(inv 1, fm 1\)$'

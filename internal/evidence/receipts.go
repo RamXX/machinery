@@ -34,7 +34,13 @@ type Receipt struct {
 	Effects  []string
 	Observed string
 	Replay   string
-	File     string // project-relative receipts file
+	// Source is "adapter" for a receipt a run adapter wrote, with its
+	// Granularity (function or file) and the build Tags of the run
+	// (section 10.3); "" for a receipt a test emitted.
+	Source      string
+	Granularity string
+	Tags        any    // a list of build tags, or "unknown"
+	File        string // project-relative receipts file
 }
 
 // RunInfo describes one complete receipts file that was used as evidence.
@@ -46,6 +52,10 @@ type RunInfo struct {
 	Exit     int
 	Dirty    bool
 	Receipts int
+	// Adapter is set for a run of the adapter, with the go environment its
+	// header recorded (nil for a run through --streams)
+	Adapter bool
+	Env     *GoEnv
 }
 
 // line is any line of a receipts file.
@@ -63,6 +73,15 @@ type line struct {
 	Observed string   `json:"observed"`
 	Replay   string   `json:"replay"`
 	Exit     *int     `json:"exit"`
+
+	Source      string `json:"source"`
+	Granularity string `json:"granularity"`
+	Tags        any    `json:"tags"`
+	// Adapter names the run adapter in a header; AdapterReceipts counts, on
+	// the end line, the lines that adapter wrote right before it (section 10.3)
+	Adapter         any    `json:"adapter"`
+	AdapterReceipts *int   `json:"adapter_receipts"`
+	Environment     *GoEnv `json:"environment"`
 }
 
 // fileData is a parsed receipts file.
@@ -83,6 +102,23 @@ func parseFile(abs, rel string) (*fileData, error) {
 		return nil, err
 	}
 	fd := &fileData{Rel: rel, Sum: digest(data)}
+	type problem struct {
+		n   int
+		msg string
+	}
+	var problems []problem
+	addProblem := func(n int, format string, a ...any) {
+		problems = append(problems, problem{n, fmt.Sprintf("line %d: ", n) + fmt.Sprintf(format, a...)})
+	}
+	// receipts are kept until the end line says which lines the adapter wrote
+	type parsed struct {
+		n       int
+		r       Receipt
+		adapter bool // has source, granularity or tags
+	}
+	var recs []parsed
+	var order []int // the lines after the header that are not blank
+	endAt := 0
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	sc.Buffer(make([]byte, 64*1024), 16*1024*1024)
 	n := 0
@@ -92,12 +128,15 @@ func parseFile(abs, rel string) (*fileData, error) {
 		if text == "" {
 			continue
 		}
+		if n > 1 {
+			order = append(order, n)
+		}
 		var l line
 		if err := json.Unmarshal([]byte(text), &l); err != nil {
 			if n == 1 {
 				return fd, nil
 			}
-			fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: not a JSON object", n))
+			addProblem(n, "not a JSON object")
 			continue
 		}
 		if n == 1 {
@@ -108,27 +147,56 @@ func parseFile(abs, rel string) (*fileData, error) {
 			continue
 		}
 		if l.V != 1 {
-			fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: v must be 1", n))
+			addProblem(n, "v must be 1")
 			continue
 		}
 		switch l.Type {
 		case "receipt":
 			if msg := checkReceipt(&l); msg != "" {
-				fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: %s", n, msg))
+				addProblem(n, "%s", msg)
 				continue
 			}
-			fd.Receipts = append(fd.Receipts, Receipt{ID: l.ID, Outcome: l.Outcome, Test: l.Test,
-				Effects: l.Effects, Observed: l.Observed, Replay: l.Replay, File: rel})
+			recs = append(recs, parsed{n, Receipt{ID: l.ID, Outcome: l.Outcome, Test: l.Test,
+				Effects: l.Effects, Observed: l.Observed, Replay: l.Replay,
+				Source: l.Source, Granularity: l.Granularity, Tags: l.Tags, File: rel},
+				l.Source != "" || l.Granularity != "" || l.Tags != nil})
 		case "end":
 			if l.Exit == nil {
-				fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: end line without exit", n))
+				addProblem(n, "end line without exit")
 				continue
 			}
 			end := l
 			fd.End = &end
+			endAt = n
 		default:
-			fd.Problems = append(fd.Problems, fmt.Sprintf("line %d: unknown type %q", n, l.Type))
+			addProblem(n, "unknown type %q", l.Type)
 		}
+	}
+	// the lines the adapter wrote: those its end line counts, right before it,
+	// in a run whose header names the adapter (section 10.3)
+	byAdapter := map[int]bool{}
+	if fd.Header != nil && fd.Header.Adapter == GoTestJSON && fd.End != nil && fd.End.AdapterReceipts != nil {
+		var before []int
+		for _, k := range order {
+			if k < endAt {
+				before = append(before, k)
+			}
+		}
+		m := min(max(*fd.End.AdapterReceipts, 0), len(before))
+		for _, k := range before[len(before)-m:] {
+			byAdapter[k] = true
+		}
+	}
+	for _, p := range recs {
+		if p.adapter && !byAdapter[p.n] {
+			addProblem(p.n, "%s: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out", p.r.ID)
+			continue
+		}
+		fd.Receipts = append(fd.Receipts, p.r)
+	}
+	sort.SliceStable(problems, func(i, j int) bool { return problems[i].n < problems[j].n })
+	for _, p := range problems {
+		fd.Problems = append(fd.Problems, p.msg)
 	}
 	return fd, sc.Err()
 }
@@ -143,6 +211,12 @@ func checkReceipt(l *line) string {
 		return fmt.Sprintf("%s: receipt without test: name the test file in test", l.ID)
 	case l.Replay != "" && l.Replay != Reproduced && l.Replay != Refuted:
 		return fmt.Sprintf("%s: replay must be reproduced or refuted, got %q", l.ID, l.Replay)
+	case l.Source != "" && l.Source != SourceAdapter:
+		return fmt.Sprintf("%s: source must be adapter or absent, got %q", l.ID, l.Source)
+	case l.Source == SourceAdapter && l.Granularity != project.GranularityFunction && l.Granularity != project.GranularityFile:
+		return fmt.Sprintf("%s: granularity must be function or file, got %q", l.ID, l.Granularity)
+	case l.Source == "" && l.Granularity != "":
+		return fmt.Sprintf("%s: granularity without source: adapter", l.ID)
 	}
 	return ""
 }

@@ -104,6 +104,43 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   replaces the counts of `proof` and stops `owed sync`. A receipt needs a `test`. This guards
   against mistakes and casual edits, not against a party who can run commands as the tool
   (`docs/formats.md` section 10.2).
+- Run adapter `go-test-json`: `machinery run --adapter go-test-json -- go test ...` reads the
+  event stream of an existing Go suite and writes the receipts itself, joining each verdict to
+  the ids the test files already claim (the function under a marker, or every test function of
+  the file). Cached packages are refused, `tc` and `cx` ids are never proven this way, and
+  `status`, `verify` and `proof` count adapter evidence apart, by granularity. The policy
+  `evidence.adapter` (kinds, tiers, minimum granularity, a map for test packages built from
+  copies) decides what it proves; by default never an id of a critical or vital area.
+  A verdict goes to the file under `trace.tests` in its package's directory that defines the
+  function, and to none when another Go file of that directory defines a function of the same
+  name that begins with `Test` and takes one parameter, whatever the build constraints or the
+  way the parameter is written: a twin behind another tag never lends its pass. The direct form
+  accepts only a narrow `go test` (relative patterns, a list of test flags, the project's own
+  module, `GOOS` and `GOARCH` of the host), and refuses a module path that two `go.mod` files
+  declare and a workspace that leaves out the module of a claiming file, which stage `trace`
+  reports as well; everything else runs through `--streams`. The header of a direct run
+  records its go environment (version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH`, the
+  digests of `go.mod` and `go.work`), and `verify` and `proof` print it. Adapter evidence is
+  as trustworthy as the project's test code and the command: the rules catch mistakes, not
+  planted code or a controlled environment. With
+  `--streams` (a wrapper that starts `go test` itself and leaves the streams in
+  `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
+  mode only. A pass replayed from the cache counts nothing. A package that failed (a timeout,
+  `os.Exit`, a panic, a build failure) writes a fail for every claimed function without a
+  verdict and no pass; a stream without a package end leaves the run incomplete, and the error
+  names the receipts file. A stream file that holds several runs of one package is judged run by
+  run, so a fail, a crash or a missing verdict in any of them is a fail; a run that starts again
+  before the one before it ended (a killed run and its retry, two runs writing at once) leaves
+  the run incomplete. A marker directly above a
+  fuzz test, a benchmark or any other function that is no test counts nothing and is named in the
+  summary. A parent
+  with a skipped subtest is a skip, and direct mode refuses a `-run` or `-skip` that selects
+  subtests. Stage `trace` reports the module layout rules only for a project that configures
+  `evidence.adapter`, and they read only tracked `go.mod` and `go.work` files outside
+  `testdata` and `vendor`, with `GOWORK=off` honoured: a project without that block sees
+  no change. A
+  receipt a test appends with the adapter's fields is refused. The ratchet compares the policy
+  by what it admits (`adapter-widened`), an error for a critical or vital tier.
 
 ### Carried forward from v1
 

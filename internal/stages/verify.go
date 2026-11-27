@@ -28,7 +28,8 @@ func VerifyStage(ev *evidence.Evaluation) *report.Stage {
 	if !ev.HasEvidence {
 		return s.NotDemonstrated(ev.NoEvidence())
 	}
-	s.Count(ev.Obligations, "obligations").Count(ev.NProven, "proven").Count(ev.NPartial, "partial").
-		Count(ev.NOwed, "owed").Count(ev.NReceipts, "receipts")
+	s.Count(ev.Obligations, "obligations").Count(ev.NProven, "proven")
+	evidence.CountAdapter(s, ev.NByFunction, ev.NByFile) // section 10.3
+	s.Count(ev.NPartial, "partial").Count(ev.NOwed, "owed").Count(ev.NReceipts, "receipts")
 	return s
 }

@@ -1,0 +1,95 @@
+# an existing Go suite gives evidence without a change to its tests: machinery reads the event
+# stream of go test and writes the receipts itself (section 10.3)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+# -json is added, the output text of the events is printed, and the summary counts the run
+exec machinery run --adapter go-test-json --stack 'in process' -- go test -count=1 ./e2e/suite
+stdout '^=== RUN   TestShipNeedsPayment$'
+stdout '^ok  \texample\.test/shop/e2e/suite\t'
+! stdout '"Action"'
+stderr '^machinery run: adapter go-test-json: 1 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+# the file with the build tag faults was not built: its function did not run
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
+# a tc id needs the effects its test observed: the adapter never writes one
+stderr '^machinery run: adapter: needs a receipt with effects: 1 tc id\(s\)$'
+! stderr 'verdict not counted'
+! stderr 'in no file under'
+stderr '^machinery run: \.machinery/receipts/[0-9TZ.]+-[0-9a-f]{7}\.jsonl \(exit 0\)$'
+
+# the header has the command as it ran and names the adapter
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+# and, in direct mode, the go environment of the run: the digest is that of the fixture's go.mod
+stdout '"command":\["go","test","-json","-count=1","./e2e/suite"\],"stack":"in process","started":"[^"]+","adapter":"go-test-json","environment":\{"go_version":"go[^"]+","go_binary":"/[^"]*/go","GOFLAGS":"","GOWORK":"","GOOS":"[a-z0-9]+","GOARCH":"[a-z0-9]+","go_mod_sha256":"642fd976302613129b2165eca49a3279adbf33c9532f7df8181b8da4bc2cccf6","go_work_sha256":""\}\}$'
+# a marker above a function gives a receipt at function granularity, a marker elsewhere one at
+# file granularity; TestMain and the subtests have no receipt of their own
+exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+cmp stdout want-receipts.jsonl
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '^\{"v":1,"type":"end","exit":0,"finished":"[^"]+","adapter_receipts":5\}$'
+# the file is bound by the ledger like any run (section 10.2)
+exec sh -c 'cat .git/machinery/runs/$(ls .machinery/receipts)'
+stdout '^\{"v":1,"commit":"[0-9a-f]{40}","dir":"/.+/\.machinery/receipts","file":"[0-9a-f]{64}"\}$'
+
+# verify, status and proof count adapter evidence as a class of its own
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 2 owed, 5 receipts$'
+stdout '^  warn   adapter environment: \.machinery/receipts/[0-9TZ.]+-[0-9a-f]{7}\.jsonl: go.* /.*/go, GOOS/GOARCH [a-z0-9]+/[a-z0-9]+, GOFLAGS "", GOWORK "", go\.mod 642fd9763026, go\.work none$'
+! stdout 'ERROR  receipt'
+! stdout 'adapter: .* not counted'
+stdout '^  ERROR  unproven: tc:ORDE-1ded14$'
+! stdout 'unproven: inv:'
+! stdout 'unproven: sc:'
+exec machinery status
+stdout '^proven: 5 \(3 by adapter at function granularity, 2 by adapter at file granularity\)  partial: 0  failed: 0  owed: 2  unproven and not owed: 9$'
+! stdout '^adapter, not counted'
+exec machinery proof --ids inv:paid-before-shipped,sc:cancelled-order-refuses-payment
+stdout '^command:  go test -json -count=1 ./e2e/suite\nadapter environment: \.machinery/receipts/[^:]+\.jsonl: go.*, go\.mod 642fd9763026, go\.work none\nresult:   '
+stdout '^result:   2 passed / 0 failed / 0 skipped, against in process$'
+stdout '^adapter:  1 proven by adapter at function granularity, 1 proven by adapter at file granularity$'
+stdout '^  inv:paid-before-shipped -> e2e/suite/order_test.go::TestShipNeedsPayment -> pass: go test: TestShipNeedsPayment passed \(by adapter at function granularity\)$'
+stdout '^  sc:cancelled-order-refuses-payment -> e2e/suite/scenario_test.go -> pass: go test: all 2 test function\(s\) of the file passed \(by adapter at file granularity\)$'
+
+# the build tags of the run are recorded; the tagged file now has a verdict and its id leaves the owed list
+env GOFLAGS=-p=2
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+env GOFLAGS=
+stderr 'adapter go-test-json: 1 package\(s\), 7 test function\(s\) with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr 'adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+stderr 'adapter: claimed, not run: 0 id\(s\)$'
+exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
+stdout '"test":"e2e/suite/outage_test.go","observed":"go test: all 1 test function\(s\) of the file passed","source":"adapter","granularity":"file","tags":\["faults"\]\}$'
+exec machinery owed sync --prune-only
+stdout '^owed: 1 kept, 0 added, 1 removed$'
+
+# an id that a receipt emitted by a test proves is not in the adapter's class
+exec machinery run -- sh e2e/orders.sh
+exec machinery status
+stdout '^proven: 15 \(1 by adapter at file granularity\)  partial: 1  failed: 0  owed: 1  unproven and not owed: 0$'
+exec machinery verify
+stdout ', 15 proven, 1 by adapter at file granularity, 1 partial, 1 owed, '
+# one line per adapter run: two environments at the same commit are no finding
+stdout -count=2 '^  warn   adapter environment: '
+stdout '^  warn   adapter environment: .*, GOFLAGS "-p=2", GOWORK "", '
+stdout '^passed$'
+exec machinery proof --ids inv:paid-before-shipped
+! stdout '^adapter:'
+stdout '^  inv:paid-before-shipped -> orders\.sh -> pass: ship from Pending refused$'
+
+# go test ./... with -p 4: the events of the packages interleave and the packages without test
+# files end with skip; each package is one complete run
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 -p 4 ./...
+! stderr 'incomplete'
+stderr '^machinery run: adapter go-test-json: 3 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
+-- want-receipts.jsonl --
+{"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"pass","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique passed","source":"adapter","granularity":"function","tags":[]}
+{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":[]}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed","source":"adapter","granularity":"function","tags":[]}
+{"v":1,"type":"receipt","id":"sc:cancelled-order-refuses-payment","outcome":"pass","test":"e2e/suite/scenario_test.go","observed":"go test: all 2 test function(s) of the file passed","source":"adapter","granularity":"file","tags":[]}
+{"v":1,"type":"receipt","id":"sc:customer-pays-and-the-order-ships","outcome":"pass","test":"e2e/suite/scenario_test.go","observed":"go test: all 2 test function(s) of the file passed","source":"adapter","granularity":"file","tags":[]}

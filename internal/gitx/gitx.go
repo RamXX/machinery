@@ -263,6 +263,22 @@ func Ignored(root, rel string) bool {
 	return err == nil
 }
 
+// Tracked returns the files git tracks below root that match the
+// pathspecs, root-relative.
+func Tracked(root string, pathspecs ...string) ([]string, error) {
+	out, err := run(root, append([]string{"ls-files", "-z", "--"}, pathspecs...)...)
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, f := range strings.Split(out, "\x00") {
+		if f != "" {
+			res = append(res, f)
+		}
+	}
+	return res, nil
+}
+
 // IsRepo reports whether root is inside a git work tree.
 func IsRepo(root string) bool {
 	_, err := run(root, "rev-parse", "--is-inside-work-tree")

@@ -99,6 +99,33 @@ is `tc:ORDE-70d94f` (the refused pay). `e2e/outage.sh` emits the receipt of
 Counts the scripts rely on: 22 obligations (12 routine, 1 critical, 9 vital), 2 proof
 obligations, 9 vital ids, 2 candidates.
 
+## `shop-gotests`
+
+Laid over `shop`: an ordinary Go suite, package `example.test/shop/e2e/suite`, whose tests emit
+no receipt and name the ids they verify in comments. It is run for real by the scripts of the
+run adapter (section 10.3).
+
+| File | Test functions | Claims |
+|---|---|---|
+| `order_test.go` | `TestShipNeedsPayment`, `TestCancelIsFinal` (two subtests), `TestRouting` | Above `TestShipNeedsPayment`: `inv:paid-before-shipped`. Above `TestCancelIsFinal`: `inv:terminal-is-final`, `tc:ORDE-1ded14`. |
+| `email_test.go` | `TestEmailUnique` | Above it: `inv:customer-email-unique`. |
+| `scenario_test.go` | `TestPayThenShip`, `TestCancelledRefusesPay`; and `TestMain`, which is none | Above no function: both `sc` ids. |
+| `outage_test.go` (build tag `faults`) | `TestProviderDown` | Above no function: `fm:payment-provider-down`. |
+
+Environment switches, read by the tests: `SHOP_EMAIL=fail|skip|hang|exit|panic|kill`
+(`TestEmailUnique`: fails, skips, blocks past `-timeout`, calls `os.Exit`, panics in a goroutine,
+or kills the `go` command that runs it), `SHOP_SCENARIO=fail|skip` (`TestCancelledRefusesPay`),
+`SHOP_FAIL_SUBTEST=shipped|cancelled` and `SHOP_SKIP_SUBTEST=shipped|cancelled` (a subtest of
+`TestCancelIsFinal` fails or skips), `SHOP_ROUTING=fail` (`TestRouting`, which claims nothing)
+and `SHOP_OUTAGE=fail` (`TestProviderDown`).
+
+Without a tag the suite has 6 test functions with a verdict; with `-tags faults`, 7.
+
+`run-suite.sh` is the project's wrapper: it copies the test files to `stage/suite` (package
+`example.test/shop/stage/suite`), starts `go test` twice (plain, then `-tags faults -run
+TestProviderDown`), writes each event stream to `$MACHINERY_GO_TEST_JSON` when that is set, and
+removes `stage`. `SUITE_FLAGS` replaces its default flags, `-count=1`.
+
 ## `library`
 
 A project that keeps its design in its own formats, read through `import` and `trace.markers`

@@ -1,0 +1,189 @@
+# claims the adapter cannot turn into a receipt, the build tags of GOFLAGS, and a test that emits
+# its own receipt during an adapter run (section 10.3)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+env GOFLAGS=-tags=faults
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/replay
+env GOFLAGS=
+stderr '^machinery run: adapter go-test-json: 2 package\(s\), 9 test function\(s\) with a verdict: 9 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+# a tc id needs effects and a cx id a replay: a verdict of go test carries neither
+stderr '^machinery run: adapter: needs a receipt with effects: 1 tc id\(s\)$'
+stderr '^machinery run: adapter: needs a receipt with a replay: 1 cx id\(s\)$'
+# a claiming file with no test function, and one that does not parse
+stderr '^machinery run: adapter: e2e/suite/helpers_test\.go: no test function; its claims count nothing$'
+stderr '^machinery run: adapter: e2e/drafts/broken_test\.go: not Go source that parses; its claims count nothing$'
+# without -tags on the command line the tags of GOFLAGS are recorded
+exec sh -c 'grep -c "\"source\":\"adapter\",\"granularity\":\"[a-z]*\",\"tags\":\[\"faults\"\]" .machinery/receipts/*.jsonl'
+stdout '^6$'
+# the receipt the test appended itself is in the same file, before the end line
+exec sh -c 'grep -c "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout '^7$'
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '"type":"end"'
+
+exec mrun 1 verify
+! stdout 'ERROR  receipt'
+! stdout 'malformed'
+stdout '^checked: 17 obligations, 7 proven, 3 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 owed, 7 receipts$'
+stdout '^  ERROR  unproven: cx:order-payment:race$'
+! stdout 'unproven: tc:ORDE-1ded14'
+exec machinery proof --ids tc:ORDE-1ded14
+! stdout '^adapter:'
+stdout '^  tc:ORDE-1ded14 -> e2e/suite/cancel_emit_test\.go::TestCancelEmits -> pass: Pending -> Cancelled; cancellation recorded$'
+
+# a line with the adapter's fields that a test appends itself is not the adapter's: refused, and
+# the pass it claims does not count
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/forge
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '"adapter_receipts":0\}$'
+exec mrun 1 verify
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:customer-email-unique: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out$'
+stdout '^  ERROR  unproven: inv:customer-email-unique$'
+stdout '^checked: 17 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
+
+# a marker directly above a fuzz test or a benchmark belongs to that function, which the adapter
+# does not judge: the claim counts nothing and never falls back to the file, whose
+# TestHelperCheck passed. The fuzz seed is skipped under -short, the benchmark never runs
+rm .machinery/receipts
+cp fuzz_test.go e2e/suite/fuzz_test.go
+gitcommit 'a fuzz test and a benchmark with markers'
+exec machinery run --adapter go-test-json -- go test -short -run 'TestHelperCheck|FuzzEmail' ./e2e/suite
+stderr '^machinery run: adapter: e2e/suite/fuzz_test\.go: inv:customer-email-unique: the adapter does not judge FuzzEmail; put the marker above a Test function or at file level$'
+stderr '^machinery run: adapter: e2e/suite/fuzz_test\.go: inv:paid-before-shipped: the adapter does not judge BenchmarkShip; put the marker above a Test function or at file level$'
+! stderr 'fuzz_test\.go: no test function'
+cp stderr fuzz.err
+exec sh -c 'test "$(grep -c "does not judge" fuzz.err)" = 2'
+exec sh -c '! grep -q fuzz_test .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  unproven: inv:customer-email-unique$'
+stdout '^  ERROR  unproven: inv:paid-before-shipped$'
+
+-- design/formal/traces/order-payment.race.trace.json --
+{
+  "version": 1,
+  "id": "cx:order-payment:race",
+  "spec": "order-payment",
+  "run": "race",
+  "tool": "tla",
+  "violates": "ChargedOnce",
+  "expect": "refuted",
+  "machine": "order",
+  "steps": [
+    {"n": 1, "case": "tc:ORDE-2e883d", "instance": "i1", "caller": "c2", "step": "begin", "state": {"i1": "Pending"}},
+    {"n": 2, "case": "tc:ORDE-2e883d", "instance": "i1", "caller": "c1", "step": "begin", "state": {"i1": "Pending"}},
+    {"n": 3, "case": "tc:ORDE-2e883d", "instance": "i1", "caller": "c1", "step": "commit", "state": {"i1": "paying"}},
+    {"n": 4, "case": "tc:ORDE-2e883d", "instance": "i1", "caller": "c2", "step": "commit", "state": {"i1": "paying"}}
+  ],
+  "loop": 0,
+  "instance": {}
+}
+-- e2e/replay/replay_test.go --
+package replay
+
+import "testing"
+
+// machinery:verifies cx:order-payment:race
+func TestReplayRace(t *testing.T) {}
+-- fuzz_test.go --
+package suite
+
+import "testing"
+
+// FuzzEmail feeds addresses to the customer store; under -short its seed is skipped.
+//
+// machinery:verifies inv:customer-email-unique
+func FuzzEmail(f *testing.F) {
+	f.Add("a@example.test")
+	f.Fuzz(func(t *testing.T, email string) {
+		if testing.Short() {
+			t.Skip("no customer store under -short")
+		}
+	})
+}
+
+// BenchmarkShip runs only with -bench, which direct mode does not accept.
+//
+// machinery:verifies inv:paid-before-shipped
+func BenchmarkShip(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		settle("ship")
+	}
+}
+
+// TestHelperCheck checks a helper and claims nothing.
+func TestHelperCheck(t *testing.T) {
+	if settle("pay") != "pay" {
+		t.Fatal("settle changed the event")
+	}
+}
+-- e2e/suite/helpers_test.go --
+package suite
+
+// machinery:verifies inv:terminal-is-final
+
+func settle(event string) string { return event }
+-- e2e/drafts/broken_test.go --
+package drafts
+
+// machinery:verifies inv:paid-before-shipped
+func TestDraft(t *testing.T) {
+-- e2e/forge/forge_test.go --
+package forge
+
+import (
+	"os"
+	"testing"
+)
+
+// TestForge appends a line that looks like one the adapter writes.
+func TestForge(t *testing.T) {
+	path := os.Getenv("MACHINERY_RECEIPTS")
+	if path == "" {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	line := `{"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"pass","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique passed","source":"adapter","granularity":"function","tags":[]}`
+	if _, err := f.WriteString(line + "\n"); err != nil {
+		t.Fatal(err)
+	}
+}
+-- e2e/suite/cancel_emit_test.go --
+package suite
+
+import (
+	"fmt"
+	"os"
+	"testing"
+
+	"example.test/shop/internal/domain"
+)
+
+// TestCancelEmits asserts first and then appends its own receipt, with the effect it observed.
+//
+// machinery:verifies tc:ORDE-1ded14
+func TestCancelEmits(t *testing.T) {
+	if got := domain.Apply(settle("cancel")); got != "cancel" {
+		t.Fatalf("Apply(cancel) = %q", got)
+	}
+	path := os.Getenv("MACHINERY_RECEIPTS")
+	if path == "" {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	fmt.Fprintln(f, `{"v":1,"type":"receipt","id":"tc:ORDE-1ded14","outcome":"pass","test":"e2e/suite/cancel_emit_test.go::TestCancelEmits","effects":["recordCancellation"],"observed":"Pending -> Cancelled; cancellation recorded"}`)
+}

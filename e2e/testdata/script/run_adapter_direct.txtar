@@ -1,0 +1,286 @@
+# direct mode is deliberately narrow, against mistakes (section 10.3): only a list of go test
+# words, a layout of modules the adapter can read and a test binary for the machine that runs
+# it. The verifier's decoy module under a workspace and the cross-build launcher are refused by
+# content. The project is proj; what is outside it stays in $WORK
+mkdir proj
+cd proj
+fixture shop
+fixture shop-gotests
+exec sh -c 'printf "evidence:\n  adapter: {}\n" >> machinery.yaml'
+exec machinery gen
+gitinit
+
+# the project's own module, its failing test: a fail receipt, and one for the file behind the
+# tag faults, which has no verdict in a package that failed
+env SHOP_EMAIL=fail
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+rm .machinery/receipts
+
+# go test -C into another directory is refused
+exec mrun 2 run --adapter go-test-json -- go test -C decoy ./e2e/suite
+stderr '^usage: --adapter go-test-json: -C: not accepted by the adapter in direct mode; run the command through --streams$'
+
+# the verifier's decoy, committed: a nested module of the same module path with empty tests,
+# under a workspace that uses it and leaves the project's module out. go would build the decoy
+# as the package example.test/shop/e2e/suite; the module path declared twice is refused first
+mkdir decoy/e2e/suite
+cp $WORK/decoy.mod decoy/go.mod
+cp $WORK/decoy_test.go decoy/e2e/suite/decoy_test.go
+cp $WORK/inside.work decoy.work
+gitcommit 'a decoy module and a workspace that uses it'
+env GOWORK=$WORK/proj/decoy.work
+exec mrun 2 run --adapter go-test-json -- go test ./decoy/e2e/suite
+stderr '^usage: --adapter go-test-json: module example\.test/shop is declared by decoy/go\.mod and go\.mod: give each module its own path, or move the copy under a testdata directory$'
+exec mrun 2 run --adapter go-test-json -- go test example.test/shop/e2e/suite
+stderr '^usage: --adapter go-test-json: example\.test/shop/e2e/suite: not accepted by the adapter in direct mode; run the command through --streams$'
+# stage trace reports the rules from the files alone, the workspace GOWORK names included
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: module example\.test/shop is declared by decoy/go\.mod and go\.mod: give each module its own path, or move the copy under a testdata directory$'
+stdout '^  ERROR  adapter: decoy\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
+env GOWORK=
+# the same workspace committed as go.work at the project root: refused the same way
+cp $WORK/inside.work go.work
+gitcommit 'the workspace at the root'
+exec mrun 2 run --adapter go-test-json -- go test ./decoy/e2e/suite
+stderr '^usage: --adapter go-test-json: module example\.test/shop is declared by decoy/go\.mod and go\.mod: '
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
+! exists .machinery/receipts
+
+# without the decoy, a workspace that leaves the project's module out is refused on its own
+rm decoy decoy.work
+mkdir tools
+cp $WORK/tools.mod tools/go.mod
+cp $WORK/tools.work go.work
+cp $WORK/both.work both.work
+cp $WORK/one.work one.work
+gitcommit 'a workspace of a tools module only, and two that use the project'
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): '
+! stdout 'is declared by'
+# a workspace git does not track is not read: go itself refuses this one, which leaves the
+# project's directory out, and nothing runs
+env GOWORK=$WORK/outside.work
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+rm .machinery/receipts
+# a workspace that uses the project's module is accepted, and the header records it; GOWORK=off
+# leaves the go.work of the root out, in the run and in stage trace
+env GOWORK=$WORK/proj/both.work
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"GOWORK":"[^"]*/both\.work",'
+stdout '"go_work_sha256":"[0-9a-f]{64}"\}\}$'
+rm .machinery/receipts
+# one use directive on its line, quoted, with comments
+env GOWORK=$WORK/proj/one.work
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+rm .machinery/receipts
+env GOWORK=off
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"GOWORK":"off",.*"go_work_sha256":""\}\}$'
+exec machinery check --stage trace
+! stdout 'ERROR  adapter'
+rm .machinery/receipts
+env GOWORK=
+rm go.work tools both.work one.work
+gitcommit 'no workspace'
+
+# a nested module under trace.tests whose test file claims an id is a module of a claiming
+# file: a workspace of the root module alone leaves it out. Whose test files claim only a tc
+# id, it holds no claiming file, and the workspace need not use it
+mkdir e2e/extra
+cp $WORK/extra.mod e2e/extra/go.mod
+cp $WORK/extra_inv_test.go e2e/extra/extra_test.go
+cp $WORK/root.work go.work
+gitcommit 'a nested module with a claim'
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: go\.work does not use the module of e2e/extra/extra_test\.go \(e2e/extra/go\.mod\): add the module to the workspace, or set GOWORK=off$'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/extra/extra_test\.go \(e2e/extra/go\.mod\): '
+cp $WORK/extra_test.go e2e/extra/extra_test.go
+gitcommit 'a nested module with a tc claim only'
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+exec machinery check --stage trace
+! stdout 'ERROR  adapter'
+rm .machinery/receipts
+rm go.work e2e/extra
+gitcommit 'no nested module'
+
+# a GOWORK go cannot read: go env fails
+env GOWORK=relative.work
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: go env failed \(.*GOWORK.*\): the adapter reads GOFLAGS, GOMOD and GOWORK from it; fix the environment of go, or run the command through --streams$'
+env GOWORK=
+
+# the verifier's -modfile in GOFLAGS, naming another module path: refused
+env GOFLAGS=-modfile=$WORK/alt.mod
+exec mrun 2 run --adapter go-test-json -- go test ./suite
+stderr '^usage: --adapter go-test-json: -modfile=.*/alt\.mod in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
+env GOFLAGS=
+
+# GOFLAGS written to the go environment file by go env -w is read the same way: a word off the
+# list is refused, the tags there are recorded, and -json=false there is harmless, since the
+# command has -json
+env GOENV=$WORK/goenv
+exec go env -w GOFLAGS=-mod=mod
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: -mod=mod in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
+env SHOP_EMAIL=
+exec go env -w 'GOFLAGS=-tags=faults -json=false'
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
+stdout '"tags":\["faults"\]\}$'
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"GOFLAGS":"-tags=faults -json=false",'
+rm .machinery/receipts
+env GOENV=
+env SHOP_EMAIL=fail
+
+# the verifier's -exec: refused
+exec mrun 2 run --adapter go-test-json -- go test -exec $WORK/fake.sh ./e2e/suite
+stderr '^usage: --adapter go-test-json: -exec: not accepted by the adapter in direct mode; run the command through --streams$'
+
+# a go inside the project is no go the adapter can trust, by path or found on PATH
+mkdir bin
+cp $WORK/fake.sh bin/go
+chmod 755 bin/go
+exec mrun 2 run --adapter go-test-json -- ./bin/go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: bin/go: a go inside the project is not accepted by the adapter in direct mode; run the command through --streams$'
+env SAVED=$PATH
+env PATH=$WORK/proj/bin:$PATH
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env PATH=$SAVED
+stderr '^usage: --adapter go-test-json: bin/go: a go inside the project is not accepted '
+rm bin
+# links are not followed: a link inside the project to the real go is a go inside the project,
+# and a link outside the project is recorded as it is
+mkdir bin
+exec sh -c 'ln -s "$(command -v go)" bin/go'
+env PATH=$WORK/proj/bin:$PATH
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env PATH=$SAVED
+stderr '^usage: --adapter go-test-json: bin/go: a go inside the project is not accepted '
+rm bin
+mkdir $WORK/linkbin
+exec sh -c 'ln -s "$(command -v go)" $WORK/linkbin/go'
+env PATH=$WORK/linkbin:$PATH
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+env PATH=$SAVED
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"go_binary":"[^"]*/linkbin/go",'
+rm .machinery/receipts
+
+# the verifier's cross-build launcher: with GOOS and GOARCH of another system go runs the test
+# binary through a go_<GOOS>_<GOARCH>_exec it finds on PATH, and this one prints a pass while
+# the test fails. A test binary for another system is refused
+# GOOS alone differs here, GOARCH is the host's
+mkdir bin
+[amd64] cp $WORK/launcher.sh bin/go_windows_amd64_exec
+[arm64] cp $WORK/launcher.sh bin/go_windows_arm64_exec
+exec sh -c 'chmod 755 bin/go_windows_*_exec'
+env PATH=$WORK/proj/bin:$PATH
+env GOOS=windows
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env PATH=$SAVED
+env GOOS=
+stderr '^usage: --adapter go-test-json: go env GOOS/GOARCH is windows/[a-z0-9]+, not the host.s [a-z0-9]+/[a-z0-9]+: go would run the test binary through go_windows_[a-z0-9]+_exec; unset GOOS and GOARCH, or run the command through --streams$'
+# GOARCH alone differs: the same
+[amd64] env GOARCH=arm64
+[!amd64] env GOARCH=amd64
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env GOARCH=
+stderr '^usage: --adapter go-test-json: go env GOOS/GOARCH is [a-z0-9]+/[a-z0-9]+, not the host.s [a-z0-9]+/[a-z0-9]+: go would run '
+rm bin
+
+# without modules go env GOMOD is empty, not the go.mod of the project root: refused
+env GO111MODULE=off
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env GO111MODULE=
+stderr '^usage: --adapter go-test-json: go env GOMOD is "", not the go\.mod of the project root: run the command through --streams$'
+# nothing ran and nothing was recorded
+! exists .machinery/receipts
+
+-- decoy.mod --
+module example.test/shop
+
+go 1.27
+-- decoy_test.go --
+package suite
+
+import "testing"
+
+func TestEmailUnique(t *testing.T)      {}
+func TestShipNeedsPayment(t *testing.T) {}
+-- inside.work --
+go 1.27
+
+use ./decoy
+-- tools.mod --
+module example.test/tools
+
+go 1.27
+-- tools.work --
+go 1.27
+
+use ./tools
+-- outside.work --
+go 1.27
+
+use ./proj/tools
+-- both.work --
+go 1.27
+
+use (
+	.
+	./tools
+)
+-- one.work --
+go 1.27
+
+// the project's module
+use "." // quoted
+-- root.work --
+go 1.27
+
+use .
+-- extra.mod --
+module example.test/extra
+
+go 1.27
+-- extra_inv_test.go --
+package extra
+
+import "testing"
+
+// machinery:verifies inv:customer-email-unique
+func TestExtra(t *testing.T) {}
+-- extra_test.go --
+package extra
+
+import "testing"
+
+// machinery:verifies tc:ORDE-1ded14
+func TestExtra(t *testing.T) {}
+-- alt.mod --
+module example.test/shop/e2e
+
+go 1.27
+-- fake.sh --
+#!/bin/sh
+echo '{"Action":"pass","Package":"example.test/shop/e2e/suite","Test":"TestEmailUnique"}'
+echo '{"Action":"pass","Package":"example.test/shop/e2e/suite"}'
+-- launcher.sh --
+#!/bin/sh
+echo '=== RUN   TestEmailUnique'
+echo '--- PASS: TestEmailUnique (0.00s)'
+echo 'PASS'

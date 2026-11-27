@@ -1,0 +1,401 @@
+# test packages built from copies: with --streams, evidence.adapter.sources maps a staged package
+# back to the files under trace.tests that carry the markers, and an ambiguous function name
+# counts nothing; without --streams the entries are not read (section 10.3)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+# without a map the staged package is the directory of no test file: its verdicts find no file
+exec machinery run --adapter go-test-json --streams -- sh staged.sh
+stderr 'adapter go-test-json: 1 stream\(s\), 1 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 6 id\(s\)$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
+
+# with the map the verdict of a staged function goes to the file that defines it
+cp mapped.yaml machinery.yaml
+gitcommit 'map the staged package'
+exec machinery run --adapter go-test-json --streams -- sh staged.sh
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+! stderr 'in no file under'
+exec sh -c 'grep -h inv:paid-before-shipped .machinery/receipts/*.jsonl'
+stdout '"test":"e2e/suite/order_test.go::TestShipNeedsPayment"'
+exec mrun 1 verify
+! stdout 'does not claim it'
+stdout ', 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, '
+
+# two mapped files define the function: its verdict counts for neither
+mkdir e2e/other
+cp dup_test.go e2e/other/dup_test.go
+cp mapped-wide.yaml machinery.yaml
+gitcommit 'a second file defines the function'
+exec machinery run --adapter go-test-json --streams -- sh staged.sh
+stderr '^machinery run: adapter: example\.test/shop/staged/suite\.TestShipNeedsPayment: defined in e2e/other/dup_test\.go, e2e/suite/order_test\.go: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions$'
+stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 1 id\(s\)$'
+exec sh -c '! grep -q inv:paid-before-shipped "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+rm e2e/other
+
+# a mapped file that claims nothing and is not under trace.tests is a candidate all the same
+mkdir drafts
+cp dup_test.go drafts/dup_test.go
+cp extra_test.go drafts/extra_test.go
+cp mapped-drafts.yaml machinery.yaml
+gitcommit 'the map names a file outside trace.tests'
+exec machinery run --adapter go-test-json --streams -- sh staged-extra.sh
+stderr '^machinery run: adapter: example\.test/shop/staged/suite\.TestShipNeedsPayment: defined in drafts/dup_test\.go, e2e/suite/order_test\.go: ambiguous: '
+stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
+# and a function only such a file defines has its verdict in no file under trace.tests
+stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: 1 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; '
+rm drafts
+cp mapped.yaml machinery.yaml
+gitcommit 'back to the map'
+
+# an entry that maps onto nothing is refused before anything runs
+cp mapped-nothing.yaml machinery.yaml
+exec mrun 2 run --adapter go-test-json --streams -- sh staged.sh
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/staged/\*\*\): files suites/\*_test\.go, suites/\*/\*_test\.go match no file under trace\.tests: correct the globs, or list the files in trace\.tests$'
+
+# without --streams the entries are not read: a staged package that go test runs itself is the
+# directory of no file under trace.tests, map or not
+cp mapped.yaml machinery.yaml
+mkdir staged/suite
+cp e2e/suite/order_test.go staged/suite/order_test.go
+cp e2e/suite/email_test.go staged/suite/email_test.go
+cp e2e/suite/scenario_test.go staged/suite/scenario_test.go
+exec machinery run --adapter go-test-json -- go test ./staged/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; a package.s verdicts go to the files under trace\.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence\.adapter\.sources$'
+rm staged
+
+# the verifier's case: an entry that names only the claiming file of a directory under
+# trace.tests would narrow what go test built there. Without --streams it is refused, and so is
+# any entry whose glob matches the package of such a directory
+cp narrow.yaml machinery.yaml
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/e2e/suite\) matches example\.test/shop/e2e/suite, the package of e2e/suite: entries are read only with --streams; remove the entry, or run the suite through --streams$'
+cp everything.yaml machinery.yaml
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 2 \(package example\.test/shop/\*\*\) matches example\.test/shop/e2e/suite, the package of e2e/suite: entries are read only with --streams; remove the entry, or run the suite through --streams$'
+exec git checkout -q machinery.yaml
+
+# config errors
+cp no-package.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources: entry 1: package is required$'
+cp no-files.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources: entry 2: files is required$'
+cp bad-glob.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources: entry 1: package "example\.test/\[" is not a valid glob$'
+cp outside.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources\.files: "\.\./e2e/\*_test\.go" must stay inside the project root$'
+
+-- staged.sh --
+#!/bin/sh
+# stages three test files of the suite in staged/suite and runs go test there
+set -u
+rm -rf staged
+mkdir -p staged/suite
+cp e2e/suite/order_test.go e2e/suite/email_test.go e2e/suite/scenario_test.go staged/suite/
+go test -json -count=1 ./staged/suite > "$MACHINERY_GO_TEST_JSON/staged.json"
+status=$?
+rm -rf staged
+exit $status
+-- staged-extra.sh --
+#!/bin/sh
+# stages the three test files and drafts/extra_test.go in staged/suite
+set -u
+rm -rf staged
+mkdir -p staged/suite
+cp e2e/suite/order_test.go e2e/suite/email_test.go e2e/suite/scenario_test.go drafts/extra_test.go staged/suite/
+go test -json -count=1 ./staged/suite > "$MACHINERY_GO_TEST_JSON/staged.json"
+status=$?
+rm -rf staged
+exit $status
+-- extra_test.go --
+package suite
+
+import "testing"
+
+func TestDraftOnly(t *testing.T) {}
+-- dup_test.go --
+package other
+
+import "testing"
+
+// machinery:verifies inv:paid-before-shipped
+func TestShipNeedsPayment(t *testing.T) {}
+-- narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/suite/order_test.go", "e2e/suite/email_test.go", "e2e/suite/scenario_test.go", "e2e/suite/outage_test.go"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/suite"
+        files: ["e2e/suite/outage_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- everything.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/suite/order_test.go", "e2e/suite/email_test.go", "e2e/suite/scenario_test.go", "e2e/suite/outage_test.go"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["e2e/suite/*_test.go"]
+      - package: "example.test/shop/**"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- mapped.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- mapped-wide.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["e2e/**/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- mapped-drafts.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["e2e/suite/*_test.go", "drafts/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- mapped-nothing.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["suites/*_test.go", "suites/*/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- no-package.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- no-files.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - {package: "example.test/shop/staged/**", files: ["e2e/suite/*_test.go"]}
+      - {package: "example.test/shop/other/**"}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-glob.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - {package: "example.test/[", files: ["e2e/suite/*_test.go"]}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- outside.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - {package: "example.test/shop/staged/**", files: ["../e2e/*_test.go"]}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

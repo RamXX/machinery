@@ -72,7 +72,8 @@ test names (`claimed by a test, no receipt yet`), the ids no test names, and the
 sources mark as planned; the plan has the usual stories for the ids no test names, one `Wire evidence`
 story per test file for the claimed ones and none for an id you had planned, so a project with a thousand claimed ids is not asked
 for a thousand stories. A claim is not evidence: every one of them is still owed until its test
-emits a receipt.
+emits a receipt, or, for a Go suite, until a run through the adapter sees the test pass
+(section 7).
 
 ## 3. Look before you write
 
@@ -254,6 +255,59 @@ claims the id (`docs/formats.md` section 10.2): the script's receipts name
 `shipment_e2e.sh`, the file that carries the `machinery:verifies` comment. A receipts file typed
 by hand, or edited after the run, is refused and proves nothing. That guards against mistakes,
 not against someone who can run commands as the tool.
+
+**A Go suite you already have.** When your tests already name the ids they verify in comments,
+you do not have to rewrite them to get evidence. Run the suite through the adapter:
+
+```
+machinery run --adapter go-test-json -- go test -count=1 ./e2e/...
+machinery owed sync --prune-only
+machinery status
+```
+
+machinery adds `-json`, reads the event stream and writes the receipts itself
+(`docs/formats.md` section 10.3). An id gets a pass when every test function its marker belongs
+to passed and the package ended ok: the function under the marker when the marker is in the
+comment directly above it, every test function of the file when it stands above no function. A
+marker directly above a fuzz test, a benchmark or any other function that is no test counts
+nothing, and the summary of the run names it. A failed function writes
+a fail, a skipped one a skip (a parent with a skipped subtest too), and one that did not run
+writes nothing. A package that failed (a test that hangs past `-timeout`, calls `os.Exit` or
+panics, a build that fails) writes a fail for every claimed function without a verdict, and a
+stream cut short leaves the run incomplete, naming the receipts file to delete; a pass answered from
+the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
+verdict belongs to a file only when no other Go file of its directory defines a function of the
+same name that begins with `Test` and takes one parameter, whatever its build tags or the
+way its parameter is written: rename such a twin, or neither counts. The summary of the run
+says how many ids were claimed and not run. The command is held narrow on purpose, against
+mistakes: `go test` with relative package patterns and the usual test flags, in the module of
+the project root, for the machine it runs on; `-C`, `-modfile`, `-exec`, a `-run` that
+selects subtests and the like run through `--streams` (below). A module path that two tracked
+`go.mod` files outside `testdata` and `vendor` declare, or a tracked `go.work` that leaves out
+the module of the claiming test files, is refused, and once `machinery.yaml` has an
+`evidence.adapter` block `machinery check` reports both (stage `trace`). The run's header records the go version, the `go` binary,
+`GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod` and `go.work`, and
+`verify` and `proof` print them. The adapter trusts your test code and the environment of the
+run exactly as much as a receipt a test emits: it catches a stale cache, a twin test, a file
+that was not built, a wrong directory or a lost fail, not code or modules planted on purpose.
+
+This evidence is weaker than a receipt, and every report says so. It shows that a test which
+names the id passed, not that the test checked the id. `status`, `verify` and `proof` count it
+apart (`proven: 40 (31 by adapter at file granularity)`), a transition case (`tc`) is never
+proven this way because it needs the effects the test observed, and by default an id of a
+critical or vital area is not either: those need a receipt the test emits after its own
+assertions. `evidence.adapter` in `machinery.yaml` tightens or widens this: which kinds and
+tiers the adapter may prove, and whether a marker at the top of a file is enough or the marker
+must stand above the function (`min_granularity: function`). If your suite runs through a make target or a script that starts
+`go test` itself, run that through `machinery run --adapter go-test-json --streams -- make e2e`
+and have it write each `go test -json` output to a file in the directory machinery names in
+`MACHINERY_GO_TEST_JSON` (a file may hold several runs, appended one after the other: each is
+judged on its own, and a fail in any of them is a fail; a run that starts before the one before
+it ended, a killed run and its retry or two runs writing at once, leaves the run incomplete); there the wrapper must pass `-count=1` itself, and because machinery
+cannot see what such a run built, every package it tests needs an entry in
+`evidence.adapter.sources` naming the files it is built from. If you build your tests from
+copies staged in another directory, `evidence.adapter.sources` maps the staged package back to
+the files that carry the markers; it is read only with `--streams`.
 
 `owed sync --prune-only` removes exactly the ids the run proved. `verify` passes: everything is
 proven or still owed. `story` is the gate for that one story; a consequential or critical story

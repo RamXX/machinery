@@ -3,6 +3,7 @@ package stages
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -96,6 +97,8 @@ func Ratchet(ctx *Context) *report.Stage {
 			s.Warnf("ratchet: review switched off: review.%s was required at %s and is off now", kind, ref)
 		}
 	}
+
+	ratchetAdapter(s, bcfg, &p.Cfg)
 
 	// scope-narrowed
 	nowScope := set(p.Cfg.Scope)
@@ -385,4 +388,88 @@ func removedSpec(change string) (spec, what string) {
 		}
 	}
 	return "-", change
+}
+
+// ratchetAdapter is rule adapter-widened (section 11.3): the policy
+// evidence.adapter lets adapter evidence prove more than at the base. The
+// policies are compared by what they admit: for each tier and kind, the least
+// granularity an adapter pass needs, or never. Ids of a critical or vital area
+// that become provable are an error; every other widening is named.
+func ratchetAdapter(s *report.Stage, base, now *project.Config) {
+	bNeed, nNeed := admits(base), admits(now)
+	changes := [][2]string{{never, project.GranularityFunction}, {never, project.GranularityFile}, {project.GranularityFunction, project.GranularityFile}}
+	for _, tier := range []string{design.Routine, design.Consequential, design.Critical, design.Vital} {
+		for _, c := range changes {
+			var kinds []string
+			for _, k := range project.AdapterKinds {
+				if bNeed[[2]string{tier, k}] == c[0] && nNeed[[2]string{tier, k}] == c[1] {
+					kinds = append(kinds, k)
+				}
+			}
+			if len(kinds) == 0 {
+				continue
+			}
+			what := fmt.Sprintf("ratchet: adapter widened: %s %s ids: %s -> %s", tier, strings.Join(kinds, ", "), c[0], c[1])
+			if c[0] == never && (tier == design.Critical || tier == design.Vital) {
+				s.Errorf("%s; an id of a critical or vital area needs a receipt its test emits after its own assertions", what)
+			} else {
+				s.Warnf("%s", what)
+			}
+		}
+	}
+	// sources, as pairs of a package glob and a files glob
+	had := map[[2]string]bool{}
+	for _, e := range base.AdapterSources() {
+		for _, f := range e.Files {
+			had[[2]string{e.Package, f}] = true
+		}
+	}
+	var pkgs []string
+	added := map[string][]string{}
+	for _, e := range now.AdapterSources() {
+		for _, f := range e.Files {
+			key := [2]string{e.Package, f}
+			if had[key] {
+				continue
+			}
+			had[key] = true
+			if added[e.Package] == nil {
+				pkgs = append(pkgs, e.Package)
+			}
+			added[e.Package] = append(added[e.Package], f)
+		}
+	}
+	for _, p := range pkgs {
+		s.Warnf("ratchet: adapter widened: evidence.adapter.sources: %s <- %s added", p, strings.Join(added[p], ", "))
+	}
+}
+
+const never = "never"
+
+// admits returns, for each tier and kind an adapter pass may prove, the
+// least granularity it needs: function, file or never (section 10.3).
+func admits(c *project.Config) map[[2]string]string {
+	kinds, tiers, min := c.AdapterPolicy()
+	in := func(list []string, s string) bool {
+		for _, v := range list {
+			if v == s {
+				return true
+			}
+		}
+		return false
+	}
+	res := map[[2]string]string{}
+	for _, tier := range []string{design.Routine, design.Consequential, design.Critical, design.Vital} {
+		for _, k := range project.AdapterKinds {
+			need := never
+			if in(kinds, k) && in(tiers, tier) {
+				need = project.GranularityFile
+				if min.Default == project.GranularityFunction || min.By[k] == project.GranularityFunction || min.By[tier] == project.GranularityFunction {
+					need = project.GranularityFunction
+				}
+			}
+			res[[2]string{tier, k}] = need
+		}
+	}
+	return res
 }

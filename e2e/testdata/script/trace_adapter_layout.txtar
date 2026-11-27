@@ -1,0 +1,118 @@
+# the layout rules of the adapter in stage trace (section 10.3, "The layout of the modules"):
+# only a project that configures evidence.adapter sees them; only go.mod and go.work files git
+# tracks count, none under testdata or vendor; GOWORK=off is honoured; every finding says what
+# to do
+fixture shop
+fixture shop-gotests
+mkdir e2e/testdata/a e2e/testdata/b vendor/example.test/shop tools
+cp fixture.mod e2e/testdata/a/go.mod
+cp fixture.mod e2e/testdata/b/go.mod
+cp shop.mod vendor/example.test/shop/go.mod
+cp tools.mod tools/go.mod
+cp tools.work go.work
+exec machinery gen
+gitinit
+
+# a project without the adapter sees no change: two testdata modules sharing a path, a vendored
+# copy of its module and a root go.work that leaves its module out (it runs with GOWORK=off)
+exec machinery check --stage trace
+stdout '^passed$'
+! stdout adapter
+
+# with evidence.adapter: the testdata and vendor copies are no modules of the project; the
+# tracked go.work is read, and the finding says what to do
+cp adapter.yaml machinery.yaml
+gitcommit 'the adapter configured'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
+stdout -count=1 'ERROR  adapter'
+env GOWORK=off
+exec machinery check --stage trace
+! stdout adapter
+env GOWORK=
+
+# a module cache kept in the project, which git ignores, is no module of the project either; a
+# tracked copy outside testdata is
+rm go.work
+mkdir .gomodcache/example.test/shop@v1.0.0 copy
+cp shop.mod .gomodcache/example.test/shop@v1.0.0/go.mod
+cp shop.mod copy/go.mod
+gitcommit 'no workspace, a tracked copy of the module'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: module example\.test/shop is declared by copy/go\.mod and go\.mod: give each module its own path, or move the copy under a testdata directory$'
+stdout -count=1 'ERROR  adapter'
+# a direct-mode run is refused the same way, whatever the project configures
+cp noadapter.yaml machinery.yaml
+gitcommit 'the adapter not configured'
+exec machinery check --stage trace
+! stdout adapter
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: module example\.test/shop is declared by copy/go\.mod and go\.mod: give each module its own path, or move the copy under a testdata directory$'
+
+-- .gitignore --
+.home/
+.machinery/
+.beads/
+.gomodcache/
+-- fixture.mod --
+module example.com/fixture
+
+go 1.27
+-- shop.mod --
+module example.test/shop
+
+go 1.27
+-- tools.mod --
+module example.test/tools
+
+go 1.27
+-- tools.work --
+go 1.27
+
+use ./tools
+-- adapter.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter: {}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- noadapter.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

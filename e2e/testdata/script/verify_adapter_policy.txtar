@@ -1,0 +1,516 @@
+# what an adapter pass proves is decided by verify under the policy evidence.adapter: by
+# default never an id of a critical or vital area, and the story gate says so (sections 10.3,
+# 12 and 15.6)
+fixture shop
+fixture shop-gotests
+cp risk.yaml design/risk.yaml
+cp default.yaml machinery.yaml
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-k1 --title 'Prove paid before shipped' --body-file k1.txt --silent
+exec bd create --id shop-k2 --title 'Prove terminal is final' --body-file k2.txt --silent
+exec bd create --id shop-k3 --title 'Prove pay then ship' --body-file k3.txt --silent
+
+# the adapter writes what happened; the policy is not applied to the run
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+
+# default: the pass of an id in a critical area does not count; a consequential one does
+exec mrun 1 verify
+stdout '^  warn   adapter: inv:paid-before-shipped not counted: a test that names it passed \(function granularity\); it is in a critical area \(order-shipping\): it needs a receipt the test emits after its own assertions$'
+stdout '^  ERROR  unproven: inv:paid-before-shipped$'
+stdout -count=1 'not counted'
+stdout '^checked: 17 obligations, 5 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
+exec machinery status
+stdout '^proven: 5 \(2 by adapter at function granularity, 3 by adapter at file granularity\)  partial: 0  failed: 0  owed: 2  unproven and not owed: 11$'
+stdout '^adapter, not counted: 1 \(inv 1\)$'
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^result:   0 passed / 0 failed / 0 skipped$'
+! stdout '^adapter:'
+stdout '^  inv:paid-before-shipped \(unproven, adapter pass not counted\)$'
+# the pass that does not count prunes nothing, and one that counts does
+exec machinery owed sync --prune-only
+stdout '^owed: 1 kept, 0 added, 1 removed$'
+exec git checkout -q design/owed.yaml
+
+# the story gate says why the id is not proven
+exec mrun 1 story shop-k1
+stdout '^  ERROR  unproven: inv:paid-before-shipped; adapter evidence does not count: it is in a critical area \(order-shipping\): it needs a receipt the test emits after its own assertions$'
+exec mrun 1 verify --story shop-k1
+stdout '^  warn   adapter: inv:paid-before-shipped not counted: '
+# a receipt the test emits after its own assertions satisfies it
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 story shop-k1
+! stdout 'unproven: inv:paid-before-shipped'
+! stdout 'adapter evidence'
+exec mrun 1 verify
+! stdout 'not counted'
+
+# allow and tiers: the kinds and the tiers an adapter pass may prove
+rm .machinery/receipts
+cp kinds.yaml machinery.yaml
+gitcommit 'adapter: inv and fm only, critical too'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   adapter: sc:cancelled-order-refuses-payment not counted: a test that names it passed \(file granularity\); evidence\.adapter\.allow does not list sc$'
+stdout '^  warn   adapter: sc:customer-pays-and-the-order-ships not counted: a test that names it passed \(file granularity\); evidence\.adapter\.allow does not list sc$'
+! stdout 'inv:paid-before-shipped'
+stdout '^checked: 17 obligations, 4 proven, 3 by adapter at function granularity, 1 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
+# verify --story prints the warning for the ids of the story only
+exec machinery verify --story shop-k2
+! stdout 'not counted'
+exec mrun 1 verify --story shop-k3
+stdout -count=1 'not counted'
+stdout 'adapter: sc:customer-pays-and-the-order-ships not counted'
+
+# a fail the adapter wrote fails its obligation whatever the policy says: allow does not list inv
+rm .machinery/receipts
+cp no-inv.yaml machinery.yaml
+gitcommit 'adapter: no inv'
+env SHOP_EMAIL=fail
+exec mrun 1 run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+env SHOP_EMAIL=
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+exec machinery status
+stdout '^proven: .*  failed: 1  owed: 2 '
+rm .machinery/receipts
+
+# min_granularity: function: a marker that stands above no function proves nothing
+cp function.yaml machinery.yaml
+gitcommit 'adapter: function granularity'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   adapter: fm:payment-provider-down not counted: a test that names it passed \(file granularity\); evidence\.adapter\.min_granularity asks for function granularity$'
+stdout '^  warn   adapter: sc:customer-pays-and-the-order-ships not counted: a test that names it passed \(file granularity\); evidence\.adapter\.min_granularity asks for function granularity$'
+stdout '^checked: 17 obligations, 2 proven, 2 by adapter at function granularity, 0 partial, 2 owed, 6 receipts$'
+exec machinery status
+stdout '^proven: 2 \(2 by adapter at function granularity\)  partial: 0 '
+stdout '^adapter, not counted: 4 \(sc 2, inv 1, fm 1\)$'
+
+# min_granularity by kind and by tier: the strictest that applies to the id
+cp by-kind.yaml machinery.yaml
+gitcommit 'adapter: function granularity for fm and consequential'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   adapter: fm:payment-provider-down not counted: .*; evidence\.adapter\.min_granularity asks for function granularity$'
+stdout '^  warn   adapter: sc:cancelled-order-refuses-payment not counted: .*; evidence\.adapter\.min_granularity asks for function granularity$'
+! stdout 'sc:customer-pays-and-the-order-ships not counted'
+stdout '^checked: 17 obligations, 3 proven, 2 by adapter at function granularity, 1 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
+
+# tiers without routine: an id in no area is routine, and its pass does not count
+cp routine.yaml machinery.yaml
+gitcommit 'adapter: consequential only'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   adapter: inv:terminal-is-final not counted: a test that names it passed \(function granularity\); evidence\.adapter\.tiers does not list routine$'
+! stdout 'sc:cancelled-order-refuses-payment not counted'
+
+# a list that is set and empty admits nothing
+cp nothing.yaml machinery.yaml
+gitcommit 'adapter: nothing'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^checked: 17 obligations, 0 proven, 0 partial, 2 owed, 6 receipts$'
+stdout -count=6 'not counted'
+
+# config prints the policy as written, and refuses what it cannot mean
+exec machinery config
+stdout '^    allow: \[\]$'
+cp by-kind.yaml machinery.yaml
+exec machinery config
+stdout '^      consequential: function$'
+cp function.yaml machinery.yaml
+exec machinery config
+stdout '^    min_granularity: function$'
+cp bad-allow.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.allow: tc: the adapter proves only inv, sc, fm and ck ids$'
+cp bad-tier.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.tiers: "severe" is not a tier: routine, consequential, critical or vital$'
+cp bad-granularity.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.min_granularity must be function or file, got "package"$'
+cp bad-map-value.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.min_granularity\.fm must be function or file, got "line"$'
+cp bad-map-key.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.min_granularity: "tc" is not default, a kind \(inv, sc, fm, ck\) or a tier$'
+
+# a receipt that calls itself an adapter's is held to the shape of one
+exec git checkout -q machinery.yaml
+rm .machinery/receipts
+exec machinery run -- sh -c 'cat bad-lines.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:terminal-is-final: source must be adapter or absent, got "manual"$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 3: inv:terminal-is-final: granularity must be function or file, got "line"$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 4: inv:terminal-is-final: granularity without source: adapter$'
+# a well-formed adapter line, and tags alone, in a run that is no adapter run: refused, not read
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 5: inv:terminal-is-final: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 6: inv:terminal-is-final: source, granularity and tags are written only by the run adapter: '
+stdout '^  ERROR  unproven: inv:terminal-is-final$'
+
+-- k1.txt --
+machinery:ids inv:paid-before-shipped
+machinery:scope internal/domain/**
+-- k2.txt --
+machinery:ids inv:terminal-is-final
+machinery:scope internal/domain/**
+-- k3.txt --
+machinery:ids sc:customer-pays-and-the-order-ships
+machinery:scope internal/domain/**
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-shipping
+    tier: critical
+    why: "a shipment cannot be recalled"
+    ids: ["inv:paid-before-shipped"]
+    questions: [concurrency]
+  - name: order-refusal
+    tier: consequential
+    why: "a cancelled order must never be charged"
+    ids: ["sc:cancelled-order-refuses-payment"]
+-- bad-lines.jsonl --
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","source":"manual"}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","source":"adapter","granularity":"line"}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","granularity":"file"}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed","source":"adapter","granularity":"function","tags":[]}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","tags":["faults"]}
+-- default.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- kinds.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [inv, fm]
+    tiers: [routine, consequential, critical]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- no-inv.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [sc, fm]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- function.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    min_granularity: function
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- by-kind.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    min_granularity: {default: file, fm: function, consequential: function}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- nothing.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: []
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- routine.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    tiers: [consequential]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-allow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [inv, tc]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-tier.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    tiers: [routine, severe]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-granularity.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    min_granularity: package
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-map-value.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    min_granularity: {fm: line}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-map-key.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    min_granularity: {tc: function}
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

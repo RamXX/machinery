@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/report"
 	"github.com/RamXX/machinery/internal/tags"
 )
@@ -84,6 +85,14 @@ func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
 	found, err := tags.Scan(p, append(append([]string{}, code...), tests...))
 	if err != nil {
 		cannot("cannot read tags: %v", err)
+	}
+
+	layout, err := evidence.GoLayout(p, d, found) // the layout of the Go modules (section 10.3)
+	if err != nil {
+		cannot("cannot list go.mod files: %v", err)
+	}
+	for _, msg := range layout {
+		s.Errorf("adapter: %s", msg)
 	}
 
 	for _, msg := range d.OwedProblems {
