@@ -142,6 +142,7 @@ constraints:                    # optional
 receipts:
   dir: .machinery/receipts      # optional, this is the default
 evidence:                       # optional
+  exempt: ["docs/**", "*.md"]   # optional: paths a run of an earlier commit stays valid across (section 10.1)
   adapter:                      # optional: what a pass written by a run adapter proves (section 10.3)
     allow: [inv, sc, fm, ck]    # optional, this is the default: the kinds an adapter pass may prove
     tiers: [routine, consequential]   # optional, this is the default: the tiers it may prove an id of
@@ -155,7 +156,7 @@ evidence:                       # optional
     excused:                    # optional, read with claims: all: claimants that cannot run where the evidence is made (section 10.3)
       - tests: ["e2e/cluster/*_test.go"]           # required: globs of files under trace.tests
         functions: ["TestFailover*"]               # optional: patterns of test function names; every function of the files when absent
-        reason: "needs three nodes; runs in the nightly job"   # required: one line
+        reason: "needs three nodes; runs in the nightly job"   # required: one line; entries may also be kept in design/excused.yaml (section 2.2)
 commands:
   e2e: ["go", "test", "./e2e/...", "-count=1"]   # optional: the project's end-to-end command
 backlog:                        # optional: the backlog bridge (section 15)
@@ -322,7 +323,25 @@ Rules:
   empty one), and a `reason` of one line, since the tool prints it
   (`evidence.adapter.excused: entry <n>: reason is required: say why these tests cannot run here`,
   `evidence.adapter.excused: entry <n>: reason "<text>" has a line break or a control character; a reason is one line`,
-  the text quoted with its escapes). The entries are read only with `claims: all`.
+  the text quoted with its escapes). The entries are read only with `claims: all`. They may also
+  be kept in `design/excused.yaml`, where a change to them leaves the runs of earlier commits
+  valid (section 2.2).
+- `evidence.exempt` lists globs of paths that a run of an earlier commit stays valid across
+  (section 10.1). Each is a valid glob inside the project
+  (`evidence.exempt: "<value>" is not a valid glob`, and for one that leaves the project
+  `evidence.exempt: "<value>" must use forward slashes`, `... must be relative to the project root`
+  or `... must stay inside the project root`). A glob never exempts a file whose change can change
+  what a test checks or what a verdict is: a file under `trace.tests` or `trace.code`, a design
+  source, `machinery.yaml` or a build manifest (section 10.1). Every command that loads the
+  project holds the globs, in the order written, against the files of the project in sorted
+  order (those git tracks and the untracked ones it does not ignore; every file below the root
+  outside git), and the first such file a glob matches is a config error:
+  `evidence.exempt: "<glob>" would exempt <file>, <what>; a run is never valid across a change to it: narrow the glob`,
+  `<what>` the first that applies of `a file under trace.tests`, `a file under trace.code`,
+  `a design source`, `the configuration` and `a build manifest`. The files of the tool (the owed
+  file, the adoption and excused files, receipts files, property records) are exempt anyway and
+  are never named. With `trace` set and `trace.code` left out, `trace.code` is the scope
+  (below), so a glob over files in the scope is refused until `trace.code` names the code.
 - `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
   config error (`plan.wire_max_files must not be negative`).
 - `review.backlog` and `review.design` are `required` or `off`
@@ -435,6 +454,43 @@ waivers:
 - It is committed, like everything under `design/`. It is configuration and no design source:
   the contract hash (section 15.4) covers neither it nor `machinery.yaml`, and covers the
   model, machine and contract files the two name.
+
+### 2.2 Excused claimants kept apart: `design/excused.yaml`
+
+The entries of `evidence.adapter.excused` (section 10.3) may also be kept in a file of their own,
+`design/excused.yaml`. The path is fixed. Every command that reads `machinery.yaml` reads this
+file with it when it exists:
+
+```yaml
+version: 1                      # required, must be 1
+excused:                        # the entries, exactly as in evidence.adapter.excused
+  - tests: ["e2e/cluster/*_test.go"]
+    functions: ["TestFailover*"]
+    reason: "needs three nodes; runs in the nightly job"
+```
+
+- `version` and `excused` are its only keys. Config errors that name the file: any other key
+  (`config: design/excused.yaml: line <n>: field <key> not found in type project.ExcusedFile`, and
+  `... in type project.AdapterExcused` for a key of an entry), a `version` that is not 1 or a file with no document in it
+  (`config: design/excused.yaml: version must be 1`), more than one document
+  (`config: design/excused.yaml: the file holds more than one YAML document`), and an entry that
+  breaks a rule of `evidence.adapter.excused` (section 2), with its message and the file in place
+  of the key: `config: design/excused.yaml: entry <n>: reason is required: say why these tests cannot run here`,
+  and for a glob that leaves the project
+  `config: design/excused.yaml: entry <n>: tests: "<value>" must stay inside the project root`.
+- **The merge.** The entries of the file follow those of `machinery.yaml` and are read with them
+  wherever they are read: only with `evidence.adapter.claims: all`, by `verify`, `status`,
+  `proof`, the tier gates and the ratchet. Each keeps its number in its own file, from 1, and a
+  message names an entry of the file `design/excused.yaml: entry <n>` where it names one of
+  `machinery.yaml` `entry <n>` (sections 10.3, 11.3 and 12). `machinery config` prints
+  `machinery.yaml` and `design/adoption.yaml`, not this file.
+- **Why a file of its own.** An entry changes no test and no code: it changes how the evidence is
+  judged, and evidence is judged with the entries of the commit where it is used. A change to the
+  file leaves the runs of earlier commits valid (section 10.1); a change to `machinery.yaml`
+  voids them, the same entry written there included. The ratchet holds the entries of the file
+  as it holds those of `machinery.yaml` (section 11.3).
+- It is committed, like everything under `design/`. It is no design source: the contract hash
+  (section 15.4) does not cover it.
 
 ## 3. Commands, output and exit codes
 
@@ -2007,14 +2063,54 @@ only after its assertions held. Section 10.2 says which receipts are read at all
 ### 10.1 When evidence is valid
 
 Evidence is bound to a commit. A receipts file is **valid for the current commit** when its header
-commit is the current commit, or when the tree of its header commit differs from the tree of the
-current commit only in the owed file, in receipts files and in the property records
-`<gen>/vital/*.json` (`git diff --name-only <receipt commit> HEAD` lists nothing else). A property
-record changes on its own only when the owed file does: any other change to it comes from a risk
-file, a design source or a core file, which are not exempt. Receipts are not meant to be committed; when they are, by a broad
-`git add`, the evidence stays valid. The owed file is bookkeeping about evidence, not part of the system under
-test, so pruning it and committing does not invalidate the run that justified the pruning.
-Evidence from any other commit says nothing about the current one.
+commit is the current commit, or when its header commit is an ancestor of the current commit and
+every path that differs between the two is **exempt**. The paths are those of
+`git diff --name-only --no-renames <receipt commit> HEAD`: a file renamed since counts by its old
+path and by its new one, so a file moved into an exempt directory from anywhere else voids the
+run. A path is exempt when it is:
+
+- **a file of the tool**: the owed file, `design/adoption.yaml` (section 2.1),
+  `design/excused.yaml` (section 2.2), a receipts file (a `.jsonl` file directly in the receipts
+  directory) or a property record `<gen>/vital/*.json`; or
+- **a path a glob of `evidence.exempt` matches** (section 2), unless it is a file whose change can
+  change what a test checks or what a verdict is: a file under `trace.tests` or `trace.code`, a
+  design source (a file the contract hash covers, section 15.4, every file of the directory
+  `design.machines` and every file `import.machines.files` matches), `machinery.yaml`, or a
+  build manifest. A build manifest is a file named `go.mod`, `go.sum`, `go.work`,
+  `go.work.sum`, `package.json`, `npm-shrinkwrap.json`, `Makefile`, `makefile` or
+  `GNUmakefile`, or whose name ends in `.lock`, `.lockb`, `-lock.json`, `-lock.yaml` or
+  `.mk`, in any directory. A glob that matches such a file of the project is a config error
+  (section 2); such a path that only the diff names (a file deleted since) is not exempt either.
+
+A run whose commit is **not an ancestor** of the current commit is never valid, even when the two
+trees are the same: an amended or rebased commit is another commit, and a run of a commit outside
+the history of HEAD says nothing about it. Evidence from any other commit says nothing about the
+current one.
+
+A property record changes on its own only when the owed file does: any other change to it comes
+from a risk file, a design source or a core file, which are not exempt. Receipts are not meant to
+be committed; when they are, by a broad `git add`, the evidence stays valid. The owed file is
+bookkeeping about evidence, not part of the system under test, so pruning it and committing does
+not invalidate the run that justified the pruning. The adoption file and the excused file change
+how evidence is judged and never what a test does, and they are judged as they are at the
+current commit; `machinery.yaml` is not exempt, and a change to it voids every run, whatever it
+changes, an `evidence.exempt` glob or an excused entry written there included.
+
+`verify` (section 12) and `status` (section 14) say of every run they use that was made at an
+earlier commit how it reaches the current one:
+`run: <file>: made at <short sha>, valid at HEAD through <n> exempt commit(s)`, `<n>` the commits
+from its commit to HEAD (`git rev-list --count <receipt commit>..HEAD`).
+
+The rule of section 10 for a dirty tree does not change: an uncommitted change to an exempt path
+still makes the tree dirty, and a run made then records `"dirty":true`. Commit the change, and
+the run of the commit before it stays valid.
+
+**What this defends against.** A run is used at a later commit only when nothing that could change
+its verdicts changed since: a test, the code, the design, the configuration, the build. It
+defends against a mistake (a test edited after the run, a dependency bumped, a run copied from
+another branch, a rebase). A glob of `evidence.exempt` is the project's statement that what it
+matches cannot change a verdict; machinery holds it to the files above and to nothing more, and
+the ratchet reports every glob added or widened (section 11.3).
 
 ### 10.2 Which receipts count
 
@@ -2896,7 +2992,9 @@ rule, and the claimants are not read; the ratchet reports `any` as a widening (s
 
 **Excused claimants (`evidence.adapter.excused`).** A claimant that cannot run where the
 evidence is made (a test that needs a cluster, a sandbox the CI cannot reach) is left out of the
-rule by an entry of `evidence.adapter.excused` with a reason. An entry covers a claimant when
+rule by an entry of `evidence.adapter.excused` with a reason, written in `machinery.yaml` or in
+`design/excused.yaml` (section 2.2); every line below names an entry of that file
+`design/excused.yaml: entry <n>` in place of `entry <n>`. An entry covers a claimant when
 the claimant's file matches one of its `tests` globs and, when the entry has `functions`, the
 claimant is a test function whose name matches one of its patterns. A file claimant is
 excused by its file, never by a function: only an entry without `functions` covers it, whatever
@@ -3034,7 +3132,8 @@ that was established at the base may quietly stop being established:
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
 | `review-off` | A review gate (section 15.10) that was required at the base is off now: `warn   ratchet: review switched off: review.<kind> was required at <ref> and is off now`. A project being adopted switches a gate off on purpose; the ratchet makes the change seen. |
-| `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it; an entry with `dir: true` is the pair of its pattern and `dir: true`, which prints in the place of the file globs. `evidence.adapter.claims` `all` at the base and `any` now lets one claimant prove an id several claim: one finding per tier for which adapter evidence may now prove some kind, `<kinds>` those kinds, `ERROR  ratchet: adapter widened: <tier> <kinds> ids: claims all -> any; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier and `warn   ratchet: adapter widened: <tier> <kinds> ids: claims all -> any` for the others. For `evidence.adapter.excused`, compared as pairs of a `tests` glob and a `functions` pattern (none for an entry without `functions`): an entry with a pair the base did not have is `ratchet: adapter widened: evidence.adapter.excused: entry <n> <added|widened>: <pairs>: <reason>`, `widened` when the base had a pair of one of its `tests` globs and `added` otherwise, `<pairs>` the new ones as `tests <glob>[, functions <pattern>]` joined by `; `; it is an ERROR, followed by `; it covers a claimant of <id>, in a <tier> area (<areas>)` (the first such id, sorted), when the new pairs cover a claimant (section 10.3) of an id of a critical or vital area, and a warn otherwise. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
+| `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it; an entry with `dir: true` is the pair of its pattern and `dir: true`, which prints in the place of the file globs. `evidence.adapter.claims` `all` at the base and `any` now lets one claimant prove an id several claim: one finding per tier for which adapter evidence may now prove some kind, `<kinds>` those kinds, `ERROR  ratchet: adapter widened: <tier> <kinds> ids: claims all -> any; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier and `warn   ratchet: adapter widened: <tier> <kinds> ids: claims all -> any` for the others. For `evidence.adapter.excused`, compared as pairs of a `tests` glob and a `functions` pattern (none for an entry without `functions`): an entry with a pair the base did not have is `ratchet: adapter widened: evidence.adapter.excused: entry <n> <added|widened>: <pairs>: <reason>`, `widened` when the base had a pair of one of its `tests` globs and `added` otherwise, `<pairs>` the new ones as `tests <glob>[, functions <pattern>]` joined by `; `; it is an ERROR, followed by `; it covers a claimant of <id>, in a <tier> area (<areas>)` (the first such id, sorted), when the new pairs cover a claimant (section 10.3) of an id of a critical or vital area, and a warn otherwise. An entry of `design/excused.yaml` (section 2.2) is named `design/excused.yaml: entry <n>` in place of `evidence.adapter.excused: entry <n>`, and the pairs of the base are those of both files at the base: moving an entry from one file to the other raises nothing. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
+| `exempt-widened` | A glob of `evidence.exempt` (section 10.1) that the base did not list, compared as written: `ratchet: evidence exempt widened: "<base glob>" -> "<glob>": a run stays valid across a change to the files it matches` when it takes the place of a glob the base listed and that is gone now, whose fixed prefix (the part before its first wildcard, up to the last `/` there) begins with the fixed prefix of the new one, and `ratchet: evidence exempt added: "<glob>": a run stays valid across a change to the files it matches` otherwise, one finding per glob in the order written. Each is a warn, and an ERROR followed by `; the risk file has a critical or vital area (<areas>)` while the risk file has one, `<areas>` in the order of the file. Removing or narrowing a glob raises nothing. |
 | `vital-weakened` | A vital area of the base (section 23.1) states less now: `ERROR  ratchet: vital weakened: <area>: <what>; record it under lowered: in the risk file with a reason`, unless the risk file records that area and that `<what>` under `lowered:` (section 23), which prints as `warn   ratchet: vital weakened: <area>: <what> (<reason>)`. Adding or strengthening raises nothing. |
 
 The `<what>` of `vital-weakened`, one finding per change, in the order the base's area lists its
@@ -3066,8 +3165,9 @@ ref is a usage error. A base at which the project has no `machinery.yaml` establ
 the stage is `not applicable: no machinery.yaml at <ref>: nothing was established there`.
 
 The configuration at the base is the base's own `machinery.yaml` with the base's own
-`design/adoption.yaml` merged into it when the base has one (section 2.1), as the configuration
-now is the two files of the work tree: a scope glob, a stage or a policy counts the same in
+`design/adoption.yaml` merged into it when the base has one (section 2.1), and the entries of the
+base's `design/excused.yaml` (section 2.2), as the configuration now is the files of the work
+tree: a scope glob, a stage or a policy counts the same in
 either file, and moving one from one file to the other changes nothing. The paths of the
 obligations, the owed list, the risk file and the baselines at the base come from that
 configuration.
@@ -3165,6 +3265,9 @@ Findings:
   excused, `warn   adapter excused: entry <n>: ...` once per entry, with its globs and patterns
   under `--partly`, and the ERRORs of a glob or a pattern through which an entry covers no
   claimant (section 10.3, with the texts).
+- `warn   run: <file>: made at <short sha>, valid at HEAD through <n> exempt commit(s)`, once for
+  every run used that was made at an earlier commit (section 10.1). It is a record, not a
+  judgment; with `--story` and `--affected` it prints all the same.
 - `warn   adapter environment: <file>: <what the header recorded>`, once for every adapter run
   that is used (section 10.3, with the text). It is a record: environments that differ between
   runs at the same commit are no finding. With `--story` it prints for every such run.
@@ -3396,6 +3499,7 @@ owed, proven by a receipt, still listed: <n> (<kind> <n>, ...)
 owed, actions: <n> served by code, <n> not served
 refused: <receipts file>: <why: the text of section 10.2 before the semicolon, or incomplete run>
 evidence: <short sha> <clean|dirty>, <n> run(s), <n> receipt(s)
+run: <receipts file>: made at <short sha>, valid at HEAD through <n> exempt commit(s)
 ```
 
 The `red` line prints only while the integration branch is red (section 12.2). The first count
@@ -3441,7 +3545,9 @@ is missing.
 
 One `refused` line prints per receipts file that section 10.2 refuses and per incomplete run
 (section 12), after the `owed,` lines. When there is no evidence the line is
-`evidence: none at <short sha>`. When
+`evidence: none at <short sha>`. After the `evidence` line, one `run` line per run used that was
+made at an earlier commit says through how many commits it is valid at HEAD (section 10.1), in
+the order of the receipts files. When
 `backlog.tool` is set and the backlog can be read, one line follows per open intake item, sorted by
 id: the summary line of `machinery intake status` (section 15.7),
 `intake <id>: <n> of 7 steps done; next: <step>`; then the latest review of each kind (section 15.10):
@@ -3740,7 +3846,7 @@ sorted list of `<path> <sha256 of the file>` lines of the design sources: the mo
 failure-mode file, the imported failure-mode catalog and its links file, the risk file, the status
 file (section 4.1), the facts file and the contract files.
 Generated files, the owed list and formal models are not part of it, and neither are
-`machinery.yaml` and `design/adoption.yaml` (section 2.1): they are configuration, and the hash
+`machinery.yaml`, `design/adoption.yaml` (section 2.1) and `design/excused.yaml` (section 2.2): they are configuration, and the hash
 covers the model, machine and contract files they name.
 
 `machinery waves --freeze` requires a clean `gen-drift` stage and writes

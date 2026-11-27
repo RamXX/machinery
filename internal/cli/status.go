@@ -135,6 +135,11 @@ func runStatus(e *Env, args []string) int {
 			state = "dirty"
 		}
 		fmt.Fprintf(w, "evidence: %s %s, %d run(s), %d receipt(s)\n", gitx.Short(ev.Head), state, len(ev.Runs), ev.NReceipts)
+		for _, r := range ev.Runs { // section 10.1: a run of an earlier commit
+			if r.Through > 0 {
+				fmt.Fprintln(w, r.ValidLine())
+			}
+		}
 	}
 	statusIntakes(e, p, noBacklog(*skip))
 	return 0

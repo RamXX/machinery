@@ -49,6 +49,12 @@ func Ratchet(ctx *Context) *report.Stage {
 		s.Errorf("cannot read %s at %s: %v", project.ConfigName, ref, err)
 		return s
 	}
+	if data, ok := gitx.Show(p.Root, ref, project.ExcusedName); ok { // section 2.2
+		if bcfg.ExcusedFile, err = project.ParseExcused(data); err != nil {
+			s.Errorf("cannot read %s at %s: %v", project.ExcusedName, ref, err)
+			return s
+		}
+	}
 	bp := &project.Project{Root: p.Root, Cfg: *bcfg}
 	d := ctx.Design()
 
@@ -104,6 +110,7 @@ func Ratchet(ctx *Context) *report.Stage {
 	if err := ratchetExcused(s, bcfg, p, d); err != nil {
 		s.Errorf("%v", err)
 	}
+	ratchetExempt(s, bcfg, &p.Cfg, d)
 
 	// scope-narrowed
 	nowScope := set(p.Cfg.Scope)
@@ -487,7 +494,7 @@ func ratchetExcused(s *report.Stage, base *project.Config, p *project.Project, d
 		}
 	}
 	var covered func(project.AdapterExcused) []string
-	for i, e := range p.Cfg.AdapterExcused() {
+	for _, e := range p.Cfg.AdapterExcused() {
 		var added [][2]string
 		old := false // the base excused some of the files of a tests glob of it
 		for _, pair := range excusedPairs(e) {
@@ -513,7 +520,7 @@ func ratchetExcused(s *report.Stage, base *project.Config, p *project.Project, d
 			}
 			texts = append(texts, text)
 		}
-		msg := fmt.Sprintf("ratchet: adapter widened: evidence.adapter.excused: entry %d %s: %s: %s", i+1, what, strings.Join(texts, "; "), e.Reason)
+		msg := fmt.Sprintf("ratchet: adapter widened: %s %s: %s: %s", e.Key(), what, strings.Join(texts, "; "), e.Reason)
 		if covered == nil {
 			var err error
 			if covered, err = evidence.CoveredIDs(p, d); err != nil {
@@ -527,6 +534,46 @@ func ratchetExcused(s *report.Stage, base *project.Config, p *project.Project, d
 		}
 	}
 	return nil
+}
+
+// ratchetExempt is rule exempt-widened (section 11.3): a glob of
+// evidence.exempt the base did not have. It is widened when it takes the
+// place of a glob of the base that is gone now and whose fixed prefix lies
+// within its own, and added otherwise; an ERROR while the risk file has a
+// critical or vital area, and a warn otherwise.
+func ratchetExempt(s *report.Stage, base, now *project.Config, d *design.Design) {
+	had, still := set(base.EvidenceExempt()), set(now.EvidenceExempt())
+	var gone []string
+	for _, g := range base.EvidenceExempt() {
+		if !still[g] {
+			gone = append(gone, g)
+		}
+	}
+	var areas []string
+	for _, a := range d.Areas {
+		if a.Tier == design.Critical || a.Tier == design.Vital {
+			areas = append(areas, a.Name)
+		}
+	}
+	for _, g := range now.EvidenceExempt() {
+		if had[g] {
+			continue
+		}
+		had[g] = true
+		what := fmt.Sprintf("added: %q", g)
+		for _, b := range gone {
+			if strings.HasPrefix(project.GlobPrefix(b), project.GlobPrefix(g)) {
+				what = fmt.Sprintf("widened: %q -> %q", b, g)
+				break
+			}
+		}
+		msg := "ratchet: evidence exempt " + what + ": a run stays valid across a change to the files it matches"
+		if len(areas) > 0 {
+			s.Errorf("%s; the risk file has a critical or vital area (%s)", msg, strings.Join(areas, ", "))
+		} else {
+			s.Warnf("%s", msg)
+		}
+	}
 }
 
 // tieredCover returns the first id, sorted, of a critical or vital area a

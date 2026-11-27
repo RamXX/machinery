@@ -194,7 +194,11 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 			add(report.Warn, "run exited %d: %s", *fd.End.Exit, rel)
 		}
 		run := RunInfo{File: rel, Commit: fd.Header.Commit, Command: fd.Header.Command, Stack: fd.Header.Stack,
-			Exit: *fd.End.Exit, Dirty: fd.Header.Dirty, Receipts: len(fd.Receipts), Adapter: fd.Header.Adapter == GoTestJSON}
+			Exit: *fd.End.Exit, Dirty: fd.Header.Dirty, Receipts: len(fd.Receipts), Adapter: fd.Header.Adapter == GoTestJSON,
+			Through: v.through(fd.Header.Commit)}
+		if run.Through > 0 { // a record of how the run reaches the current commit (section 10.1)
+			add(report.Warn, "%s", run.ValidLine())
+		}
 		if run.Adapter {
 			run.Env = fd.Header.Environment
 			add(report.Warn, "%s", EnvLine(rel, run.Env)) // a record, not a judgment (section 10.3)

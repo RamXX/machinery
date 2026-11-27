@@ -46,6 +46,9 @@ type Config struct {
 	Tools        Tools             `yaml:"tools"`
 	Waivers      []Waiver          `yaml:"waivers,omitempty"`
 	Assess       *Assess           `yaml:"assess,omitempty"`
+	// ExcusedFile holds the entries of design/excused.yaml (section 2.2),
+	// merged after those of evidence.adapter.excused
+	ExcusedFile []AdapterExcused `yaml:"-"`
 }
 
 // Assess is read only by machinery assess (section 18).
@@ -393,8 +396,12 @@ type Receipts struct {
 	Dir string `yaml:"dir,omitempty"`
 }
 
-// Evidence holds the policy for evidence machinery writes itself.
+// Evidence holds the policy for evidence machinery writes itself, and the
+// paths a run stays valid across (section 10.1).
 type Evidence struct {
+	// Exempt are globs of paths whose change leaves a run of an earlier
+	// commit valid; they never match a path that can change a verdict
+	Exempt  []string `yaml:"exempt,omitempty"`
 	Adapter *Adapter `yaml:"adapter,omitempty"`
 }
 
@@ -439,6 +446,15 @@ func (e AdapterExcused) Label() string {
 		return fmt.Sprintf("%s: entry %d", e.From, e.N)
 	}
 	return fmt.Sprintf("entry %d", e.N)
+}
+
+// Key is how the ratchet names the entry: by its key in machinery.yaml, or
+// by its file.
+func (e AdapterExcused) Key() string {
+	if e.From != "" {
+		return e.Label()
+	}
+	return "evidence.adapter.excused: " + e.Label()
 }
 
 // Name is how a message names what the entry covers: its tests globs, and
@@ -605,7 +621,19 @@ func (c *Config) AdapterExcused() []AdapterExcused {
 			res = append(res, e)
 		}
 	}
+	for i, e := range c.ExcusedFile {
+		e.N, e.From = i+1, ExcusedName
+		res = append(res, e)
+	}
 	return res
+}
+
+// EvidenceExempt returns the globs of evidence.exempt.
+func (c *Config) EvidenceExempt() []string {
+	if c.Evidence == nil {
+		return nil
+	}
+	return c.Evidence.Exempt
 }
 
 // AdapterSources returns evidence.adapter.sources.
@@ -618,7 +646,18 @@ func (c *Config) AdapterSources() []AdapterSource {
 
 // validateEvidence holds the evidence block to section 2.
 func (c *Config) validateEvidence() error {
-	if c.Evidence == nil || c.Evidence.Adapter == nil {
+	if c.Evidence == nil {
+		return nil
+	}
+	for _, g := range c.Evidence.Exempt {
+		if err := CheckPath("evidence.exempt", g); err != nil {
+			return err
+		}
+		if strings.TrimSpace(g) == "" || !ValidGlob(g) {
+			return Errf("evidence.exempt: %q is not a valid glob", g)
+		}
+	}
+	if c.Evidence.Adapter == nil {
 		return nil
 	}
 	a := c.Evidence.Adapter
@@ -668,29 +707,8 @@ func (c *Config) validateEvidence() error {
 	if a.Claims != "" && a.Claims != ClaimsAll && a.Claims != ClaimsAny {
 		return Errf("evidence.adapter.claims must be all or any, got %q", a.Claims)
 	}
-	for i, e := range a.Excused {
-		if len(e.Tests) == 0 {
-			return Errf("evidence.adapter.excused: entry %d: tests is required: globs of files under trace.tests", i+1)
-		}
-		for _, g := range e.Tests {
-			if err := CheckPath("evidence.adapter.excused.tests", g); err != nil {
-				return err
-			}
-			if strings.TrimSpace(g) == "" || !ValidGlob(g) {
-				return Errf("evidence.adapter.excused: entry %d: tests %q is not a valid glob", i+1, g)
-			}
-		}
-		for _, f := range e.Functions {
-			if _, err := path.Match(f, ""); err != nil || strings.TrimSpace(f) == "" {
-				return Errf("evidence.adapter.excused: entry %d: functions %q is not a valid pattern", i+1, f)
-			}
-		}
-		switch {
-		case strings.TrimSpace(e.Reason) == "":
-			return Errf("evidence.adapter.excused: entry %d: reason is required: say why these tests cannot run here", i+1)
-		case !OneLine(e.Reason):
-			return Errf("evidence.adapter.excused: entry %d: reason %q has a line break or a control character; a reason is one line", i+1, e.Reason)
-		}
+	if err := validateExcused(a.Excused, "evidence.adapter.excused", func(int) string { return "evidence.adapter.excused.tests" }); err != nil {
+		return err
 	}
 	for i, s := range a.Sources {
 		switch {
@@ -714,6 +732,37 @@ func (c *Config) validateEvidence() error {
 			if strings.TrimSpace(f) == "" || !ValidGlob(f) {
 				return Errf("evidence.adapter.sources: entry %d: files %q is not a valid glob", i+1, f)
 			}
+		}
+	}
+	return nil
+}
+
+// validateExcused holds entries of evidence.adapter.excused to section 2: in
+// messages they are "<where>: entry <n>", and pathKey names the key of the
+// tests of entry n in the messages of a path that leaves the project.
+func validateExcused(entries []AdapterExcused, where string, pathKey func(n int) string) error {
+	for i, e := range entries {
+		if len(e.Tests) == 0 {
+			return Errf("%s: entry %d: tests is required: globs of files under trace.tests", where, i+1)
+		}
+		for _, g := range e.Tests {
+			if err := CheckPath(pathKey(i+1), g); err != nil {
+				return err
+			}
+			if strings.TrimSpace(g) == "" || !ValidGlob(g) {
+				return Errf("%s: entry %d: tests %q is not a valid glob", where, i+1, g)
+			}
+		}
+		for _, f := range e.Functions {
+			if _, err := path.Match(f, ""); err != nil || strings.TrimSpace(f) == "" {
+				return Errf("%s: entry %d: functions %q is not a valid pattern", where, i+1, f)
+			}
+		}
+		switch {
+		case strings.TrimSpace(e.Reason) == "":
+			return Errf("%s: entry %d: reason is required: say why these tests cannot run here", where, i+1)
+		case !OneLine(e.Reason):
+			return Errf("%s: entry %d: reason %q has a line break or a control character; a reason is one line", where, i+1, e.Reason)
 		}
 	}
 	return nil
@@ -878,7 +927,14 @@ func Load(explicit string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Project{Root: root, Cfg: *cfg}, nil
+	if cfg.ExcusedFile, err = ReadExcused(root); err != nil {
+		return nil, err
+	}
+	p := &Project{Root: root, Cfg: *cfg}
+	if err := p.checkExempt(); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // Parse decodes and validates a machinery.yaml alone and applies defaults.

@@ -138,9 +138,10 @@ func Show(root, ref, rel string) ([]byte, bool) {
 	return out, true
 }
 
-// DiffNames lists project-relative paths that differ between two commits.
+// DiffNames lists project-relative paths that differ between two commits. A
+// rename is a deletion and an addition: both paths are listed.
 func DiffNames(root, a, b string) ([]string, error) {
-	out, err := run(root, "diff", "--name-only", "--relative", a, b, "--", ".")
+	out, err := run(root, "diff", "--name-only", "--relative", "--no-renames", a, b, "--", ".")
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +202,17 @@ func CommonDir(root string) (string, error) {
 		d = filepath.Join(root, d)
 	}
 	return filepath.Clean(d), nil
+}
+
+// CountCommits returns how many commits are in a..b.
+func CountCommits(root, a, b string) (int, error) {
+	out, err := run(root, "rev-list", "--count", a+".."+b)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	_, err = fmt.Sscanf(strings.TrimSpace(out), "%d", &n)
+	return n, err
 }
 
 // IsAncestor reports whether a is an ancestor of b (or equal).
@@ -273,6 +285,24 @@ func Tracked(root string, pathspecs ...string) ([]string, error) {
 	var res []string
 	for _, f := range strings.Split(out, "\x00") {
 		if f != "" {
+			res = append(res, f)
+		}
+	}
+	return res, nil
+}
+
+// Listed returns the files below root that git tracks and the untracked
+// files it does not ignore, root-relative.
+func Listed(root string) ([]string, error) {
+	out, err := run(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ".")
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var res []string
+	for _, f := range strings.Split(out, "\x00") {
+		if f != "" && !seen[f] {
+			seen[f] = true
 			res = append(res, f)
 		}
 	}

@@ -1,0 +1,370 @@
+# evidence.exempt may never match a file whose change can change what a test checks: a file under
+# trace.tests or trace.code, a design source, machinery.yaml or a build manifest. Such a glob is
+# a config error naming the file (section 2)
+fixture shop
+mkdir docs build
+cp notes.md docs/notes.md
+cp notes.md docs/package.json
+cp notes.md build/extra.mk
+cp notes.md build/yarn.lock
+cp notes.md go.sum
+cp notes.md Makefile
+
+cp tests.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "e2e/\*\*" would exempt e2e/orders\.sh, a file under trace\.tests; a run is never valid across a change to it: narrow the glob$'
+cp code.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "internal/\*\*" would exempt internal/api/handlers\.go, a file under trace\.code; a run is never valid across a change to it: narrow the glob$'
+cp design.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "design/\*\*/\*\.json" would exempt design/machines/Order\.machine\.json, a design source; a run is never valid across a change to it: narrow the glob$'
+cp model.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "design/model/\*" would exempt design/model/shop\.modelith\.yaml, a design source; '
+cp config.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "\*\.yaml" would exempt machinery\.yaml, the configuration; a run is never valid across a change to it: narrow the glob$'
+cp gomod.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "go\.\*" would exempt go\.mod, a build manifest; a run is never valid across a change to it: narrow the glob$'
+cp make.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "Make\*" would exempt Makefile, a build manifest; '
+cp mk.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "build/\*" would exempt build/extra\.mk, a build manifest; '
+cp lock.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "build/\*\.lock" would exempt build/yarn\.lock, a build manifest; '
+cp package.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "docs/\*\*" would exempt docs/package\.json, a build manifest; '
+cp bad-glob.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "docs/\[" is not a valid glob$'
+cp outside.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "\.\./notes" must stay inside the project root$'
+
+# a glob over files none of which can change a verdict is accepted
+cp docs.yaml machinery.yaml
+rm docs/package.json
+exec machinery config
+stdout '^  exempt:$'
+stdout '^    - docs/\*\*$'
+
+-- notes.md --
+Nothing here changes what the tests check.
+-- tests.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["e2e/**"]
+-- code.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["internal/**"]
+-- design.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["design/**/*.json"]
+-- model.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["design/model/*"]
+-- config.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["*.yaml"]
+-- gomod.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["go.*"]
+-- make.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["Make*"]
+-- mk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["build/*"]
+-- lock.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["build/*.lock"]
+-- package.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**"]
+-- bad-glob.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/["]
+-- outside.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["../notes"]
+-- docs.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**"]

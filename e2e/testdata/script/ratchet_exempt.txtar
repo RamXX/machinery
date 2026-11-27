@@ -1,0 +1,120 @@
+# the ratchet reports an evidence.exempt glob added or widened since the base: a warning, and an
+# ERROR while the risk file has a critical or vital area (section 11.3)
+fixture shop
+mkdir docs/notes
+cp notes.md docs/notes/a.md
+cp notes.md docs/guide.md
+exec machinery gen
+gitinit
+exec git tag none
+cp narrow.yaml machinery.yaml
+gitcommit 'exempt the notes'
+exec git tag narrow
+
+exec machinery check --stage ratchet --base none
+stdout '^  warn   ratchet: evidence exempt added: "docs/notes/\*\.md": a run stays valid across a change to the files it matches$'
+stdout '^passed$'
+
+# a glob that takes the place of a narrower one is widened; the same globs written again are
+# nothing
+cp wide.yaml machinery.yaml
+exec machinery check --stage ratchet --base narrow
+stdout '^  warn   ratchet: evidence exempt widened: "docs/notes/\*\.md" -> "docs/\*\*": a run stays valid across a change to the files it matches$'
+stdout -count=1 'evidence exempt'
+cp narrow.yaml machinery.yaml
+exec machinery check --stage ratchet --base narrow
+! stdout 'evidence exempt'
+# narrowing raises nothing
+exec git checkout -q none -- machinery.yaml
+exec machinery check --stage ratchet --base narrow
+! stdout 'evidence exempt'
+
+# with a critical or vital area every added or widened glob is an ERROR
+cp narrow-risk.yaml machinery.yaml
+cp risk.yaml design/risk.yaml
+exec mrun 1 check --stage ratchet --base none
+stdout '^  ERROR  ratchet: evidence exempt added: "docs/notes/\*\.md": a run stays valid across a change to the files it matches; the risk file has a critical or vital area \(order-shipping\)$'
+
+-- notes.md --
+Nothing here changes what the tests check.
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-shipping
+    tier: critical
+    why: "a shipment cannot be recalled"
+    ids: ["inv:paid-before-shipped"]
+    questions: [concurrency]
+-- narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/notes/*.md"]
+-- wide.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**"]
+-- narrow-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/notes/*.md"]

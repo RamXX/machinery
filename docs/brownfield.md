@@ -289,7 +289,10 @@ evidence:
 
 `verify` prints every entry with what it covers, and an id whose claimants are all excused is
 not proven (`no claimant can run here`). `claims: any` brings back the rule of one claimant;
-the ratchet reports it, and an entry added or widened, as a widening.
+the ratchet reports it, and an entry added or widened, as a widening. The same entries may be
+kept in `design/excused.yaml` (`version: 1` and a list `excused:`), which the tool reads with
+`machinery.yaml`: a change to that file leaves the runs of earlier commits valid, while a change
+to `machinery.yaml` voids them.
 
 **A Go suite behind a wrapper: `--streams`.** When a make target or a script starts `go test`
 itself, machinery cannot add `-json`. The wrapper writes each stream to a file in the directory
@@ -354,7 +357,14 @@ machinery verify
 
 `owed sync --prune-only` removes exactly the ids the runs proved and adds nothing. Prune before
 you verify: `verify` fails on an owed id that is proven (`stale owed entry`). Pruning changes
-only the owed file, so the runs stay valid at the new commit. `verify` counts adapter evidence
+only the owed file, so the runs stay valid at the new commit.
+
+A run stays valid at a later commit when every path changed since is the tool's own (the owed
+list, the adoption and excused files, receipts) or matches a glob of `evidence.exempt` (say
+`docs/**`), and its commit is an ancestor of HEAD; `verify` and `status` print
+`valid at HEAD through <n> exempt commit(s)` for such a run. A glob that would exempt a test, the
+code, a design source, `machinery.yaml` or a build manifest is a config error, and the ratchet
+reports every glob added or widened. `verify` counts adapter evidence
 apart (`4 by adapter at function granularity`) and prints the go environment of each adapter run.
 
 ## 8. Plan: stories beside the ones you have

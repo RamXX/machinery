@@ -44,6 +44,12 @@ type Receipt struct {
 	File        string // project-relative receipts file
 }
 
+// ValidLine says of a run of an earlier commit how it is valid at the current
+// one (sections 10.1, 12 and 14).
+func (r RunInfo) ValidLine() string {
+	return fmt.Sprintf("run: %s: made at %s, valid at HEAD through %d exempt commit(s)", r.File, gitx.Short(r.Commit), r.Through)
+}
+
 // RunInfo describes one complete receipts file that was used as evidence.
 type RunInfo struct {
 	File     string // project-relative
@@ -57,6 +63,10 @@ type RunInfo struct {
 	// header recorded (nil for a run through --streams)
 	Adapter bool
 	Env     *GoEnv
+	// Through is how many commits lead from the commit of the run to the
+	// current one, every path they change exempt (section 10.1); 0 for a run
+	// of the current commit
+	Through int
 }
 
 // line is any line of a receipts file.
@@ -298,6 +308,31 @@ type validity struct {
 	p     *project.Project
 	head  string
 	cache map[string]bool
+	// count: a valid commit -> the commits from it to the head, 0 for the head
+	count map[string]int
+}
+
+// through returns how many commits lead from a valid commit to the head.
+func (v *validity) through(commit string) int {
+	if commit == v.head || !v.valid(commit) {
+		return 0
+	}
+	if n, ok := v.count[commit]; ok {
+		return n
+	}
+	n, _ := gitx.CountCommits(v.p.Root, commit, v.head)
+	v.count[commit] = n
+	return n
+}
+
+// exemptAcross reports whether a change to a path leaves a run of an earlier
+// commit valid (section 10.1): a file of the tool, or a path a glob of
+// evidence.exempt matches that can change no verdict.
+func exemptAcross(p *project.Project, rel string) bool {
+	if p.Cfg.ToolOwned(rel) {
+		return true
+	}
+	return project.Match(p.Cfg.EvidenceExempt(), rel) && p.Cfg.Protected(rel) == ""
 }
 
 // ValidFor reports whether evidence from commit is valid for head (section 10.1).
@@ -306,7 +341,7 @@ func ValidFor(p *project.Project, head, commit string) bool {
 }
 
 func newValidity(p *project.Project, head string) *validity {
-	return &validity{p: p, head: head, cache: map[string]bool{head: true}}
+	return &validity{p: p, head: head, cache: map[string]bool{head: true}, count: map[string]int{}}
 }
 
 func (v *validity) valid(commit string) bool {
@@ -314,12 +349,14 @@ func (v *validity) valid(commit string) bool {
 		return ok
 	}
 	ok := false
-	if commit != "" && gitx.Exists(v.p.Root, commit) {
+	// a run of a commit that is not an ancestor of the head is never valid,
+	// whatever its tree (section 10.1)
+	if commit != "" && gitx.Exists(v.p.Root, commit) && gitx.IsAncestor(v.p.Root, commit, v.head) {
 		names, err := gitx.DiffNames(v.p.Root, commit, v.head)
 		if err == nil {
 			ok = true
 			for _, n := range names {
-				if !exempt(v.p, n) {
+				if !exemptAcross(v.p, n) {
 					ok = false
 					break
 				}
