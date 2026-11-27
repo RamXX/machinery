@@ -146,11 +146,16 @@ evidence:                       # optional
     allow: [inv, sc, fm, ck]    # optional, this is the default: the kinds an adapter pass may prove
     tiers: [routine, consequential]   # optional, this is the default: the tiers it may prove an id of
     min_granularity: file       # optional, this is the default: function | file, or a mapping (below)
+    claims: all                 # optional, this is the default: all | any; whether every claimant of an id must pass (section 10.3)
     sources:                    # optional, read only with --streams: the files each test package of the run is built from
       - package: "example.test/shop/staged/**"   # required: a glob of package import paths
         files: ["e2e/suite/*_test.go"]           # the Go files the package is built from: *_test.go files, or staged sources under trace.tests
       - package: "example.test/shop/e2e/..."     # with dir: true, an import path pattern of go: ... matches any string
         dir: true                                 # each package it matches is built from the test files of its own directory
+    excused:                    # optional, read with claims: all: claimants that cannot run where the evidence is made (section 10.3)
+      - tests: ["e2e/cluster/*_test.go"]           # required: globs of files under trace.tests
+        functions: ["TestFailover*"]               # optional: patterns of test function names; every function of the files when absent
+        reason: "needs three nodes; runs in the nightly job"   # required: one line
 commands:
   e2e: ["go", "test", "./e2e/...", "-count=1"]   # optional: the project's end-to-end command
 backlog:                        # optional: the backlog bridge (section 15)
@@ -301,6 +306,22 @@ Rules:
   Section 10.3 ("Whose verdict") says which files each form gives a package. The
   entries are read only by `machinery run --adapter go-test-json --streams`; without `--streams`
   an entry for a package tested in its own directory is refused (section 10.3).
+
+  `claims` is `all`, the default, or `any`
+  (`evidence.adapter.claims must be all or any, got "<value>"`): with `all` adapter evidence
+  proves an id only when every claimant of it has a pass at the commit, with `any` a pass of one
+  claimant is enough (section 10.3, "Every claimant"); the ratchet reports `any` as a widening
+  (section 11.3). Each entry of `excused`, numbered from 1, needs `tests`, a non-empty list of
+  valid globs inside the project
+  (`evidence.adapter.excused: entry <n>: tests is required: globs of files under trace.tests`,
+  `evidence.adapter.excused: entry <n>: tests "<value>" is not a valid glob`, and for a glob that
+  leaves the project the messages of `sources` under the key `evidence.adapter.excused.tests`),
+  `functions`, optional patterns of test function names as Go's `path.Match` reads them
+  (`evidence.adapter.excused: entry <n>: functions "<value>" is not a valid pattern`, also for an
+  empty one), and a `reason` of one line, since the tool prints it
+  (`evidence.adapter.excused: entry <n>: reason is required: say why these tests cannot run here`,
+  `evidence.adapter.excused: entry <n>: reason "<text>" has a line break or a control character; a reason is one line`,
+  the text quoted with its escapes). The entries are read only with `claims: all`.
 - `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
   config error (`plan.wire_max_files must not be negative`).
 - `review.backlog` and `review.design` are `required` or `off`
@@ -428,8 +449,8 @@ waivers:
 | `machinery trace` | Stage `trace` (section 8). `--non-action-serves` lists the ids that serves tags name and that are not actions, and runs no check. |
 | `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3), and with `--story <id>` as well stage `scope` (section 15.11). `--no-backlog` (section 15.1). |
 | `machinery checks` | Prints the declaration of applicable checks (section 3.4). A report, never a gate. |
-| `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). `--adapter go-test-json -- go test ...` also writes the receipts of an existing Go suite from its event stream, and with `--streams -- <command>` from the streams a wrapper leaves (section 10.3). |
-| `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`. |
+| `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). `--adapter go-test-json -- go test ...` also writes the receipts of an existing Go suite from its event stream, and with `--streams -- <command>` from the streams a wrapper leaves, with `--allow-no-streams` and `--keep-streams <dir>` (section 10.3). |
+| `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`, `--partly`. |
 | `machinery affected --base <ref>` | Prints the obligation ids a change touches (section 12.1). |
 | `machinery landing --base <ref>` | The end gate: `check`, the full suite through `run`, `verify` (section 12.2). A failed landing marks the integration branch red. `--repair`; `--clear-red --reason <text>`. |
 | `machinery owed list` | Prints the owed list. |
@@ -1938,7 +1959,8 @@ for such a run too.
 5. appends the end line when the command exits, and records the digest of the finished file in
    the run ledger;
 6. exits with the command's exit code, after printing `machinery run: <file> (exit <n>)` on
-   stderr. A command that cannot be started exits 127 and leaves no file and no ledger entry; a
+   stderr (an adapter run through `--streams` that reads no stream exits 1 instead of 0,
+   section 10.3). A command that cannot be started exits 127 and leaves no file and no ledger entry; a
    command killed by a signal exits 128 plus the signal number.
 
 The command runs in the project root. The variables machinery sets for a run
@@ -1969,8 +1991,8 @@ A test emits one `receipt` line per obligation it checked, by appending to the f
 - `observed`: one short sentence, at most 300 characters, saying what was seen.
 - `replay`: for `cx` ids only, what the real system did when the counterexample was replayed:
   `reproduced` or `refuted` (section 16.10).
-- `source`, `granularity`, `tags`: only on a receipt a run adapter wrote (section 10.3). A
-  receipt a test writes with any of them is refused (section 12).
+- `source`, `granularity`, `tags`, `subtests`: only on a receipt a run adapter wrote (section
+  10.3). A receipt a test writes with any of them is refused (section 12).
 
 A test writes each line with a single append so that parallel tests do not interleave. When
 `MACHINERY_RECEIPTS` is not set, the test emits nothing and still runs. When `MACHINERY_ONLY` is
@@ -2512,6 +2534,7 @@ An adapter receipt is a receipt line with three more keys:
 ```json
 {"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":["faults"]}
 {"v":1,"type":"receipt","id":"sc:customer-pays-and-the-order-ships","outcome":"pass","test":"e2e/suite/scenario_test.go","observed":"go test: all 2 test function(s) of the file passed","source":"adapter","granularity":"file","tags":[]}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed (subtests: 2)","source":"adapter","granularity":"function","tags":[],"subtests":2}
 ```
 
 - `test` is `<file>::<function>` at function granularity and `<file>` at file granularity,
@@ -2524,13 +2547,21 @@ An adapter receipt is a receipt line with three more keys:
   failed ("A package that failed", above), reads `go test: <functions>: started, no verdict; the package failed`
   for the functions a failure stopped, and
   `go test: <functions>: the package did not run its tests` when there are none, at file
-  granularity when no function of the file has a `fail` event.
+  granularity when no function of the file has a `fail` event. A `pass` whose functions ran
+  subtests ends with ` (subtests: <k>)`, `<k>` as in `subtests` (below).
 - `source` is `adapter`. A receipt without `source` is one a test emitted.
 - `granularity` is `function` or `file`, required with `source: adapter` and refused without.
 - `tags` are the tags of `-tags` (above), always present: a list, `[]` when the command gave
   none, or the word `"unknown"` when machinery cannot know them, which is every `--streams` run.
   An event stream of `go test` does not say under which tags it was built, and the flags a
   wrapper passes are not seen: `[]` there would say more than is known.
+- `subtests` is on a `pass` whose claim is satisfied through a parent test: `<k>`, the number of
+  distinct subtests, at any depth, that gave a verdict under the function in the runs of its
+  package that were not answered from the cache, summed over the functions of the file at file
+  granularity. It is absent when none ran. A parent whose cases a filter or a variable of the
+  environment selects passes with one case as it does with all of them; the count shows how
+  many ran, and `verify --partly` names a test whose count differs between runs at the commit
+  (section 12). It is a record and decides nothing.
 
 Receipts are written sorted by id, then file, then function, the file-level one first. They and
 the end line are written in one append, after the command has exited, and the end line of an
@@ -2541,9 +2572,9 @@ before it:
 {"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z","adapter_receipts":6}
 ```
 
-Those lines are the only ones that may carry `source`, `granularity` or `tags`. A receipt line
-that has any of them and is not one of the lines before the end line of a run whose header
-names the adapter, appended by a test during the run for instance, is refused (section 12).
+Those lines are the only ones that may carry `source`, `granularity`, `tags` or `subtests`. A
+receipt line that has any of them and is not one of the lines before the end line of a run whose
+header names the adapter, appended by a test during the run for instance, is refused (section 12).
 
 **Suites run through a wrapper: `--streams`.** A project may run its tests through a make
 target or a script that stages sources and starts `go test` itself, perhaps several times.
@@ -2562,6 +2593,19 @@ exited reads every regular file directly in that directory whose name ends in `.
 the directory is read. The directory is removed after reading, whatever was found.
 `--streams` without `--adapter` is `usage: --streams needs --adapter go-test-json: add it before --streams`.
 
+**Keeping the streams: `--keep-streams <dir>`.** What a wrapper ran can be read again later:
+with `--keep-streams <dir>` machinery copies every file it reads as a stream into
+`<dir>/<run id>/` before it reads them and before the directory of the streams is removed.
+`<run id>` is the name of the receipts file without `.jsonl`, and `<dir>` is a path from the
+current directory. machinery makes `<dir>/<run id>` before the command runs, and the header
+records it as `"streams_kept":"<dir>/<run id>"`: by its project-relative path when it is inside
+the project (links resolved), and absolute otherwise. A stream that leaves the run incomplete
+is kept too; a file of the directory that is no stream is not. A directory inside the project
+that git does not ignore makes the tree dirty for the next run (section 10). A copy that fails
+leaves the run incomplete, with `machinery: run: --keep-streams: <error>`. Without `--streams`
+the flag is `usage: --keep-streams needs --streams: it keeps the streams a wrapper leaves; add --streams or leave it out`,
+and an empty value is `usage: --keep-streams needs a directory: --keep-streams <dir>`.
+
 - **Every rule above holds for every stream**: test functions, attribution, verdicts, the cached
   package, the package that must end with pass. `evidence.adapter.sources` is read in this mode
   only, and it is the only way a verdict finds its file: staged tests run as packages of other
@@ -2576,9 +2620,17 @@ the directory is read. The directory is removed after reading, whatever was foun
   `machinery: run: stream <file>: line <n>: not a go test -json event; the run is left incomplete: fix what writes the stream, delete <receipts> and run again`
   (`stream <file>: no event; ...` for a file without one), `<receipts>` as above, and exits with the command's exit
   code, or 1 when that was 0. `verify` reports the file as an incomplete run (section 12).
-- **No stream at all** is a run that ran nothing the adapter can read. The run is complete, it
-  has no adapter receipt, and the summary begins with
-  `adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven`.
+- **No stream at all** is not a success. A wrapper that writes its stream only when
+  `MACHINERY_GO_TEST_JSON` is set, started under `env -i`, runs its `go test` and writes
+  nothing, and so does a command that runs no `go test`. The run is complete, its end line
+  records the exit of the command, and it has no adapter receipt; the summary begins with
+  `adapter go-test-json: no stream was written to MACHINERY_GO_TEST_JSON: the command ran no go test, or it cleared the environment (env -i) before starting one; pass --allow-no-streams if it may run nothing`,
+  and machinery exits with the command's exit code, or 1 when that was 0; its last line
+  (section 10) names that code. With `--allow-no-streams`, for a wrapper that may run nothing,
+  the summary begins with
+  `adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven`
+  and machinery exits with the command's exit code. Without `--streams` the flag is
+  `usage: --allow-no-streams needs --streams: it is about the streams a wrapper leaves; add --streams or leave it out`.
 - **One package in several runs**, in several streams or several times in one ("A package that
   failed", above). A run that answered the package from the cache gives none of its passes; the
   other runs give theirs, and a fail of any run is a fail ("Cached results never count",
@@ -2644,10 +2696,13 @@ adapter go-test-json: <n> package(s), <n> test function(s) with a verdict: <n> p
 adapter: receipts written: <n> pass, <n> fail, <n> skip
 adapter: claimed, not run: <n> id(s)
 adapter: in the whole project: <n> claimed id(s) not run, <n> claiming file(s) with no test function, <n> claim(s) above functions the adapter does not judge
+adapter: partly run: <n> id(s): <n> of <n> claimants passed in this run
 adapter: claimed, verdict not counted: <n> id(s)
 adapter: needs a receipt with effects: <n> tc id(s)
 adapter: needs a receipt with a replay: <n> cx id(s)
-adapter: <n> test function(s) with a verdict are in no file under trace.tests: package(s) <import paths>; <what to do>
+adapter: <n> test function(s) with a verdict are in package(s) no file under trace.tests belongs to: <import path> (<n>), <import path> (<n>); <what to do>
+adapter: <import path>: <function>: defined in no candidate file; <advice>
+adapter: <import path>: <function>: defined only in <file>, which is not under trace.tests: its verdict counts nothing; list the file in trace.tests
 adapter: <n> verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>
 adapter: <n> verdict(s) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>
 adapter: package <import path>: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1
@@ -2662,13 +2717,29 @@ adapter: <function>: failed in <where>, so read as failed in <files>: a fail goe
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: not Go source that parses; its claims count nothing
+adapter: streams kept in <dir>/<run id>: <n> file(s)
 ```
 
 The first four lines always print; the others only when they count or name something, in this
-order, the named ones sorted. `<what to do>` is
+order, the named ones sorted. With `--streams` the first line counts the streams too (below),
+and a run that read no stream has the line of "No stream at all" in its place (above). The
+`streams kept` line prints with `--keep-streams` (above).
+
+A verdict that finds no file under `trace.tests` is in one of three lines. When no file under
+`trace.tests` is a candidate of its package ("Whose verdict", above: in direct mode a package
+whose directory holds none, with `--streams` one no entry maps to one), it is counted under its
+package, and every such package is named, sorted, with the number of its functions. When the
+package has candidates under `trace.tests` and none of them defines the function (another file
+of the directory defines it, or none does, as for a test staged into the set from another
+directory), the function is named with its package, one line each. When only a candidate
+outside `trace.tests` defines it (an entry whose `files` reach outside), it is named with that
+file. `<what to do>` is
 `a package's verdicts go to the files under trace.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence.adapter.sources`,
 and with `--streams`
 `with --streams a package's verdicts go only to the files of its entry in evidence.adapter.sources: add one`.
+`<advice>` is `list its file in trace.tests, or run a package built from copies through --streams`,
+and with `--streams` `if it is staged from another directory, give that set its own name`
+(section 10.3, "Naming a staged set").
 Of the two `name no package` lines the first prints in direct mode and the second with
 `--streams`; the events that name no package count in neither the packages nor the functions
 of the first line. In the ambiguous line a file that does not parse is followed by ` (does not parse)`. A package that did not end with pass is named when it failed in a
@@ -2678,9 +2749,8 @@ Passing functions seen only in failed runs do not count on that line. After thos
 package names the functions a failure stopped after they started, and then one line per
 package that did not run its tests names the functions that failed with it, each list sorted,
 the first five and then `and <n> more`; a function a failure stopped is also counted as failed in the first
-line, and a function of a package that did not run its tests is not. The packages of the
-`in no file` line, and the packages and files of the `failed in` line, are sorted,
-the first five and then `and <n> more`. Packages and functions are counted over the whole stream.
+line, and a function of a package that did not run its tests is not. The packages and files of
+the `failed in` line are sorted, the first five and then `and <n> more`. Packages and functions are counted over the whole stream.
 `claimed, not run` counts the ids for which no receipt was written and a function of one of
 their claims did not run, among the claims of the files of the packages the run saw: their
 candidates ("Whose verdict", above) and every file a verdict of the run went to, an ambiguous
@@ -2691,7 +2761,16 @@ above a function the adapter does not judge counts in neither. The `no test func
 name only the candidate files of the packages the run saw. `in the whole project` counts the
 ids without a receipt with a claim whose function did not run, the claiming files with no
 test function, and the distinct file, id and function combinations of claims above functions
-the adapter does not judge, across every file the adapter reads.
+the adapter does not judge, across every file the adapter reads. In a run that wrote no receipt
+at all (the adapter none and no test either: no stream, every pass replayed from the cache, a
+command that ran nothing), its count of ids leaves out every id that a receipt of another run
+used at the commit names (section 12): those ids have evidence at the commit, and the line
+counts the ones that have none. A run that wrote receipts counts every claimed id it did not
+run, as before. `partly run` counts, with `evidence.adapter.claims: all`, the ids that got a
+`pass` receipt and no `fail` receipt in this run and have a claimant, not excused, without a
+`pass` in this run ("Every claimant", below), with the sum of their claimants that passed here
+and of their claimants that are not excused; earlier runs at the commit are not read, and
+`verify` judges the id over all of them.
 
 **What the evidence proves: `evidence.adapter`.** `verify`, and every command that judges
 evidence, reads an adapter receipt under sections 10.1 and 10.2 like any other. A `fail` fails
@@ -2711,7 +2790,59 @@ proven by other receipts, stage `verify` prints, once per id,
 for the function-granularity receipt when the id has both; the id is then `unproven` like any
 id without evidence. An id that a counted adapter pass proves, and that no receipt emitted by a
 test proves on its own, is **proven by adapter**, at function granularity when one of its
-counted adapter passes has it and at file granularity otherwise.
+counted adapter passes has it and at file granularity otherwise, once the rule of every
+claimant (below) holds for it.
+
+**Every claimant (`evidence.adapter.claims`).** An id claimed by several tests is not proven by
+one of them. A **claimant** of an id is a test function with a marker for the id directly above
+it, or a file under `trace.tests` with a file-level marker for the id and at least one test
+function ("Whose claim", above). The claimants are read from the files the adapter reads: the
+`_test.go` files under `trace.tests` and the staged sources the entries of
+`evidence.adapter.sources` name there, whichever mode a run used. A marker above a function the
+adapter does not judge, a file-level marker in a file with no test function and a claim in a
+file that does not parse make no claimant, since nothing could ever give them a verdict. A
+claimant has a pass at the commit when an adapter receipt of a run used at the commit is a
+`pass` for the id with the claimant as its `test` (`<file>::<function>`, or `<file>` at file
+granularity, which passes when every test function of the file passed, as above), whether or
+not the policy lets that pass count.
+
+With `claims: all`, the default, an id that counted adapter passes would prove, and that no
+receipt a test emitted proves on its own, is proven only when every claimant of it that is not
+excused (below) has a pass at the commit. Otherwise it is **partly run**: not proven and not
+failed. A claimant with a `fail` receipt fails the id as before. Receipts a test emits itself
+are not affected: an id that one of them proves is proven whatever its adapter claimants say.
+A partly run id is reported as `partly run: <n> of <m> claimants passed` (`<m>` the claimants
+that are not excused, followed by ` (<k> claimant(s) excused)` when some are) by `verify`,
+which also names the claimants without a pass (section 12), by `status` (section 14), by
+`proof` (section 13), and for the run alone by the run summary (above). `owed sync` does not
+remove it (section 11.2) and the story gate fails it (section 15.6). With `claims: any` one
+counted pass proves the id, as before this rule; the ratchet reports `any` as a widening
+(section 11.3).
+
+**Excused claimants (`evidence.adapter.excused`).** A claimant that cannot run where the
+evidence is made (a test that needs a cluster, a sandbox the CI cannot reach) is left out of the
+rule by an entry of `evidence.adapter.excused` with a reason. An entry covers a claimant when
+the claimant's file matches one of its `tests` globs and, when the entry has `functions`, the
+claimant's function, or for a file every test function of it, matches one of its patterns. An
+id all of whose claimants that are not excused passed is proven, and `verify` says
+`warn   excused: <id>: proven (<k> claimant(s) excused)`. An id whose claimants are all
+excused is not proven by adapter evidence, whatever an excused claimant gave: no claimant can
+run here (sections 12 to 15.6). A fail of an excused claimant still fails its id. `verify`
+prints every entry once,
+`warn   adapter excused: entry <n> (tests <globs>[; functions <patterns>]): <k> claimant(s) of <j> id(s): <reason>`,
+`<k>` counting distinct claimants and `<j>` the ids they claim, and a glob or a pattern that
+covers no claimant is an ERROR:
+`ERROR  adapter excused: entry <n>: tests "<glob>" covers no claimant: correct the glob or remove it`
+and `ERROR  adapter excused: entry <n>: functions "<pattern>" covers no claimant of its tests: correct the pattern or remove it`
+(a pattern is matched against the claimants whose file matches the entry's `tests`). The
+ratchet reports an entry that is added or widened (section 11.3). The entries are read only with
+`claims: all`. An entry is the project's statement about where its tests can run; machinery
+does not check it, and a reviewer reads the reason.
+
+The rule defends against a claimant that the evidence left out by accident: a package the
+command did not name, a set the wrapper did not stage, a job that did not run at the commit, a
+test whose variables selected none of its cases elsewhere. It says nothing of what a claimant
+asserts (above).
 
 **What this does not defend against** is what section 10.2 lists and what the threat model at
 the top of this section leaves to review: code or modules planted in the project, a `go` or a
@@ -2780,7 +2911,8 @@ Reads the evidence exactly as `verify` does (section 12). While a receipts file 
 prints the finding `verify` has for each such file as `ERROR  <finding>` and exits 1. A receipt
 whose test claims nothing proves nothing here either. Otherwise it rewrites `owed.yaml`:
 
-- removes every entry whose id is proven;
+- removes every entry whose id is proven; a partly run id, and an id no claimant of which can
+  run here, are not proven (section 10.3), and their entries stay;
 - unless `--prune-only`, adds every obligation that is neither proven nor listed, with the reason
   `unproven at <short sha>`;
 - keeps existing reasons and story fields.
@@ -2811,7 +2943,7 @@ that was established at the base may quietly stop being established:
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
 | `review-off` | A review gate (section 15.10) that was required at the base is off now: `warn   ratchet: review switched off: review.<kind> was required at <ref> and is off now`. A project being adopted switches a gate off on purpose; the ratchet makes the change seen. |
-| `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it; an entry with `dir: true` is the pair of its pattern and `dir: true`, which prints in the place of the file globs. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
+| `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it; an entry with `dir: true` is the pair of its pattern and `dir: true`, which prints in the place of the file globs. `evidence.adapter.claims` `all` at the base and `any` now lets one claimant prove an id several claim: one finding per tier for which adapter evidence may now prove some kind, `<kinds>` those kinds, `ERROR  ratchet: adapter widened: <tier> <kinds> ids: claims all -> any; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier and `warn   ratchet: adapter widened: <tier> <kinds> ids: claims all -> any` for the others. For `evidence.adapter.excused`, compared as pairs of a `tests` glob and a `functions` pattern (none for an entry without `functions`): an entry with a pair the base did not have is `ratchet: adapter widened: evidence.adapter.excused: entry <n> <added|widened>: <pairs>: <reason>`, `widened` when the base had a pair of one of its `tests` globs and `added` otherwise, `<pairs>` the new ones as `tests <glob>[, functions <pattern>]` joined by `; `; it is an ERROR, followed by `; it covers a claimant of <id>, in a <tier> area (<areas>)` (the first such id, sorted), when the new pairs cover a claimant (section 10.3) of an id of a critical or vital area, and a warn otherwise. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
 | `vital-weakened` | A vital area of the base (section 23.1) states less now: `ERROR  ratchet: vital weakened: <area>: <what>; record it under lowered: in the risk file with a reason`, unless the risk file records that area and that `<what>` under `lowered:` (section 23), which prints as `warn   ratchet: vital weakened: <area>: <what> (<reason>)`. Adding or strengthening raises nothing. |
 
 The `<what>` of `vital-weakened`, one finding per change, in the order the base's area lists its
@@ -2870,12 +3002,15 @@ Per obligation:
 | `failed` | At least one `fail` receipt. For a `cx` id: a receipt whose `replay` differs from the trace's `expect`. |
 | `proven` | Not failed, at least one `pass` receipt, and for a `tc` id at least one `pass` receipt whose `effects` equal the case's effects as a set. For a `cx` id: a receipt whose `replay` equals the trace's `expect`. For an `fv` id: the formal stage finds nothing against the area (section 16.9); no receipt is involved. |
 | `partial` | A `tc` id that is not failed, has a `pass` receipt, but no `pass` receipt observed every effect. |
-| `unproven` | Anything else. `skip` receipts never count. |
+| `partly run` | Not failed, proven by adapter passes alone but for a claimant of the id, not excused, that has no pass at the commit (section 10.3, "Every claimant"). |
+| `unproven` | Anything else, an id every claimant of which is excused included. `skip` receipts never count. |
 
 A `pass` a run adapter wrote (`source: adapter`, section 10.3) is a `pass` receipt of this table
 only when the policy `evidence.adapter` lets it count for its id; its `fail` always is a `fail`
 receipt. An id proven by such passes alone is proven by adapter, at function or at file
-granularity, and is counted apart.
+granularity, and is counted apart; with `evidence.adapter.claims: all` it is so only when every
+claimant of it that is not excused has a pass at the commit, and is `partly run` otherwise
+(section 10.3).
 
 Findings:
 
@@ -2891,10 +3026,10 @@ Findings:
   whose `source` is not `adapter` (`<id>: source must be adapter or absent, got "<value>"`),
   whose `source` is `adapter` and whose `granularity` is neither `function` nor `file`
   (`<id>: granularity must be function or file, got "<value>"`), that has a `granularity` and
-  no `source` (`<id>: granularity without source: adapter`), or that has `source`, `granularity`
-  or `tags` and is not one of the lines the adapter wrote before the end line of an adapter run
-  (section 10.3:
-  `<id>: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out`).
+  no `source` (`<id>: granularity without source: adapter`), or that has `source`, `granularity`,
+  `tags` or `subtests` and is not one of the lines the adapter wrote before the end line of an
+  adapter run (section 10.3:
+  `<id>: source, granularity, tags and subtests are written only by the run adapter: a test that emits receipts leaves them out`).
   Such a line is not read. A file whose first
   line is not a run header is not a receipts file and is ignored.
 - `ERROR  unknown id in receipt: <id>` (an `act` id is not an obligation), and for a proposed or
@@ -2911,6 +3046,20 @@ Findings:
 - `warn   adapter: <id> not counted: a test that names it passed (<granularity> granularity); <reason>`
   for an id that is not proven and has an adapter pass the policy does not let count
   (section 10.3, with the reasons). Owed or not, the id is unproven.
+- `ERROR  partly run: <id>: <n> of <m> claimants passed`, followed by
+  ` (<k> claimant(s) excused)` when some are, for a partly run id that is not owed, in place of
+  `unproven: <id>`, and the same line as a `warn` for one that is owed. Then one
+  `warn   partly run: <id>: no verdict: <claimant>` per claimant without a pass
+  (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
+  `<file>::<function>` or `<file>`: the first ten of these lines in the order they print, and then
+  `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`;
+  with `--partly` every one of them.
+- `ERROR  no claimant can run here: <id>: <k> claimant(s) excused` for an id every claimant of
+  which is excused and that is not proven otherwise, in place of `unproven: <id>`, and the same
+  line as a `warn` for one that is owed (section 10.3).
+- `warn   excused: <id>: proven (<k> claimant(s) excused)` for a proven id with claimants
+  excused, `warn   adapter excused: entry <n> (...)` once per entry, and the ERRORs of a pattern
+  that covers no claimant (section 10.3, with the text).
 - `warn   adapter environment: <file>: <what the header recorded>`, once for every adapter run
   that is used (section 10.3, with the text). It is a record: environments that differ between
   runs at the same commit are no finding. With `--story` it prints for every such run.
@@ -2926,6 +3075,16 @@ receipt lines read from the runs that are used; a `pass` that is not used is amo
 its ERROR. When an id is proven by adapter (section 10.3), the count of the proven is followed
 by how many of them that is, each part only when it counts something:
 `14 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, 0 partial`.
+The ids that are partly run follow `partial` when there are any: `0 partial, 2 partly run, 3 owed`.
+
+`--partly` names every claimant without a pass of the partly run ids, and prints on standard
+error, before the stage block, one line per test whose adapter passes at the commit record a
+different number of subtests (section 10.3) in different runs:
+`machinery verify: hint: <test>: subtests differ between runs at <short sha>: <k> in <receipts file>, <k> in <receipts file>`,
+the tests and the files sorted, a `pass` without `subtests` counted as 0. A parent test whose
+cases an environment variable selects shows there. It is a hint, not a finding: the stage block
+and the exit code are those of `verify` without it. With `--story` or `--affected` the hints
+and the claimants are those of the selected ids.
 
 When the risk file has a vital area, the stage also prints, so that its evidence never reads as
 more than it is (section 23.2): `warn   proofs awaiting: <n>`, the number of proof obligations;
@@ -2941,7 +3100,9 @@ makes the effect real and the test observes it, the case becomes `proven` and le
 `--story <id>` judges only the ids of that backlog story (section 15.1); every other obligation is
 ignored except for `failed` ones, which always print. A refused receipts file, an incomplete
 run and `receipt: <id>: <test> does not claim it` (section 10.2) always print too, whatever id
-they name. The `adapter: <id> not counted` warning prints for the ids of the story only.
+they name. The `adapter: <id> not counted` warning, the `partly run`, `no claimant can run here`
+and `excused: <id>` lines and the claimants without a pass print for the ids of the story only;
+the lines of the excused entries always print.
 
 ### 12.1 Targeted runs: `machinery affected`
 
@@ -2968,8 +3129,9 @@ With nothing touched it prints nothing and exits 0.
 
 `machinery run --affected --base <ref> -- <command>` computes the same list and exports it as
 `MACHINERY_ONLY`; when the list is empty it runs nothing and exits 0. `--affected` and `--base`
-go together. `machinery verify --affected --base <ref>` reports `unproven` only for those
-ids. A targeted verify is a check for one change; only a full `verify` supports a landing.
+go together. `machinery verify --affected --base <ref>` reports `unproven`, `partly run` and
+`no claimant can run here` as ERRORs only for those ids, and names the claimants without a pass
+of those ids only. A targeted verify is a check for one change; only a full `verify` supports a landing.
 
 ### 12.2 The end gate: `machinery landing`
 
@@ -3061,7 +3223,11 @@ observations:
 `usage: --ids: <id> is a proof obligation: it awaits a machine-checked proof and has no evidence to show`. Without evidence the block
 has no `command:` line and `result:   no evidence at <short sha>`. The `, against <stack>` part is
 left out when no run names a stack. An owed id prints under `not proven` as
-`<id> (<state>, owed)`. When a receipts file is refused (section 10.2) or a run is incomplete
+`<id> (<state>, owed)`. A partly run id (section 10.3) prints as
+`<id> (partly run: <n> of <m> claimants passed)`, with ` (<k> claimant(s) excused)` after
+`passed` when some are and `, owed` after it when it is owed; an id that is not proven because
+every claimant of it is excused ends with `, no claimant can run here` after the other parts:
+`<id> (unproven, owed, no claimant can run here)`. When a receipts file is refused (section 10.2) or a run is incomplete
 (section 12), no count stands: the line is
 `result:   <n> receipts file(s) refused: delete them and run the tests through machinery run`
 and the exit code is 1, whatever the other runs prove. `--post` posts that block as it is.
@@ -3072,7 +3238,9 @@ of section 10.3, whatever ids are selected.
 The `adapter:` line prints only when a selected obligation is proven by adapter (section 10.3),
 with the parts that count something: the block never shows such an id as if its test had
 emitted the receipt. When an id has receipts of both kinds, its line shows one a test emitted. Its `pass` line under `criteria` ends with
-` (by adapter at <granularity> granularity)`, before the words of a vital property. A selected
+` (by adapter at <granularity> granularity)`, before the words of a vital property, and
+` (by adapter at <granularity> granularity, <k> claimant(s) excused)` for an id proven with
+claimants excused (section 10.3). A selected
 obligation that is not proven and has an adapter pass the policy does not let count prints under
 `not proven` as `<id> (<state>, adapter pass not counted)`, after `owed` when it is owed.
 
@@ -3109,6 +3277,8 @@ tiers: routine <n>, consequential <n>, critical <n>, vital <n>
 ids: <n> proposed, <n> owed, <n> proven, <n> retired
 proven: <n> (<n> by adapter at function granularity, <n> by adapter at file granularity)  partial: <n>  failed: <n>  owed: <n>  unproven and not owed: <n>
 adapter, not counted: <n> (<kind> <n>, ...)
+partly run: <n> (<kind> <n>, ...): <n> of <n> claimants passed
+excused: <n> id(s) proven with <n> claimant(s) excused, <n> id(s) with no claimant that can run here
 proofs awaiting: <n>
 vital: <id> proven (by test and model; proof awaited)
 assumed, unproven: <area> <name>: <statement>
@@ -3130,9 +3300,16 @@ next line says what the evidence shows. After its count of the proven it says, i
 how many of them are proven by adapter (section 10.3), by granularity, each part only when it
 counts something and no parentheses when neither does. The line `adapter, not counted` prints
 only when it counts something: the ids that are not proven and have an adapter pass the policy
-`evidence.adapter` does not let count, by kind.
+`evidence.adapter` does not let count, by kind, a partly run id and an id no claimant of which
+can run here excepted. The line `partly run` prints only when an id is partly run (section
+10.3): those ids by kind, the sum of their claimants that passed and the sum of their claimants
+that are not excused; `verify` names them and their claimants (section 12). The line
+`excused` prints only when it counts something, each part only when it does: the proven ids
+with claimants excused and how many claimants that is, and the ids that are not proven because
+every claimant of them is excused. A partly run id that is not owed counts in
+`unproven and not owed`.
 The `tiers` line counts obligations by the tier of their area and is omitted when there is no
-risk file; its `vital` part, and the three lines after the `proven` line, print only when the
+risk file; its `vital` part, and the `proofs awaiting`, `vital` and `assumed, unproven` lines, print only when the
 risk file has a vital area (section 23.2): the number of proof obligations, one `vital` line per
 id a property is over that the evidence proves, and one `assumed, unproven` line per assumption
 whose evidence is owed, each group sorted.
@@ -3583,7 +3760,9 @@ machinery predict before reading the proof`, `ERROR  verifier is the builder: <a
 area: such an id needs a receipt its test emits after its own assertions. An id of the story
 that is not proven and has an adapter pass which does not count is
 `ERROR  unproven: <id>; adapter evidence does not count: <reason>`, with the reason of section
-10.3. A refused receipts file or an incomplete run fails the gate of every
+10.3. A partly run id is `ERROR  partly run: <id>: <n> of <m> claimants passed`, and an id that
+is not proven because every claimant of it is excused is
+`ERROR  unproven: <id>; no claimant can run here: <k> claimant(s) excused` (section 10.3). A refused receipts file or an incomplete run fails the gate of every
 story with the finding `verify` has for it (`ERROR  receipts: <file>: ...`,
 `ERROR  incomplete run: <file>`; sections 10.2 and 12): the failure of the story may be in it.
 `checked:` counts ids, proofs, predictions and verdicts. A story without a `machinery:ids` line

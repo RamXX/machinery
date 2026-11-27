@@ -262,7 +262,26 @@ version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod
 
 A marker directly above a test function claims for that function (`granularity: function`); a
 marker above no function claims for every test function of the file (`granularity: file`); one
-above a fuzz test, a benchmark or a helper counts nothing and is named in the summary.
+above a fuzz test, a benchmark or a helper counts nothing and is named in the summary. A pass
+through a parent test records how many subtests ran (`subtests: 2`).
+
+**Every claimant.** An id that several tests claim is proven by the adapter only when every one
+of them passed at the commit, in this run or another one. One that did not leaves the id
+`partly run: 1 of 2 claimants passed`: not proven, not failed, kept in the owed list. `verify`
+names the first ten claimants without a pass and `verify --partly` every one. A test that
+cannot run where you make the evidence goes into `evidence.adapter.excused` with a reason:
+
+```yaml
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        reason: "needs three nodes; runs in the nightly job"
+```
+
+`verify` prints every entry with what it covers, and an id whose claimants are all excused is
+not proven (`no claimant can run here`). `claims: any` brings back the rule of one claimant;
+the ratchet reports it, and an entry added or widened, as a widening.
 
 **A Go suite behind a wrapper: `--streams`.** When a make target or a script starts `go test`
 itself, machinery cannot add `-json`. The wrapper writes each stream to a file in the directory
@@ -286,7 +305,11 @@ git commit -q -m "run the Go suite through a wrapper"
 machinery run --adapter go-test-json --streams -- sh e2e/go-suite.sh
 ```
 
-The wrapper passes `-count=1` itself: machinery reads only `GOFLAGS`. A file may hold several runs
+The wrapper passes `-count=1` itself: machinery reads only `GOFLAGS`. A run that reads no stream
+exits 1: the wrapper ran no `go test`, or started it under `env -i`, which drops
+`MACHINERY_GO_TEST_JSON`. `--allow-no-streams` accepts a wrapper that may run nothing, and
+`--keep-streams <dir>` keeps a copy of every stream in `<dir>/<run id>/` so that what the
+wrapper ran can be read later. A file may hold several runs
 appended one after the other, each judged on its own, and a fail in any of them is a fail; a run
 that starts again before the one before it ended (a killed run and its retry, two runs writing at
 once) leaves the run incomplete. The entries of `evidence.adapter.sources` are read only in this
@@ -357,6 +380,7 @@ named by no test, planned, and actions by whether code serves them.
 | An id of a critical or vital area | By default adapter evidence proves routine and consequential ids only (`warn   adapter: <id> not counted`). | A receipt the test emits after its own assertions. |
 | An id no test names | Nothing claims it. | Its `Prove` story. |
 | A claimed id with no verdict | Its test did not run, was cached, or has a twin (`claimed, not run`, `claimed, verdict not counted`). | Run it, or rename the twin. |
+| A partly run id | One of the tests that claim it has no pass at the commit (`partly run: 1 of 2 claimants passed`). | Run that test at the same commit, or excuse it with a reason. |
 | An id planned at adoption | Your project said it is not delivered. | The story your mark names. |
 | An action | No `machinery:serves` in the code yet. | The `Serve <Entity> actions` story. |
 

@@ -80,6 +80,27 @@ command, output line and exit code.
   never proves an id of a critical or vital area. `status`, `verify` and `proof` count it
   apart, and the ratchet reports a policy that admits more (`adapter widened`, an ERROR for a
   critical or vital tier).
+- Every claimant must pass (`evidence.adapter.claims: all`, the default): an id several tests
+  claim is proven by adapter evidence only when each of them, a test function with its marker
+  or a file with a file-level marker and a test function, has a pass at the commit. Otherwise
+  it is `partly run: <n> of <m> claimants passed` in `verify`, `status`, `proof` and the run
+  summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names the
+  first ten claimants without a pass, `verify --partly` every one. A receipt a test emits is
+  not affected. `claims: any` is the rule of one claimant, and the ratchet reports it.
+- `evidence.adapter.excused` leaves claimants that cannot run here out of that rule, each entry
+  with globs of test files, optional function patterns and a one-line reason. `verify` prints
+  every entry with the claimants it covers and an ERROR for a pattern that covers nothing; an
+  id whose claimants are all excused is not proven; the ratchet names an entry added or widened,
+  an ERROR when it covers a claimant of a critical or vital id.
+- A `--streams` run that reads no stream exits 1 (the wrapper ran no `go test`, or cleared the
+  environment with `env -i`); `--allow-no-streams` accepts a wrapper that may run nothing.
+  `--keep-streams <dir>` copies every stream read into `<dir>/<run id>/` and records it in the
+  header. The verdicts that find no file are split: packages no file under `trace.tests`
+  belongs to, each with its count and none left out, and each function of a mapped package
+  that no candidate file defines, by name. The whole-project line of a run that wrote no
+  receipt counts only the ids without evidence at the commit. An adapter pass through a parent
+  test records how many subtests ran, and `verify --partly` hints at a test whose count
+  differs between runs at the commit.
 - Stage `tests`: end-to-end only, no test doubles, with a baseline that only shrinks.
 - `probe`: mutation probing of the generated tables as the measure of test quality.
 - Shift-right testing: `affected`, targeted `run` and `verify`, and `landing` as the one full
