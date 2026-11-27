@@ -294,12 +294,14 @@ mode, and a direct run refuses an entry for a package tested in its own director
 package. One entry `{package: "<module path>/e2e/...", dir: true}` gives every package it
 matches the test files of its own directory. Tests staged as copies elsewhere map back with
 `files`, which may name sources kept under `trace.tests` without the `_test.go` name. When the
-wrapper tests several staged sets, name each one: `go test -c` the set, then run the binary under
-`go tool test2json -t -p <name>`, named by the import path of the directory its sources are kept
-in, and one entry with a wildcard maps each set to its own sources. A pass needs its package and
+wrapper tests several staged sets, name each one by running its compiled test binary under
+`go tool test2json -t -p <name>` or by setting the `Package` field of its `go test -json`
+events before writing the stream. Use the import path of the source directory as the name so
+one wildcard entry can map each set to its own sources. A pass needs its package and
 its entry; a fail goes by function name to every file of the entries that defines it, also from a
-test binary run without `-p`, and that name gets no pass in the run. The summary counts what was
-claimed and not run for the packages of the run, and the number for the whole project once.
+test binary run without `-p`, and that name gets no pass in the run. The summary identifies
+when one run of a package suppresses passes from another. It reports individual non-test
+function marker claims for the packages seen and counts those claims across the whole project.
 
 **A test that emits receipts.** A transition case (`tc`) needs the effects the test observed,
 which a verdict of `go test` does not carry. `e2e/shipment_e2e.sh` drives the real binary,

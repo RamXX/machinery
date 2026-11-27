@@ -57,9 +57,10 @@ gitcommit 'a fuzz test and a benchmark with markers'
 exec machinery run --adapter go-test-json -- go test -short -run 'TestHelperCheck|FuzzEmail' ./e2e/suite
 stderr '^machinery run: adapter: e2e/suite/fuzz_test\.go: inv:customer-email-unique: the adapter does not judge FuzzEmail; put the marker above a Test function or at file level$'
 stderr '^machinery run: adapter: e2e/suite/fuzz_test\.go: inv:paid-before-shipped: the adapter does not judge BenchmarkShip; put the marker above a Test function or at file level$'
+! stderr 'the adapter does not judge BenchmarkOther'
+stderr '^machinery run: adapter: in the whole project: .* 3 claim\(s\) above functions the adapter does not judge$'
 ! stderr 'fuzz_test\.go: no test function'
-cp stderr fuzz.err
-exec sh -c 'test "$(grep -c "does not judge" fuzz.err)" = 2'
+stderr -count=2 '; put the marker above a Test function or at file level$'
 exec sh -c '! grep -q fuzz_test .machinery/receipts/*.jsonl'
 exec mrun 1 verify
 stdout '^  ERROR  unproven: inv:customer-email-unique$'
@@ -129,6 +130,13 @@ package suite
 // machinery:verifies inv:terminal-is-final
 
 func settle(event string) string { return event }
+-- e2e/other/bench_test.go --
+package other
+
+import "testing"
+
+// machinery:verifies inv:paid-before-shipped
+func BenchmarkOther(b *testing.B) {}
 -- e2e/drafts/broken_test.go --
 package drafts
 

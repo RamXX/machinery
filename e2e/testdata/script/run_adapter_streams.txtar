@@ -40,7 +40,7 @@ stderr '^machinery run: adapter go-test-json: no stream in MACHINERY_GO_TEST_JSO
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 # no package was seen: no claim is of a package of the run, and the project-wide line counts them
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 ! grep nonexistent .machinery/dir.txt
 exec sh -c 'test ! -e "$(cat .machinery/dir.txt)"'
 exec mrun 1 verify
@@ -154,7 +154,7 @@ env TWO_ENV=
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 ! stderr 'read as failed'
 stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 2 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 2 claimed id\(s\) not run, 0 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
 stderr 'package example\.test/shop/stage/b: did not end with pass; no pass is written from it$'
 

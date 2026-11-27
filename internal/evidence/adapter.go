@@ -60,9 +60,8 @@ type GoTest struct {
 	units    []claimUnit
 	effects  map[string]bool // claimed tc ids
 	replay   map[string]bool // claimed cx ids
-	// unjudged: the summary lines of claims above a function the adapter
-	// does not judge (section 10.3, "Whose claim")
-	unjudged map[string]bool
+	// unjudged holds claims above functions the adapter does not judge.
+	unjudged map[claimUnit]bool
 
 	// streams are the event streams read: the command's standard output, or
 	// with fromDir the files the command left in MACHINERY_GO_TEST_JSON
@@ -108,7 +107,7 @@ type goPackage struct {
 // With streams the command is any command: it is not read, and the streams
 // are the files it leaves in MACHINERY_GO_TEST_JSON.
 func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool) (*GoTest, error) {
-	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, unjudged: map[string]bool{}, fromDir: streams,
+	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, unjudged: map[claimUnit]bool{}, fromDir: streams,
 		pkgFiles: map[string][]string{}, pkgDir: map[string]string{}, dirGo: map[string][]string{}, dirIP: map[string]string{}, cands: map[string][]string{}}
 	if streams {
 		// the command is not read and its build tags are not known; GOFLAGS of
@@ -212,12 +211,12 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 					a.replay[id] = true
 				case contains(project.AdapterKinds, o.Kind):
 					fn, test := a.files[t.File].owner(t.Line)
+					u := claimUnit{ID: id, File: t.File, Func: fn}
 					if fn != "" && !test {
-						// above a function the adapter does not judge: it counts nothing
-						a.unjudged[fmt.Sprintf("adapter: %s: %s: the adapter does not judge %s; put the marker above a Test function or at file level", t.File, id, fn)] = true
+						a.unjudged[u] = true
 						continue
 					}
-					if u := (claimUnit{ID: id, File: t.File, Func: fn}); !seen[u] {
+					if !seen[u] {
 						seen[u] = true
 						a.units = append(a.units, u)
 					}
@@ -759,9 +758,11 @@ func (a *GoTest) Receipts() [][]byte {
 		// what each run of each stream says of the package. A pass replayed
 		// from the cache is not read; every other verdict of every run is
 		cached, notOK := false, false
+		packageFailed := false
 		type seen struct {
 			verdict, stream string
 			silent          bool // a run event and no verdict, in a stream where the package failed
+			packagePassed   bool
 		}
 		read := map[string][]seen{}
 		replayed := map[string]bool{}
@@ -781,10 +782,11 @@ func (a *GoTest) Receipts() [][]byte {
 							replayed[fn] = true
 							continue
 						}
-						read[fn] = append(read[fn], seen{verdict: v, stream: s.name})
+						read[fn] = append(read[fn], seen{verdict: v, stream: s.name, packagePassed: pkg.end == Pass})
 					}
 				}
 				if pkg.end == Fail { // whatever stopped the binary stopped these
+					packageFailed = true
 					if len(pkg.started) == 0 {
 						unran[name] = true
 					}
@@ -809,15 +811,18 @@ func (a *GoTest) Receipts() [][]byte {
 			}
 		}
 		sort.Strings(fns)
+		suppressed := 0
 		for _, fn := range fns {
 			verdict := "" // only a pass replayed from the cache
 			isSilent, isExplicit := false, false
+			passedInSuccessfulRun := false
 			if got := read[fn]; len(got) > 0 {
 				verdict = got[0].verdict
 				same := true
 				var parts []string
 				for _, g := range got {
 					same = same && g.verdict == verdict
+					passedInSuccessfulRun = passedInSuccessfulRun || (g.verdict == Pass && g.packagePassed)
 					label := g.verdict
 					if g.silent {
 						label = "no verdict"
@@ -857,6 +862,9 @@ func (a *GoTest) Receipts() [][]byte {
 			default:
 				if verdict == Pass && !notOK {
 					st = stPass
+				}
+				if verdict == Pass && packageFailed && passedInSuccessfulRun {
+					suppressed++
 				}
 				passed++
 			}
@@ -914,6 +922,9 @@ func (a *GoTest) Receipts() [][]byte {
 				homeless++
 				lost[name] = true
 			}
+		}
+		if a.fromDir && suppressed > 0 {
+			refused = append(refused, fmt.Sprintf("adapter: %s: %d pass(es) not counted because another run of this package failed; give each run its own package name to keep them apart", name, suppressed))
 		}
 	}
 
@@ -1002,6 +1013,13 @@ func (a *GoTest) Receipts() [][]byte {
 			scope[file] = true
 		}
 	}
+	var unjudged []string
+	for u := range a.unjudged {
+		if scope[u.File] {
+			unjudged = append(unjudged, fmt.Sprintf("adapter: %s: %s: the adapter does not judge %s; put the marker above a Test function or at file level", u.File, u.ID, u.Func))
+		}
+	}
+	sort.Strings(unjudged)
 	for file := range state {
 		scope[file] = true
 	}
@@ -1136,7 +1154,7 @@ func (a *GoTest) Receipts() [][]byte {
 	a.summary = append(a.summary,
 		fmt.Sprintf("adapter: receipts written: %d pass, %d fail, %d skip", wrote[Pass], wrote[Fail], wrote[Skip]),
 		fmt.Sprintf("adapter: claimed, not run: %d id(s)", notRun),
-		fmt.Sprintf("adapter: in the whole project: %d claimed id(s) not run, %d claiming file(s) with no test function", notRunAll, emptyAll),
+		fmt.Sprintf("adapter: in the whole project: %d claimed id(s) not run, %d claiming file(s) with no test function, %d claim(s) above functions the adapter does not judge", notRunAll, emptyAll, len(a.unjudged)),
 	)
 	add := func(n int, format string) {
 		if n > 0 {
@@ -1159,7 +1177,7 @@ func (a *GoTest) Receipts() [][]byte {
 		add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
 	}
 	sort.Strings(differ)
-	a.summary = append(append(append(append(append(a.summary, refused...), ambiguous...), differ...), byName...), sortedKeys(a.unjudged)...)
+	a.summary = append(append(append(append(append(a.summary, refused...), ambiguous...), differ...), byName...), unjudged...)
 	a.summary = append(append(a.summary, empty...), broken...)
 	return lines
 }

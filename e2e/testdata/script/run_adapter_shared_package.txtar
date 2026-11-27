@@ -1,0 +1,45 @@
+# A different function fails under the same package name, suppressing a pass in two streams.
+fixture shop
+fixture shop-gotests
+exec machinery gen
+exec bash add-sources.sh
+gitinit
+
+exec mrun 1 run --adapter go-test-json --streams -- bash runs.sh
+stderr '^machinery run: adapter go-test-json: 3 stream\(s\), 1 package\(s\), 2 test function\(s\) with a verdict: 1 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr -count=1 '^machinery run: adapter: example\.test/shop/e2e/suite: [0-9]+ pass\(es\) not counted because another run of this package failed; give each run its own package name to keep them apart$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite: 1 pass\(es\) not counted'
+exec mrun 1 verify
+stdout '^  ERROR  unproven: inv:paid-before-shipped$'
+
+# A separate package name preserves the pass while the other test still fails.
+exec mrun 1 run --adapter go-test-json --streams -- bash runs.sh split
+stderr '^machinery run: adapter go-test-json: 3 stream\(s\), 2 package\(s\), 2 test function\(s\) with a verdict: 1 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 1 pass, 1 fail, 0 skip$'
+! stderr 'not counted because another run of this package failed'
+exec mrun 1 verify
+! stdout '^  ERROR  unproven: inv:paid-before-shipped$'
+
+-- add-sources.sh --
+set -eu
+cat sources.yaml >> machinery.yaml
+-- sources.yaml --
+evidence:
+  adapter:
+    sources:
+      - {package: example.test/shop/e2e/suite, dir: true}
+      - {package: example.test/shop/second-run, files: ["e2e/suite/email_test.go"]}
+-- runs.sh --
+set -eu
+for run in first repeat; do
+  go test -json -count=1 -run '^TestShipNeedsPayment$' ./e2e/suite > "$MACHINERY_GO_TEST_JSON/$run.json"
+done
+status=0
+SHOP_EMAIL=fail go test -json -count=1 -run '^TestEmailUnique$' ./e2e/suite > last.json || status=$?
+if [ "${1:-}" = split ]; then
+  sed 's|"Package":"example.test/shop/e2e/suite"|"Package":"example.test/shop/second-run"|' last.json > "$MACHINERY_GO_TEST_JSON/last.json"
+else
+  mv last.json "$MACHINERY_GO_TEST_JSON/last.json"
+fi
+exit "$status"

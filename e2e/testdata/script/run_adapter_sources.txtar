@@ -12,7 +12,7 @@ stderr 'adapter go-test-json: 1 stream\(s\), 1 package\(s\), 6 test function\(s\
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 # the staged package has no candidate: no claim is of a package of the run
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
 
 # with the map the verdict of a staged function goes to the file that defines it

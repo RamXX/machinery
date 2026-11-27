@@ -59,9 +59,10 @@ command, output line and exit code.
   An entry of the sources names its files (`files`, which may be staged test sources under
   `trace.tests` that are not `*_test.go` files; a wildcard entry gives each package the files of
   its own directory when it names some) or gives each package of an import path pattern the test
-  files of its own directory (`dir: true`). A wrapper names each staged set with `go test -c` and
-  `go tool test2json -t -p <name>`. The summary counts "claimed, not run" and files without a
-  test function for the packages of the run, and gives the numbers for the whole project once.
+  files of its own directory (`dir: true`). A wrapper names each staged set with
+  `go tool test2json -t -p <name>` or by rewriting the `Package` field of its `go test -json`
+  stream. The summary limits non-test function marker diagnostics to packages seen in the run
+  and counts those markers on the whole-project line.
 - A verdict goes to the claiming file in its package's directory, never through a test of the
   same name in another file. No fail is lost: in a package that failed, a function with a run
   event and no verdict (a timeout, `os.Exit`, a panic) fails, a function a filter left out or a
@@ -70,7 +71,8 @@ command, output line and exit code.
   a fail needs no package and no exact entry: it goes by function name to every file of the
   sources that defines it, also from a test binary run under `test2json` without `-p` (there a
   function with more `run` events than verdicts in its stream fails too), and that name gets no
-  pass in the run; a pass needs its package and its entry. A stream cut
+  pass in the run; a pass needs its package and its entry. The summary reports how many
+  passing functions lost credit because another run of their package failed. A stream cut
   short or holding two interleaved runs leaves the run incomplete. A cached pass counts
   nothing, and `tc` and `cx` ids are never proven this way. The rules aim at mistakes, not at
   planted code or a controlled environment.

@@ -2371,7 +2371,7 @@ reads them (sections 8 and 8.1). Each is attributed:
   top level of the file (a fuzz test, a benchmark, an example, `TestMain`, a helper, a method)
   belongs to that function, which the adapter does not judge. The claim gives no receipt and is
   counted neither as `claimed, not run` nor as `claimed, verdict not counted`; the summary
-  names it once,
+  names it once if its file is a candidate of a package seen in the run,
   `adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level`.
   It never falls back to the file: a test function of the file that passed says nothing of a
   fuzz test whose seeds were skipped or not selected, or of a benchmark, which direct mode never
@@ -2583,7 +2583,10 @@ the directory is read. The directory is removed after reading, whatever was foun
   above). A function whose verdicts differ between runs failed ("Which verdict", above), a
   function that started and gave no verdict in a run where the package failed included; each
   verdict of the summary line is followed by the file of its run, the same file for two runs of
-  one stream. A pass counts only when the package ended with pass in every run of it.
+  one stream. A pass counts only when the package ended with pass in every run of it. When
+  a failed run of a package suppresses passes from a successful, uncached run of the same
+  package, the summary lists the package once and counts each suppressed passing function
+  once. A function whose combined verdict is a failure or skip is excluded from this count.
 - **What a stream is trusted for.** machinery did not start what wrote the files. Lines typed
   into a file of the directory are read like a stream of `go test`: this mode trusts the
   wrapper exactly as section 10.2 trusts a test that appends its own receipts, and no more can
@@ -2599,8 +2602,11 @@ the directory is read. The directory is removed after reading, whatever was foun
   goes by name", above), and their verdicts are counted in the summary.
 - **Naming a staged set.** `go test` run on files rather than on a package names every such set
   of tests `command-line-arguments`, so several sets of one run cannot be told apart and an
-  entry for that name maps every set to every file it names. A wrapper names each set by
-  building its test binary and running it under `test2json` with a name of its own:
+  entry for that name maps every set to every file it names. A wrapper names each set either
+  by running its compiled test binary under `go tool test2json -t -p <name>` or by replacing
+  the `Package` field of the set's `go test -json` events with `<name>` before writing the
+  stream to the streams directory. The adapter uses the same package mapping for both.
+  A wrapper using a compiled binary can write the stream like this:
 
   ```
   go test -c -o <binary> <the staged files>
@@ -2635,7 +2641,7 @@ section 10, each line after `machinery run: `:
 adapter go-test-json: <n> package(s), <n> test function(s) with a verdict: <n> passed, <n> failed, <n> skipped
 adapter: receipts written: <n> pass, <n> fail, <n> skip
 adapter: claimed, not run: <n> id(s)
-adapter: in the whole project: <n> claimed id(s) not run, <n> claiming file(s) with no test function
+adapter: in the whole project: <n> claimed id(s) not run, <n> claiming file(s) with no test function, <n> claim(s) above functions the adapter does not judge
 adapter: claimed, verdict not counted: <n> id(s)
 adapter: needs a receipt with effects: <n> tc id(s)
 adapter: needs a receipt with a replay: <n> cx id(s)
@@ -2644,6 +2650,7 @@ adapter: <n> verdict(s) name no package and are used for nothing: run the test b
 adapter: <n> verdict(s) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>
 adapter: package <import path>: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1
 adapter: package <import path>: did not end with pass; no pass is written from it
+adapter: <package>: <n> pass(es) not counted because another run of this package failed; give each run its own package name to keep them apart
 adapter: package <import path>: <n> test function(s) started and gave no verdict, read as failed: <functions>
 adapter: package <import path>: did not run its tests: <n> test function(s) read as failed: <functions>
 adapter: <import path>.<function>: defined in <file>, <file>: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions
@@ -2677,10 +2684,10 @@ name included. A claim in a file of no package of the run does not count there.
 `claimed, verdict not counted` counts the other ids without a receipt whose claims met a pass
 replayed from the cache, a package that did not end with pass, or an ambiguous name. A claim
 above a function the adapter does not judge counts in neither. The `no test function` lines
-name only the candidate files of the packages the run saw. `in the whole project` gives, once,
-the same two numbers over every claim the adapter reads, whatever package it is of: the ids
-without a receipt with a claim whose function did not run, and the claiming files with no test
-function.
+name only the candidate files of the packages the run saw. `in the whole project` counts the
+ids without a receipt with a claim whose function did not run, the claiming files with no
+test function, and the distinct file, id and function combinations of claims above functions
+the adapter does not judge, across every file the adapter reads.
 
 **What the evidence proves: `evidence.adapter`.** `verify`, and every command that judges
 evidence, reads an adapter receipt under sections 10.1 and 10.2 like any other. A `fail` fails

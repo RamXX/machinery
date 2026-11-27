@@ -21,7 +21,7 @@ stderr '^machinery run: adapter: receipts written: 3 pass, 0 fail, 0 skip$'
 # the claims of the suite and of the notes file are of no package of the run: they count only in
 # the project-wide line, the notes file among the claiming files with no test function
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 3 claimed id\(s\) not run, 1 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 3 claimed id\(s\) not run, 1 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 ! stderr 'no test function; its claims count nothing'
 exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 stdout '"id":"inv:customer-email-unique","outcome":"pass","test":"e2e/testdata/sets/ledger/ledger\.go::TestBalance","observed":"go test: TestBalance passed"'
@@ -30,6 +30,15 @@ stdout '"id":"inv:terminal-is-final","outcome":"pass","test":"e2e/testdata/sets/
 exec mrun 1 verify
 ! stdout 'does not claim it'
 stdout ', 3 proven, 3 by adapter at function granularity, '
+
+# Relabeling the Package field of go test -json events gives the same receipts as test2json -p.
+exec bash latest-receipts.sh
+cp stdout sets.want
+exec machinery run --adapter go-test-json --streams -- bash relabeled.sh
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 3 test function\(s\) with a verdict: 3 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 3 pass, 0 fail, 0 skip$'
+exec bash latest-receipts.sh
+cmp stdout sets.want
 
 # a fail goes by name: TestBalance fails in the ledger set, and the TestBalance of the orders set,
 # which passed, is read as failed too. That is the false fail the contract names; renaming one
@@ -77,7 +86,7 @@ gitcommit 'the staged map again'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/suite
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, 0 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 
 # a second package tested in its own directory, with a function of the same name as one of the
 # suite, and a file whose claim stands above no test function
@@ -236,12 +245,12 @@ rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/more
 stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 5 claimed id\(s\) not run, 1 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 5 claimed id\(s\) not run, 1 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims count nothing$'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/suite
 stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, 1 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, 1 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
 ! stderr 'doc_test\.go'
 
 # refusals of dir: true: without --streams an entry that matches a package tested in its own
@@ -404,6 +413,20 @@ for dir in e2e/testdata/sets/*/; do
 done
 rm -rf stage
 exit $status
+-- relabeled.sh --
+set -eu
+raw="$MACHINERY_GO_TEST_JSON/raw"
+mkdir "$raw"
+MACHINERY_GO_TEST_JSON="$raw" sh loose.sh
+for stream in "$raw"/*.json; do
+  file=$(basename "$stream")
+  name="example.test/shop/e2e/testdata/sets/${file%.json}"
+  sed "s|\"Package\":\"command-line-arguments\"|\"Package\":\"$name\"|" "$stream" > "$MACHINERY_GO_TEST_JSON/$file"
+done
+-- latest-receipts.sh --
+set -eu
+for file in .machinery/receipts/*.jsonl; do last=$file; done
+grep '"type":"receipt"' "$last"
 -- e2e/testdata/sets/orders/orders.go --
 package sets
 
