@@ -469,7 +469,12 @@ waivers:
 | `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
 | `machinery hook <event>` | Reads a harness's hook JSON on stdin and answers with hook JSON on stdout: `session-start`, `pre-tool`, `stop` (section 21.1). Always exits 0. |
 | `machinery config` | Prints the effective configuration as YAML, defaults applied. |
-| `machinery version` | Prints `machinery <version>`. |
+| `machinery version`, `machinery --version` | Print one line, `machinery <version> (<commit>, <build date>)`. |
+
+The version defaults to `dev` and is set by `VERSION` when building with Make. The commit is
+`vcs.revision` from the binary's Go build information, with `-dirty` appended when
+`vcs.modified` is true, or `unknown` when the revision is unavailable. The Makefile records
+the UTC build date as `YYYY-MM-DD` by default. A build with no date recorded prints `unknown`.
 
 `lint` and `check` accept `--stage <name>` (repeatable): only the named stages run, in their usual
 order, and the exit code depends on them alone. An unknown stage name is a usage error (exit 2).
@@ -515,7 +520,7 @@ After the last stage a command prints one summary line:
 machinery <command>: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
 ```
 
-Messages name files by project-relative path. Output is deterministic: no timestamps, no absolute
+Messages name files by project-relative path. Stage output is deterministic: no timestamps, no absolute
 paths, stable ordering.
 
 ### 3.3 Exit codes
@@ -1941,10 +1946,14 @@ The command runs in the project root. The variables machinery sets for a run
 The file is JSON Lines. Three line types:
 
 ```json
-{"v":1,"type":"run","commit":"<40 hex>","dirty":false,"command":["go","test","./e2e/..."],"stack":"postgres 17 in docker","started":"2026-01-02T03:04:05Z"}
+{"v":1,"type":"run","commit":"<40 hex>","dirty":false,"command":["go","test","./e2e/..."],"stack":"postgres 17 in docker","started":"2026-01-02T03:04:05Z","tool":{"version":"dev","commit":"<machinery build revision>"}}
 {"v":1,"type":"receipt","id":"tc:ORDE-2e883d","outcome":"pass","test":"order_test.go::TestOrder/ORDE-2e883d","effects":["stampAttempt"],"observed":"Pending -> paying; attempt row written"}
 {"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z"}
 ```
+
+The header's `tool` object records the machinery build's `version` and `commit` exactly as
+`machinery version` prints them (section 3.1). The top-level `commit` identifies the project
+under test. Older receipts files without `tool` remain valid.
 
 A test emits one `receipt` line per obligation it checked, by appending to the file named by
 `MACHINERY_RECEIPTS`:

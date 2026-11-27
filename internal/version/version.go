@@ -1,8 +1,38 @@
 // Package version holds the machinery version.
 package version
 
-// Version changes only in a release commit.
-const Version = "2.0.0"
+import "runtime/debug"
+
+// Version and BuildDate may be set at link time by the Makefile.
+var (
+	Version   = "dev"
+	BuildDate = "unknown"
+)
+
+// Commit reports the source revision embedded by the Go toolchain.
+func Commit() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	var revision string
+	var modified bool
+	for _, setting := range info.Settings {
+		switch setting.Key {
+		case "vcs.revision":
+			revision = setting.Value
+		case "vcs.modified":
+			modified = setting.Value == "true"
+		}
+	}
+	if revision == "" {
+		return "unknown"
+	}
+	if modified {
+		revision += "-dirty"
+	}
+	return revision
+}
 
 // Pinned upstream versions the formats are designed against (docs/formats.md).
 const (

@@ -11,7 +11,7 @@ stdout '^[0-9]{8}T[0-9]{6}\.[0-9]{3}Z-[0-9a-f]{7}\.jsonl$'
 exec sh -c 'ls .machinery/receipts/*-$(git rev-parse --short=7 HEAD).jsonl'
 stdout 'jsonl'
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
-stdout '^\{"v":1,"type":"run","commit":"[0-9a-f]{40}","dirty":false,"command":\["sh","e2e/orders.sh"\],"stack":"shell fixture","started":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"\}$'
+stdout '^\{"v":1,"type":"run","commit":"[0-9a-f]{40}","tool":\{"version":"dev","commit":"[0-9a-f]{40}(-dirty)?"\},"dirty":false,"command":\["sh","e2e/orders.sh"\],"stack":"shell fixture","started":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"\}$'
 exec sh -c 'grep -q "\"commit\":\"$(git rev-parse HEAD)\"" .machinery/receipts/*.jsonl && echo header-commit-ok'
 stdout header-commit-ok
 exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'

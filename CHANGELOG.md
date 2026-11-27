@@ -43,7 +43,8 @@ command, output line and exit code.
 ### Evidence
 
 - `machinery run` records receipts bound to a commit, `verify` joins them to the obligations,
-  `owed.yaml` is the single ratchet, and `proof` and `status` report.
+  `owed.yaml` is the single ratchet, and `proof` and `status` report. The receipts header
+  records the machinery build's version and commit.
 - A receipts file counts only when `machinery run` entered it in the run ledger of the git
   directory and nothing changed it since, and a `pass` proves only when its `test` names a
   test file that claims the id (`receipt.Test` in `pkg/receipt` builds it). A refused receipts
@@ -127,6 +128,8 @@ command, output line and exit code.
 
 ### Method
 
+- `machinery --version` and `machinery version` report the version, source revision and
+  build date.
 - Stage outcomes: passed, failed, not applicable, not demonstrated (which blocks like failed).
   Exit codes 0, 1, 2. `machinery checks` names what each stage protects.
 - Backlog bridge on `bd`: `plan` (stories and edges from what is owed), `waves`, the contract

@@ -89,6 +89,9 @@ func Execute(args []string, stdout, stderr io.Writer) int {
 		help(stdout)
 		return 0
 	}
+	if args[0] == "--version" {
+		return e.run(commands["version"], args[1:])
+	}
 	if len(args) >= 2 {
 		if c, ok := commands[args[0]+" "+args[1]]; ok {
 			return e.run(c, args[2:])

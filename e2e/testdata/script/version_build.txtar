@@ -1,0 +1,30 @@
+# Both forms report the version and the VCS data embedded in the binary.
+exec bash expected-version.sh
+cp stdout version.want
+exec machinery --version
+cmp stdout version.want
+! stderr .
+exec machinery version
+cmp stdout version.want
+! stderr .
+
+# The receipt names the tool build, separately from the project under test.
+fixture shop
+gitinit
+exec machinery run -- true
+exec bash check-header.sh
+
+-- expected-version.sh --
+set -eu
+info=$(go version -m "$(command -v machinery)")
+revision=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*build[[:space:]]vcs\.revision=//p')
+test -n "$revision"
+if printf '%s\n' "$info" | grep -q 'vcs\.modified=true$'; then
+    revision=$revision-dirty
+fi
+printf 'machinery dev (%s, unknown)\n' "$revision"
+-- check-header.sh --
+set -eu
+commit=$(sed -n 's/^machinery dev (\([^,]*\), unknown)$/\1/p' version.want)
+test -n "$commit"
+head -n 1 .machinery/receipts/*.jsonl | grep -F "\"tool\":{\"version\":\"dev\",\"commit\":\"$commit\"}"

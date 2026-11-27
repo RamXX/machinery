@@ -15,6 +15,7 @@ import (
 
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/internal/version"
 )
 
 // RunOptions configures Run.
@@ -63,6 +64,7 @@ type header struct {
 	V       int      `json:"v"`
 	Type    string   `json:"type"`
 	Commit  string   `json:"commit"`
+	Tool    runTool  `json:"tool"`
 	Dirty   bool     `json:"dirty"`
 	Command []string `json:"command"`
 	Stack   string   `json:"stack"`
@@ -70,6 +72,11 @@ type header struct {
 	Adapter string   `json:"adapter,omitempty"`
 	// Environment is the go environment of a direct-mode adapter run (section 10.3)
 	Environment any `json:"environment,omitempty"`
+}
+
+type runTool struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
 }
 
 type endLine struct {
@@ -130,6 +137,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		return 1, "", err
 	}
 	h := header{V: 1, Type: "run", Commit: head, Dirty: dirty, Command: argv,
+		Tool:  runTool{Version: version.Version, Commit: version.Commit()},
 		Stack: opts.Stack, Started: now.Format(time.RFC3339)}
 	if opts.Adapter != nil {
 		h.Adapter, h.Environment = opts.Adapter.Name(), opts.Adapter.Environment()

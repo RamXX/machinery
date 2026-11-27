@@ -7,9 +7,9 @@ This branch is **machinery v2**: a new tool, not an upgrade of v1. v1 is on `mai
 
 ## Status
 
-v2 is experimental and not released yet. `machinery version` prints `machinery 2.0.0`, the version
-`CHANGELOG.md` lists as unreleased. Formats and commands may still change; `docs/formats.md`
-always describes the tool on this branch.
+v2 is experimental and not released yet. `machinery --version` and `machinery version` print
+`machinery <version> (<commit>, <build date>)`. The version defaults to `dev`.
+See `CHANGELOG.md` for unreleased changes and `docs/formats.md` for the current contract.
 
 ## What it does
 
