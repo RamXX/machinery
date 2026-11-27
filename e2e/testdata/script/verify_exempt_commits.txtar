@@ -5,8 +5,9 @@
 # and 14)
 fixture shop
 cp exempt.yaml machinery.yaml
-mkdir docs notes
+mkdir docs/examples notes
 cp notes.md docs/notes.md
+cp check.sh docs/examples/check.sh
 cp plan.txt notes/plan.txt
 exec machinery gen
 gitinit
@@ -75,6 +76,25 @@ gitcommit 'change code'
 exec mrun 1 verify
 stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
 
+# a path that only the diff names is held to the rule too: a file deleted since, which the
+# adoption file (exempt) made a test file, voids the run although a glob matches it
+exec machinery run -- sh e2e/orders.sh
+cp adoption-tests.yaml design/adoption.yaml
+rm docs/examples/check.sh
+gitcommit 'the examples are tests now, and the old one is gone'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+
+-- check.sh --
+#!/bin/sh
+exit 0
+-- adoption-tests.yaml --
+version: 1
+scope:
+  - "internal/**"
+trace:
+  tests:
+    - "docs/examples/*.sh"
 -- notes.md --
 # Notes
 
