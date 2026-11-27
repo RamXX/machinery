@@ -12,7 +12,7 @@ smoke script and its own backlog. The contract is `docs/formats.md`.
 | 2. Config | a `machinery.yaml` kept outside the project until you adopt | Nothing | 2 |
 | 3. Rehearse | `machinery adopt --rehearse --config <file> --out <dir>` | Nothing | 17.3 |
 | 4. Links file | the subject and required value of each catalog row | One design file | 5.4.1 |
-| 5. Adopt | `machinery adopt --paths <glob> --write` | `machinery.yaml`, `design/` | 17.2 |
+| 5. Adopt | `machinery adopt --paths <glob> --write` | A `machinery.yaml` when there is none, `design/` | 17.2 |
 | 6. Evidence | `machinery run`, with `--adapter go-test-json` for a Go suite | Receipts, never committed | 10 |
 | 7. Owed sync, verify | `machinery owed sync --prune-only`, `machinery verify` | `design/owed.yaml` | 11, 12 |
 | 8. Plan | `machinery plan --apply` | Stories in your backlog | 15.2 |
@@ -194,8 +194,10 @@ git add -A
 git commit -q -m "model the shipment lifecycle"
 ```
 
-The second `adopt --write` adds the new sources to `machinery.yaml`, runs `gen`, and owes every
-obligation in `design/owed.yaml` with the first reason that applies:
+The first `adopt --write` wrote `machinery.yaml`, and from then on the file is yours: the line
+above appends a waiver to it by hand. The second `adopt --write` does not touch it. It puts the
+new sources in `design/adoption.yaml`, runs `gen`, and owes every obligation in
+`design/owed.yaml` with the first reason that applies:
 
 | Reason | For |
 |---|---|
@@ -208,13 +210,18 @@ no failure mode yet (`unmodeled at adoption`), and a machine that binds to nothi
 with actions and no lifecycle machine (`unbound at adoption`). A waiver whose cause is fixed is
 a `stale waiver` ERROR, so the list only shrinks.
 
-Adopt writes only `machinery.yaml` and files under `design/` and the gen directory: when you
+Adopt never writes a `machinery.yaml` that exists, whatever it holds and however it is laid
+out. What a later adoption adds to the configuration (a wider scope, the design sources it
+finds, baselines, waivers) goes to `design/adoption.yaml`, a file the tool owns and writes
+whole. Every command reads the two files as one configuration: lists are joined, and a key
+such as `tests.baseline` set to two different values is an error that names both files.
+`machinery config` prints the result. You may edit `design/adoption.yaml`, say to drop a waiver
+once its cause is fixed, but a comment you leave there is lost the next time adopt adds
+something. Commit it with the rest of `design/`.
+
+Besides those two files adopt writes only under `design/` and the gen directory: when you
 keep a model elsewhere with a Markdown rendering of your own beside it, adopt leaves that file
-alone and says when it is stale (`machinery gen` rewrites it when you run it). In a
-`machinery.yaml` you wrote, every byte stays: adopt adds a missing key as a block at the end of
-its mapping and items to a list in block style, in the file's indentation and line endings. Any
-other shape (flow style, a key with no value, an anchor, an alias, a merge key) is refused before
-anything is written, with the lines to add by hand.
+alone and says when it is stale (`machinery gen` rewrites it when you run it).
 
 Mark failures where the code records them: tag the state `failure` and list the events in
 `_failure_events` (`docs/machine-format.md`, "Failure idioms"), or say it in
@@ -364,8 +371,9 @@ machinery check
 ```
 
 The ratchet compares with an earlier commit: nothing proven there is owed now, and the adapter
-sources added since are named. A second `adopt` widens the scope to the next area; its unit tests
-join the baseline, and from then on the area is held to the same rules.
+sources added since are named. A second `adopt` widens the scope to the next area, in
+`design/adoption.yaml`; its unit tests join the baseline, and from then on the area is held to
+the same rules.
 
 ## What you did not have to do
 

@@ -346,6 +346,74 @@ Rules:
 - The tools directory is `tools.dir` when set, else the environment variable `MACHINERY_TOOLS`,
   else `.machinery/tools` in the project.
 
+### 2.1 What adoption added: `design/adoption.yaml`
+
+`machinery adopt` never edits a `machinery.yaml` that exists (section 17.2). What it adds to the
+configuration of such a project it keeps in a file of its own, `design/adoption.yaml`. The path
+is fixed. Every command that reads `machinery.yaml` reads this file with it when it exists:
+
+```yaml
+# machinery adopt writes this file whole: what adoption added to the configuration. machinery.yaml is yours; adopt never edits it.
+version: 1                      # required, must be 1
+scope:                          # every key below is optional and means what it means in machinery.yaml
+  - "internal/billing/**"
+design:
+  models:
+    - design/model/depot.modelith.yaml
+  machines: design/machines
+contracts:
+  - kind: openapi
+    path: api/openapi.yaml
+trace:
+  code:
+    - "internal/billing/**"
+  tests:
+    - "e2e/**"
+tests:
+  e2e:
+    - "e2e/**"
+  baseline: design/tests-baseline.yaml
+constraints:
+  baseline: design/arch-baseline.yaml
+backlog:
+  tool: bd
+waivers:
+  - {rule: machine-binding, id: "courierRun", reason: "unbound at adoption (1a2b3c4)"}
+```
+
+- These are all its keys: the ones `adopt` adds (section 17.2, steps 1, 4 and 5). Config errors
+  that name the file: any other key (`config: design/adoption.yaml: line <n>: field <key> not found in type project.Adoption`),
+  a `version` that is not 1 or a file with no document in it
+  (`config: design/adoption.yaml: version must be 1`), and more than one document
+  (`config: design/adoption.yaml: the file holds more than one YAML document`).
+- **The merge.** The configuration is `machinery.yaml` with this file merged into it, before
+  anything is validated and before any default applies. A list gets the items of this file
+  after its own, in their order, and nothing is dropped: `scope`, `design.models`, `contracts`,
+  `trace.code`, `trace.tests`, `tests.e2e` and `waivers`. A waiver that both files hold is two
+  waivers, and the second is a `stale waiver` (section 6.7), as it is when one file holds it
+  twice. A scalar is the one that is set: `design.machines`, `tests.baseline`,
+  `constraints.baseline` and `backlog.tool`. Set in both files with the same value it is that
+  value; with two values it is a config error that names both files:
+  `config: <key>: machinery.yaml has "<value>" and design/adoption.yaml has "<value>": keep one`.
+  A block that only this file has (`tests`, `trace`, `constraints`, `backlog`) is a block of
+  the configuration.
+- Everything sees the merged configuration: every stage, `machinery config` (which prints it),
+  `status`, `verify`, the hooks, `assess` and the rehearsal (sections 17.3 and 18.1), and the
+  ratchet, which reads both files at the base (section 11.3). A config error about a value
+  names its key, as in section 2, whichever of the two files holds it.
+- The file is the tool's. `adopt` writes it whole through a YAML encoder each time it adds
+  something: the keys in the order above, lists in block style, one waiver per line. It keeps
+  every value the file holds and no comment or layout of the reader's. Its content may be
+  edited by hand all the same: removing a waiver, a glob or the whole file does what removing
+  the same lines from `machinery.yaml` does, and the ratchet holds it the same way (a narrowed
+  scope, a stage switched off). A later `adopt` adds a waiver again when its finding still
+  stands.
+- A `design/adoption.yaml` in a directory without `machinery.yaml` is no project, and `adopt`
+  refuses to start one beside it (section 17.2).
+- It is committed, like everything under `design/`. It is configuration and no design source:
+  the contract hash (section 15.4) covers neither it nor `machinery.yaml`, and covers the
+  model, machine and contract files the two name.
+
 ## 3. Commands, output and exit codes
 
 ### 3.1 Commands
@@ -1402,7 +1470,9 @@ warning and its failure mode stays unlinked.
 
 ### 6.7 Waivers
 
-A cross-reference finding (sections 6.4 to 6.6) can be waived in `machinery.yaml`:
+A cross-reference finding (sections 6.4 to 6.6) can be waived in `machinery.yaml`, or in
+`design/adoption.yaml`, where `machinery adopt` writes the waivers it adds to an existing project
+(section 2.1); the waivers of the two files are one list:
 
 ```yaml
 waivers:
@@ -2393,12 +2463,12 @@ entry names and that defines a test function of that name: a Go file the `files`
 match, or a `_test.go` file of a directory whose import path the pattern of an entry with
 `dir: true` matches. Read as failed means, in a package whether or not an entry maps it, a
 `fail` event (its own or a subtest's), verdicts that differ, or a `run` event with no verdict
-in a run where its package failed; and in the events that name no package, a `fail` event (its
-own or a subtest's) or a `run` event with no verdict in a run of them that did not end with
-`pass`. Those events are split into runs as the events of a package are, at their
-package-level end events (an event with no `Package` and no `Test`) and also at a `start`
-event that follows other events of the current run, which leaves nothing incomplete; a run of
-them without an end event did not end with `pass`. The name then gets no pass from any package
+in a run where its package failed; and in the events of a stream that name no package, a `fail`
+event (its own or a subtest's), or more `run` events for the function than verdicts of it
+(`pass`, `fail` or `skip`), counted over the whole stream. Those events are not split into
+runs, and how a run of them ended is not asked: the counts add up over the runs a file holds,
+so a run cut short after it started the function is not hidden by a later run in the same file
+that passes it, and nothing of them leaves the run incomplete. The name then gets no pass from any package
 in that `machinery run`, and every id that a function of that name claims in those files gets a `fail` receipt
 ("Which receipt", below). A package that did not run its tests fails the candidates of that
 package only (above). When the fail reaches a file the mapping did not give it to, the summary
@@ -2713,7 +2783,7 @@ that was established at the base may quietly stop being established:
 |---|---|
 | `proven-to-owed` | An id that was an obligation at the base and was not owed there is owed now: `ERROR  ratchet: <id> was proven at <ref> and is owed now`. New obligations may be owed. |
 | `scope-narrowed` | A scope glob of the base is missing now: `ERROR  ratchet: scope narrowed: <glob>`. |
-| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`, and stage `failure-modes` with `design.failure_modes` or `import.failure_modes`: moving from one to the other keeps it on. |
+| `stage-disabled` | A stage that applied at the base no longer applies because its config key is gone: `ERROR  ratchet: stage disabled: <stage> applied at <ref> and <key> is gone now`. Deleting a block of `machinery.yaml` or of `design/adoption.yaml`, or that file, does not switch a gate off. Stage `machines` applies with `design.machines` or `import.machines`, and stage `failure-modes` with `design.failure_modes` or `import.failure_modes`: moving from one to the other keeps it on. |
 | `obligation-removed` | An obligation of the base the design no longer declares: `warn   ratchet: obligation removed since <ref>: <id>`. A design may retire a promise; it may not do so unseen. |
 | `demoted` | An `act` or obligation id of the base (owed or proven there) is proposed now (section 4.1): `ERROR  ratchet: demoted to proposed: <id>; proposed is for candidates, not a way out of an obligation`. |
 | `retired` | An `act` or obligation id that was proven at the base (not owed there) is retired now: `warn   ratchet: retired: <id> (<reason>)`. Retiring an id that was owed at the base prints nothing; the entry is the record. |
@@ -2752,8 +2822,12 @@ base has a vital area, its vital areas. An unknown
 ref is a usage error. A base at which the project has no `machinery.yaml` established nothing:
 the stage is `not applicable: no machinery.yaml at <ref>: nothing was established there`.
 
-The paths of the obligations, the owed list, the risk file and the baselines at the base come
-from the base's own `machinery.yaml`.
+The configuration at the base is the base's own `machinery.yaml` with the base's own
+`design/adoption.yaml` merged into it when the base has one (section 2.1), as the configuration
+now is the two files of the work tree: a scope glob, a stage or a policy counts the same in
+either file, and moving one from one file to the other changes nothing. The paths of the
+obligations, the owed list, the risk file and the baselines at the base come from that
+configuration.
 
 ## 12. Verify
 
@@ -3357,7 +3431,9 @@ sorted list of `<path> <sha256 of the file>` lines of the design sources: the mo
 `*.machine.json` or imported machine source, the register of the imported machines, the
 failure-mode file, the imported failure-mode catalog and its links file, the risk file, the status
 file (section 4.1), the facts file and the contract files.
-Generated files, the owed list and formal models are not part of it.
+Generated files, the owed list and formal models are not part of it, and neither are
+`machinery.yaml` and `design/adoption.yaml` (section 2.1): they are configuration, and the hash
+covers the model, machine and contract files they name.
 
 `machinery waves --freeze` requires a clean `gen-drift` stage and writes
 `<git common dir>/machinery/wave.json`, which every worktree of the repository shares:
@@ -4650,9 +4726,15 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
 1. **Config.** Without a `machinery.yaml`, writes one, every list in it a block list: `scope` from `--paths`, `tests.e2e` from
    `--e2e` (default `e2e/**`), and, once design sources exist, `trace.code` equal to the scope
    and `trace.tests` equal to the e2e roots, with the model, machine and contract files found (`*.modelith.yaml`, `*.machine.json`, `openapi.{yaml,yml,json}`),
-   `tests.baseline`, and `backlog.tool: bd` when a backlog was found. With an existing file it
-   only adds what is missing, each addition at the end of its mapping or list, and nothing
-   else:
+   `tests.baseline`, and `backlog.tool: bd` when a backlog was found. It creates that file
+   and never replaces one.
+
+   With an existing `machinery.yaml`, adopt never writes that file, with or without `--write`:
+   it does not edit, reformat or replace it, whatever the file holds (any line endings, tabs,
+   anchors, flow style, a byte order mark), and it reads it only as every command does, through
+   the YAML decoder. What the configuration is missing goes to `design/adoption.yaml` (section
+   2.1), which adopt owns and writes whole: the values the file held, then what this run adds.
+   The configuration is the two files merged, and adopt adds:
    - to `scope` and to `trace.code`, where the key is there, the `--paths` globs it does not
      match yet; to `trace.tests` and `tests.e2e`, where the key is there, the `--e2e` globs it
      does not match yet, and `tests.e2e` from `--e2e` when neither it nor `trace.tests` is
@@ -4667,52 +4749,18 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    - `backlog.tool: bd` when a backlog was found and there is no `backlog`;
    - the waivers of steps 4 and 5.
 
-   What the file has stays byte for byte: comments, blank lines, the spacing before a comment,
-   the order of the keys, the style of each list and mapping, and the line endings. adopt adds
-   to a key in two shapes only:
-   - the key is absent: the key and its value go as a block at the end of the mapping that
-     holds it (at the end of the file for a key of the top level), at the column of that
-     mapping's keys;
-   - the key holds a block list: the items go after its last item, at the column of its dashes.
+   "Where the key is there" is asked of the merged configuration: a key with an empty list or
+   no value counts as absent. Under `would write:` the line of the file is
+   `design/adoption.yaml  adds: <what>; <what>`, each `<what>` one of `<key> +<values>` for a
+   list or for `design.machines`, `contracts +<path>`, `tests.baseline`,
+   `constraints.baseline`, `backlog.tool: bd`, `new waivers: <n>` and `unbound waivers: <n>`.
+   When nothing is missing the file is not written, and one that exists is left as it is. A
+   later `adopt`, such as one that widens the scope, writes only this file again.
 
-   A nested value goes one indentation step of the file deeper (the step of the first block
-   nested under a key of the top level, 2 when there is none). Every line adopt adds ends as the
-   first line of the file does (`\r\n` in a file written with them), and a file whose last line
-   has no line break gets one before an addition at its end. The lists adopt writes, in a new
-   file too, are block lists, so that a later `adopt` can add to them. Every other shape is
-   refused before anything is written, with or without `--write`, exit 2:
-   - a list or a mapping in flow style, on one line or over several, `[]` and `{}` included;
-   - a key with no value, `~` or another scalar, where adopt adds to a list or a mapping;
-   - an anchor on the list or mapping adopt adds to or on one that holds it, an alias in its
-     place, and a merge key (`<<`) in the mapping adopt adds a key to: a merge at the top level
-     that supplies `waivers` is refused, never overridden by a `waivers` key of adopt's;
-   - a block scalar (`|` or `>`) that ends the list or mapping, when an addition after it would
-     change its value (one written last in a file without a final line break, say);
-   - a file with more than one YAML document, or with a document end marker (`...`).
-
-   The refusal names each key adopt would add to and what stands in its way, and prints the
-   lines to add by hand in the indentation they would take in the file:
-
-   ```
-   config: machinery.yaml: adopt adds to a key only where it is absent or holds a block list, and writes nothing: add these lines by hand, then run adopt again
-   <key>: <shape>; <place>:
-   <the lines>
-   ```
-
-   `<key>` is the key adopt adds to or adds (`waivers`, `trace.code`, `tests.baseline`), one
-   such group per key. `<shape>` is one of `<path> is a flow list`, `<path> is a flow mapping`
-   (`the top level is a flow mapping`), `<path> has the anchor &<name>`,
-   `<path> is the alias *<name>`, `<path> has a merge key (<<)`
-   (`the top level has a merge key (<<)`), `<path> has no value`,
-   `<path> holds the scalar <text>`, `<path> is a list`, `<path> is a mapping`,
-   `a block scalar ends <path>, and an addition after it would change its value`
-   (`ends the file` for the top level), `the file holds more than one YAML document` and
-   `the file has a document end marker (...)`, where `<path>` is the key that holds the list or
-   mapping. `<place>` is `as a block list under <key>` for items, and `under <path>` or
-   `at the top level` for a key. Before it writes, adopt also checks that the file it would
-   write holds one document that says what the edited configuration says, and that every value
-   the file had is unchanged; when not, it refuses the same way, with the shape
-   `an addition here would change what the file has`.
+   A project adopted by an earlier build has those additions in its `machinery.yaml`. They
+   stay there and nothing is moved: both files are read. A `design/adoption.yaml` in a
+   directory that has no `machinery.yaml` is refused before anything is written, exit 2:
+   `config: design/adoption.yaml exists and machinery.yaml does not: it holds what adopt added to a machinery.yaml; restore that file or remove this one`.
 2. **Baselines.** Writes the tests baseline with every unit test and test double now in scope
    (section 9.4), and the architecture baseline when `constraints` are configured. Existing
    entries are kept; entries are added only for paths newly in scope.
@@ -4757,12 +4805,12 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    section 5.4.1) is fixed in the catalog itself.
 4. **Failure waivers.** Findings of `failure-state-mode` and `failure-event-mode` (section 6.6)
    must not block day one: a failure state or failure event the design already has is
-   unmodeled, not new. For each such finding no waiver covers, it adds a waiver to
-   `machinery.yaml` (written with step 1) with the reason `unmodeled at adoption (<short sha>)`.
+   unmodeled, not new. For each such finding no waiver covers, it adds a waiver to the file
+   step 1 writes (a new `machinery.yaml`, or `design/adoption.yaml`) with the reason `unmodeled at adoption (<short sha>)`.
    It never removes or rewrites a waiver, so the list only shrinks as failure modes are written:
    a waiver whose finding is gone is an ERROR `stale waiver` (section 6.7). While the
    failure-mode file has an ERROR it adds none, since what the file names is then unknown.
-   Without `--write`, the `machinery.yaml` line under `would write:` says `new waivers: <n>`.
+   Without `--write`, the line of that file under `would write:` says `new waivers: <n>`.
 5. **Unbound waivers.** Findings of `machine-binding` and `entity-machine` (section 6.4) must not
    block day one either: a machine the design already has that binds to nothing, or an entity
    with actions and no lifecycle machine yet, is unbound, not new. For each such finding no
@@ -4770,12 +4818,12 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    rule and subject. It never removes or rewrites one, so the list only shrinks as machines are
    bound and lifecycles written. While a model or a machine cannot be loaded (a file that cannot
    be read or parsed, or a translation finding of section 5.2.1) it adds none, since what binds
-   to what is then unknown. Without `--write`, the `machinery.yaml` line says
+   to what is then unknown. Without `--write`, the line of that file says
    `unbound waivers: <n>`. A waived machine is still unbound: while no machine is the lifecycle
    machine of a model entity, stage `xref-model-machine` is not demonstrated (section 6.4).
 
-`adopt` writes only `machinery.yaml` (a new one, or an existing one with the additions of
-steps 1, 4 and 5 and nothing else), files under the design directory `design/`, files under
+`adopt` writes only a `machinery.yaml` where there is none (never one that exists), files under
+the design directory `design/`, `design/adoption.yaml` among them, files under
 the gen directory, and the owed list and the baselines where the configuration puts them. It
 never creates, changes or deletes any other file of the project. That includes the rendering
 `<name>.modelith.md` beside a model kept outside `design/` (section 5.1): it is the project's
@@ -4819,6 +4867,7 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [
   18.2), the same code with `adopt --rehearse` in the messages and `machinery-rehearse-*` as the
   default out directory. Without `--config` the project's `machinery.yaml` is used when it
   exists; without either the snapshot has none and adoption starts from scratch, as `adopt` does.
+  The project's `design/adoption.yaml` goes with either, as for `assess` (section 18.1).
   `--write` is a usage error (`usage: --rehearse writes only in its out directory; it takes no --write`).
 - In the snapshot it runs `machinery adopt --write` with the `--paths` and `--e2e` given,
   commits the result (hooks and signing off), runs the stages of `machinery check`, and builds
@@ -4831,7 +4880,7 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [
 - Every commit a file of the rehearsal names is the project's HEAD that was snapshotted, the
   `<short sha>` of `project: <directory name> at <short sha>`: in the reasons adopt writes to
   `owed.yaml` (`planned at adoption (<short sha>)`, `claimed at ...`, `unproven at ...`), in the
-  reasons of the waivers it adds to the snapshot's `machinery.yaml` (`unmodeled at adoption
+  reasons of the waivers it adds in the snapshot (`unmodeled at adoption
   (<short sha>)`, `unbound at ...`) and in every `waivable:` line (`found at adoption
   (<short sha>)`). The commits of the snapshot itself (`snapshot of <sha>`, then `rehearsed
   adoption`) exist so that the stages have a commit to read; no file of the out directory names
@@ -4843,8 +4892,8 @@ timestamp or an absolute path:
 | Part | What |
 |---|---|
 | `backlog` | The backlog line of the adopt report (section 17.2): `backlog: none found`, or `backlog: bd, not read in a rehearsal`. |
-| `files` | The files adopt wrote in the snapshot, each with its size in bytes. |
-| `waivers` | The waivers adopt added, by rule, with counts. |
+| `files` | The files adopt wrote in the snapshot, each with its size in bytes: `design/adoption.yaml` among them when the snapshot has a `machinery.yaml` and adoption adds to the configuration, and never that `machinery.yaml`. |
+| `waivers` | The waivers adopt added to the configuration, by rule, with counts. |
 | `baselines` | The tests and architecture baselines, each with its number of entries. |
 | `owed` | The entries of the owed list, by kind (`tc`, `sc`, `inv`, `fm`, `fv`, `cx`, `ck`, `act`), and their total; then the same ids as the `owed,` lines of `machinery status` count them (section 14), each after `- ` instead of `owed, `: `- claimed by a test, no receipt yet: <n> (<kind> <n>, ...)`, `- no test names it: <n> (...)` and, when they count something, `- planned: <n> (...)`, `- proven by a receipt, still listed: <n> (...)` and `- actions: <n> served by code, <n> not served`. |
 | `blocked` | When adopt was blocked (section 17.2): the lines of its `blocked` report. |
@@ -4917,7 +4966,9 @@ machinery assess [--config <file>] [--out <dir>] [--since <git-ref>]...
   current directory. It must be a git repository with a commit: assess reads `HEAD`.
 - `--config` names the `machinery.yaml` to use. It may live outside the project; its paths are
   relative to the project root as always (section 2). Without it the project's own
-  `machinery.yaml` is used. Either is read from the file, never from `HEAD`. A relative
+  `machinery.yaml` is used. Either is read from the file, never from `HEAD`, and so is the
+  project's `design/adoption.yaml` when it exists (section 2.1): it is merged into the config
+  used, `--config` or not. A relative
   `tools.dir` is resolved against the project, which assess reads and never writes.
 - `--out` is the directory for everything assess produces. It must be absent or an empty
   directory, outside the project and outside the git work tree that holds it. Default: a new
@@ -4940,7 +4991,8 @@ Each refusal exits 2 before anything is written:
 
 assess pipes `git archive HEAD`, run in the project root (a project inside a larger repository
 is archived alone), into an extraction at `<out>/snapshot`: no worktree and no checkout. It
-writes the config there as `machinery.yaml`, runs `git init` and one commit inside the snapshot
+writes the config there as `machinery.yaml` and the project's `design/adoption.yaml` as it is in
+the work tree (the one of `HEAD` is removed when the work tree has none), runs `git init` and one commit inside the snapshot
 (hooks and signing off) so that stages that need a commit work, and runs every section there.
 
 The extraction writes through a root bound to `<out>/snapshot`, so nothing lands outside it. A
@@ -4953,7 +5005,7 @@ holds a `..` segment stops the snapshot (exit 1).
 
 What assess reads of the project itself: `git` commands that write nothing (`archive`, `show`,
 `log`, `rev-parse`, `for-each-ref`, and `status` with optional locks off, so the index is
-not refreshed), the config file and the tracker export (section 18.8). When the work tree
+not refreshed), the config file, `design/adoption.yaml` and the tracker export (section 18.8). When the work tree
 differs from `HEAD` the report says `dirty: <n> changed, <n> untracked file(s) are not
 assessed`: changed counts the tracked files that differ, untracked the files git neither tracks
 nor ignores. They are not in the snapshot.

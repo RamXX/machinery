@@ -67,8 +67,9 @@ command, output line and exit code.
   crash never reached gets nothing, and no pass counts; a package that ran none of its tests (a
   build failure, a `TestMain` that exits first) fails every claimed function. With `--streams`
   a fail needs no package and no exact entry: it goes by function name to every file of the
-  sources that defines it, also from a test binary run under `test2json` without `-p`, and
-  that name gets no pass in the run; a pass needs its package and its entry. A stream cut
+  sources that defines it, also from a test binary run under `test2json` without `-p` (there a
+  function with more `run` events than verdicts in its stream fails too), and that name gets no
+  pass in the run; a pass needs its package and its entry. A stream cut
   short or holding two interleaved runs leaves the run incomplete. A cached pass counts
   nothing, and `tc` and `cx` ids are never proven this way. The rules aim at mistakes, not at
   planted code or a controlled environment.
@@ -92,15 +93,18 @@ command, output line and exit code.
   failure mode and unbound machines are waived; a waiver goes stale when its cause is fixed.
 - `machinery adopt --rehearse`: adoption on a snapshot, with what it writes and owes, the check,
   the plan and what blocks it. Every reason and waivable line names the project's HEAD.
-- `adopt --write` writes only `machinery.yaml`, files under `design/` and the gen directory, the
-  owed list and the baselines: the rendering beside a model kept elsewhere is the project's file,
-  and adopt says `<file> is stale; the project regenerates it` (or `is missing`) and leaves it.
-- `adopt` and an existing `machinery.yaml`: every byte stays. adopt adds a key that is absent as
-  a block at the end of its mapping and items to a key that holds a block list, in the file's
-  indentation and line endings (`\r\n` kept), and refuses every other shape before it writes,
-  exit 2, naming the key and the shape and printing the lines to add by hand: flow style, a key
-  with no value or a scalar, an anchor, an alias or a merge key, a block scalar whose value an
-  addition would change, more than one document. The lists it writes are block lists.
+- `adopt --write` writes only a `machinery.yaml` where there is none, files under `design/` and
+  the gen directory, the owed list and the baselines: the rendering beside a model kept elsewhere
+  is the project's file, and adopt says `<file> is stale; the project regenerates it` (or
+  `is missing`) and leaves it.
+- `adopt` never writes a `machinery.yaml` that exists, whatever it holds. What adoption adds to
+  the configuration of such a project (scope and trace globs, design sources, baselines,
+  `backlog.tool`, waivers) goes to `design/adoption.yaml`, which the tool owns and writes whole
+  through a YAML encoder. Every command reads the two files merged: lists are joined, and a
+  scalar set in both with two values is a config error that names both files. The ratchet reads
+  both at the base, `assess` and the rehearsal take both, and `machinery config` prints the
+  merged configuration. A project adopted by an earlier build keeps what is in its
+  `machinery.yaml`.
 - `import`: machines in a dialect of the project's own (`states`, `rename`, `terminal`,
   `register`, `bind`), and `import.machines.annotate` for what the dialect has no key for:
   `external_events`, `failure_events`, `failure_states`, `aliases`, `refusal_events` and
