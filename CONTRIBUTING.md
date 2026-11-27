@@ -18,6 +18,7 @@ This is machinery v2. v1, the 0.x releases, lives on branch `v1`.
 make tools     # modelith 0.6.0, xstate 5.33.4 and the formal jars into .bin/ (needs Go, Node, Java)
 make check     # gofmt, go vet, build, and machinery check on this repository
 make e2e-one S=gen_shop    # one script
+make formal    # the formal_ scripts: TLC and Alloy for real
 make e2e       # the whole suite, once, at the end
 make verify    # check, e2e and the reference project (needs Docker)
 ```
