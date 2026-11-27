@@ -191,6 +191,25 @@ stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
 stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra: started, no verdict; the package failed"'
+# the events that name no package are one whole, never split into runs: a run of them cut after
+# it started TestExtra, followed in the same file by a run of the same binary that passes it, is
+# still a function with more run events than verdicts. It fails by name, and no pass of it counts
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh cutpass
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+stderr '^machinery run: adapter: 1 verdict\(s\) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout -count=1 receipt
+stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra: started, no verdict; the package failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/testdata/staged/extra_test\.go::TestExtra\)$'
+# and two whole runs of it in one file, each with its verdict, fail nothing: the counts add up
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh nameless.sh twice
+stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: 2 verdict\(s\) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>$'
+! stderr 'failed in events that name no package'
 # with a package of the run in which the name failed as well, the line names both
 rm .machinery/receipts
 exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh both
@@ -317,8 +336,10 @@ func TestExtra(t *testing.T) {
 # copies the staged test into e2e/run/extra and runs go test there, then builds the same file
 # into a test binary in stage/x and runs it under go tool test2json without -p, so that its
 # events name no package. With "cut" the second stream holds the events of such a binary that
-# started TestExtra and stopped there, typed as the wrapper saw them; with "both" a run of a
-# copy in stage/y comes first, whose package failed after it started TestExtra
+# started TestExtra and stopped there, typed as the wrapper saw them; with "cutpass" a whole run
+# of the binary follows them in the same file, and with "twice" the file holds two whole runs;
+# with "both" a run of a copy in stage/y comes first, whose package failed after it started
+# TestExtra
 set -u
 status=0
 mkdir -p e2e/run/extra stage/x
@@ -338,6 +359,17 @@ cut)
 both)
   printf '%s\n%s\n' "$y" "$cut" > "$MACHINERY_GO_TEST_JSON/2.json"
   status=1
+  ;;
+cutpass|twice)
+  cp e2e/testdata/staged/extra_test.go stage/x/extra_test.go
+  go test -c -o stage/x.test ./stage/x > /dev/null 2>&1 || status=1
+  if [ "$1" = cutpass ]; then
+    printf '%s\n' "$cut" > "$MACHINERY_GO_TEST_JSON/2.json"
+    status=1
+  else
+    (cd stage/x && go tool test2json -t ../x.test -test.v=test2json) > "$MACHINERY_GO_TEST_JSON/2.json" || status=1
+  fi
+  (cd stage/x && go tool test2json -t ../x.test -test.v=test2json) >> "$MACHINERY_GO_TEST_JSON/2.json" || status=1
   ;;
 *)
   cp e2e/testdata/staged/extra_test.go stage/x/extra_test.go

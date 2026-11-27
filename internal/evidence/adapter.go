@@ -84,10 +84,9 @@ type goStream struct {
 	// package-level end event ends a run (section 10.3)
 	pkgs     map[string][]*goPackage
 	nameless int // verdicts of test functions that name no package
-	// unnamed: the runs of the events that name no package, split at their
-	// end events and at a start event after other events (section 10.3,
-	// "A fail goes by name")
-	unnamed []*goPackage
+	// unnamed: the events that name no package, read as one whole: never
+	// split into runs (section 10.3, "A fail goes by name")
+	unnamed *goPackage
 	// restarted: the first package with a start event before the end of
 	// its current run; the run is left incomplete (section 10.3)
 	restarted string
@@ -643,10 +642,10 @@ func (s *goStream) read(ev goEvent) {
 		if ev.Test != "" && isVerdict(ev.Action) && !strings.Contains(ev.Test, "/") {
 			s.nameless++
 		}
-		if n := len(s.unnamed); n == 0 || s.unnamed[n-1].end != "" || (start && s.unnamed[n-1].events > 0) {
-			s.unnamed = append(s.unnamed, newRun())
+		if s.unnamed == nil {
+			s.unnamed = newRun()
 		}
-		s.unnamed[len(s.unnamed)-1].read(ev)
+		s.unnamed.read(ev)
 		return
 	}
 	runs := s.pkgs[ev.Package]
@@ -922,14 +921,12 @@ func (a *GoTest) Receipts() [][]byte {
 	// none go by name too (section 10.3), under the package ""
 	if a.fromDir {
 		for _, s := range a.streams {
-			for _, run := range s.unnamed {
-				for fn, isExplicit := range run.failed() {
-					if failedIn[fn] == nil {
-						failedIn[fn] = map[string]bool{}
-					}
-					failedIn[fn][""] = true
-					failEvent[fn] = failEvent[fn] || isExplicit
+			for fn, isExplicit := range s.unnamed.failed() {
+				if failedIn[fn] == nil {
+					failedIn[fn] = map[string]bool{}
 				}
+				failedIn[fn][""] = true
+				failEvent[fn] = failEvent[fn] || isExplicit
 			}
 		}
 	}
@@ -1167,12 +1164,16 @@ func (a *GoTest) Receipts() [][]byte {
 	return lines
 }
 
-// failed returns the test functions a run of the events that name no
+// failed returns the test functions the events of a stream that name no
 // package read as failed (section 10.3, "A fail goes by name"): true for a
-// fail event, its own or a subtest's, and false for a function the run
-// started and gave no verdict when it did not end with pass.
+// fail event, its own or a subtest's, and false for a function with more
+// run events than verdicts. The events are one whole, so a run cut short is
+// not hidden by a later one that passes, and how a run ended is not asked.
 func (pkg *goPackage) failed() map[string]bool {
 	res := map[string]bool{}
+	if pkg == nil {
+		return res
+	}
 	for fn, vs := range pkg.verdicts {
 		if contains(vs, Fail) {
 			res[fn] = true
@@ -1183,11 +1184,9 @@ func (pkg *goPackage) failed() map[string]bool {
 			res[fn] = true
 		}
 	}
-	if pkg.end != Pass {
-		for fn, n := range pkg.started {
-			if _, seen := res[fn]; !seen && len(pkg.verdicts[fn]) < n {
-				res[fn] = false
-			}
+	for fn, n := range pkg.started {
+		if _, seen := res[fn]; !seen && len(pkg.verdicts[fn]) < n {
+			res[fn] = false
 		}
 	}
 	return res
