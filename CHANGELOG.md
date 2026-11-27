@@ -70,13 +70,22 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - Failure modes: a subject `machine:<id>` for a machine as a whole; `columns.required` in
   `import.failure_modes` for a catalog that has the column; and stage `xref-failure` counts on
   its own the failure modes that name a subject and no required value (still unlinked).
+- A links entry that names a subject and no required value is no error: `gen` and `adopt` go on
+  and the row is owed; a required value that is given and invalid stays an error. Stages
+  `failure-modes` and `xref-failure` print one account of linked, unlinked, subject-only and
+  subject-less failure modes, and a subject that names nothing is a `subject-resolves` finding
+  whatever its required value.
 - `import.planned` reads scenario descriptions (`in: scenario-description`).
 - `_refusal_events` (`refusal_events` in `import.machines.annotate`) declares the event by which
   a machine writes that it refused a caller's command, with the action and a reason; rule
-  `event-action` accepts it unless the event enters a failure state, the stage prints it with
+  `event-action` accepts it unless the event moves the machine into a failure state it was not in
+  already (a transition that stays in its failure state is accepted; one from a state that is
+  not tagged failure, or from one failure state into another, is not), the stage prints it with
   its reason and counts it, and it is neither hinted nor asked for a failure mode.
 - An aliased event may be listed in `_failure_events` when the action it stands for is itself
   the failing outcome.
+- A rehearsal names the project's HEAD in every reason and waivable line it writes, never the
+  commit of its snapshot.
 - An owed file that does not parse is never read as empty: every command refuses with the
   parse error, and machinery writes the file through a YAML encoder.
 - Stage `xref-failure` prints how many failure modes are linked and how many are not, and is

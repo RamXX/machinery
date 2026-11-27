@@ -4,7 +4,7 @@ fixture shop
 # state:<machine id>.<State>, a nested one by its dotted path, and event:<machine id>.<event>
 cp valid.yaml design/failure-modes.yaml
 exec machinery lint --stage failure-modes
-stdout '^checked: 3 failure modes, 0 abuse cases$'
+stdout '^checked: 3 failure modes, 0 abuse cases, 0 linked, 3 unlinked$'
 stdout '^passed$'
 
 # the machine id and the name are both required

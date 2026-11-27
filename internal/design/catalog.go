@@ -70,7 +70,7 @@ func LoadImportedFailureModes(p *project.Project, native []FailureMode) (fms []F
 	if lf.Version != 1 {
 		problems = append(problems, fmt.Sprintf("%s: version must be 1", c.Links))
 	}
-	problems = append(problems, applyLinks(c.Links, c.File, lf.Links, fms, byID, len(c.Columns.Required) > 0)...)
+	problems = append(problems, applyLinks(c.Links, c.File, lf.Links, fms, byID)...)
 	return fms, problems, true
 }
 
@@ -82,10 +82,11 @@ const listed = 5
 
 // applyLinks gives the rows the values of the links entries that name them.
 // byID maps a machinery id to its row in fms. A row two entries name keeps
-// the values of the first. With cells (the catalog has a column for the
-// required value) an entry may leave required out: a row keeps the value of
-// its own cell, and an entry that gives another one is a problem.
-func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[string]int, cells bool) (problems []string) {
+// the values of the first. An entry may leave required out: a row keeps the
+// value of its own cell (a catalog with a required column), and an entry that
+// gives another one is a problem; a row left with no value names a subject
+// and no required value, which is no problem (section 5.4.1).
+func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[string]int) (problems []string) {
 	owner := map[string]int{} // machinery id -> index of the entry that holds it
 	labels := make([]string, len(links))
 	for i, l := range links {
@@ -111,9 +112,11 @@ func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[s
 			continue
 		}
 		values := FailureMode{Kind: l.Kind, Subject: l.Subject, NoSubject: l.NoSubject, Required: l.Required}
-		problems = append(problems, checkValues(where, &values, l.NoSubject != nil || cells)...)
+		// required may be left out: a row without a value names a subject
+		// and no required value, which stops nothing (section 5.4.1)
+		problems = append(problems, checkValues(where, &values, true)...)
 		seen := map[string]bool{}
-		var missing, empty, differ, refused []string
+		var missing, differ, refused []string
 		overlaps := map[int][]string{}
 		for _, written := range ids {
 			id := strings.ToLower(written)
@@ -135,27 +138,17 @@ func applyLinks(rel, catalog string, links []Link, fms []FailureMode, byID map[s
 			fm := &fms[at]
 			required := values.Required
 			if cell := fm.Required; cell != "" || required == "" {
-				switch {
-				case required != "" && required != cell:
+				if required != "" && required != cell {
 					differ = append(differ, written)
-				case cell == "" && l.NoSubject == nil && cells && !fm.CellRefused:
-					// a cell that holds no value has its own finding: one cause, one finding
-					empty = append(empty, written)
 				}
 				if required = cell; cell == "refuse" && values.Kind != "abuse" {
 					refused = append(refused, written)
 				}
 			}
-			fm.Kind, fm.Subject, fm.NoSubject, fm.Required, fm.Linked = values.Kind, values.Subject, values.NoSubject, required, true
+			fm.Kind, fm.Subject, fm.NoSubject, fm.Required, fm.Entry = values.Kind, values.Subject, values.NoSubject, required, true
 		}
 		if len(differ) > 0 {
 			problems = append(problems, fmt.Sprintf("%s: required %s differs from the required cell of %s; keep one", where, values.Required, firstOf(differ)))
-		}
-		switch {
-		case len(empty) == 1:
-			problems = append(problems, fmt.Sprintf("%s: required is not set and the required cell of %s is empty; set required in the entry or fill the cell", where, empty[0]))
-		case len(empty) > 1:
-			problems = append(problems, fmt.Sprintf("%s: required is not set and the required cells of %s are empty; set required in the entry or fill the cells", where, firstOf(empty)))
 		}
 		if len(refused) > 0 {
 			problems = append(problems, fmt.Sprintf("%s: required: refuse (the required cell of %s) is only valid with kind: abuse", where, firstOf(refused)))

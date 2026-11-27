@@ -354,49 +354,59 @@ func refusalEvents(fs *xfindings, lines *[]string, m *machine.Machine, r refusal
 }
 
 // entersFailure returns the first state tagged failure, in document order,
-// among the states the machine enters on an on transition of the event until
-// it comes to rest, or "": the target and the states it is inside, the
-// initial descent of a compound target, and from the state reached every
-// always branch and every completion (the onDone of a state whose final
-// child is entered), guarded or not, as far as they lead.
+// that an on transition of the event moves the machine into, or "". It
+// follows the machine until it comes to rest: the target and the states it
+// is inside, the initial descent of a compound target, and from the state
+// reached every always branch and every completion (the onDone of a state
+// whose final child is entered), guarded or not, as far as they lead. A
+// failure state is no ground when the state whose on holds the transition is
+// that state or inside it: the machine was in it already, and the event
+// leaves it there.
 func entersFailure(m *machine.Machine, ev string) string {
-	entered, seen := map[string]bool{}, map[string]bool{}
 	final := map[string]bool{}
 	for _, st := range m.Table.States {
 		final[st.Path] = st.Kind == "final"
 	}
-	var visit func(target string)
-	visit = func(target string) {
-		leaf := m.Resolver.Leaf(target)
-		if seen[leaf] {
-			return
-		}
-		seen[leaf] = true
-		for p := leaf; ; p = p[:strings.LastIndex(p, ".")] {
-			entered[p] = true
-			if !strings.Contains(p, ".") {
-				break
-			}
-		}
-		for _, t := range m.Table.Transitions {
-			if t.Target == "" {
-				continue
-			}
-			switch {
-			case t.Kind == "always" && (t.Source == leaf || strings.HasPrefix(leaf, t.Source+".")):
-				visit(t.Target)
-			case t.Kind == "stateDone" && final[leaf] && strings.Contains(leaf, ".") && t.Source == leaf[:strings.LastIndex(leaf, ".")]:
-				visit(t.Target)
-			}
-		}
-	}
+	moved := map[string]bool{} // failure-state candidates the event moves the machine into
 	for _, t := range m.Table.Transitions {
-		if t.Kind == "on" && t.Event == ev && t.Target != "" {
-			visit(t.Target)
+		if t.Kind != "on" || t.Event != ev || t.Target == "" {
+			continue
+		}
+		entered, seen := map[string]bool{}, map[string]bool{}
+		var visit func(target string)
+		visit = func(target string) {
+			leaf := m.Resolver.Leaf(target)
+			if seen[leaf] {
+				return
+			}
+			seen[leaf] = true
+			for p := leaf; ; p = p[:strings.LastIndex(p, ".")] {
+				entered[p] = true
+				if !strings.Contains(p, ".") {
+					break
+				}
+			}
+			for _, a := range m.Table.Transitions {
+				if a.Target == "" {
+					continue
+				}
+				switch {
+				case a.Kind == "always" && (a.Source == leaf || strings.HasPrefix(leaf, a.Source+".")):
+					visit(a.Target)
+				case a.Kind == "stateDone" && final[leaf] && strings.Contains(leaf, ".") && a.Source == leaf[:strings.LastIndex(leaf, ".")]:
+					visit(a.Target)
+				}
+			}
+		}
+		visit(t.Target)
+		for p := range entered {
+			if t.Source != p && !strings.HasPrefix(t.Source, p+".") {
+				moved[p] = true
+			}
 		}
 	}
 	for _, f := range m.FailureStates() {
-		if entered[f] {
+		if moved[f] {
 			return f
 		}
 	}

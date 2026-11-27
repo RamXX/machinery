@@ -71,6 +71,42 @@ exec mrun 1 lint --stage xref-model-machine
 stdout '^  ERROR  event-action: order\.cancel_failed: _refusal_events declares the event, and on it the machine can come to broken, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or remove it from _refusal_events in design/machines/Order\.machine\.json$'
 ! stdout 'refusal: order'
 
+# the rule is that a refusal event does not move the machine into a failure state: in a state tagged
+# failure, a transition on it that stays in that state leaves the machine where it was, and is accepted
+cp self-target.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   refusal: order: cancel_refused refuses cancel \(the command was refused, nothing failed\)$'
+! stdout 'ERROR'
+stdout '^passed$'
+cp self-inside.json design/machines/Order.machine.json
+exec machinery lint --stage xref-model-machine
+stdout '^  warn   refusal: order: cancel_refused refuses cancel \(the command was refused, nothing failed\)$'
+! stdout 'ERROR'
+stdout '^passed$'
+
+# a move into a failure state from a state that is not one is refused, also where another state
+# already tagged failure stays where it is on the same event
+cp self-and-move.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events declares the event, and on it the machine can come to broken, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or remove it from _refusal_events in design/machines/Order\.machine\.json$'
+! stdout 'refusal: order'
+stdout '^failed: 1 finding\(s\)$'
+
+# the stricter reading for a move between two failure states: from one state tagged failure into a
+# different one, directly or by an always branch after the event, the event records a new failure
+cp failure-to-failure.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events declares the event, and on it the machine can come to stuck, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or remove it from _refusal_events in design/machines/Order\.machine\.json$'
+! stdout 'refusal: order'
+cp self-then-always.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events declares the event, and on it the machine can come to stuck, a state tagged failure; '
+! stdout 'refusal: order'
+cp nested-failure.json design/machines/Order.machine.json
+exec mrun 1 lint --stage xref-model-machine
+stdout '^  ERROR  event-action: order\.cancel_refused: _refusal_events declares the event, and on it the machine can come to held\.stuck, a state tagged failure; '
+! stdout 'refusal: order'
+
 # a failure state the machine does not enter on the event is no ground: a compound target enters
 # its initial child, not the failure state beside it
 cp other-child.json design/machines/Order.machine.json
@@ -506,6 +542,239 @@ entities:
       "on": {
         "cancel": {
           "target": "Cancelled"
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- self-target.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": ["provider_down"],
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {"target": "Paid"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {"target": "Paid"},
+        "provider_down": {"target": "broken"}
+      }
+    },
+    "broken": {
+      "tags": "failure",
+      "on": {
+        "cancel_refused": {"target": "broken"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- self-inside.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": ["provider_down"],
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {"target": "Paid"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {"actions": "recordRefusal"},
+        "provider_down": {"target": "held"}
+      }
+    },
+    "held": {
+      "tags": "failure",
+      "initial": "waiting",
+      "on": {
+        "cancel": {"target": "Cancelled"}
+      },
+      "states": {
+        "waiting": {
+          "on": {
+            "cancel_refused": {"target": "#order.held.noted"}
+          }
+        },
+        "noted": {
+          "on": {
+            "cancel_refused": {"target": "#order.held"}
+          }
+        }
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- self-and-move.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": ["provider_down"],
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {"target": "Paid"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {"target": "broken"},
+        "provider_down": {"target": "broken"}
+      }
+    },
+    "broken": {
+      "tags": "failure",
+      "on": {
+        "cancel_refused": {"target": "broken"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- failure-to-failure.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": ["provider_down"],
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {"target": "Paid"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {"actions": "recordRefusal"},
+        "provider_down": {"target": "broken"}
+      }
+    },
+    "broken": {
+      "tags": "failure",
+      "on": {
+        "cancel_refused": {"target": "stuck"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "stuck": {
+      "tags": "failure",
+      "on": {
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- self-then-always.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": ["provider_down"],
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {"target": "Paid"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {"actions": "recordRefusal"},
+        "provider_down": {"target": "broken"}
+      }
+    },
+    "broken": {
+      "tags": "failure",
+      "always": {"target": "stuck", "guard": "isStale"},
+      "on": {
+        "cancel_refused": {"target": "broken"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "stuck": {
+      "tags": "failure",
+      "on": {
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Cancelled": {
+      "type": "final"
+    }
+  }
+}
+-- nested-failure.json --
+{
+  "id": "order",
+  "_refusal_events": {
+    "cancel_refused": {"action": "cancel", "reason": "the command was refused, nothing failed"}
+  },
+  "_failure_events": ["provider_down"],
+  "initial": "Pending",
+  "states": {
+    "Pending": {
+      "on": {
+        "pay": {"target": "Paid"},
+        "cancel": {"target": "Cancelled"}
+      }
+    },
+    "Paid": {
+      "on": {
+        "cancel_refused": {"actions": "recordRefusal"},
+        "provider_down": {"target": "held"}
+      }
+    },
+    "held": {
+      "tags": "failure",
+      "initial": "waiting",
+      "on": {
+        "cancel": {"target": "Cancelled"}
+      },
+      "states": {
+        "waiting": {
+          "on": {
+            "cancel_refused": {"target": "#order.held.stuck"}
+          }
+        },
+        "stuck": {
+          "tags": "failure"
         }
       }
     },

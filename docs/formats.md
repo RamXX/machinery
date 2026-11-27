@@ -874,7 +874,9 @@ failure_modes:
     behavior: "The request is refused with FORBIDDEN and the order does not change."
 ```
 
-`id`, `subject`, `failure`, `required` and `behavior` are required. Unknown keys are an ERROR.
+`id`, `subject`, `failure`, `required` and `behavior` are required. Unknown keys are an ERROR. In
+this file a missing `required` is an ERROR of stage `failure-modes`; only an entry of the links
+file of an imported catalog may leave it out (section 5.4.1).
 
 Subject forms: `invoke:<machine id>.<src>`, `dependency:<name>`, `act:<Entity>.<action>`,
 `entity:<Name>`, `state:<machine id>.<State>` (a failure state, a nested one by its dotted path),
@@ -978,18 +980,22 @@ the catalog id, compared case-insensitively.
   least as many digits as the first end has: `FM-01..FM-23` is `FM-01`, `FM-02` to `FM-23`, and
   `FM-08..FM-101` is `FM-08` to `FM-99`, then `FM-100` and `FM-101`. A range holds at most 10000
   ids.
-- **Values.** `subject` and `required` are required and `kind` is optional (default `fault`),
-  with the value rules of section 5.4 and its messages. `no_subject: "<reason>"` in place of
-  `subject` declares the rows subject-less (section 5.4); `required` and `kind` are then
-  optional. Every row an entry names takes its values. The value rules are checked once per
-  entry.
+- **Values.** `subject` is required; `required` and `kind` are optional (default `fault`),
+  with the value rules of section 5.4 and its messages. An entry that names a subject and gives
+  no `required`, for a row whose own cell gives none either, is no finding: the row **names a
+  subject and no required value** (section 6.6). It is unlinked for the verdict of stage
+  `xref-failure` and counted there and by stage `failure-modes`, and it stops neither
+  `machinery gen` nor `machinery adopt` (sections 7 and 17.2): it is owed and generated like
+  any row. A `required` that is given and is none of the four stays an ERROR, with the message
+  of section 5.4. `no_subject: "<reason>"` in place of `subject` declares the rows subject-less
+  (section 5.4). Every row an entry names takes its values. The value rules are checked once
+  per entry.
 - **`required` beside a required column.** With `columns.required`, an entry may leave
-  `required` out: each row keeps the value of its own cell. Then, one finding per entry, each
-  naming the rows as the entry writes them (the first five and `and <n> more`):
-  a row whose cell is empty, or whose table has no such column, is
-  `ERROR  <links file>: <entry>: required is not set and the required cell of <id> is empty; set required in the entry or fill the cell`
-  (`the required cells of <ids> are empty; ... fill the cells` for several); a row whose cell
-  holds something that is no value has the finding of its cell and no second one;
+  `required` out: each row keeps the value of its own cell. A row whose cell is empty, or whose
+  table has no such column, then has no value and is no finding: it names a subject and no
+  required value, as above. One finding per entry, each naming the rows as the entry writes them
+  (the first five and `and <n> more`): a row whose cell holds something that is no value has the
+  finding of its cell and no second one;
   an entry whose `required` is another value than a row's cell is
   `ERROR  <links file>: <entry>: required <value> differs from the required cell of <ids>; keep one`,
   and the row keeps the value of its cell; and a cell that says `refuse` for a row whose entry
@@ -1022,8 +1028,8 @@ Every imported row is then one of three:
 - An **unlinked** row is every other one: no entry names it, or the entry that names it gives
   no subject, a malformed one, one that resolves to nothing, or no valid `required` value
   (neither the entry nor a cell of the row gives one). A row that names a subject which
-  resolves and only lacks the value is counted on its own by stage `xref-failure`
-  (section 6.6), and is unlinked all the same. An
+  resolves and only lacks the value is counted on its own by stages `failure-modes` and
+  `xref-failure` (sections 6.3 and 6.6), and is unlinked all the same. An
   entry is never a link by being there. It is an obligation all the same: `fm:<id>` is owed,
   claimed and traced like any failure mode. It names nothing, so it takes part in no subject
   rule of `xref-failure`: it neither resolves nor covers an invoke, a dependency, an action, a
@@ -1124,11 +1130,18 @@ nor `import.machines` is configured. With `import.machines` the translation find
 
 Parses the file against section 5.4, and the catalog and its links file against section 5.4.1.
 Unique ids, valid `kind` and `required` values, well-formed `subject`. `checked:` counts failure
-modes, native and imported, and, of those, abuse cases. When `import.failure_modes` is configured
-it also counts the imported rows and, of those, the unlinked ones (a row declared subject-less is
-not unlinked, section 5.4.1):
-`checked: 9 failure modes, 1 abuse cases, 7 imported, 4 unlinked`. Not applicable when neither
-`design.failure_modes` nor `import.failure_modes` is configured.
+modes, native and imported, and, of those, abuse cases, and, when `import.failure_modes` is
+configured, the imported rows. Then it prints the account of the failure modes of section 6.6,
+the one stage `xref-failure` prints: the same definition of linked, unlinked, naming a subject
+and no required value, and subject-less, computed once per command, so that both stages print
+the same numbers for the same failure modes. As there, `linked` and `unlinked` are printed when
+`import.failure_modes` is configured or a failure mode is unaccounted for, and the two others
+when they count one:
+`checked: 9 failure modes, 1 abuse cases, 7 imported, 2 linked, 4 unlinked, 1 name a subject and no required value, 3 subject-less`.
+The account decides no outcome of this stage: an unlinked failure mode is the verdict of stage
+`xref-failure`, and a links entry that names a subject and no required value is no finding here
+(section 5.4.1). Not applicable when neither `design.failure_modes` nor `import.failure_modes` is
+configured.
 
 ### 6.4 `xref-model-machine`
 
@@ -1203,8 +1216,8 @@ command: the machine handles `cancel` and, where it does not accept it, records
 has its own event, so the event is no alias. `_refusal_events` declares it, and a declaration
 holds when the event is no action, the action it names is one of the machine's entity (for an
 operational machine, of an entity behind what it serves), that action has an `on` event of its
-own name in the same machine, and no transition on the event brings the machine to a state
-tagged `failure`.
+own name in the same machine, and no transition on the event moves the machine into a state
+tagged `failure` that it was not in already.
 The findings of `event-action` about one that does not hold:
 
 - `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <event> is itself an action of <E>; an action is a caller's command, not the refusal of one: <where>`;
@@ -1212,14 +1225,22 @@ The findings of `event-action` about one that does not hold:
   `event-action: <id>.<event>: _refusal_events names action <action>, which is not an action of an entity behind what the machine serves (<serves>); name one, or <where>`;
 - `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <action> has no event of its own name in <machine id>; a refusal is of a command the machine handles: <where>`;
 - `event-action: <id>.<event>: _refusal_events declares the event, and on it the machine can come to <state>, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or <where>`:
-  `<state>` is the first state tagged `failure`, in document order, among the states the
-  machine enters on an `on` transition of the event until it comes to rest: the target and the
+  `<state>` is the first state tagged `failure`, in document order, that an `on` transition of
+  the event moves the machine into. The states it enters are followed until it comes to rest: the target and the
   states the target is inside; for a compound target, its initial child, and that child's, down
   to a leaf (a failure state beside the initial child is not entered and is no ground); and
   from the leaf reached, the target of every `always` branch of it or of a state it is inside,
   and of the `onDone` of its parent when the leaf is final, each followed the same way, guarded
   or not. A delay (`after`), an invoke's outcome and a later event are not followed: they are
-  another cause.
+  another cause. A state tagged `failure` among those is no ground when the state whose `on`
+  holds the transition is that state or a state inside it: the machine was in it already, and
+  the event leaves it there (`failed: {tags: [failure], on: {cancel_refused: failed}}`, or a
+  transition between two states inside it that are not tagged `failure` themselves). Every
+  other one is: a move from a state that is not tagged `failure`, and a move from one state
+  tagged `failure` into a different one, directly or by a branch followed after the event,
+  because the event then records a new failure. The rule is held per transition: a transition
+  that stays in its failure state does not excuse another one on the same event that moves into
+  it from elsewhere.
 
 `<where>` is `remove it from _refusal_events in <file>`, or
 `remove the refusal from import.machines.annotate <key> (for <file>)`. As for an alias, a
@@ -1238,9 +1259,9 @@ be checked and is otherwise put in front of a reviewer:
 - it carries a reason, non-blank, for every event (section 6.2);
 - the event is in neither `_failure_events` nor `_external_events` and has no alias, so a
   declared failure is never declared away (section 6.2);
-- the event brings the machine to no state tagged `failure`, directly or through eventless
-  transitions (the finding above), so an event the machine itself records as a failure stays
-  one, whatever it is called;
+- the event moves the machine into no state tagged `failure` that it was not in already,
+  directly or through eventless transitions (the finding above), so an event the machine itself
+  records as a failure stays one, whatever it is called;
 - the reason is one line, so the printed line is one declaration and nothing else;
 - every declaration that holds is printed with its reason and counted, on every run.
 
@@ -1320,8 +1341,9 @@ modes, those that are linked (`linked`, native ones included) and those unaccoun
 `checked: 48 failure modes, 30 linked, 4 unlinked, 14 subject-less, 9 invokes, 2 dependencies, 0 tiered actions, 4 failure states, 1 failure events`.
 When at least one of the unlinked ones names a subject that resolves and only lacks a valid
 `required` value (below), their number follows `unlinked`:
-`..., 4 unlinked, 3 name a subject and no required value, ...`. `machinery assess` carries the
-line as it is (section 18).
+`..., 4 unlinked, 3 name a subject and no required value, ...`. Stage `failure-modes` prints the
+same counts from the same account (section 6.3). `machinery assess` carries the line as it is
+(section 18).
 With no failure-mode file
 configured only `failure-state-mode` and `failure-event-mode` run: each failure state and failure
 event is a finding that says to configure `design.failure_modes`, and `checked:` counts failure
@@ -1343,8 +1365,12 @@ that **names a subject and no required value** is an unaccounted one that somebo
 its subject has one of the forms of section 5.4 and resolves, it has no `no_subject` key, and its
 `required` is missing or not one of the four. It is counted on its own, as a part of
 `unlinked`, so that the rows that only wait for the value are told apart from the rows nobody
-linked. It stays unlinked for every rule and for the result, and no `subject-resolves` finding is
-printed for a subject without a valid `required` value. While one failure mode is unaccounted for,
+linked. It stays unlinked for every rule and for the result. In the links file a missing value
+is no finding of stage `failure-modes` and stops neither generation nor adoption (section
+5.4.1); a value that is given and is none of the four is an ERROR there, and in the failure-mode
+file a missing one is too (section 5.4). A subject of one of the forms of section 5.4 that names
+nothing is a `subject-resolves` finding (or `unknown-system`) whatever its `required` value:
+such a failure mode is unlinked, and is not counted as naming a subject. While one failure mode is unaccounted for,
 the stage did
 not compare every failure mode with the design: one linked row among many is no pass. Its result
 is
@@ -1421,7 +1447,8 @@ and beside each model its `<name>.modelith.md`.
 All generated files are committed and never edited by hand. JSON is written with two-space
 indentation, keys in the order given in this document, and a trailing newline. Writes are atomic
 (temporary file, then rename). `machinery gen` refuses to write (ERROR) when the `model`,
-`machines` or `failure-modes` stage has an ERROR.
+`machines` or `failure-modes` stage has an ERROR. A links entry that names a subject and no
+required value is none (section 5.4.1): its rows are generated like any failure mode.
 
 `machinery gen --check` regenerates in memory and reports `DRIFT  <path>: stale`, `DRIFT  <path>:
 missing`, and `ERROR  <path>: unexpected file in gen directory`, the translated machines
@@ -4425,7 +4452,9 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    before anything is written, with or without `--write`: one line per mark,
    `<file>:<line>: <id>: import.planned entry <n> captured the story "<text>"; a story id has only letters, digits, ".", "-" and "_": tighten the pattern`,
    the first after `machinery: `, and exit 1. The line is that of the invariant's statement, of the
-   scenario's description or of the catalog row. When a stage fails the config and the baselines
+   scenario's description or of the catalog row. A catalog row whose links entry names a subject
+   and no required value is no finding of these stages (section 5.4.1): it is owed like any row,
+   and stage `xref-failure` counts it. When a stage fails the config and the baselines
    are still
    written, no owed entry is written and the exit code is 1. The report then says exactly what
    blocks, and nothing else (warnings do not block and are not printed):
@@ -4505,6 +4534,14 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [
   `not applicable: a rehearsal never reads the backlog`.
 - Nothing is written in the project. The output of adopt and of check is saved as
   `<out>/stages/adopt.txt` and `<out>/stages/check.txt`.
+- Every commit a file of the rehearsal names is the project's HEAD that was snapshotted, the
+  `<short sha>` of `project: <directory name> at <short sha>`: in the reasons adopt writes to
+  `owed.yaml` (`planned at adoption (<short sha>)`, `claimed at ...`, `unproven at ...`), in the
+  reasons of the waivers it adds to the snapshot's `machinery.yaml` (`unmodeled at adoption
+  (<short sha>)`, `unbound at ...`) and in every `waivable:` line (`found at adoption
+  (<short sha>)`). The commits of the snapshot itself (`snapshot of <sha>`, then `rehearsed
+  adoption`) exist so that the stages have a commit to read; no file of the out directory names
+  one, outside the snapshot's own `.git`.
 
 `<out>/rehearsal.md` (for people) and `<out>/rehearsal.json` hold the same content, without a
 timestamp or an absolute path:
@@ -5167,8 +5204,10 @@ checker reads; a checker never reads the project's sources. Every list is sorted
 }
 ```
 
-An invariant's `entity` is empty for a top-level invariant. An imported failure mode that is not
-linked (section 5.4.1) has an empty `subject` and `required`. A machine's `role` is `lifecycle` or
+An invariant's `entity` is empty for a top-level invariant. A failure mode carries the values it
+has, linked or not (section 5.4.1): an imported row no links entry names has an empty `subject`
+and `required`, and a row that has no required value (neither its entry nor its cell gives one)
+an empty `required`. A machine's `role` is `lifecycle` or
 `operational`. A machine lists, after its `ignores`, its `refusals` and its guard `clauses` (section 7.2),
 each with its `tc` id. Lists that have nothing are empty lists, never absent. The projection does not
 contain `ck` obligations: it is the input of the checkers, not their output.

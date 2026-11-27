@@ -9,7 +9,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/RamXX/machinery/internal/dialect"
 	"github.com/RamXX/machinery/internal/project"
 )
 
@@ -27,10 +26,11 @@ type FailureMode struct {
 	// Source is the file the failure mode comes from: the failure-mode file
 	// or the imported catalog (section 5.4.1).
 	Source string `yaml:"-"`
-	// Imported is true for a row of the catalog; Linked when the links file
-	// gives it a subject and a required value.
+	// Imported is true for a row of the catalog; Entry when an entry of the
+	// links file names the row. Whether it is linked is stage xref-failure's
+	// account (section 6.6).
 	Imported bool `yaml:"-"`
-	Linked   bool `yaml:"-"`
+	Entry    bool `yaml:"-"`
 	// Cells are the cells of an imported row, as written and trimmed, and
 	// Line the line of the row.
 	Cells []string `yaml:"-"`
@@ -53,21 +53,18 @@ func (r *Reason) UnmarshalYAML(n *yaml.Node) error {
 	return nil
 }
 
-// Unlinked reports an imported row without a link: it names nothing, so it
-// takes part in no subject rule (section 5.4.1).
-func (fm FailureMode) Unlinked() bool { return fm.Imported && !fm.Linked }
-
 // SubjectLess reports a failure mode declared to name no subject: no_subject
-// with a reason, and no subject beside it. Like an unlinked row it takes part
+// with a reason, and no subject beside it. Like an unlinked one it takes part
 // in no subject rule.
 func (fm FailureMode) SubjectLess() bool {
 	return fm.NoSubject != nil && strings.TrimSpace(string(*fm.NoSubject)) != "" && fm.Subject == ""
 }
 
-// Named reports a failure mode that names a subject. One that is neither
-// named nor subject-less is unaccounted for: an unlinked row, or a
-// no_subject without a reason or beside a subject.
-func (fm FailureMode) Named() bool { return !fm.Unlinked() && fm.NoSubject == nil }
+// Named reports a failure mode that names a subject: a native one, or an
+// imported row an entry names, without no_subject. One that is neither named
+// nor subject-less is unaccounted for: a row no entry names, or a no_subject
+// without a reason or beside a subject.
+func (fm FailureMode) Named() bool { return (!fm.Imported || fm.Entry) && fm.NoSubject == nil }
 
 type failureFile struct {
 	Version      int           `yaml:"version"`
@@ -134,23 +131,17 @@ func LoadFailureModes(p *project.Project) (fms []FailureMode, problems []string,
 	return f.FailureModes, problems, true
 }
 
-// WellFormed reports a failure mode that names a subject of one of the
-// forms of section 5.4 and carries a required value: the precondition of
-// being compared with the design. Whether the subject resolves is stage
-// xref-failure's question.
-func (fm FailureMode) WellFormed() bool {
-	return fm.NamesSubject() && dialect.ValidRequired(fm.Required)
-}
-
 // NamesSubject reports a failure mode whose subject has one of the forms of
-// section 5.4, with a required value or without.
+// section 5.4, with a required value or without. Whether it resolves, and so
+// whether the failure mode is linked, is stage xref-failure's account.
 func (fm FailureMode) NamesSubject() bool { return fm.Named() && subjectRe.MatchString(fm.Subject) }
 
 // checkValues holds kind, subject (or no_subject) and required to section
 // 5.4, defaulting kind to fault. where prefixes every problem. optional is
-// true where required may be left out: an entry of the links file that
-// declares no_subject, or whose rows may have the value in a cell of their
-// own (section 5.4.1).
+// true where required may be left out: every entry of the links file. A row
+// whose entry names a subject and neither the entry nor a cell gives a value
+// is no finding: it names a subject and no required value (sections 5.4.1
+// and 6.6). A value that is given and is none of the four is a finding.
 func checkValues(where string, fm *FailureMode, optional bool) (problems []string) {
 	if fm.Kind == "" {
 		fm.Kind = "fault"

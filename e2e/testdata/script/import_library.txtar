@@ -12,7 +12,7 @@ stdout 'design/gen/imported/machines/hold_queue.machine.json'
 exec machinery lint
 stdout '(?s)== model ==\nchecked: 1 models, 1 entities, 3 actions, 2 invariants, 2 scenarios\npassed\n'
 stdout '(?s)== machines ==\nchecked: 2 machines, 6 states, 7 transitions\npassed\n'
-stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 1 abuse cases, 4 imported, 0 unlinked\npassed\n'
+stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 1 abuse cases, 4 imported, 3 linked, 0 unlinked, 1 subject-less\npassed\n'
 stdout '(?s)== xref-model-machine ==\nchecked: 2 machines, 1 lifecycle machines, 1 operational machines, 4 domain states, 4 events, 3 actions, 1 entities with actions\npassed\n'
 stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 3 linked, 0 unlinked, 1 subject-less, 1 invokes, 0 dependencies, 0 tiered actions, 1 failure states, 0 failure events\npassed\n'
 stdout '(?s)== xstate ==\nchecked: 2 machines, 4 cases\npassed\n'

@@ -54,7 +54,8 @@ machinery adopt --rehearse --config ../depot.machinery.yaml --out ../depot-rehea
 ```
 
 A rehearsal reads only what is committed. To try a links file before adopting it, commit it on
-a scratch branch of a clone of the project and rehearse there.
+a scratch branch of a clone of the project and rehearse there. Every reason and offered waiver
+it writes names the commit of your project that it rehearsed, never the commit of its snapshot.
 
 `rehearsal.md` (and `rehearsal.json`) lists the files adoption would write with their sizes, the
 waivers it would add by rule, the baselines, what it would owe by kind, the result of the check,
@@ -167,7 +168,10 @@ failure events and invokes; a row that names nothing in the system at all is dec
 in `columns.required`, and an entry may then leave `required` out. A row whose entry names a
 subject and gives no required value is counted on its own (`name a subject and no required
 value`), so the rows that only wait for that value are told apart from the rows nobody linked;
-it is unlinked all the same.
+it is unlinked all the same. It is no error: `gen` and `adopt` go on, the row is owed like any
+other, and stages `failure-modes` and `xref-failure` print the same counts of linked, unlinked,
+subject-only and subject-less rows. A `required` value that is given and is none of the four is
+an error, fixed in the links file or the cell.
 
 **Read your machines as they are.** `import.machines` (`docs/formats.md` section 5.2.1) takes
 globs anywhere in the project, so a lifecycle file kept beside its service is read with the
@@ -192,7 +196,10 @@ it in `refusal_events`, with the action and the reason
 (`cancel_refused: {action: cancel, reason: "a paid order is not cancelled"}`): it is no event
 from outside and no alias, and a declared refusal is neither hinted nor asked for a failure
 mode. That holds only for a refusal, where nothing failed: an event on which the machine
-enters a failure state is refused as one, and every declaration is printed with its reason. A
+moves into a failure state it was not in is refused as one (from a state that is not a failure
+state, or from one failure state into another), while one that leaves a failure state where it
+is (`failed` on `cancel_refused` stays `failed`) is a refusal, and every declaration is printed
+with its reason. A
 pattern that matches nothing in a machine it is applied to is an error, a pattern
 of `*` only is refused, and an event that is an action of the model stays a finding whether you
 list it as external or give it an alias: the config cannot hide a command. Every alias and every

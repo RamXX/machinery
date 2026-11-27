@@ -93,6 +93,14 @@ grep '^  - waivable: - \{rule: action-event, id: "act:Order.place", reason: "fou
 ! grep '^## Fix in the project first' out/rehearsal.md
 ! grep 'Order.place' out/snapshot/machinery.yaml
 
+# every commit the rehearsal names is the project's HEAD, in a reason or a waivable line, never one
+# of the snapshot's own
+exec sh -c 'h=$(git -C proj rev-parse HEAD | cut -c1-7); grep -c "claimed at adoption ($h)" out/snapshot/design/owed.yaml; grep -c "found at adoption ($h)" out/rehearsal.md out/rehearsal.json'
+stdout '^14\nout/rehearsal.md:1\nout/rehearsal.json:2$'
+exec sh -c 'for s in $(git -C out/snapshot log --format=%H | cut -c1-7); do grep -rl --exclude-dir=.git "$s" out; done; echo searched'
+stdout '^searched$'
+! stdout 'out/'
+
 # rehearsal.json holds the same, keys sorted
 grep '^  "backlog": "backlog: bd, not read in a rehearsal",$' out/rehearsal.json
 grep '"config": "--config shop.yaml"' out/rehearsal.json
