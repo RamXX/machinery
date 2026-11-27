@@ -1,0 +1,155 @@
+# a claimant is satisfied by a verdict of the adapter or by a pass receipt its own test emits.
+# An id with no counted adapter pass is judged as before: one receipt a test emits proves it.
+# Once an adapter pass is used for the id, every claimant answers for itself (sections 10.3 and 12)
+fixture shop
+fixture shop-gotests
+cp base.yaml machinery.yaml
+exec machinery gen
+cp ship.sh.txt e2e/ship.sh
+gitinit
+
+# only receipts tests emit: the id is proven by the shell script, whatever the Go tests that
+# also claim it did, and nothing reads the claimants
+exec machinery run -- sh e2e/ship.sh
+exec mrun 1 verify
+! stdout 'partly run'
+! stdout 'paid-before-shipped'
+exec machinery proof --ids inv:paid-before-shipped
+stdout '^  inv:paid-before-shipped -> e2e/ship\.sh -> pass: ship from Pending refused$'
+stdout '^not proven:\nlimits:$'
+
+# the suite runs through the adapter at the same commit: an adapter pass is now used for the id,
+# so each of its three claimants must be satisfied. The suite's test has a verdict, the script has
+# its own receipt, and the test of the second package has neither
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
+stdout -count=1 '^  warn   partly run: inv:paid-before-shipped: '
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 2 of 3 claimants passed\)$'
+
+# a Go test that emits its own receipt satisfies its claimant without the adapter
+env SHOP_EMIT=1
+exec machinery run -- go test -count=1 ./e2e/extra
+env SHOP_EMIT=
+exec mrun 1 verify
+! stdout 'paid-before-shipped'
+exec machinery proof --ids inv:paid-before-shipped
+stdout '^not proven:\nlimits:$'
+
+# the adapter alone, both packages: the script has no receipt, and the adapter cannot judge it
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/extra
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/ship\.sh: cannot be judged by the adapter \(not a Go file\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout -count=1 '^  warn   partly run: inv:paid-before-shipped: '
+
+# an adapter pass the policy does not let count is not used: the id of a critical area is judged
+# by the receipt its test emits, as before, though the second package did not run
+rm .machinery/receipts
+cp risk.yaml design/risk.yaml
+cp risk-config.yaml machinery.yaml
+exec machinery gen
+gitcommit 'paid before shipped is critical'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+exec machinery run -- sh e2e/ship.sh
+exec mrun 1 verify
+! stdout 'paid-before-shipped'
+exec machinery proof --ids inv:paid-before-shipped
+stdout '^  inv:paid-before-shipped -> e2e/ship\.sh -> pass: ship from Pending refused'
+stdout '^not proven:\nlimits:$'
+
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-shipping
+    tier: critical
+    why: "a shipment cannot be recalled"
+    ids: ["inv:paid-before-shipped"]
+    questions: [concurrency]
+-- risk-config.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- ship.sh.txt --
+#!/bin/sh
+# A test in another language, which emits its own receipt.
+#
+# machinery:verifies inv:paid-before-shipped
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+printf '{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/ship.sh","observed":"ship from Pending refused"}\n' >> "$MACHINERY_RECEIPTS"
+-- e2e/extra/extra_test.go --
+package extra
+
+import (
+	"os"
+	"testing"
+)
+
+// TestShipAgain is a second Go claimant of the invariant, in a package of its own. With
+// SHOP_EMIT=1 it emits its own receipt after its assertions.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipAgain(t *testing.T) {
+	file := os.Getenv("MACHINERY_RECEIPTS")
+	if os.Getenv("SHOP_EMIT") != "1" || file == "" {
+		return
+	}
+	f, err := os.OpenFile(file, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	line := `{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/extra/extra_test.go::TestShipAgain","observed":"a second shop refused to ship"}` + "\n"
+	if _, err := f.WriteString(line); err != nil {
+		t.Fatal(err)
+	}
+}
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

@@ -43,6 +43,26 @@ exec bd create --id shop-e1 --title 'Survive a provider outage' --body-file e1.t
 exec mrun 1 story shop-e1
 stdout '^  ERROR  unproven: fm:payment-provider-down; no claimant can run here: 1 claimant\(s\) excused: run a claimant of it here and narrow evidence\.adapter\.excused, or prove it with a receipt a test emits$'
 
+# a targeted verify drops that ERROR while the change does not touch the id, and keeps it when
+# the change does
+exec git tag before-touch
+exec sh -c 'echo "// touched" >> e2e/suite/email_test.go'
+gitcommit 'touch the email test'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 0 affected --base before-touch
+stdout '^inv:customer-email-unique$'
+! stdout 'fm:payment-provider-down'
+exec mrun 0 verify --affected --base before-touch
+! stdout 'no claimant can run here'
+exec sh -c 'echo "// touched" >> e2e/suite/outage_test.go'
+gitcommit 'touch the outage test'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 0 affected --base before-touch
+stdout '^fm:payment-provider-down$'
+exec mrun 1 verify --affected --base before-touch
+stdout '^  ERROR  no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused: run a claimant of it here and narrow evidence\.adapter\.excused, or prove it with a receipt a test emits$'
+! stdout 'unproven: '
+
 # a claimant that is not excused and has no verdict leaves the id partly run; the excused ones
 # are not counted
 mkdir e2e/more

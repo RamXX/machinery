@@ -13,9 +13,9 @@ import (
 	"github.com/RamXX/machinery/internal/tags"
 )
 
-// Claimant is a test function with a marker for an id directly above it,
-// or a file with a file-level marker for the id and at least one test
-// function, Func "" (section 10.3, "Every claimant").
+// Claimant is what claims an id in a file under trace.tests (section 10.3,
+// "Every claimant"): the test function a marker for the id stands directly
+// above, in a file the adapter reads, and otherwise the file, Func "".
 type Claimant struct{ File, Func string }
 
 // String is the test of the claimant's adapter receipt: <file>::<function>,
@@ -109,12 +109,12 @@ type claimants struct {
 	of      map[string][]Claimant // id -> its claimants, sorted
 	excused map[Claimant]bool     // covered by an entry
 	files   map[string]*goTestFile
-	// broken: a claiming file that cannot be read as Go -> why; it is a
-	// claimant of each id it claims, never passed and never excused
-	broken map[string]string
-	// unreadable: one line per broken claiming file; uses: one line per
-	// entry in effect; problems: its patterns that cover nothing
-	unreadable, uses, problems []string
+	// unjudged: a file claimant of an id that the adapter cannot give a
+	// verdict (Func "") -> why; only a receipt its own test emits satisfies it
+	unjudged map[claimUnit]string
+	// uses: one line per entry in effect; problems: its patterns that cover
+	// nothing
+	uses, problems []string
 }
 
 // What to do about a partly run id, and about an id no claimant of which can
@@ -124,15 +124,20 @@ const (
 	NoClaimantRemedy = "run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits"
 )
 
-// unreadableClaimant is what verify and the run summary say of a claiming
-// file that cannot be read as Go (section 10.3).
+// unreadableClaimant is what the run summary says of a claiming file the
+// adapter reads that cannot be read as Go (section 10.3).
 func unreadableClaimant(file, why string) string {
 	return fmt.Sprintf("%s: cannot be read as Go (%s): its claims count as not passed; fix the file or remove its markers", file, why)
 }
 
-// readClaimants reads the claimants of the project's Go test files: the
-// _test.go files under trace.tests and the staged sources the entries of
-// evidence.adapter.sources name there, as the adapter reads them.
+// cannotJudge is what verify says of a file claimant the adapter cannot
+// judge (sections 10.3 and 12).
+func cannotJudge(file, why string) string {
+	return fmt.Sprintf("%s: cannot be judged by the adapter (%s); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason", file, why)
+}
+
+// readClaimants reads the claimants of the project: every file under
+// trace.tests that carries a marker for an id, as stage trace reads markers.
 func readClaimants(p *project.Project, d *design.Design) (*claimants, error) {
 	return readClaimantsWith(p, d, p.Cfg.AdapterClaimsAll())
 }
@@ -140,7 +145,7 @@ func readClaimants(p *project.Project, d *design.Design) (*claimants, error) {
 // readClaimantsWith reads the claimants, and with excuse applies the entries
 // of evidence.adapter.excused to them.
 func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*claimants, error) {
-	c := &claimants{of: map[string][]Claimant{}, excused: map[Claimant]bool{}, files: map[string]*goTestFile{}, broken: map[string]string{}}
+	c := &claimants{of: map[string][]Claimant{}, excused: map[Claimant]bool{}, files: map[string]*goTestFile{}, unjudged: map[claimUnit]string{}}
 	if p.Cfg.Trace == nil || len(p.Cfg.Trace.Tests) == 0 {
 		return c, nil
 	}
@@ -148,29 +153,16 @@ func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*clai
 	if err != nil {
 		return nil, err
 	}
-	files, err := readGoTests(p, list, stagedSource(p))
+	// the files the adapter reads among them; every other file claims as a whole
+	if c.files, err = readGoTests(p, list, stagedSource(p)); err != nil {
+		return nil, err
+	}
+	found, err := tags.Scan(p, list)
 	if err != nil {
 		return nil, err
 	}
-	c.files = files
-	found, err := tags.Scan(p, sortedKeys(files))
-	if err != nil {
+	if err := c.derive(d, found); err != nil {
 		return nil, err
-	}
-	// the line scan finds the markers of a file the parser cannot read: its
-	// claim is the whole file's, and it never passes (section 10.3)
-	units, _, _, _ := readClaims(d, files, found)
-	for _, u := range units {
-		switch f := files[u.File]; {
-		case f.Broken:
-			c.broken[u.File] = f.Err
-		case u.Func == "" && len(f.Funcs) == 0:
-			continue // no test function: no claimant
-		}
-		c.of[u.ID] = append(c.of[u.ID], Claimant{File: u.File, Func: u.Func})
-	}
-	for _, file := range sortedKeys(c.broken) {
-		c.unreadable = append(c.unreadable, "claimant: "+unreadableClaimant(file, c.broken[file]))
 	}
 	if excuse {
 		c.excuse(p.Cfg.AdapterExcused())
@@ -178,48 +170,106 @@ func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*clai
 	return c, nil
 }
 
-// UnreadableClaimants names, for stage trace (section 8), each claiming file
-// under trace.tests that cannot be read as Go: a claimant of the ids it
-// claims that never passes (section 10.3). Only the files with a verifies
-// tag are parsed; nothing with evidence.adapter.claims any.
-func UnreadableClaimants(p *project.Project, d *design.Design, found []tags.Tag) []string {
-	if !p.Cfg.AdapterClaimsAll() || p.Cfg.Trace == nil {
-		return nil
-	}
-	staged := stagedSource(p)
-	var list []string
-	seen := map[string]bool{}
+// derive computes the claimants from the markers, and beside them the files
+// that claim each id for stage trace, from the same reading: the two must
+// name the same files for every id, so that no claim is dropped for what its
+// file is called or holds (section 10.3).
+func (c *claimants) derive(d *design.Design, found []tags.Tag) error {
+	ids, scenarios := d.DeclaredIDs(), d.ScenarioIDs()
+	seen, judged := map[claimUnit]bool{}, map[claimUnit]bool{}
+	above := map[claimUnit]string{} // the first function, not a test function, a marker of the id stands above
 	for _, t := range found {
-		if t.Kind == tags.Verifies && !seen[t.File] && project.Match(p.Cfg.Trace.Tests, t.File) {
-			seen[t.File] = true
-			list = append(list, t.File)
+		if t.Kind != tags.Verifies {
+			continue
+		}
+		for _, tok := range t.IDs {
+			for _, id := range tags.Resolve(t, tok, ids, scenarios) {
+				if o := d.Obligation(id); o == nil || !contains(project.AdapterKinds, o.Kind) {
+					continue
+				}
+				u := claimUnit{ID: id, File: t.File}
+				if f := c.files[t.File]; f != nil && !f.Broken {
+					switch fn, test := f.owner(t.Line); {
+					case test:
+						u.Func = fn
+					case fn != "":
+						if above[u] == "" {
+							above[u] = fn
+						}
+					case len(f.Funcs) > 0:
+						judged[u] = true // the adapter writes a receipt for the file
+					}
+				}
+				if !seen[u] {
+					seen[u] = true
+					c.of[id] = append(c.of[id], Claimant{File: u.File, Func: u.Func})
+				}
+			}
 		}
 	}
-	files, err := readGoTests(p, list, staged)
-	if err != nil {
-		return nil // never: a file it cannot read is broken
-	}
-	units, _, _, _ := readClaims(d, files, found)
-	broken := map[string]string{}
-	for _, u := range units {
-		if f := files[u.File]; f.Broken {
-			broken[u.File] = f.Err
+	for u := range seen {
+		if u.Func == "" && !judged[u] {
+			c.unjudged[u] = c.why(u.File, above[u])
 		}
 	}
-	var res []string
-	for _, file := range sortedKeys(broken) {
-		res = append(res, "claimant: "+unreadableClaimant(file, broken[file]))
+	trace := tags.ClaimsOf(d, found).Tests
+	for i := range d.Obligations {
+		o := &d.Obligations[i]
+		if !contains(project.AdapterKinds, o.Kind) {
+			continue
+		}
+		cls := c.of[o.ID]
+		sort.Slice(cls, func(i, j int) bool {
+			if cls[i].File != cls[j].File {
+				return cls[i].File < cls[j].File
+			}
+			return cls[i].Func < cls[j].Func
+		})
+		var files []string
+		for _, cl := range cls {
+			if len(files) == 0 || files[len(files)-1] != cl.File {
+				files = append(files, cl.File)
+			}
+		}
+		if strings.Join(files, "\x00") != strings.Join(trace[o.ID], "\x00") {
+			return fmt.Errorf("the claimants of %s are in %s and the files that claim it are %s: a defect of machinery; nothing is judged",
+				o.ID, fileList(files), fileList(trace[o.ID]))
+		}
 	}
-	return res
+	return nil
+}
+
+// fileList renders files for a message.
+func fileList(files []string) string {
+	if len(files) == 0 {
+		return "no file"
+	}
+	return strings.Join(files, ", ")
+}
+
+// why says why the adapter cannot judge a file claimant (section 10.3, "A
+// file the adapter cannot judge"); above is the function, not a test
+// function, its marker stands above.
+func (c *claimants) why(file, above string) string {
+	switch f := c.files[file]; {
+	case f == nil && !strings.HasSuffix(file, ".go"):
+		return "not a Go file"
+	case f == nil:
+		return "a Go file not named _test.go that no entry of evidence.adapter.sources names"
+	case f.Broken:
+		return "cannot be read as Go: " + f.Err
+	case above != "":
+		return "its marker for the id is above " + above + ", which is not a test function"
+	}
+	return "no test function"
 }
 
 // covers reports whether an entry of evidence.adapter.excused covers a
 // claimant: its file matches the tests of the entry and, when the entry has
-// functions, it is a test function a pattern matches. A file-level claimant
-// is excused by its file, never by a function, and a claimant that cannot be
-// read as Go is never excused (section 10.3).
+// functions, it is a test function a pattern matches. A file claimant is
+// excused by its file, never by a function (section 10.3).
 func (c *claimants) covers(e project.AdapterExcused, cl Claimant) bool {
-	if _, bad := c.broken[cl.File]; bad || !project.Match(e.Tests, cl.File) {
+	if !project.Match(e.Tests, cl.File) {
 		return false
 	}
 	if len(e.Functions) == 0 {
@@ -269,25 +319,15 @@ func (c *claimants) excuse(entries []project.AdapterExcused) {
 }
 
 // whyGlob says why a tests glob of an entry covers no claimant, and what to
-// do: the functions of the entry leave out every claimant of its files, its
-// files cannot be read as Go, or it matches no claiming file.
+// do: the functions of the entry leave out every claimant of its files, or it
+// matches no claiming file.
 func (c *claimants) whyGlob(g string) string {
-	broken := ""
 	for _, cls := range c.of {
 		for _, cl := range cls {
-			if !project.Match([]string{g}, cl.File) {
-				continue
-			}
-			if _, bad := c.broken[cl.File]; !bad {
+			if project.Match([]string{g}, cl.File) {
 				return "its functions leave out every claimant of the files it matches: correct the functions or remove the glob"
 			}
-			if broken == "" || cl.File < broken {
-				broken = cl.File
-			}
 		}
-	}
-	if broken != "" {
-		return broken + " cannot be read as Go, and a claimant that cannot be read as Go is never excused: fix the file"
 	}
 	return "correct the glob or remove it"
 }
@@ -299,10 +339,11 @@ func (c *claimants) whyPattern(e project.AdapterExcused, f string) string {
 	file := ""
 	for _, cls := range c.of {
 		for _, cl := range cls {
-			if cl.Func != "" || !project.Match(e.Tests, cl.File) {
+			src := c.files[cl.File]
+			if cl.Func != "" || src == nil || !project.Match(e.Tests, cl.File) {
 				continue
 			}
-			for _, fn := range c.files[cl.File].Funcs {
+			for _, fn := range src.Funcs {
 				if ok, _ := path.Match(f, fn); ok && (file == "" || cl.File < file) {
 					file = cl.File
 				}
@@ -350,14 +391,16 @@ func (c *claimants) open(id string) (open []Claimant, excused int) {
 	return open, excused
 }
 
-// Partly is an id that is partly run: its adapter evidence would prove it
-// if every claimant that is not excused had passed (section 10.3).
+// Partly is an id that is partly run: an adapter pass is used for it, and a
+// claimant of it that is not excused is not satisfied (section 10.3).
 type Partly struct {
 	Passed, Of, Excused int
-	// Missing are the claimants without a pass, sorted; Skipped those of
-	// them whose receipt is a skip
-	Missing []Claimant
-	Skipped map[Claimant]bool
+	// Missing are the claimants that are not satisfied, sorted; Skipped those
+	// of them whose receipt is a skip; Unjudged those the adapter cannot
+	// judge, with why
+	Missing  []Claimant
+	Skipped  map[Claimant]bool
+	Unjudged map[Claimant]string
 }
 
 // Text is "<n> of <m> claimants passed", with the excused ones when there are.
@@ -421,7 +464,7 @@ func FindingID(msg string, prefixes []string) (string, bool) {
 // partlyShown is how many missing claimants verify names without --partly.
 const partlyShown = 10
 
-// PartlyFindings names the claimants without a pass of the partly run ids
+// PartlyFindings names the claimants that are not satisfied of the partly run ids
 // (of only, when it is set): the first ten in the order they print, and every
 // one with all (section 12).
 func (e *Evaluation) PartlyFindings(only map[string]bool, all bool) []report.Finding {
@@ -432,11 +475,14 @@ func (e *Evaluation) PartlyFindings(only map[string]bool, all bool) []report.Fin
 		}
 		pr := e.partly[id]
 		for _, cl := range pr.Missing {
-			what := "no verdict"
-			if pr.Skipped[cl] {
-				what = "skipped"
+			switch why, cannot := pr.Unjudged[cl]; {
+			case cannot:
+				msgs = append(msgs, fmt.Sprintf("partly run: %s: %s", id, cannotJudge(cl.File, why)))
+			case pr.Skipped[cl]:
+				msgs = append(msgs, fmt.Sprintf("partly run: %s: skipped: %s", id, cl))
+			default:
+				msgs = append(msgs, fmt.Sprintf("partly run: %s: no verdict: %s", id, cl))
 			}
-			msgs = append(msgs, fmt.Sprintf("partly run: %s: %s: %s", id, what, cl))
 		}
 	}
 	sort.Strings(msgs)

@@ -29,10 +29,14 @@ stdout '"type":"end"'
 exec mrun 1 verify
 ! stdout 'ERROR  receipt'
 ! stdout 'malformed'
-# the claimant in the file that does not parse never passes: the id it claims is partly run
-stdout '^checked: 17 obligations, 6 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 1 partly run, 2 owed, 7 receipts$'
-stdout '^  ERROR  claimant: e2e/drafts/broken_test\.go: cannot be read as Go \(4:32: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
-stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+# the file that does not parse, the file with no test function and the file whose marker stands
+# above a benchmark are claimants the adapter cannot judge: the ids they claim are partly run
+stdout '^checked: 17 obligations, 5 proven, 1 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 partly run, 2 owed, 7 receipts$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  ERROR  partly run: inv:terminal-is-final: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/drafts/broken_test\.go: cannot be judged by the adapter \(cannot be read as Go: 4:32: expected ''\}'', found ''EOF''\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/other/bench_test\.go: cannot be judged by the adapter \(its marker for the id is above BenchmarkOther, which is not a test function\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:terminal-is-final: e2e/suite/helpers_test\.go: cannot be judged by the adapter \(no test function\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 stdout '^  ERROR  unproven: cx:order-payment:race$'
 ! stdout 'unproven: tc:ORDE-1ded14'
 exec machinery proof --ids tc:ORDE-1ded14

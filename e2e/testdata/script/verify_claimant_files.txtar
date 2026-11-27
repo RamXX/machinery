@@ -1,0 +1,191 @@
+# the claimants of an id are every file under trace.tests that carries a marker for it, as stage
+# trace reads markers, whatever the file is called and whatever language it is in. A file the
+# adapter cannot judge is a claimant that only a receipt of its own test satisfies: it is never
+# dropped, and verify says what it needs (sections 10.3 and 12)
+fixture shop
+fixture shop-gotests
+cp base.yaml machinery.yaml
+exec machinery gen
+
+# a test file whose name lacks _test, with a syntax error, in a package the command does not
+# name: go test never builds it, and it still claims the invariant
+mkdir e2e/misnamed
+cp broken.go.txt e2e/misnamed/ship_tests.go
+gitinit
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^machinery run: adapter: partly run: 1 id\(s\): 1 of 2 claimants passed in this run$'
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/ship_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+! stdout 'unproven: inv:paid-before-shipped'
+exec machinery status --no-backlog
+stdout '^partly run: 1 \(inv 1\): 1 of 2 claimants passed$'
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 1 of 2 claimants passed\)$'
+
+# the same file valid, its test failing, its package named: go test builds it as no test, the
+# fail never happens, and the id is not proven for that
+cp misnamed.go.txt e2e/misnamed/ship_tests.go
+gitcommit 'the misnamed test file parses'
+env SHOP_MISNAMED=fail
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/ship_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 1 of 2 claimants passed\)$'
+# under the name of a test file its test runs, and the fail is found
+exec git mv e2e/misnamed/ship_tests.go e2e/misnamed/ship_test.go
+gitcommit 'the misnamed test file is a test file'
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:paid-before-shipped \(e2e/misnamed/ship_test\.go::TestShipMisnamed\)$'
+! stdout 'partly run: inv:paid-before-shipped'
+env SHOP_MISNAMED=
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
+! stderr 'partly run'
+exec mrun 1 verify
+! stdout 'paid-before-shipped'
+
+# claims of one id in five kinds of files: two _test.go files, a misnamed Go test file, a Go file
+# that is no test, a shell script and a staged source an entry of evidence.adapter.sources names.
+# Each is a claimant, and each one without a pass is named with what it is
+cp late.go.txt e2e/misnamed/late_tests.go
+mkdir e2e/support e2e/staged
+cp shipping.go.txt e2e/support/shipping.go
+cp cases.go.txt e2e/staged/cases.go
+cp ship.sh.txt e2e/ship.sh
+exec sh -c 'cat base.yaml sources.part > machinery.yaml'
+gitcommit 'four more files claim paid before shipped'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
+stderr '^machinery run: adapter: partly run: 1 id\(s\): 2 of 6 claimants passed in this run$'
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 6 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/late_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/support/shipping\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/ship\.sh: cannot be judged by the adapter \(not a Go file\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/staged/cases\.go::TestShipStaged$'
+stdout -count=4 '^  warn   partly run: inv:paid-before-shipped: '
+! stdout 'ship_test\.go'
+! stdout 'order_test\.go'
+
+# a receipt the shell script emits itself satisfies the script, and no other claimant
+exec machinery run -- sh e2e/ship.sh
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 3 of 6 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+! stdout 'e2e/ship\.sh'
+stdout -count=3 '^  warn   partly run: inv:paid-before-shipped: '
+
+# the others are excused with a reason, by their files: every claimant is then satisfied or
+# excused, and none is left out of the count
+exec sh -c 'cat base.yaml sources.part excused.part > machinery.yaml'
+gitcommit 'excuse the files that cannot run here'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
+exec machinery run -- sh e2e/ship.sh
+exec mrun 1 verify
+! stdout 'partly run'
+stdout '^  warn   excused: inv:paid-before-shipped: proven \(3 claimant\(s\) excused\)$'
+stdout '^  warn   adapter excused: entry 1 \(tests e2e/misnamed/late_tests\.go\): 1 claimant\(s\) of 1 id\(s\): a draft, not a test yet$'
+stdout '^  warn   adapter excused: entry 2 \(tests e2e/support/\*\.go\): 1 claimant\(s\) of 1 id\(s\): a helper that names the invariant it supports$'
+stdout '^  warn   adapter excused: entry 3 \(tests e2e/staged/\*\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\): staged by the nightly wrapper$'
+
+-- broken.go.txt --
+package misnamed
+
+import "testing"
+
+// TestShipMisnamed claims the invariant from a file go test does not read as a test file.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipMisnamed(t *testing.T {
+}
+-- misnamed.go.txt --
+package misnamed
+
+import (
+	"os"
+	"testing"
+)
+
+// TestShipMisnamed claims the invariant. SHOP_MISNAMED=fail fails it, when it runs.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipMisnamed(t *testing.T) {
+	if os.Getenv("SHOP_MISNAMED") == "fail" {
+		t.Fatal("an unpaid order shipped")
+	}
+}
+-- late.go.txt --
+package misnamed
+
+import "testing"
+
+// TestShipLate is a second test in a file that is not named as a test file.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipLate(t *testing.T) {}
+-- shipping.go.txt --
+// Package support holds what the shipping tests share.
+//
+// machinery:verifies inv:paid-before-shipped
+package support
+
+// Unpaid is the order no test may ship.
+func Unpaid() string { return "pending" }
+-- cases.go.txt --
+package cases
+
+import "testing"
+
+// TestShipStaged is copied into place by a wrapper before go test.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipStaged(t *testing.T) {}
+-- ship.sh.txt --
+#!/bin/sh
+# A test in another language, which emits its own receipt.
+#
+# machinery:verifies inv:paid-before-shipped
+set -eu
+[ -n "${MACHINERY_RECEIPTS:-}" ] || exit 0
+printf '{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/ship.sh","observed":"ship from Pending refused"}\n' >> "$MACHINERY_RECEIPTS"
+-- sources.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/stage/cases"
+        files: ["e2e/staged/*.go"]
+-- excused.part --
+    excused:
+      - tests: ["e2e/misnamed/late_tests.go"]
+        reason: "a draft, not a test yet"
+      - tests: ["e2e/support/*.go"]
+        reason: "a helper that names the invariant it supports"
+      - tests: ["e2e/staged/*.go"]
+        functions: ["TestShip*"]
+        reason: "staged by the nightly wrapper"
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

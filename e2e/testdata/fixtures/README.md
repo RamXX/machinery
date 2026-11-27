@@ -103,7 +103,9 @@ obligations, 9 vital ids, 2 candidates.
 
 Laid over `shop`: an ordinary Go suite, package `example.test/shop/e2e/suite`, whose tests emit
 no receipt and name the ids they verify in comments. It is run for real by the scripts of the
-run adapter (section 10.3).
+run adapter (section 10.3). Its `e2e/orders.sh` replaces the one of `shop`: it claims and emits
+the transition cases only, which the adapter never proves, so the Go suite is the only claimant
+of every other id and a script that wants a second claimant adds its own file.
 
 | File | Test functions | Claims |
 |---|---|---|

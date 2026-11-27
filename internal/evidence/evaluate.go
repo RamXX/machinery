@@ -18,8 +18,8 @@ const (
 	Partial  = "partial"
 	Failed   = "failed"
 	Unproven = "unproven"
-	// PartlyRun: adapter evidence would prove the id, and a claimant of it
-	// has no pass at the commit (section 10.3); neither proven nor failed
+	// PartlyRun: an adapter pass is used for the id, and a claimant of it is
+	// not satisfied at the commit (section 10.3); neither proven nor failed
 	PartlyRun = "partly run"
 )
 
@@ -225,7 +225,7 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	ev.HasEvidence = len(ev.Runs) > 0
 	ev.NReceipts = len(recs)
 	ev.Obligations = len(d.Obligations)
-	claimed, err := claimedOnly(p, d, recs, add)
+	claimed, cl, err := claimedOnly(p, d, recs, add)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	counted, held := admitted(p, d, claimed) // section 10.3
 	j := Judge(d, counted)
 	ev.states, ev.receipts = j.States, j.Receipts
-	if err := ev.everyClaimant(p, d, add); err != nil {
+	if err := ev.everyClaimant(p, d, cl, add); err != nil {
 		return nil, err
 	}
 	ev.adapter, ev.notCounted = map[string]string{}, map[string]NotCounted{}
@@ -306,12 +306,14 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	return ev, nil
 }
 
-// everyClaimant applies the rule of every claimant to the ids adapter
-// evidence alone proves (section 10.3): with evidence.adapter.claims all, an
-// id is proven only when every claimant of it that is not excused has an
-// adapter pass at the commit. A fail stands, and a receipt a test emitted
-// proves its id whatever the claimants say.
-func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add func(report.Severity, string, ...any)) error {
+// everyClaimant applies the rule of every claimant (section 10.3): with
+// evidence.adapter.claims all, an id for which a counted adapter pass is used
+// is proven only when every claimant of it that is not excused is satisfied
+// at the commit, by an adapter pass or by a pass its own test emitted. A fail
+// stands, and an id without a counted adapter pass is judged by the receipts
+// tests emit, as before. cl resolves the file of an emitted receipt; nil
+// when there is no receipt.
+func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *claims, add func(report.Severity, string, ...any)) error {
 	ev.partly, ev.excusedOK, ev.noClaimant = map[string]Partly{}, map[string]int{}, map[string]int{}
 	if !p.Cfg.AdapterClaimsAll() || (len(ev.passes) == 0 && len(p.Cfg.AdapterExcused()) == 0) {
 		return nil
@@ -320,23 +322,35 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add fu
 	if err != nil {
 		return err
 	}
-	for _, u := range cs.unreadable {
-		add(report.Error, "%s", u)
-	}
 	for _, u := range cs.uses {
 		add(report.Warn, "%s", u)
 	}
 	for _, pr := range cs.problems {
 		add(report.Error, "%s", pr)
 	}
+	// (a) the adapter passes and skips, by claimant; (b) the files whose own
+	// test emitted a pass
 	passed, skipped := map[string]map[Claimant]bool{}, map[string]map[Claimant]bool{}
-	for id, rs := range ev.receiptsOf(SourceAdapter) {
+	emitted, used := map[string]map[string]bool{}, map[string]bool{}
+	for id, rs := range ev.receipts {
 		for _, r := range rs {
+			switch {
+			case r.Source != SourceAdapter:
+				if file := cl.fileOf(r.Test); r.Outcome == Pass && file != "" {
+					if emitted[id] == nil {
+						emitted[id] = map[string]bool{}
+					}
+					emitted[id][file] = true
+				}
+				continue
+			case r.Outcome == Pass:
+				used[id] = true // a pass the policy lets count
+			case r.Outcome != Skip:
+				continue
+			}
 			m := skipped
 			if r.Outcome == Pass {
 				m = passed
-			} else if r.Outcome != Skip {
-				continue
 			}
 			if m[id] == nil {
 				m[id] = map[Claimant]bool{}
@@ -357,25 +371,30 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add fu
 		}
 		open, excused := cs.open(o.ID)
 		st := ev.states[o.ID]
-		byAd := st == Proven && byAdapter(o, ev.receipts[o.ID]) != ""
 		switch {
-		case st == Failed, st == Proven && !byAd:
-		case len(open) == 0: // no claimant can run here
+		case st == Failed:
+		case len(open) == 0: // no claimant can run here: the receipts tests emit decide
+			if st == Proven && byAdapter(o, ev.receipts[o.ID]) == "" {
+				break
+			}
 			ev.noClaimant[o.ID] = excused
-			if byAd {
+			if st == Proven {
 				ev.states[o.ID] = Unproven
 			}
-		case !byAd:
+		case !used[o.ID]: // no adapter evidence: not under the rule
 		default:
-			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}}
-			for _, cl := range open {
-				_, bad := cs.broken[cl.File] // never passed (section 10.3)
+			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}, Unjudged: map[Claimant]string{}}
+			for _, c := range open {
+				why, cannot := cs.unjudged[claimUnit{ID: o.ID, File: c.File, Func: c.Func}]
 				switch {
-				case passed[o.ID][cl] && !bad:
+				case passed[o.ID][c] && !cannot, emitted[o.ID][c.File]:
 					pr.Passed++
 				default:
-					pr.Missing = append(pr.Missing, cl)
-					pr.Skipped[cl] = skipped[o.ID][cl]
+					pr.Missing = append(pr.Missing, c)
+					pr.Skipped[c] = skipped[o.ID][c]
+					if cannot {
+						pr.Unjudged[c] = why
+					}
 				}
 			}
 			switch {
@@ -390,31 +409,18 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add fu
 	return nil
 }
 
-// receiptsOf returns the receipts of a source by id.
-func (ev *Evaluation) receiptsOf(source string) map[string][]Receipt {
-	res := map[string][]Receipt{}
-	for id, rs := range ev.receipts {
-		for _, r := range rs {
-			if r.Source == source {
-				res[id] = append(res[id], r)
-			}
-		}
-	}
-	return res
-}
-
 // claimedOnly reports, once per id and test, every receipt whose test names
 // no test file that claims its id (section 10.2), and drops those among them
 // that could prove: a pass, unless it is a replay that fails its trace. A
 // fail is never dropped. A receipt for an id that is no obligation is kept:
 // Judge names it.
-func claimedOnly(p *project.Project, d *design.Design, recs []Receipt, add func(report.Severity, string, ...any)) ([]Receipt, error) {
+func claimedOnly(p *project.Project, d *design.Design, recs []Receipt, add func(report.Severity, string, ...any)) ([]Receipt, *claims, error) {
 	if len(recs) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	cl, err := newClaims(p, d)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	expect := map[string]string{}
 	for _, t := range d.Traces {
@@ -438,7 +444,7 @@ func claimedOnly(p *project.Project, d *design.Design, recs []Receipt, add func(
 		}
 		res = append(res, r)
 	}
-	return res, nil
+	return res, cl, nil
 }
 
 // Judgment is the state of every obligation from one set of receipts.

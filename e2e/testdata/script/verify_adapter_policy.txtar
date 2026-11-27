@@ -40,7 +40,8 @@ stdout '^  ERROR  unproven: inv:paid-before-shipped; adapter evidence does not c
 exec mrun 1 verify --story shop-k1
 stdout '^  warn   adapter: inv:paid-before-shipped not counted: '
 # a receipt the test emits after its own assertions satisfies it
-exec machinery run -- sh e2e/orders.sh
+cp paid.sh.txt .machinery/paid.sh
+exec machinery run -- sh .machinery/paid.sh
 exec mrun 1 story shop-k1
 ! stdout 'unproven: inv:paid-before-shipped'
 ! stdout 'adapter evidence'
@@ -162,6 +163,10 @@ machinery:scope internal/domain/**
 -- k3.txt --
 machinery:ids sc:customer-pays-and-the-order-ships
 machinery:scope internal/domain/**
+-- paid.sh.txt --
+#!/bin/sh
+# Stands in for TestShipNeedsPayment emitting its own receipt after its assertions.
+printf '{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"ship from Pending refused"}\n' >> "$MACHINERY_RECEIPTS"
 -- risk.yaml --
 version: 1
 areas:

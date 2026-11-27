@@ -66,19 +66,22 @@ stdout '"test":"e2e/suite/outage_test.go","observed":"go test: all 1 test functi
 exec machinery owed sync --prune-only
 stdout '^owed: 1 kept, 0 added, 1 removed$'
 
-# an id that a receipt emitted by a test proves is not in the adapter's class
+# an id that a receipt emitted by a test proves is not in the adapter's class: the shell script
+# emits for the transition cases, and the test of paid before shipped emits its own receipt
 exec machinery run -- sh e2e/orders.sh
+cp paid.sh.txt .machinery/paid.sh
+exec machinery run -- sh .machinery/paid.sh
 exec machinery status
-stdout '^proven: 15 \(1 by adapter at file granularity\)  partial: 1  failed: 0  owed: 1  unproven and not owed: 0$'
+stdout '^proven: 15 \(2 by adapter at function granularity, 3 by adapter at file granularity\)  partial: 1  failed: 0  owed: 1  unproven and not owed: 0$'
 exec machinery verify
-stdout ', 15 proven, 1 by adapter at file granularity, 1 partial, 1 owed, '
+stdout ', 15 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, 1 partial, 1 owed, '
 # one line per adapter run: two environments at the same commit are no finding
 stdout -count=2 '^  warn   adapter environment: '
 stdout '^  warn   adapter environment: .*, GOFLAGS "-p=2", GOWORK "", '
 stdout '^passed$'
 exec machinery proof --ids inv:paid-before-shipped
 ! stdout '^adapter:'
-stdout '^  inv:paid-before-shipped -> orders\.sh -> pass: ship from Pending refused$'
+stdout '^  inv:paid-before-shipped -> e2e/suite/order_test\.go::TestShipNeedsPayment -> pass: ship from Pending refused$'
 
 # go test ./... with -p 4: the events of the packages interleave and the packages without test
 # files end with skip; each package is one complete run
@@ -88,6 +91,10 @@ exec machinery run --adapter go-test-json -- go test -count=1 -p 4 ./...
 stderr '^machinery run: adapter go-test-json: 3 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
 
+-- paid.sh.txt --
+#!/bin/sh
+# Stands in for TestShipNeedsPayment emitting its own receipt after its assertions.
+printf '{"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"ship from Pending refused"}\n' >> "$MACHINERY_RECEIPTS"
 -- want-receipts.jsonl --
 {"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"pass","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique passed","source":"adapter","granularity":"function","tags":[]}
 {"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":[]}

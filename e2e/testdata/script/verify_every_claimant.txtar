@@ -22,8 +22,6 @@ stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/ext
 stdout '^  warn   partly run: sc:customer-pays-and-the-order-ships: no verdict: e2e/extra/file_test\.go$'
 ! stdout 'unproven: inv:paid-before-shipped'
 ! stdout 'unproven: sc:customer-pays-and-the-order-ships'
-# a file-level marker in a file without a test function, and a marker above a benchmark, are no
-# claimants: their ids are proven by the suite alone
 ! stdout 'inv:customer-email-unique'
 ! stdout 'inv:terminal-is-final'
 ! stdout 'more claimant'
@@ -71,8 +69,8 @@ exec machinery status --no-backlog
 ! stdout '^partly run'
 
 # a claiming file that cannot be read as Go, in a package the command does not name, is a
-# claimant that never passes: the line scan still finds its marker, the id is partly run in
-# verify, status, proof and the story gate, and verify and check name the file
+# claimant the adapter cannot judge: the line scan still finds its marker, the id is partly run
+# in verify, status, proof and the story gate, and verify names the file with the parse error
 mkdir e2e/broken
 cp broken_test.go.txt e2e/broken/broken_test.go
 gitcommit 'a claimant in a file that does not parse'
@@ -81,9 +79,9 @@ stderr '^machinery run: adapter: e2e/broken/broken_test\.go: cannot be read as G
 stderr '^machinery run: adapter: partly run: 1 id\(s\): 2 of 3 claimants passed in this run$'
 exec mrun 1 verify
 stdout '^checked: 16 obligations, 4 proven, 2 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 1 partly run, 2 owed, 7 receipts$'
-stdout '^  ERROR  claimant: e2e/broken/broken_test\.go: cannot be read as Go \(10:3: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/broken/broken_test\.go$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/broken/broken_test\.go: cannot be judged by the adapter \(cannot be read as Go: 10:3: expected ''\}'', found ''EOF''\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+! stdout 'no verdict: e2e/broken'
 ! stdout 'unproven: inv:paid-before-shipped'
 exec machinery status --no-backlog
 stdout '^partly run: 1 \(inv 1\): 2 of 3 claimants passed$'
@@ -91,14 +89,13 @@ exec mrun 1 proof --ids inv:paid-before-shipped
 stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 2 of 3 claimants passed\)$'
 exec mrun 1 story shop-c1
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-exec mrun 1 check --stage trace
-stdout '^  ERROR  claimant: e2e/broken/broken_test\.go: cannot be read as Go \(10:3: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
-# an entry of evidence.adapter.excused never covers it
+# it is a file claimant like any other: an entry of evidence.adapter.excused without functions
+# covers it, with a reason
 cp broken-excused.yaml machinery.yaml
 exec mrun 1 verify --allow-dirty
-stdout '^  ERROR  adapter excused: entry 1: tests "e2e/broken/\*_test\.go" covers no claimant: e2e/broken/broken_test\.go cannot be read as Go, and a claimant that cannot be read as Go is never excused: fix the file$'
-stdout '^  warn   adapter excused: entry 1 \(tests e2e/broken/\*_test\.go\): 0 claimant\(s\) of 0 id\(s\): the broken package runs elsewhere$'
-stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   adapter excused: entry 1 \(tests e2e/broken/\*_test\.go\): 1 claimant\(s\) of 1 id\(s\): the broken package runs elsewhere$'
+stdout '^  warn   excused: inv:paid-before-shipped: proven \(1 claimant\(s\) excused\)$'
+! stdout 'partly run: inv:paid-before-shipped'
 exec git checkout -q machinery.yaml
 # a file under trace.tests that cannot be read at all hides its markers: the commands that read
 # them fail, and nothing is judged without it
@@ -130,14 +127,6 @@ exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:paid-before-shipped: skipped: e2e/extra/extra_test\.go::TestShipAgain$'
 ! stdout 'no verdict: e2e/extra/extra_test\.go::TestShipAgain'
-
-# a receipt a test emits itself proves its id whatever the adapter claimants say
-rm .machinery/receipts
-exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
-exec machinery run -- sh e2e/orders.sh
-exec machinery verify
-! stdout 'partly run'
-stdout '^passed$'
 
 # past ten missing claimants verify names the first ten; --partly names every one
 rm .machinery/receipts
@@ -237,23 +226,6 @@ package extra
 import "testing"
 
 func TestPayAgain(t *testing.T) {}
--- e2e/extra/helper_test.go --
-package extra
-
-// A file-level marker in a file without a test function: no claimant.
-//
-// machinery:verifies inv:customer-email-unique
-
-func ship() string { return "ship" }
--- e2e/extra/bench_test.go --
-package extra
-
-import "testing"
-
-// BenchmarkFinal is no claimant: the adapter does not judge a benchmark.
-//
-// machinery:verifies inv:terminal-is-final
-func BenchmarkFinal(b *testing.B) {}
 -- broken_test.go.txt --
 package broken
 

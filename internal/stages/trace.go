@@ -94,9 +94,6 @@ func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
 	for _, msg := range layout {
 		s.Errorf("adapter: %s", msg)
 	}
-	for _, msg := range evidence.UnreadableClaimants(p, d, found) { // section 10.3
-		s.Errorf("%s", msg)
-	}
 
 	for _, msg := range d.OwedProblems {
 		s.Errorf("%s", msg)

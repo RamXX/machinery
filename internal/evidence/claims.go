@@ -54,27 +54,45 @@ func newClaims(p *project.Project, d *design.Design) (*claims, error) {
 }
 
 // unclaimed returns "" when the test of the receipt names a test file that
-// claims its id, and otherwise what is wrong and what to do about it. The
-// test is <file> or <file>::<name>; the file is a project-relative path, or
-// a base name that exactly one test file has.
+// claims its id, and otherwise what is wrong and what to do about it.
 func (c *claims) unclaimed(r Receipt) string {
 	if !c.set {
 		return "trace.tests is not set: list the test files there in machinery.yaml"
 	}
-	name, _, _ := strings.Cut(r.Test, "::")
-	file := name
-	if !c.files[name] {
-		switch same := c.byBase[name]; len(same) {
-		case 1:
-			file = same[0]
-		case 0:
-			return fmt.Sprintf("no file under trace.tests is named %s: write test as <path of the test file> or <path>::<name>", name)
-		default:
-			return fmt.Sprintf("%d files under trace.tests are named %s: write the path in test", len(same), name)
-		}
+	file, why := c.resolve(r.Test)
+	if why != "" {
+		return why
 	}
 	if !c.ids[file][r.ID] {
 		return fmt.Sprintf("add machinery:verifies %s to %s, or emit the receipt from the test that claims it", r.ID, file)
 	}
 	return ""
+}
+
+// resolve returns the test file the test of a receipt names, or why it names
+// none. The test is <file> or <file>::<name>; the file is a project-relative
+// path, or a base name that exactly one test file has (section 10.2).
+func (c *claims) resolve(test string) (file, why string) {
+	name, _, _ := strings.Cut(test, "::")
+	if c.files[name] {
+		return name, ""
+	}
+	switch same := c.byBase[name]; len(same) {
+	case 1:
+		return same[0], ""
+	case 0:
+		return "", fmt.Sprintf("no file under trace.tests is named %s: write test as <path of the test file> or <path>::<name>", name)
+	default:
+		return "", fmt.Sprintf("%d files under trace.tests are named %s: write the path in test", len(same), name)
+	}
+}
+
+// fileOf returns the test file the test of a receipt names by that rule, or
+// "" when it names none. A nil c knows no file.
+func (c *claims) fileOf(test string) string {
+	if c == nil {
+		return ""
+	}
+	file, _ := c.resolve(test)
+	return file
 }
