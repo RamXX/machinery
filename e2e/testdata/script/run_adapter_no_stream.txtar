@@ -1,0 +1,136 @@
+# a streams run that reads no stream is not a success; --allow-no-streams accepts a wrapper that
+# may run nothing; --keep-streams keeps every stream the run read; the whole-project line of a run
+# that wrote no receipt counts only the ids without evidence at the commit (section 10.3)
+fixture shop
+fixture shop-gotests
+cp mapped.yaml machinery.yaml
+exec machinery gen
+gitinit
+
+# both flags go with --streams
+exec mrun 2 run --adapter go-test-json --allow-no-streams -- go test ./e2e/suite
+stderr '^usage: --allow-no-streams needs --streams: it is about the streams a wrapper leaves; add --streams or leave it out$'
+exec mrun 2 run --adapter go-test-json --keep-streams .machinery/kept -- go test ./e2e/suite
+stderr '^usage: --keep-streams needs --streams: it keeps the streams a wrapper leaves; add --streams or leave it out$'
+! exists .machinery/receipts
+
+# a wrapper that clears the environment never sees MACHINERY_GO_TEST_JSON: its go test runs, no
+# stream is written, and the run exits 1
+exec mrun 1 run --adapter go-test-json --streams -- env -i PATH=$PATH HOME=$HOME GOCACHE=$GOCACHE GOMODCACHE=$GOMODCACHE GOPATH=$GOPATH sh run-suite.sh
+stdout '^run-suite: 2 go test run\(s\), exit 0$'
+stderr '^machinery run: adapter go-test-json: no stream was written to MACHINERY_GO_TEST_JSON: the command ran no go test, or it cleared the environment \(env -i\) before starting one; pass --allow-no-streams if it may run nothing$'
+! stderr 'no stream in MACHINERY_GO_TEST_JSON'
+stderr '^machinery run: \.machinery/receipts/[0-9TZ.]+-[0-9a-f]{7}\.jsonl \(exit 1\)$'
+# the run is complete and its end line has the exit of the command; it proves nothing
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '^\{"v":1,"type":"end","exit":0,"finished":"[^"]+","adapter_receipts":0\}$'
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
+
+# a command that fails keeps its own exit code
+rm .machinery/receipts
+exec mrun 3 run --adapter go-test-json --streams -- sh -c 'exit 3'
+stderr 'no stream was written to MACHINERY_GO_TEST_JSON'
+
+# with --allow-no-streams a run without a stream exits with the command's code
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams --allow-no-streams -- sh -c 'echo nothing to run'
+stderr '^machinery run: adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven$'
+stderr '\(exit 0\)$'
+stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, '
+
+# the whole-project line of a run that wrote no receipt leaves out the ids that another run at
+# the commit has evidence for
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/suite.json"'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, '
+exec machinery run --adapter go-test-json --streams --allow-no-streams -- true
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, '
+exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+exec machinery run --adapter go-test-json --streams --allow-no-streams -- true
+stderr '^machinery run: adapter: in the whole project: 0 claimed id\(s\) not run, 0 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
+# a run that wrote receipts counts as before: every claimed id it did not run
+exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/suite.json"'
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, '
+
+# --keep-streams copies every stream the run read into <dir>/<run id>/ before the directory of
+# the streams is removed, and the header names it
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams --keep-streams .machinery/kept -- sh keep.sh
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: streams kept in \.machinery/kept/[0-9TZ.]+-[0-9a-f]{7}: 2 file\(s\)$'
+exec sh -c 'ls .machinery/kept/*/'
+cmp stdout want-kept.txt
+exec sh -c 'basename .machinery/receipts/*.jsonl .jsonl'
+cp stdout .machinery/want-id.txt
+exec ls .machinery/kept
+cmp stdout .machinery/want-id.txt
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"adapter":"go-test-json","streams_kept":"\.machinery/kept/[0-9TZ.]+-[0-9a-f]{7}"\}$'
+exec sh -c 'grep -c "\"Package\":\"example.test/shop/stage/suite\"" .machinery/kept/*/1-plain.json'
+stdout '^[1-9][0-9]*$'
+# a directory git ignores leaves the tree clean
+exec mrun 1 verify
+! stdout 'uncommitted'
+stdout '^checked: 16 obligations, 6 proven, '
+
+# an absolute directory inside the project is recorded by its project-relative path
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams --keep-streams $WORK/.machinery/abs -- sh keep.sh
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"streams_kept":"\.machinery/abs/[0-9TZ.]+-[0-9a-f]{7}"\}$'
+
+# a stream that leaves the run incomplete is kept all the same
+rm .machinery/receipts
+rm .machinery/kept
+exec mrun 1 run --adapter go-test-json --streams --keep-streams .machinery/kept -- sh broken.sh
+stderr 'stream 2-broken\.jsonl: line 2: not a go test -json event; the run is left incomplete'
+exec sh -c 'ls .machinery/kept/*/'
+stdout '^1-good\.json$'
+stdout '^2-broken\.jsonl$'
+
+-- want-kept.txt --
+1-plain.json
+2-faults.json
+-- keep.sh --
+#!/bin/sh
+# the suite, and a note beside its streams that is no stream
+set -eu
+sh run-suite.sh
+echo "a note" > "$MACHINERY_GO_TEST_JSON/notes.txt"
+-- broken.sh --
+#!/bin/sh
+set -eu
+go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/1-good.json"
+printf '{"Action":"start","Package":"example.test/shop/e2e/suite"}\nFAIL example.test/shop/e2e/suite\n' > "$MACHINERY_GO_TEST_JSON/2-broken.jsonl"
+-- mapped.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/stage/**"
+        files: ["e2e/suite/*_test.go"]
+      - package: "example.test/shop/e2e/suite"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

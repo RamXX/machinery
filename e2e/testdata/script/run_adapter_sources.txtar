@@ -13,14 +13,15 @@ stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 # the staged package has no candidate: no claim is of a package of the run
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
 stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
-stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in package\(s\) no file under trace\.tests belongs to: example\.test/shop/staged/suite \(6\); with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
 
 # with the map the verdict of a staged function goes to the file that defines it
 cp mapped.yaml machinery.yaml
 gitcommit 'map the staged package'
 exec machinery run --adapter go-test-json --streams -- sh staged.sh
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
-! stderr 'in no file under'
+! stderr 'no file under trace\.tests belongs to'
+! stderr 'defined in no candidate file'
 exec sh -c 'grep -h inv:paid-before-shipped .machinery/receipts/*.jsonl'
 stdout '"test":"e2e/suite/order_test.go::TestShipNeedsPayment"'
 exec mrun 1 verify
@@ -48,9 +49,11 @@ gitcommit 'the map names a file outside trace.tests'
 exec machinery run --adapter go-test-json --streams -- sh staged-extra.sh
 stderr '^machinery run: adapter: example\.test/shop/staged/suite\.TestShipNeedsPayment: defined in drafts/dup_test\.go, e2e/suite/order_test\.go: ambiguous: '
 stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
-# and a function only such a file defines has its verdict in no file under trace.tests
+# and a function only such a file defines has its verdict in no file under trace.tests: the
+# summary names it with that file
 stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
-stderr '^machinery run: adapter: 1 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; '
+stderr '^machinery run: adapter: example\.test/shop/staged/suite: Test[A-Za-z]+: defined only in drafts/extra_test\.go, which is not under trace\.tests: its verdict counts nothing; list the file in trace\.tests$'
+! stderr 'no file under trace\.tests belongs to'
 rm drafts
 cp mapped.yaml machinery.yaml
 gitcommit 'back to the map'
@@ -69,7 +72,7 @@ cp e2e/suite/email_test.go staged/suite/email_test.go
 cp e2e/suite/scenario_test.go staged/suite/scenario_test.go
 exec machinery run --adapter go-test-json -- go test ./staged/suite
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; a package.s verdicts go to the files under trace\.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence\.adapter\.sources$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in package\(s\) no file under trace\.tests belongs to: example\.test/shop/staged/suite \(6\); a package.s verdicts go to the files under trace\.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence\.adapter\.sources$'
 rm staged
 
 # the verifier's case: an entry that names only the claiming file of a directory under

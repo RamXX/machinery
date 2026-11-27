@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/RamXX/machinery/internal/affected"
 	"github.com/RamXX/machinery/internal/backlog"
 	"github.com/RamXX/machinery/internal/evidence"
@@ -19,6 +21,7 @@ func runVerify(e *Env, args []string) int {
 	targeted := fs.Bool("affected", false, "report unproven only for the ids a change touches")
 	base := fs.String("base", "", "git ref for --affected")
 	story := fs.String("story", "", "judge only the ids of a backlog story")
+	partly := fs.Bool("partly", false, "name every claimant without a pass of a partly run id, and the tests whose subtests differ between runs")
 	if !e.Parse(fs, args) {
 		return 2
 	}
@@ -53,7 +56,12 @@ func runVerify(e *Env, args []string) int {
 		if err != nil {
 			return e.Fail(err)
 		}
-		return report.PrintAll(e.Stdout, "verify", []*report.Stage{stages.VerifyStage(affected.Restrict(ev, ids))})
+		only := map[string]bool{}
+		for _, id := range ids {
+			only[id] = true
+		}
+		hints(e, ev, only, *partly)
+		return report.PrintAll(e.Stdout, "verify", []*report.Stage{stages.VerifyStage(affected.Restrict(ev, ids), only, *partly)})
 	case *story != "":
 		c, err := backlog.New(p, "")
 		if err != nil {
@@ -74,7 +82,33 @@ func runVerify(e *Env, args []string) int {
 			s.Errorf("%v", err)
 			return report.PrintAll(e.Stdout, "verify", []*report.Stage{s})
 		}
-		return report.PrintAll(e.Stdout, "verify", []*report.Stage{pm.StoryVerify(d, ev, ids)})
+		only := map[string]bool{}
+		for _, id := range ids {
+			only[id] = true
+		}
+		hints(e, ev, only, *partly)
+		return report.PrintAll(e.Stdout, "verify", []*report.Stage{pm.StoryVerify(d, ev, ids, *partly)})
 	}
-	return report.PrintAll(e.Stdout, "verify", []*report.Stage{stages.Verify(ctx, *allowDirty)})
+	ev, err := evidence.Evaluate(p, ctx.Design(), *allowDirty)
+	if err != nil {
+		s := report.New("verify")
+		s.Errorf("%v", err)
+		return report.PrintAll(e.Stdout, "verify", []*report.Stage{s})
+	}
+	hints(e, ev, nil, *partly)
+	return report.PrintAll(e.Stdout, "verify", []*report.Stage{stages.VerifyStage(ev, nil, *partly)})
+}
+
+// hints prints, with --partly, the tests whose subtest count differs between
+// runs at the commit, on stderr: a hint, not a finding (section 12).
+func hints(e *Env, ev *evidence.Evaluation, only map[string]bool, partly bool) {
+	if !partly {
+		return
+	}
+	if len(only) == 0 {
+		only = nil
+	}
+	for _, h := range ev.SubtestHints(only) {
+		fmt.Fprintf(e.Stderr, "machinery verify: hint: %s\n", h)
+	}
 }

@@ -19,7 +19,8 @@ stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
 stderr '^machinery run: adapter: claimed, verdict not counted: 1 id\(s\)$'
 stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions$'
 stderr -count=1 ambiguous
-! stderr 'in no file under'
+! stderr 'no file under trace\.tests belongs to'
+! stderr 'defined in no candidate file'
 exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
 exec mrun 1 verify
 stdout ', 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, '

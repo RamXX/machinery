@@ -17,7 +17,8 @@ stdout '^sets: 2 set\(s\), exit 0$'
 stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 3 test function\(s\) with a verdict: 3 passed, 0 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 3 pass, 0 fail, 0 skip$'
 ! stderr 'ambiguous'
-! stderr 'in no file under'
+! stderr 'no file under trace\.tests belongs to'
+! stderr 'defined in no candidate file'
 # the claims of the suite and of the notes file are of no package of the run: they count only in
 # the project-wide line, the notes file among the claiming files with no test function
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
@@ -29,7 +30,13 @@ stdout '"id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/testdata/set
 stdout '"id":"inv:terminal-is-final","outcome":"pass","test":"e2e/testdata/sets/orders/orders\.go::TestShipOnce"'
 exec mrun 1 verify
 ! stdout 'does not claim it'
-stdout ', 3 proven, 3 by adapter at function granularity, '
+# the suite claims the same ids and did not run: every claimant of them must pass, so each is
+# partly run, the pass of its set counted among its claimants
+stdout '^checked: 16 obligations, 0 proven, 0 partial, 3 partly run, 2 owed, 3 receipts$'
+stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 2 claimants passed$'
+stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/email_test\.go::TestEmailUnique$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: inv:terminal-is-final: 1 of 2 claimants passed$'
 
 # Relabeling the Package field of go test -json events gives the same receipts as test2json -p.
 exec bash latest-receipts.sh
@@ -117,7 +124,8 @@ exec mrun 1 run --adapter go-test-json --streams -- sh more.sh
 env MORE_FAILS_IN=
 stderr '^machinery run: adapter: TestEmailUnique: failed in package\(s\) example\.test/shop/stage/x, so read as failed in e2e/more/more_test\.go, e2e/suite/email_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
-! stderr 'in no file under'
+! stderr 'no file under trace\.tests belongs to'
+! stderr 'defined in no candidate file'
 exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
 stdout '"outcome":"fail","test":"e2e/more/more_test\.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
 stdout '"outcome":"fail","test":"e2e/suite/email_test\.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
@@ -152,7 +160,8 @@ env EXTRA_FAILS_IN=
 stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 8 test function\(s\) with a verdict: 7 passed, 1 failed, 0 skipped$'
 stderr '^machinery run: adapter: TestExtra: failed in package\(s\) example\.test/shop/e2e/suite, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
-! stderr 'in no file under'
+! stderr 'no file under trace\.tests belongs to'
+! stderr 'defined in no candidate file'
 exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 stdout -count=1 receipt
 stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra failed"'

@@ -24,16 +24,20 @@ exec sh -c '! grep -q "\"tags\":\\[" .machinery/receipts/*.jsonl'
 exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
 stdout '"outcome":"pass","test":"e2e/suite/outage_test.go"'
 exec mrun 1 verify
-stdout '^checked: 16 obligations, 6 proven, 3 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
+# e2e/again claims inv:terminal-is-final too and did not run: every claimant must pass
+stdout '^checked: 16 obligations, 5 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 1 partly run, 2 owed, 6 receipts$'
+stdout '^  ERROR  partly run: inv:terminal-is-final: 1 of 2 claimants passed$'
+stdout '^  warn   partly run: inv:terminal-is-final: no verdict: e2e/again/again_test\.go::TestSettlesOnce$'
 stdout '^  ERROR  stale owed entry: fm:payment-provider-down is proven$'
 # machinery did not run go: the run records no go environment
 stdout '^  warn   adapter environment: \.machinery/receipts/[^:]+\.jsonl: not recorded: the command ran through --streams$'
 
-# no stream: the command ran nothing the adapter can read. A file of another name is not read.
-# The directory is machinery's own, it starts empty, and it is gone after the run
+# no stream, from a command that may run nothing (--allow-no-streams): the command ran nothing the
+# adapter can read. A file of another name is not read. The directory is machinery's own, it starts
+# empty, and it is gone after the run
 rm .machinery/receipts
 env MACHINERY_GO_TEST_JSON=/nonexistent
-exec machinery run --adapter go-test-json --streams -- sh -c 'ls -A "$MACHINERY_GO_TEST_JSON" | wc -l; echo "$MACHINERY_GO_TEST_JSON" > .machinery/dir.txt; echo notes > "$MACHINERY_GO_TEST_JSON/notes.txt"'
+exec machinery run --adapter go-test-json --streams --allow-no-streams -- sh -c 'ls -A "$MACHINERY_GO_TEST_JSON" | wc -l; echo "$MACHINERY_GO_TEST_JSON" > .machinery/dir.txt; echo notes > "$MACHINERY_GO_TEST_JSON/notes.txt"'
 env MACHINERY_GO_TEST_JSON=
 stdout '^ *0$'
 stderr '^machinery run: adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven$'
@@ -270,7 +274,8 @@ stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
 ! stdout 'failed: sc:customer-pays-and-the-order-ships'
-stdout '^checked: 16 obligations, 5 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, '
+# (inv:terminal-is-final is partly run: its claimant in e2e/again did not run)
+stdout '^checked: 16 obligations, 4 proven, 1 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 1 partly run, '
 
 # a stream cut short, here because the test killed the go command that wrote it, names a package
 # with no end event: the run is left incomplete
@@ -364,7 +369,9 @@ rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh once.sh
 stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous: '
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; '
+stderr -count=6 '^machinery run: adapter: example\.test/shop/e2e/suite: Test[A-Za-z]+: defined in no candidate file; if it is staged from another directory, give that set its own name$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite: TestShipNeedsPayment: defined in no candidate file; '
+! stderr 'no file under trace\.tests belongs to'
 exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
 
 # without an entry for its package a verdict finds no file, also in the package's own directory
@@ -373,7 +380,8 @@ cp unmapped.yaml machinery.yaml
 gitcommit 'no map'
 exec machinery run --adapter go-test-json --streams -- sh once.sh
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
+stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in package\(s\) no file under trace\.tests belongs to: example\.test/shop/e2e/suite \(6\); with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
+! stderr 'defined in no candidate file'
 
 -- sub.sh --
 #!/bin/sh

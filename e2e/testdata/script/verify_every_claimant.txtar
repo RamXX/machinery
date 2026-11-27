@@ -1,0 +1,294 @@
+# adapter evidence proves an id only when every claimant of it under trace.tests has a pass at
+# the commit. A claimant without one leaves the id partly run: not proven and not failed
+# (sections 10.3, 11.2, 12, 13, 14 and 15.6)
+fixture shop
+fixture shop-gotests
+cp all.yaml machinery.yaml
+exec machinery gen
+gitinit
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-c1 --title 'Prove paid before shipped' --body-file c1.txt --silent
+
+# the suite runs, the second package does not: two ids have a claimant without a verdict
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: partly run: 2 id\(s\): 2 of 4 claimants passed in this run$'
+
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 3 proven, 2 by adapter at function granularity, 1 by adapter at file granularity, 0 partial, 2 partly run, 2 owed, 5 receipts$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: sc:customer-pays-and-the-order-ships: 1 of 2 claimants passed$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
+stdout '^  warn   partly run: sc:customer-pays-and-the-order-ships: no verdict: e2e/extra/file_test\.go$'
+! stdout 'unproven: inv:paid-before-shipped'
+! stdout 'unproven: sc:customer-pays-and-the-order-ships'
+# a file-level marker in a file without a test function, and a marker above a benchmark, are no
+# claimants: their ids are proven by the suite alone
+! stdout 'inv:customer-email-unique'
+! stdout 'inv:terminal-is-final'
+! stdout 'more claimant'
+
+exec machinery status --no-backlog
+stdout '^proven: 3 \(2 by adapter at function granularity, 1 by adapter at file granularity\)  partial: 0  failed: 0  owed: 2  unproven and not owed: 11$'
+stdout '^partly run: 2 \(sc 1, inv 1\): 2 of 4 claimants passed$'
+
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^  inv:paid-before-shipped -> e2e/suite/order_test\.go::TestShipNeedsPayment -> pass: go test: TestShipNeedsPayment passed$'
+stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 1 of 2 claimants passed\)$'
+! stdout '^adapter:'
+
+# the story gate treats it as not proven
+exec mrun 1 story shop-c1
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+! stdout 'unproven: inv:paid-before-shipped'
+exec mrun 1 verify --story shop-c1
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
+! stdout 'sc:customer-pays-and-the-order-ships'
+
+# owed sync does not prune a partly run id; owed, it is a warning
+cp owed-paid.yaml design/owed.yaml
+gitcommit 'paid before shipped is owed'
+exec machinery owed sync --prune-only
+stdout '^owed: 3 kept, 0 added, 0 removed$'
+exec mrun 1 verify
+stdout '^  warn   partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+! stdout 'ERROR  partly run: inv:paid-before-shipped'
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^  inv:paid-before-shipped \(partly run: 1 of 2 claimants passed, owed\)$'
+
+# the second package runs at the same commit: every claimant passed, the id is proven and pruned
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/extra
+stderr '^machinery run: adapter: receipts written: 2 pass, 0 fail, 0 skip$'
+# the summary speaks of this run alone: here the suite did not run
+stderr '^machinery run: adapter: partly run: 2 id\(s\): 2 of 4 claimants passed in this run$'
+exec machinery owed sync --prune-only
+stdout '^owed: 2 kept, 0 added, 1 removed$'
+exec mrun 1 verify
+! stdout 'partly run'
+stdout '^checked: 16 obligations, 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 2 owed, 7 receipts$'
+exec machinery status --no-backlog
+! stdout '^partly run'
+
+# a claimant with a fail fails the id, whatever the others passed
+env SHOP_AGAIN=fail
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/extra
+env SHOP_AGAIN=
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:paid-before-shipped \(e2e/extra/extra_test\.go::TestShipAgain\)$'
+! stdout 'partly run: inv:paid-before-shipped'
+
+# a receipt a test emits itself proves its id whatever the adapter claimants say
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+! stdout 'partly run'
+stdout '^passed$'
+
+# past ten missing claimants verify names the first ten; --partly names every one
+rm .machinery/receipts
+mkdir e2e/many
+cp many_test.go.txt e2e/many/many_test.go
+gitcommit 'twelve more claimants of the email invariant'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+stderr '^machinery run: adapter: partly run: 3 id\(s\): 3 of 17 claimants passed in this run$'
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 13 claimants passed$'
+stdout -count=10 '^  warn   partly run: [a-z:-]+: no verdict: '
+stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/many/many_test\.go::TestM01$'
+stdout '^  warn   partly run: 4 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
+! stdout 'TestShipAgain'
+exec mrun 1 verify --partly
+stdout -count=14 '^  warn   partly run: [a-z:-]+: no verdict: '
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
+! stdout 'more claimant'
+
+# claims: any is the rule of one claimant: any pass proves the id
+cp any.yaml machinery.yaml
+gitcommit 'adapter: any claimant'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+! stderr 'partly run'
+exec mrun 1 verify
+! stdout 'partly run'
+stdout '^checked: 16 obligations, 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 2 owed, 5 receipts$'
+
+# claims takes all or any
+cp bad-claims.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.claims must be all or any, got "some"$'
+
+-- c1.txt --
+machinery:ids inv:paid-before-shipped
+machinery:scope internal/domain/**
+-- owed-paid.yaml --
+version: 1
+owed:
+  - id: fm:payment-provider-down
+    reason: "no test induces a provider outage yet"
+  - id: inv:paid-before-shipped
+    reason: "the second claimant runs in another job"
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- e2e/extra/extra_test.go --
+package extra
+
+import (
+	"os"
+	"testing"
+)
+
+// TestShipAgain is a second claimant of the invariant, in a package of its own. SHOP_AGAIN=fail
+// fails it.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipAgain(t *testing.T) {
+	if os.Getenv("SHOP_AGAIN") == "fail" {
+		t.Fatal("an unpaid order shipped")
+	}
+}
+-- e2e/extra/file_test.go --
+package extra
+
+// The marker of this file stands above no function: the file is a claimant of the scenario.
+//
+// machinery:verifies sc:customer-pays-and-the-order-ships
+
+import "testing"
+
+func TestPayAgain(t *testing.T) {}
+-- e2e/extra/helper_test.go --
+package extra
+
+// A file-level marker in a file without a test function: no claimant.
+//
+// machinery:verifies inv:customer-email-unique
+
+func ship() string { return "ship" }
+-- e2e/extra/bench_test.go --
+package extra
+
+import "testing"
+
+// BenchmarkFinal is no claimant: the adapter does not judge a benchmark.
+//
+// machinery:verifies inv:terminal-is-final
+func BenchmarkFinal(b *testing.B) {}
+-- many_test.go.txt --
+package many
+
+import "testing"
+
+// machinery:verifies inv:customer-email-unique
+func TestM01(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM02(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM03(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM04(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM05(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM06(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM07(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM08(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM09(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM10(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM11(t *testing.T) {}
+
+// machinery:verifies inv:customer-email-unique
+func TestM12(t *testing.T) {}
+-- all.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- any.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    claims: any
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-claims.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    claims: some
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

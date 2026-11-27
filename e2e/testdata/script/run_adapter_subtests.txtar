@@ -1,0 +1,67 @@
+# a receipt for a claim satisfied through a parent test records how many subtests ran, and
+# verify --partly names the tests whose count differs between runs at the same commit: a hint,
+# not a finding (sections 10.3 and 12)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/rows
+exec sh -c 'grep -h TestCancelIsFinal .machinery/receipts/*.jsonl'
+stdout '"outcome":"pass","test":"e2e/suite/order_test\.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed \(subtests: 2\)","source":"adapter","granularity":"function","tags":\[\],"subtests":2\}$'
+# a file-level claim over a parent test counts the subtests of every function of the file
+exec sh -c 'grep -h e2e/rows/rows_test.go .machinery/receipts/*.jsonl'
+stdout '"observed":"go test: all 1 test function\(s\) of the file passed \(subtests: 3\)","source":"adapter","granularity":"file","tags":\[\],"subtests":3\}$'
+# a function without subtests records none
+exec sh -c 'grep -h TestShipNeedsPayment .machinery/receipts/*.jsonl'
+! stdout 'subtests'
+
+# the same parent with one case, then with none, at the same commit
+env SHOP_ROWS=paid
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/rows
+env SHOP_ROWS=none
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/rows
+env SHOP_ROWS=
+exec sh -c 'grep -h e2e/rows/rows_test.go "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+stdout '"observed":"go test: all 1 test function\(s\) of the file passed","source":"adapter","granularity":"file","tags":\[\]\}$'
+
+exec mrun 1 verify
+! stderr 'hint'
+! stdout 'subtests'
+exec mrun 1 verify --partly
+stderr '^machinery verify: hint: e2e/rows/rows_test\.go: subtests differ between runs at [0-9a-f]{7}: 3 in \.machinery/receipts/[^,]+\.jsonl, 1 in \.machinery/receipts/[^,]+\.jsonl, 0 in \.machinery/receipts/[^,]+\.jsonl$'
+! stderr 'TestCancelIsFinal'
+! stdout 'subtests'
+# the verify stage is what it was: the hint is not a finding
+stdout '^checked: 16 obligations, 5 proven, '
+
+# a receipt a test emits with subtests is refused
+rm .machinery/receipts
+exec machinery run -- sh -c 'cat forged.jsonl >> "$MACHINERY_RECEIPTS"'
+exec mrun 1 verify
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:terminal-is-final: source, granularity, tags and subtests are written only by the run adapter: a test that emits receipts leaves them out$'
+
+-- forged.jsonl --
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"orders.sh","observed":"typed","subtests":2}
+-- e2e/rows/rows_test.go --
+package rows
+
+// The marker of this file stands above no function: it waits for every function of the file.
+//
+// machinery:verifies sc:cancelled-order-refuses-payment
+
+import (
+	"os"
+	"strings"
+	"testing"
+)
+
+// TestRows runs the cases SHOP_ROWS names, every case when it is empty.
+func TestRows(t *testing.T) {
+	for _, row := range []string{"paid", "shipped", "cancelled"} {
+		if only := os.Getenv("SHOP_ROWS"); only != "" && !strings.Contains(only, row) {
+			continue
+		}
+		t.Run(row, func(t *testing.T) {})
+	}
+}

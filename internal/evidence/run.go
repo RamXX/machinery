@@ -36,6 +36,9 @@ type RunOptions struct {
 	// files the command leaves in a directory machinery makes and names in
 	// MACHINERY_GO_TEST_JSON.
 	Streams bool
+	// KeepStreams, with Streams, is an absolute directory: every stream read
+	// is copied into <KeepStreams>/<run id>/ (section 10.3).
+	KeepStreams string
 }
 
 // RunAdapter writes receipts from what a test command prints.
@@ -47,8 +50,10 @@ type RunAdapter interface {
 	Consume(stream io.Reader, out io.Writer) error
 	// Receipts returns the receipt lines to write, once the command is done.
 	Receipts() [][]byte
-	// ReadStreams reads the stream files of a directory instead of Consume.
-	ReadStreams(dir string) error
+	// ReadStreams reads the stream files of a directory instead of Consume,
+	// after copying them into keep when it is set; label is how the summary
+	// names keep.
+	ReadStreams(dir, keep, label string) error
 	// Environment is what the header records of the environment of the
 	// run, nil for nothing.
 	Environment() any
@@ -72,6 +77,8 @@ type header struct {
 	Adapter string   `json:"adapter,omitempty"`
 	// Environment is the go environment of a direct-mode adapter run (section 10.3)
 	Environment any `json:"environment,omitempty"`
+	// StreamsKept is where --keep-streams copies the streams of the run
+	StreamsKept string `json:"streams_kept,omitempty"`
 }
 
 type runTool struct {
@@ -142,6 +149,16 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	if opts.Adapter != nil {
 		h.Adapter, h.Environment = opts.Adapter.Name(), opts.Adapter.Environment()
 	}
+	keep := "" // the directory the streams of this run are kept in
+	if opts.Streams && opts.KeepStreams != "" {
+		keep = filepath.Join(opts.KeepStreams, strings.TrimSuffix(filepath.Base(file), ".jsonl"))
+		if err := os.MkdirAll(keep, 0o755); err != nil {
+			f.Close()
+			os.Remove(file)
+			return 1, "", fmt.Errorf("--keep-streams: %v", err)
+		}
+		h.StreamsKept = displayPath(p, keep)
+	}
 	head1 := jsonLine(h)
 	_, err = f.Write(head1)
 	f.Close()
@@ -209,7 +226,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	}
 	exit = exitCode(cmd.Wait())
 	if streamsDir != "" && streamErr == nil {
-		streamErr = opts.Adapter.ReadStreams(streamsDir)
+		streamErr = opts.Adapter.ReadStreams(streamsDir, keep, h.StreamsKept)
 	}
 	if streamErr != nil {
 		// nothing of this run counts: no receipt, no end line (section 10.3)
@@ -244,6 +261,22 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		err = finishEntry(p, file, ledgerEntry{Commit: head, Dir: ledgerDir(p)})
 	}
 	return exit, file, err
+}
+
+// displayPath names a path as a record does: project-relative inside the
+// project, links resolved, and absolute outside it.
+func displayPath(p *project.Project, abs string) string {
+	root, err := filepath.EvalSymlinks(p.Root)
+	if err != nil {
+		root = p.Root
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	if rel, in := inside(root, abs); in {
+		return rel
+	}
+	return abs
 }
 
 func isOwn(kv string) bool {

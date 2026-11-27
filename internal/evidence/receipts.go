@@ -40,6 +40,7 @@ type Receipt struct {
 	Source      string
 	Granularity string
 	Tags        any    // a list of build tags, or "unknown"
+	Subtests    int    // the subtests that ran under the claim's functions
 	File        string // project-relative receipts file
 }
 
@@ -77,6 +78,7 @@ type line struct {
 	Source      string `json:"source"`
 	Granularity string `json:"granularity"`
 	Tags        any    `json:"tags"`
+	Subtests    *int   `json:"subtests"`
 	// Adapter names the run adapter in a header; AdapterReceipts counts, on
 	// the end line, the lines that adapter wrote right before it (section 10.3)
 	Adapter         any    `json:"adapter"`
@@ -156,10 +158,13 @@ func parseFile(abs, rel string) (*fileData, error) {
 				addProblem(n, "%s", msg)
 				continue
 			}
-			recs = append(recs, parsed{n, Receipt{ID: l.ID, Outcome: l.Outcome, Test: l.Test,
+			r := Receipt{ID: l.ID, Outcome: l.Outcome, Test: l.Test,
 				Effects: l.Effects, Observed: l.Observed, Replay: l.Replay,
-				Source: l.Source, Granularity: l.Granularity, Tags: l.Tags, File: rel},
-				l.Source != "" || l.Granularity != "" || l.Tags != nil})
+				Source: l.Source, Granularity: l.Granularity, Tags: l.Tags, File: rel}
+			if l.Subtests != nil {
+				r.Subtests = *l.Subtests
+			}
+			recs = append(recs, parsed{n, r, l.Source != "" || l.Granularity != "" || l.Tags != nil || l.Subtests != nil})
 		case "end":
 			if l.Exit == nil {
 				addProblem(n, "end line without exit")
@@ -189,7 +194,7 @@ func parseFile(abs, rel string) (*fileData, error) {
 	}
 	for _, p := range recs {
 		if p.adapter && !byAdapter[p.n] {
-			addProblem(p.n, "%s: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out", p.r.ID)
+			addProblem(p.n, "%s: source, granularity, tags and subtests are written only by the run adapter: a test that emits receipts leaves them out", p.r.ID)
 			continue
 		}
 		fd.Receipts = append(fd.Receipts, p.r)
@@ -219,6 +224,15 @@ func checkReceipt(l *line) string {
 		return fmt.Sprintf("%s: granularity without source: adapter", l.ID)
 	}
 	return ""
+}
+
+// ReceiptCount returns the number of receipt lines a receipts file holds.
+func ReceiptCount(abs string) (int, error) {
+	fd, err := parseFile(abs, abs)
+	if err != nil {
+		return 0, err
+	}
+	return len(fd.Receipts), nil
 }
 
 // Dir returns the project-relative receipts directory without a trailing slash.

@@ -44,7 +44,7 @@ stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
 stdout '"adapter_receipts":0\}$'
 exec mrun 1 verify
-stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:customer-email-unique: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:customer-email-unique: source, granularity, tags and subtests are written only by the run adapter: a test that emits receipts leaves them out$'
 stdout '^  ERROR  unproven: inv:customer-email-unique$'
 stdout '^checked: 17 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
 

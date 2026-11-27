@@ -1,0 +1,144 @@
+# the verdicts the adapter could give to no file under trace.tests, in two kinds: those of
+# packages no file belongs to, counted per package and every package named, and those of a
+# package with candidates that none of its candidate files defines, each named (section 10.3)
+fixture shop
+fixture shop-gotests
+cp streams.yaml machinery.yaml
+exec machinery gen
+gitinit
+
+# a staged set that also stages a test from another directory loses that test's verdict, and
+# says which; the packages of the unit tests have no entry, and every one of them is named
+exec machinery run --adapter go-test-json --streams -- sh set.sh
+stderr '^machinery run: adapter: 7 test function\(s\) with a verdict are in package\(s\) no file under trace\.tests belongs to: example\.test/shop/unit/a \(2\), example\.test/shop/unit/b \(1\), example\.test/shop/unit/c \(1\), example\.test/shop/unit/d \(1\), example\.test/shop/unit/e \(1\), example\.test/shop/unit/f \(1\); with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
+stderr '^machinery run: adapter: example\.test/shop/stage/set: TestOther: defined in no candidate file; if it is staged from another directory, give that set its own name$'
+! stderr 'and [0-9]+ more'
+! stderr 'in no file under trace\.tests'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
+# direct mode: a function of the package's directory whose file trace.tests does not list
+cp direct.yaml machinery.yaml
+gitcommit 'trace.tests lists the suite file by file'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./unit/...
+stderr '^machinery run: adapter: 7 test function\(s\) with a verdict are in package\(s\) no file under trace\.tests belongs to: example\.test/shop/unit/a \(2\), example\.test/shop/unit/b \(1\), example\.test/shop/unit/c \(1\), example\.test/shop/unit/d \(1\), example\.test/shop/unit/e \(1\), example\.test/shop/unit/f \(1\); a package.s verdicts go to the files under trace\.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence\.adapter\.sources$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite: TestUnlisted: defined in no candidate file; list its file in trace\.tests, or run a package built from copies through --streams$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
+-- set.sh --
+#!/bin/sh
+# stages the suite, and a test of another directory with it, as one set; runs the unit tests too
+set -u
+rm -rf stage
+mkdir -p stage/set
+cp e2e/suite/*_test.go stage/set/
+cp e2e/other/other_test.go stage/set/
+sed -i.bak 's/^package other$/package suite/' stage/set/other_test.go
+rm -f stage/set/other_test.go.bak
+status=0
+go test -json -count=1 ./stage/set > "$MACHINERY_GO_TEST_JSON/set.json" || status=$?
+go test -json -count=1 ./unit/... > "$MACHINERY_GO_TEST_JSON/unit.json" || status=$?
+rm -rf stage
+exit $status
+-- e2e/other/other_test.go --
+package other
+
+import "testing"
+
+// TestOther is kept here and staged into the set of the suite.
+//
+// machinery:verifies inv:terminal-is-final
+func TestOther(t *testing.T) {}
+-- e2e/suite/unlisted_test.go --
+package suite
+
+import "testing"
+
+// TestUnlisted is in the directory of the suite, in a file trace.tests does not list in direct.yaml.
+func TestUnlisted(t *testing.T) {}
+-- unit/a/a_test.go --
+package a
+
+import "testing"
+
+func TestA1(t *testing.T) {}
+
+func TestA2(t *testing.T) {}
+-- unit/b/b_test.go --
+package b
+
+import "testing"
+
+func TestB(t *testing.T) {}
+-- unit/c/c_test.go --
+package c
+
+import "testing"
+
+func TestC(t *testing.T) {}
+-- unit/d/d_test.go --
+package d
+
+import "testing"
+
+func TestD(t *testing.T) {}
+-- unit/e/e_test.go --
+package e
+
+import "testing"
+
+func TestE(t *testing.T) {}
+-- unit/f/f_test.go --
+package f
+
+import "testing"
+
+func TestF(t *testing.T) {}
+-- streams.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/stage/set"
+        files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- direct.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/suite/order_test.go", "e2e/suite/email_test.go", "e2e/suite/scenario_test.go", "e2e/suite/outage_test.go", "e2e/other/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

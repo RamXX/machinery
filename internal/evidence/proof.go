@@ -169,13 +169,19 @@ func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra
 		if line := criterion(d, ev, id, st); line != "" {
 			fmt.Fprintf(w, "  %s\n", line)
 		}
-		if st == Partial || st == Unproven || isOwed {
+		if st == Partial || st == Unproven || st == PartlyRun || isOwed {
 			label := st
+			if pr, ok := ev.Partly(id); ok {
+				label += ": " + pr.Text()
+			}
 			if isOwed {
 				label += ", owed"
 			}
 			if _, held := ev.AdapterNotCounted(id); held {
 				label += ", adapter pass not counted"
+			}
+			if _, none := ev.NoClaimant(id); none {
+				label += ", no claimant can run here"
 			}
 			notProven = append(notProven, fmt.Sprintf("%s (%s)", id, label))
 		}
@@ -237,7 +243,11 @@ func criterion(d *design.Design, ev *Evaluation, id, st string) string {
 	r, label := pick(d, o, st, rs)
 	line := fmt.Sprintf("%s -> %s -> %s: %s", id, r.Test, label, r.Observed)
 	if g := ev.ByAdapter(id); g != "" && st == Proven {
-		line += fmt.Sprintf(" (by adapter at %s granularity)", g)
+		if n := ev.ExcusedOf(id); n > 0 {
+			line += fmt.Sprintf(" (by adapter at %s granularity, %d claimant(s) excused)", g, n)
+		} else {
+			line += fmt.Sprintf(" (by adapter at %s granularity)", g)
+		}
 	}
 	if st == Proven && d.IsOver(id) {
 		line += " " + design.ProofAwaited // section 23.2

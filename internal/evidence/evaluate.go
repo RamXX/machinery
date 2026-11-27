@@ -18,6 +18,9 @@ const (
 	Partial  = "partial"
 	Failed   = "failed"
 	Unproven = "unproven"
+	// PartlyRun: adapter evidence would prove the id, and a claimant of it
+	// has no pass at the commit (section 10.3); neither proven nor failed
+	PartlyRun = "partly run"
 )
 
 // Undetermined is the expect value of a trace no replay can prove.
@@ -54,6 +57,8 @@ type Evaluation struct {
 	// alone proves, by granularity (section 10.3).
 	NByFunction int
 	NByFile     int
+	// NPartlyRun counts the ids that are partly run (section 10.3).
+	NPartlyRun int
 
 	d        *design.Design
 	states   map[string]string
@@ -62,6 +67,16 @@ type Evaluation struct {
 	// notCounted: an id that is not proven -> its adapter pass that does not count
 	adapter    map[string]string
 	notCounted map[string]NotCounted
+	// the rule of every claimant (section 10.3): the ids partly run, the
+	// proven ones with claimants excused and the ids no claimant of which
+	// can run here, with how many are excused
+	partly     map[string]Partly
+	excusedOK  map[string]int
+	noClaimant map[string]int
+	// seen: the ids a receipt of a usable run names; passes: the adapter
+	// passes of those runs
+	seen   map[string]bool
+	passes []Receipt
 }
 
 // State returns the state of an obligation id, or "" when it is not one.
@@ -210,16 +225,28 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 	ev.HasEvidence = len(ev.Runs) > 0
 	ev.NReceipts = len(recs)
 	ev.Obligations = len(d.Obligations)
-	counted, err := claimedOnly(p, d, recs, add)
+	claimed, err := claimedOnly(p, d, recs, add)
 	if err != nil {
 		return nil, err
 	}
-	counted, held := admitted(p, d, counted) // section 10.3
+	ev.seen = map[string]bool{}
+	for _, r := range claimed {
+		ev.seen[r.ID] = true
+		if r.Source == SourceAdapter && r.Outcome == Pass {
+			ev.passes = append(ev.passes, r)
+		}
+	}
+	counted, held := admitted(p, d, claimed) // section 10.3
 	j := Judge(d, counted)
 	ev.states, ev.receipts = j.States, j.Receipts
+	if err := ev.everyClaimant(p, d, add); err != nil {
+		return nil, err
+	}
 	ev.adapter, ev.notCounted = map[string]string{}, map[string]NotCounted{}
 	for id, n := range held {
-		if ev.states[id] != Proven {
+		_, partly := ev.partly[id]
+		_, none := ev.noClaimant[id]
+		if ev.states[id] != Proven && !partly && !none {
 			ev.notCounted[id] = n
 			add(report.Warn, "adapter: %s not counted: a test that names it passed (%s granularity); %s", id, n.Granularity, n.Why)
 		}
@@ -248,17 +275,128 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 			}
 		case Partial:
 			ev.NPartial++
+		case PartlyRun:
+			ev.NPartlyRun++
 		case Failed:
 			ev.NFailed++
 		}
-		if (st == Unproven || st == Partial) && !isOwed {
+		none, noneOK := ev.noClaimant[o.ID]
+		if st != Unproven {
+			noneOK = false
+		}
+		sev := report.Warn // what an owed id is told
+		if !isOwed {
+			sev = report.Error
+		}
+		if (st == Unproven || st == Partial || st == PartlyRun) && !isOwed {
 			ev.NUnowed++
-			if ev.HasEvidence {
-				add(report.Error, "unproven: %s", o.ID)
-			}
+		}
+		switch {
+		case !ev.HasEvidence:
+		case st == PartlyRun:
+			add(sev, "partly run: %s: %s", o.ID, ev.partly[o.ID].Text())
+		case noneOK:
+			add(sev, "no claimant can run here: %s: %d claimant(s) excused", o.ID, none)
+		case (st == Unproven || st == Partial) && !isOwed:
+			add(report.Error, "unproven: %s", o.ID)
+		case st == Proven && ev.excusedOK[o.ID] > 0:
+			add(report.Warn, "excused: %s: proven (%d claimant(s) excused)", o.ID, ev.excusedOK[o.ID])
 		}
 	}
 	return ev, nil
+}
+
+// everyClaimant applies the rule of every claimant to the ids adapter
+// evidence alone proves (section 10.3): with evidence.adapter.claims all, an
+// id is proven only when every claimant of it that is not excused has an
+// adapter pass at the commit. A fail stands, and a receipt a test emitted
+// proves its id whatever the claimants say.
+func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add func(report.Severity, string, ...any)) error {
+	ev.partly, ev.excusedOK, ev.noClaimant = map[string]Partly{}, map[string]int{}, map[string]int{}
+	if !p.Cfg.AdapterClaimsAll() || (len(ev.passes) == 0 && len(p.Cfg.AdapterExcused()) == 0) {
+		return nil
+	}
+	cs, err := readClaimants(p, d)
+	if err != nil {
+		return err
+	}
+	for _, u := range cs.uses {
+		add(report.Warn, "%s", u)
+	}
+	for _, pr := range cs.problems {
+		add(report.Error, "%s", pr)
+	}
+	passed, skipped := map[string]map[Claimant]bool{}, map[string]map[Claimant]bool{}
+	for id, rs := range ev.receiptsOf(SourceAdapter) {
+		for _, r := range rs {
+			m := skipped
+			if r.Outcome == Pass {
+				m = passed
+			} else if r.Outcome != Skip {
+				continue
+			}
+			if m[id] == nil {
+				m[id] = map[Claimant]bool{}
+			}
+			m[id][claimantOf(r)] = true
+		}
+	}
+	for _, r := range ev.passes { // a pass the policy does not count still passed
+		if passed[r.ID] == nil {
+			passed[r.ID] = map[Claimant]bool{}
+		}
+		passed[r.ID][claimantOf(r)] = true
+	}
+	for i := range d.Obligations {
+		o := &d.Obligations[i]
+		if !contains(project.AdapterKinds, o.Kind) || len(cs.of[o.ID]) == 0 {
+			continue
+		}
+		open, excused := cs.open(o.ID)
+		st := ev.states[o.ID]
+		byAd := st == Proven && byAdapter(o, ev.receipts[o.ID]) != ""
+		switch {
+		case st == Failed, st == Proven && !byAd:
+		case len(open) == 0: // no claimant can run here
+			ev.noClaimant[o.ID] = excused
+			if byAd {
+				ev.states[o.ID] = Unproven
+			}
+		case !byAd:
+		default:
+			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}}
+			for _, cl := range open {
+				switch {
+				case passed[o.ID][cl]:
+					pr.Passed++
+				default:
+					pr.Missing = append(pr.Missing, cl)
+					pr.Skipped[cl] = skipped[o.ID][cl]
+				}
+			}
+			switch {
+			case pr.Passed < pr.Of:
+				ev.states[o.ID] = PartlyRun
+				ev.partly[o.ID] = pr
+			case excused > 0:
+				ev.excusedOK[o.ID] = excused
+			}
+		}
+	}
+	return nil
+}
+
+// receiptsOf returns the receipts of a source by id.
+func (ev *Evaluation) receiptsOf(source string) map[string][]Receipt {
+	res := map[string][]Receipt{}
+	for id, rs := range ev.receipts {
+		for _, r := range rs {
+			if r.Source == source {
+				res[id] = append(res[id], r)
+			}
+		}
+	}
+	return res
 }
 
 // claimedOnly reports, once per id and test, every receipt whose test names

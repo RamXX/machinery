@@ -17,7 +17,8 @@ stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
 # a tc id needs the effects its test observed: the adapter never writes one
 stderr '^machinery run: adapter: needs a receipt with effects: 1 tc id\(s\)$'
 ! stderr 'verdict not counted'
-! stderr 'in no file under'
+! stderr 'no file under trace\.tests belongs to'
+! stderr 'defined in no candidate file'
 stderr '^machinery run: \.machinery/receipts/[0-9TZ.]+-[0-9a-f]{7}\.jsonl \(exit 0\)$'
 
 # the header has the command as it ran and names the adapter
@@ -90,6 +91,6 @@ stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
 -- want-receipts.jsonl --
 {"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"pass","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique passed","source":"adapter","granularity":"function","tags":[]}
 {"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":[]}
-{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed","source":"adapter","granularity":"function","tags":[]}
+{"v":1,"type":"receipt","id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal passed (subtests: 2)","source":"adapter","granularity":"function","tags":[],"subtests":2}
 {"v":1,"type":"receipt","id":"sc:cancelled-order-refuses-payment","outcome":"pass","test":"e2e/suite/scenario_test.go","observed":"go test: all 2 test function(s) of the file passed","source":"adapter","granularity":"file","tags":[]}
 {"v":1,"type":"receipt","id":"sc:customer-pays-and-the-order-ships","outcome":"pass","test":"e2e/suite/scenario_test.go","observed":"go test: all 2 test function(s) of the file passed","source":"adapter","granularity":"file","tags":[]}

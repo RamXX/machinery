@@ -62,6 +62,11 @@ type GoTest struct {
 	replay   map[string]bool // claimed cx ids
 	// unjudged holds claims above functions the adapter does not judge.
 	unjudged map[claimUnit]bool
+	// claimants are those of every id under trace.tests, for the rule of
+	// every claimant (section 10.3)
+	claimants *claimants
+	// AllowNoStreams: with streams, a run that reads no stream is no failure
+	AllowNoStreams bool
 
 	// streams are the event streams read: the command's standard output, or
 	// with fromDir the files the command left in MACHINERY_GO_TEST_JSON
@@ -69,6 +74,16 @@ type GoTest struct {
 	fromDir  bool
 	summary  []string
 	receipts [][]byte
+	// kept: the streams copied for --keep-streams, and where (as the header
+	// names it)
+	kept   int
+	keptAt string
+	// wrote counts the receipts written; whole is the index of the
+	// whole-project line in summary, idleAll the ids it counts as not run
+	wrote    int
+	whole    int
+	idleAll  []string
+	emptyAll int
 
 	// env is the go environment of a direct-mode run, recorded in the
 	// header; gomod is the go.mod go env names
@@ -99,6 +114,8 @@ type goPackage struct {
 	verdicts map[string][]string // test function -> its pass, fail and skip events
 	started  map[string]int      // test function -> its run events, one per iteration
 	subs     map[string]string   // test function -> the worst verdict of its subtests, fail or skip
+	// subNames: test function -> the subtests with a verdict, at any depth
+	subNames map[string]map[string]bool
 }
 
 // NewGoTest reads the command and the claims of the test files, and refuses
@@ -134,17 +151,8 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 	entries := p.Cfg.AdapterSources()
 	// with streams a Go file an entry names under trace.tests is a test
 	// source whatever its name: one the project stages before go test
-	staged := func(rel string) bool {
-		if !streams || !strings.HasSuffix(rel, ".go") {
-			return false
-		}
-		for _, s := range entries {
-			if !s.Dir && project.Match(s.Files, rel) {
-				return true
-			}
-		}
-		return false
-	}
+	isStaged := stagedSource(p)
+	staged := func(rel string) bool { return streams && isStaged(rel) }
 	if a.files, err = readGoTests(p, files, staged); err != nil {
 		return nil, err
 	}
@@ -194,46 +202,10 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 	if err != nil {
 		return nil, err
 	}
-	ids, scenarios := d.DeclaredIDs(), d.ScenarioIDs()
-	seen := map[claimUnit]bool{}
-	for _, t := range found {
-		if t.Kind != tags.Verifies {
-			continue
-		}
-		for _, tok := range t.IDs {
-			for _, id := range tags.Resolve(t, tok, ids, scenarios) {
-				o := d.Obligation(id)
-				switch {
-				case o == nil:
-				case o.Kind == "tc":
-					a.effects[id] = true
-				case o.Kind == "cx":
-					a.replay[id] = true
-				case contains(project.AdapterKinds, o.Kind):
-					fn, test := a.files[t.File].owner(t.Line)
-					u := claimUnit{ID: id, File: t.File, Func: fn}
-					if fn != "" && !test {
-						a.unjudged[u] = true
-						continue
-					}
-					if !seen[u] {
-						seen[u] = true
-						a.units = append(a.units, u)
-					}
-				}
-			}
-		}
+	a.units, a.unjudged, a.effects, a.replay = readClaims(d, a.files, found)
+	if a.claimants, err = readClaimants(p, d); err != nil {
+		return nil, err
 	}
-	sort.Slice(a.units, func(i, j int) bool {
-		x, y := a.units[i], a.units[j]
-		if x.ID != y.ID {
-			return x.ID < y.ID
-		}
-		if x.File != y.File {
-			return x.File < y.File
-		}
-		return x.Func < y.Func
-	})
 	if !streams {
 		if err := a.checkLayout(ClaimingGoTests(d, found)); err != nil {
 			return nil, err
@@ -585,17 +557,28 @@ const StreamsEnv = "MACHINERY_GO_TEST_JSON"
 
 // ReadStreams reads every .json and .jsonl file directly in dir as one
 // stream, in the order of their names. A file that is not a well-formed
-// stream is an error: nothing of the run counts.
-func (a *GoTest) ReadStreams(dir string) error {
+// stream is an error: nothing of the run counts. With keep, every such file
+// is first copied into that directory (--keep-streams), named by label.
+func (a *GoTest) ReadStreams(dir, keep, label string) error {
 	entries, err := os.ReadDir(dir) // sorted by name
 	if err != nil {
 		return err
 	}
+	var names []string
 	for _, e := range entries {
-		name := e.Name()
-		if !e.Type().IsRegular() || !(strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".jsonl")) {
-			continue
+		if name := e.Name(); e.Type().IsRegular() && (strings.HasSuffix(name, ".json") || strings.HasSuffix(name, ".jsonl")) {
+			names = append(names, name)
 		}
+	}
+	if keep != "" {
+		for _, name := range names {
+			if err := copyFile(filepath.Join(dir, name), filepath.Join(keep, name)); err != nil {
+				return fmt.Errorf("--keep-streams: %v", err)
+			}
+		}
+		a.kept, a.keptAt = len(names), label
+	}
+	for _, name := range names {
 		data, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			return err
@@ -627,10 +610,19 @@ func (a *GoTest) ReadStreams(dir string) error {
 	return nil
 }
 
+// copyFile copies a file whole.
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o644)
+}
+
 func isVerdict(action string) bool { return action == Pass || action == Fail || action == Skip }
 
 func newRun() *goPackage {
-	return &goPackage{verdicts: map[string][]string{}, started: map[string]int{}, subs: map[string]string{}}
+	return &goPackage{verdicts: map[string][]string{}, started: map[string]int{}, subs: map[string]string{}, subNames: map[string]map[string]bool{}}
 }
 
 func (s *goStream) read(ev goEvent) {
@@ -681,6 +673,10 @@ func (pkg *goPackage) read(ev goEvent) {
 		if ev.Action == Fail || (ev.Action == Skip && pkg.subs[parent] != Fail) {
 			pkg.subs[parent] = ev.Action
 		}
+		if pkg.subNames[parent] == nil {
+			pkg.subNames[parent] = map[string]bool{}
+		}
+		pkg.subNames[parent][ev.Test] = true
 	case verdict:
 		pkg.verdicts[ev.Test] = append(pkg.verdicts[ev.Test], ev.Action)
 	}
@@ -707,6 +703,7 @@ type adapterReceipt struct {
 	Source      string `json:"source"`
 	Granularity string `json:"granularity"`
 	Tags        any    `json:"tags"` // the build tags, or "unknown"
+	Subtests    int    `json:"subtests,omitempty"`
 }
 
 // Receipts joins the stream to the claims and returns the receipt lines, in
@@ -737,14 +734,31 @@ func (a *GoTest) Receipts() [][]byte {
 	// function of it has a run event there (section 10.3)
 	unran := map[string]bool{}
 	unrun := map[string]map[string]bool{}
-	var passed, failed, skipped, homeless, nameless int
+	var passed, failed, skipped, nameless int
 	var ambiguous, refused, differ []string
-	lost := map[string]bool{} // packages with a verdict that found no file
+	// a verdict that found no file: by package when no file under
+	// trace.tests belongs to the package, by name when one does (section 10.3)
+	lostIn := map[string]int{}
+	var undefined, outside []string
+	lose := func(pkg, fn string, defs []string, cands map[string]bool) {
+		switch {
+		case len(defs) == 1 && cands[defs[0]]: // a candidate outside trace.tests
+			outside = append(outside, fmt.Sprintf("adapter: %s: %s: defined only in %s, which is not under trace.tests: its verdict counts nothing; list the file in trace.tests", pkg, fn, defs[0]))
+		case a.mapped(pkg):
+			undefined = append(undefined, pkg+": "+fn)
+		default:
+			lostIn[pkg]++
+		}
+	}
 	// with streams a fail goes by name (section 10.3): the packages each
 	// function failed in, whether it had a fail event, and the fails the
 	// mapping found no file for
 	failedIn, failEvent := map[string]map[string]bool{}, map[string]bool{}
-	type pkgFn struct{ pkg, fn string }
+	type pkgFn struct {
+		pkg, fn string
+		defs    []string
+		cands   map[string]bool
+	}
 	var unplaced []pkgFn
 	names := map[string]bool{}
 	for _, s := range a.streams {
@@ -754,6 +768,7 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 	}
 	raw := map[string]map[string][2]string{} // file -> function -> its verdict and the package it came from
+	subCount := map[string]map[string]int{}  // file -> function -> how many subtests ran (section 10.3)
 	for _, name := range sortedKeys(names) {
 		// what each run of each stream says of the package. A pass replayed
 		// from the cache is not read; every other verdict of every run is
@@ -766,9 +781,21 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 		read := map[string][]seen{}
 		replayed := map[string]bool{}
+		subsOf := map[string]map[string]bool{} // function -> its subtests with a verdict, in runs not answered from the cache
 		for _, s := range a.streams {
 			for _, pkg := range s.pkgs[name] {
 				cached = cached || pkg.cached
+				for fn, subs := range pkg.subNames {
+					if pkg.cached {
+						continue
+					}
+					if subsOf[fn] == nil {
+						subsOf[fn] = map[string]bool{}
+					}
+					for sub := range subs {
+						subsOf[fn][sub] = true
+					}
+				}
 				notOK = notOK || pkg.end == Fail || (pkg.end != Pass && len(pkg.verdicts) > 0)
 				for fn, vs := range pkg.verdicts {
 					for _, v := range vs {
@@ -912,15 +939,20 @@ func (a *GoTest) Receipts() [][]byte {
 				} else if verdict != "" {
 					raw[file][fn] = [2]string{verdict, name}
 				}
+				if n := len(subsOf[fn]); n > 0 {
+					if subCount[file] == nil {
+						subCount[file] = map[string]int{}
+					}
+					subCount[file][fn] = max(subCount[file][fn], n)
+				}
 				set(file, fn, st)
 				if st == stFail {
 					markFail(file)
 				}
 			case st == stFail && a.fromDir:
-				unplaced = append(unplaced, pkgFn{name, fn}) // it may still go by name, below
+				unplaced = append(unplaced, pkgFn{name, fn, defs, cands}) // it may still go by name, below
 			default:
-				homeless++
-				lost[name] = true
+				lose(name, fn, defs, cands)
 			}
 		}
 		if a.fromDir && suppressed > 0 {
@@ -994,8 +1026,7 @@ func (a *GoTest) Receipts() [][]byte {
 	}
 	for _, u := range unplaced {
 		if !placed[u.fn] {
-			homeless++
-			lost[u.pkg] = true
+			lose(u.pkg, u.fn, u.defs, u.cands)
 		}
 	}
 	for _, name := range sortedKeys(silentBy) {
@@ -1030,6 +1061,7 @@ func (a *GoTest) Receipts() [][]byte {
 	// function that did not run (any claim, for idleAll), a claim met a
 	// verdict that does not count
 	has, idle, idleAll, held := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
+	passedBy, failedID := map[string]map[Claimant]bool{}, map[string]bool{}
 	var lines [][]byte
 	for _, u := range a.units {
 		f := a.files[u.File]
@@ -1077,6 +1109,12 @@ func (a *GoTest) Receipts() [][]byte {
 			if u.Func != "" {
 				r.Observed = "go test: " + u.Func + " passed"
 			}
+			for _, fn := range funcs { // a claim satisfied through a parent test says how many subtests ran
+				r.Subtests += subCount[u.File][fn]
+			}
+			if r.Subtests > 0 {
+				r.Observed += fmt.Sprintf(" (subtests: %d)", r.Subtests)
+			}
 		case stFail:
 			r.Outcome = Fail
 			switch {
@@ -1102,16 +1140,47 @@ func (a *GoTest) Receipts() [][]byte {
 		wrote[r.Outcome]++
 		has[u.ID] = true
 		lines = append(lines, jsonLine(r))
+		switch r.Outcome {
+		case Pass:
+			if passedBy[u.ID] == nil {
+				passedBy[u.ID] = map[Claimant]bool{}
+			}
+			passedBy[u.ID][Claimant{File: u.File, Func: u.Func}] = true
+		case Fail:
+			failedID[u.ID] = true
+		}
 	}
-	var notRun, notCounted, notRunAll int
+	a.wrote = len(lines)
+	// partly run in this run: an id with a pass and no fail here, and a
+	// claimant that is not excused without a pass here (section 10.3)
+	var partly, partlyPassed, partlyOf int
+	if a.p.Cfg.AdapterClaimsAll() {
+		for _, id := range sortedKeys(passedBy) {
+			open, _ := a.claimants.open(id)
+			if failedID[id] || len(open) == 0 {
+				continue
+			}
+			n := 0
+			for _, cl := range open {
+				if passedBy[id][cl] {
+					n++
+				}
+			}
+			if n < len(open) {
+				partly, partlyPassed, partlyOf = partly+1, partlyPassed+n, partlyOf+len(open)
+			}
+		}
+	}
+	var notRun, notCounted int
 	for id := range idle {
 		if !has[id] {
 			notRun++
 		}
 	}
-	for id := range idleAll {
+	a.idleAll = nil
+	for _, id := range sortedKeys(idleAll) {
 		if !has[id] {
-			notRunAll++
+			a.idleAll = append(a.idleAll, id)
 		}
 	}
 	for id := range held {
@@ -1125,8 +1194,12 @@ func (a *GoTest) Receipts() [][]byte {
 	counted := ""
 	if a.fromDir {
 		counted = fmt.Sprintf("%d stream(s), ", len(a.streams))
-		if len(a.streams) == 0 {
+		switch {
+		case len(a.streams) > 0:
+		case a.AllowNoStreams:
 			a.summary = append(a.summary, fmt.Sprintf("adapter %s: no stream in %s: the command ran nothing the adapter can read, and nothing is proven", GoTestJSON, StreamsEnv))
+		default: // a run that reads no stream is not a success (section 10.3)
+			a.summary = append(a.summary, fmt.Sprintf("adapter %s: no stream was written to %s: the command ran no go test, or it cleared the environment (env -i) before starting one; pass --allow-no-streams if it may run nothing", GoTestJSON, StreamsEnv))
 		}
 	}
 	if !a.fromDir || len(a.streams) > 0 {
@@ -1139,13 +1212,13 @@ func (a *GoTest) Receipts() [][]byte {
 		claiming[u.File] = true
 	}
 	var empty, broken []string
-	emptyAll := 0
+	a.emptyAll = 0
 	for _, rel := range sortedKeys(claiming) {
 		switch f := a.files[rel]; {
 		case f.Broken:
 			broken = append(broken, fmt.Sprintf("adapter: %s: not Go source that parses; its claims count nothing", rel))
 		case len(f.Funcs) == 0:
-			emptyAll++
+			a.emptyAll++
 			if scope[rel] {
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims count nothing", rel))
 			}
@@ -1154,23 +1227,43 @@ func (a *GoTest) Receipts() [][]byte {
 	a.summary = append(a.summary,
 		fmt.Sprintf("adapter: receipts written: %d pass, %d fail, %d skip", wrote[Pass], wrote[Fail], wrote[Skip]),
 		fmt.Sprintf("adapter: claimed, not run: %d id(s)", notRun),
-		fmt.Sprintf("adapter: in the whole project: %d claimed id(s) not run, %d claiming file(s) with no test function, %d claim(s) above functions the adapter does not judge", notRunAll, emptyAll, len(a.unjudged)),
 	)
+	a.whole = len(a.summary)
+	a.summary = append(a.summary, a.wholeLine(nil))
 	add := func(n int, format string) {
 		if n > 0 {
 			a.summary = append(a.summary, fmt.Sprintf(format, n))
 		}
 	}
+	if partly > 0 {
+		a.summary = append(a.summary, fmt.Sprintf("adapter: partly run: %d id(s): %d of %d claimants passed in this run", partly, partlyPassed, partlyOf))
+	}
 	add(notCounted, "adapter: claimed, verdict not counted: %d id(s)")
 	add(len(a.effects), "adapter: needs a receipt with effects: %d tc id(s)")
 	add(len(a.replay), "adapter: needs a receipt with a replay: %d cx id(s)")
-	if homeless > 0 {
+	if len(lostIn) > 0 { // every package named, with its count
 		todo := "a package's verdicts go to the files under trace.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence.adapter.sources"
 		if a.fromDir {
 			todo = "with --streams a package's verdicts go only to the files of its entry in evidence.adapter.sources: add one"
 		}
-		a.summary = append(a.summary, fmt.Sprintf("adapter: %d test function(s) with a verdict are in no file under trace.tests: package(s) %s; %s", homeless, nameList(sortedKeys(lost)), todo))
+		n := 0
+		var parts []string
+		for _, pkg := range sortedKeys(lostIn) {
+			n += lostIn[pkg]
+			parts = append(parts, fmt.Sprintf("%s (%d)", pkg, lostIn[pkg]))
+		}
+		a.summary = append(a.summary, fmt.Sprintf("adapter: %d test function(s) with a verdict are in package(s) no file under trace.tests belongs to: %s; %s", n, strings.Join(parts, ", "), todo))
 	}
+	advice := "list its file in trace.tests, or run a package built from copies through --streams"
+	if a.fromDir {
+		advice = "if it is staged from another directory, give that set its own name"
+	}
+	sort.Strings(undefined)
+	for _, u := range undefined {
+		a.summary = append(a.summary, fmt.Sprintf("adapter: %s: defined in no candidate file; %s", u, advice))
+	}
+	sort.Strings(outside)
+	a.summary = append(a.summary, outside...)
 	if a.fromDir {
 		add(nameless, "adapter: %d verdict(s) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>")
 	} else {
@@ -1179,7 +1272,36 @@ func (a *GoTest) Receipts() [][]byte {
 	sort.Strings(differ)
 	a.summary = append(append(append(append(append(a.summary, refused...), ambiguous...), differ...), byName...), unjudged...)
 	a.summary = append(append(a.summary, empty...), broken...)
+	if a.keptAt != "" {
+		a.summary = append(a.summary, fmt.Sprintf("adapter: streams kept in %s: %d file(s)", a.keptAt, a.kept))
+	}
 	return lines
+}
+
+// wholeLine renders the whole-project line of the summary, leaving out the
+// ids evidenced says another run has evidence for (nil: none left out).
+func (a *GoTest) wholeLine(evidenced func(string) bool) string {
+	n := 0
+	for _, id := range a.idleAll {
+		if evidenced == nil || !evidenced(id) {
+			n++
+		}
+	}
+	return fmt.Sprintf("adapter: in the whole project: %d claimed id(s) not run, %d claiming file(s) with no test function, %d claim(s) above functions the adapter does not judge", n, a.emptyAll, len(a.unjudged))
+}
+
+// Wrote is the number of receipts the adapter wrote, after Receipts.
+func (a *GoTest) Wrote() int { return a.wrote }
+
+// NoStream reports a run through --streams that read no stream at all.
+func (a *GoTest) NoStream() bool { return a.fromDir && len(a.streams) == 0 }
+
+// Rescope counts on the whole-project line of a run that produced no
+// evidence only the ids without evidence at the commit (section 10.3).
+func (a *GoTest) Rescope(evidenced func(string) bool) {
+	if a.whole < len(a.summary) {
+		a.summary[a.whole] = a.wholeLine(evidenced)
+	}
 }
 
 // failed returns the test functions the events of a stream that name no
@@ -1293,6 +1415,18 @@ func (a *GoTest) candidates(pkg string) []string {
 	res := sortedKeys(set)
 	a.cands[pkg] = res
 	return res
+}
+
+// mapped reports whether a file under trace.tests is a candidate of the
+// package: a verdict of it that finds no file is then one its candidates do
+// not define (section 10.3).
+func (a *GoTest) mapped(pkg string) bool {
+	for _, file := range a.candidates(pkg) {
+		if a.files[file] != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // sourceFiles returns the files under trace.tests that the entries of

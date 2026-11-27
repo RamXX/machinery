@@ -10,6 +10,7 @@ import (
 	"github.com/RamXX/machinery/internal/arch"
 	"github.com/RamXX/machinery/internal/baseline"
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/evidence"
 	"github.com/RamXX/machinery/internal/formal"
 	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/project"
@@ -100,6 +101,9 @@ func Ratchet(ctx *Context) *report.Stage {
 	}
 
 	ratchetAdapter(s, bcfg, &p.Cfg)
+	if err := ratchetExcused(s, bcfg, p, d); err != nil {
+		s.Errorf("%v", err)
+	}
 
 	// scope-narrowed
 	nowScope := set(p.Cfg.Scope)
@@ -418,6 +422,27 @@ func ratchetAdapter(s *report.Stage, base, now *project.Config) {
 			}
 		}
 	}
+	// claims: any lets one claimant prove an id several claim, for every tier
+	// adapter evidence may prove an id of
+	if base.AdapterClaimsAll() && !now.AdapterClaimsAll() {
+		for _, tier := range []string{design.Routine, design.Consequential, design.Critical, design.Vital} {
+			var kinds []string
+			for _, k := range project.AdapterKinds {
+				if nNeed[[2]string{tier, k}] != never {
+					kinds = append(kinds, k)
+				}
+			}
+			if len(kinds) == 0 {
+				continue
+			}
+			what := fmt.Sprintf("ratchet: adapter widened: %s %s ids: claims all -> any", tier, strings.Join(kinds, ", "))
+			if tier == design.Critical || tier == design.Vital {
+				s.Errorf("%s; an id of a critical or vital area needs a receipt its test emits after its own assertions", what)
+			} else {
+				s.Warnf("%s", what)
+			}
+		}
+	}
 	// sources, as pairs of a package glob and a files glob
 	had := map[[2]string]bool{}
 	for _, e := range base.AdapterSources() {
@@ -446,6 +471,107 @@ func ratchetAdapter(s *report.Stage, base, now *project.Config) {
 }
 
 const never = "never"
+
+// ratchetExcused is rule adapter-widened for evidence.adapter.excused
+// (section 11.3): entries are compared as pairs of a tests glob and a
+// functions pattern ("" for every function). An entry with a pair the base
+// did not have is widened when the base had a pair of one of its tests
+// globs, and added otherwise; it is an
+// ERROR when its new pairs cover a claimant of an id of a critical or vital
+// area, and a warn otherwise.
+func ratchetExcused(s *report.Stage, base *project.Config, p *project.Project, d *design.Design) error {
+	had, hadTests := map[[2]string]bool{}, map[string]bool{}
+	for _, e := range base.AdapterExcused() {
+		for _, pair := range excusedPairs(e) {
+			had[pair], hadTests[pair[0]] = true, true
+		}
+	}
+	var covered func(project.AdapterExcused) []string
+	for i, e := range p.Cfg.AdapterExcused() {
+		var added [][2]string
+		old := false // the base excused some of the files of a tests glob of it
+		for _, pair := range excusedPairs(e) {
+			old = old || hadTests[pair[0]]
+			if had[pair] {
+				continue
+			}
+			had[pair] = true
+			added = append(added, pair)
+		}
+		if len(added) == 0 {
+			continue
+		}
+		what := "added"
+		if old {
+			what = "widened"
+		}
+		var texts []string
+		for _, pair := range added {
+			text := "tests " + pair[0]
+			if pair[1] != "" {
+				text += ", functions " + pair[1]
+			}
+			texts = append(texts, text)
+		}
+		msg := fmt.Sprintf("ratchet: adapter widened: evidence.adapter.excused: entry %d %s: %s: %s", i+1, what, strings.Join(texts, "; "), e.Reason)
+		if covered == nil {
+			var err error
+			if covered, err = evidence.CoveredIDs(p, d); err != nil {
+				return err
+			}
+		}
+		if id, tier, areas, ok := tieredCover(d, covered, added); ok {
+			s.Errorf("%s; it covers a claimant of %s, in a %s area (%s)", msg, id, tier, strings.Join(areas, ", "))
+		} else {
+			s.Warnf("%s", msg)
+		}
+	}
+	return nil
+}
+
+// tieredCover returns the first id, sorted, of a critical or vital area a
+// claimant of which the pairs cover.
+func tieredCover(d *design.Design, covered func(project.AdapterExcused) []string, pairs [][2]string) (id, tier string, areas []string, ok bool) {
+	ids := map[string]bool{}
+	for _, pair := range pairs {
+		e := project.AdapterExcused{Tests: []string{pair[0]}}
+		if pair[1] != "" {
+			e.Functions = []string{pair[1]}
+		}
+		for _, id := range covered(e) {
+			ids[id] = true
+		}
+	}
+	for _, id := range sortedIDs(ids) {
+		if tier, areas := evidence.TierOf(d, id); tier == design.Critical || tier == design.Vital {
+			return id, tier, areas, true
+		}
+	}
+	return "", "", nil, false
+}
+
+func sortedIDs(m map[string]bool) []string {
+	res := make([]string, 0, len(m))
+	for k := range m {
+		res = append(res, k)
+	}
+	sort.Strings(res)
+	return res
+}
+
+// excusedPairs returns the pairs of an entry of evidence.adapter.excused.
+func excusedPairs(e project.AdapterExcused) [][2]string {
+	var res [][2]string
+	for _, g := range e.Tests {
+		if len(e.Functions) == 0 {
+			res = append(res, [2]string{g, ""})
+		}
+		for _, f := range e.Functions {
+			res = append(res, [2]string{g, f})
+		}
+	}
+	return res
+}
 
 // admits returns, for each tier and kind an adapter pass may prove, the
 // least granularity it needs: function, file or never (section 10.3).

@@ -276,7 +276,14 @@ func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed ma
 	case evidence.Proven:
 	case evidence.Failed:
 		s.Errorf("failed: %s", id)
+	case evidence.PartlyRun: // section 10.3: a claimant has no pass
+		pr, _ := ev.Partly(id)
+		s.Errorf("partly run: %s: %s", id, pr.Text())
 	default:
+		if n, none := ev.NoClaimant(id); none {
+			s.Errorf("unproven: %s; no claimant can run here: %d claimant(s) excused", id, n)
+			return
+		}
 		if n, held := ev.AdapterNotCounted(id); held { // section 10.3
 			s.Errorf("unproven: %s; adapter evidence does not count: %s", id, n.Why)
 			return
@@ -342,7 +349,7 @@ func judgeVerdict(s *report.Stage, t backlog.Tags, fresh []backlog.Stamp, valid 
 // StoryVerify renders stage verify for the ids of one story (section 12):
 // findings about other obligations are dropped, except failed ones and those
 // about receipts files and receipts that are not used (section 10.2).
-func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *report.Stage {
+func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string, partly bool) *report.Stage {
 	s := report.New("verify")
 	sel := setOf(ids)
 	for _, f := range ev.Findings {
@@ -350,6 +357,7 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 			s.Findings = append(s.Findings, f)
 		}
 	}
+	s.Findings = append(s.Findings, ev.PartlyFindings(sel, partly)...)
 	for _, id := range ids {
 		if !d.Known(id) {
 			s.Errorf("unknown id in story: %s", id)
@@ -359,7 +367,7 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 		return s.NotDemonstrated(ev.NoEvidence())
 	}
 	owed := d.OwedSet()
-	var n, proven, partial, nOwed, receipts int
+	var n, proven, partial, partlyRun, nOwed, receipts int
 	byFunction, byFile := ev.AdapterCounts(ObligationIDs(d, ids))
 	for _, id := range ObligationIDs(d, ids) {
 		n++
@@ -368,6 +376,8 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 			proven++
 		case evidence.Partial:
 			partial++
+		case evidence.PartlyRun:
+			partlyRun++
 		}
 		if _, ok := owed[id]; ok {
 			nOwed++
@@ -376,7 +386,11 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 	}
 	s.Count(n, "obligations").Count(proven, "proven")
 	evidence.CountAdapter(s, byFunction, byFile)
-	s.Count(partial, "partial").Count(nOwed, "owed").Count(receipts, "receipts")
+	s.Count(partial, "partial")
+	if partlyRun > 0 {
+		s.Count(partlyRun, "partly run")
+	}
+	s.Count(nOwed, "owed").Count(receipts, "receipts")
 	if areas := d.VitalAreasOf(ids); len(areas) > 0 {
 		evidence.VitalOf(ev, areas, sel).Warn(s, true) // section 12
 	}
@@ -387,14 +401,11 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string) *repor
 }
 
 // per-id findings of stage verify; failed ones always print
-var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: ", "adapter: "}
+var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: ", "adapter: ", "partly run: ", "no claimant can run here: ", "excused: "}
 
 func keepFinding(msg string, sel map[string]bool) bool {
-	for _, pre := range idFindings {
-		if rest, ok := strings.CutPrefix(msg, pre); ok {
-			id, _, _ := strings.Cut(rest, " ")
-			return sel[id]
-		}
+	if id, ok := evidence.FindingID(msg, idFindings); ok {
+		return sel[id]
 	}
 	return true
 }

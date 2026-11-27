@@ -79,6 +79,24 @@ func runStatus(e *Env, args []string) int {
 	if ids := ev.AdapterNotCountedIDs(); len(ids) > 0 {
 		fmt.Fprintf(w, "adapter, not counted: %s\n", tags.TallyOf(ids))
 	}
+	if ids := ev.PartlyIDs(); len(ids) > 0 { // section 10.3: every claimant
+		passed, of := 0, 0
+		for _, id := range ids {
+			pr, _ := ev.Partly(id)
+			passed, of = passed+pr.Passed, of+pr.Of
+		}
+		fmt.Fprintf(w, "partly run: %s: %d of %d claimants passed\n", tags.TallyOf(ids), passed, of)
+	}
+	if proven, excused, none := ev.ExcusedCounts(); proven+none > 0 {
+		var parts []string
+		if proven > 0 {
+			parts = append(parts, fmt.Sprintf("%d id(s) proven with %d claimant(s) excused", proven, excused))
+		}
+		if none > 0 {
+			parts = append(parts, fmt.Sprintf("%d id(s) with no claimant that can run here", none))
+		}
+		fmt.Fprintf(w, "excused: %s\n", strings.Join(parts, ", "))
+	}
 	if len(vas) > 0 {
 		for _, l := range evidence.VitalOf(ev, vas, nil).Lines() { // section 23.2
 			fmt.Fprintln(w, l)

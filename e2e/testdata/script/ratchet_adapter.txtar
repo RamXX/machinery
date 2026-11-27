@@ -63,6 +63,27 @@ stdout '^failed: 2 finding\(s\)$'
 gitcommit 'critical and vital by adapter'
 exec machinery check --stage ratchet --base HEAD
 ! stdout 'adapter widened'
+
+# claims: any lets one claimant prove an id that several tests claim: a widening for each tier
+# adapter evidence may prove, and an error for a critical or vital one
+cp any.yaml machinery.yaml
+exec machinery check --stage ratchet --base defaults
+stdout '^  warn   ratchet: adapter widened: routine inv, sc, fm, ck ids: claims all -> any$'
+stdout '^  warn   ratchet: adapter widened: consequential inv, sc, fm, ck ids: claims all -> any$'
+stdout -count=2 'adapter widened'
+stdout '^passed$'
+cp all-written.yaml machinery.yaml
+exec machinery check --stage ratchet --base defaults
+! stdout 'adapter widened'
+cp any-critical.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base defaults
+stdout '^  ERROR  ratchet: adapter widened: critical inv, sc, fm, ck ids: claims all -> any; an id of a critical or vital area needs a receipt its test emits after its own assertions$'
+stdout '^  ERROR  ratchet: adapter widened: vital inv, sc, fm, ck ids: claims all -> any; an id of a critical or vital area needs a receipt its test emits after its own assertions$'
+# against a base that admitted critical ids with every claimant, any is the one widening
+cp any-critical-only.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base HEAD
+stdout '^  ERROR  ratchet: adapter widened: critical inv ids: claims all -> any; '
+! stdout 'never ->'
 -- explicit.yaml --
 version: 2
 design:
@@ -278,6 +299,109 @@ trace:
 evidence:
   adapter:
     tiers: [routine, consequential, critical, vital]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- any.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    claims: any
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- all-written.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    claims: all
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- any-critical.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    claims: any
+    tiers: [routine, consequential, critical, vital]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- any-critical-only.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    claims: any
+    allow: [inv]
+    tiers: [critical]
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}

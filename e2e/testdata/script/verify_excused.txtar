@@ -1,0 +1,452 @@
+# evidence.adapter.excused leaves claimants that cannot run here out of the rule of every
+# claimant, with a reason; verify names every entry, and the ratchet names what is added or
+# widened (sections 2, 10.3, 11.3, 12, 13 and 14)
+fixture shop
+fixture shop-gotests
+cp all.yaml machinery.yaml
+exec machinery gen
+gitinit
+exec git tag defaults
+cp excused.yaml machinery.yaml
+gitcommit 'excuse the cluster tests, a second shop and the provider sandbox'
+
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+! stderr 'partly run'
+
+# an id whose claimants that are not excused all passed is proven, and says so
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 5 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
+stdout '^  warn   excused: inv:paid-before-shipped: proven \(2 claimant\(s\) excused\)$'
+stdout '^  warn   excused: inv:terminal-is-final: proven \(1 claimant\(s\) excused\)$'
+# an id whose every claimant is excused is not proven, owed or not
+stdout '^  warn   no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused$'
+# every entry in effect, once, with what it covers
+stdout '^  warn   adapter excused: entry 1 \(tests e2e/cluster/\*_test\.go\): 2 claimant\(s\) of 2 id\(s\): the cluster tests need three nodes; they run in the nightly job$'
+stdout '^  warn   adapter excused: entry 2 \(tests e2e/extra/\*_test\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\): needs a second shop instance$'
+stdout '^  warn   adapter excused: entry 3 \(tests e2e/suite/outage_test\.go\): 1 claimant\(s\) of 1 id\(s\): the provider sandbox is unreachable from CI$'
+stdout -count=3 'adapter excused: entry'
+exec machinery status --no-backlog
+stdout '^excused: 2 id\(s\) proven with 3 claimant\(s\) excused, 1 id\(s\) with no claimant that can run here$'
+exec mrun 1 proof --ids inv:paid-before-shipped,fm:payment-provider-down
+stdout '^  inv:paid-before-shipped -> e2e/suite/order_test\.go::TestShipNeedsPayment -> pass: go test: TestShipNeedsPayment passed \(by adapter at function granularity, 2 claimant\(s\) excused\)$'
+stdout '^  fm:payment-provider-down \(unproven, owed, no claimant can run here\)$'
+
+cp owed-tc.yaml design/owed.yaml
+gitcommit 'the provider outage is no longer owed'
+exec mrun 1 verify
+stdout '^  ERROR  no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused$'
+! stdout 'unproven: fm:payment-provider-down'
+
+# a claimant that is not excused and has no verdict leaves the id partly run; the excused ones
+# are not counted
+mkdir e2e/more
+cp more_test.go.txt e2e/more/more_test.go
+gitcommit 'a third claimant of paid before shipped'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+stderr '^machinery run: adapter: partly run: 1 id\(s\): 1 of 2 claimants passed in this run$'
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed \(2 claimant\(s\) excused\)$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/more/more_test\.go::TestShipMore$'
+! stdout 'TestClusterShip'
+
+# a pattern that covers nothing is an error
+cp nothing.yaml machinery.yaml
+exec mrun 1 verify --allow-dirty
+stdout '^  ERROR  adapter excused: entry 4: tests "e2e/nowhere/\*_test\.go" covers no claimant: correct the glob or remove it$'
+stdout '^  ERROR  adapter excused: entry 5: functions "TestNothing\*" covers no claimant of its tests: correct the pattern or remove it$'
+
+# an entry needs tests and a reason of one line, and patterns that are valid
+cp no-reason.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.excused: entry 1: reason is required: say why these tests cannot run here$'
+cp two-lines.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.excused: entry 1: reason "nightly\\nonly" has a line break or a control character; a reason is one line$'
+cp no-tests.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.excused: entry 1: tests is required: globs of files under trace\.tests$'
+cp bad-tests.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.excused: entry 1: tests "e2e/\[" is not a valid glob$'
+cp bad-functions.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.excused: entry 1: functions "Test\[" is not a valid pattern$'
+exec git checkout -q machinery.yaml
+
+# the ratchet: every entry added since the base is named with its reason
+exec machinery check --stage ratchet --base defaults
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.excused: entry 1 added: tests e2e/cluster/\*_test\.go: the cluster tests need three nodes; they run in the nightly job$'
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.excused: entry 2 added: tests e2e/extra/\*_test\.go, functions TestShip\*: needs a second shop instance$'
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.excused: entry 3 added: tests e2e/suite/outage_test\.go: the provider sandbox is unreachable from CI$'
+stdout '^passed$'
+# an entry that excuses more than at the base is widened; the same entries written again are not
+exec git tag excused
+cp wider.yaml machinery.yaml
+exec machinery check --stage ratchet --base excused
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.excused: entry 2 widened: tests e2e/extra/\*_test\.go: needs a second shop instance$'
+stdout -count=1 'adapter widened'
+cp excused.yaml machinery.yaml
+exec machinery check --stage ratchet --base excused
+! stdout 'adapter widened'
+# an entry that covers a claimant of an id in a critical or vital area is an error
+cp risk.yaml design/risk.yaml
+cp excused-risk.yaml machinery.yaml
+exec mrun 1 check --stage ratchet --base defaults
+stdout '^  ERROR  ratchet: adapter widened: evidence\.adapter\.excused: entry 1 added: tests e2e/cluster/\*_test\.go: the cluster tests need three nodes; they run in the nightly job; it covers a claimant of inv:paid-before-shipped, in a critical area \(order-shipping\)$'
+stdout '^  ERROR  ratchet: adapter widened: evidence\.adapter\.excused: entry 2 added: '
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.excused: entry 3 added: '
+stdout '^failed: 2 finding\(s\)$'
+
+-- owed-tc.yaml --
+version: 1
+owed:
+  - id: tc:ORDE-8bd6e7
+    reason: "effect recordCharge is a noop in the skeleton"
+-- risk.yaml --
+version: 1
+areas:
+  - name: order-shipping
+    tier: critical
+    why: "a shipment cannot be recalled"
+    ids: ["inv:paid-before-shipped"]
+    questions: [concurrency]
+-- e2e/cluster/cluster_test.go --
+package cluster
+
+import "testing"
+
+// TestClusterShip needs three nodes.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestClusterShip(t *testing.T) {}
+
+// TestClusterFailover needs three nodes.
+//
+// machinery:verifies inv:terminal-is-final
+func TestClusterFailover(t *testing.T) {}
+-- e2e/extra/extra_test.go --
+package extra
+
+import "testing"
+
+// TestShipAgain needs a second shop instance.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipAgain(t *testing.T) {}
+-- more_test.go.txt --
+package more
+
+import "testing"
+
+// machinery:verifies inv:paid-before-shipped
+func TestShipMore(t *testing.T) {}
+-- all.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- excused.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        reason: "the cluster tests need three nodes; they run in the nightly job"
+      - tests: ["e2e/extra/*_test.go"]
+        functions: ["TestShip*"]
+        reason: "needs a second shop instance"
+      - tests: ["e2e/suite/outage_test.go"]
+        reason: "the provider sandbox is unreachable from CI"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- wider.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        reason: "the cluster tests need three nodes; they run in the nightly job"
+      - tests: ["e2e/extra/*_test.go"]
+        reason: "needs a second shop instance"
+      - tests: ["e2e/suite/outage_test.go"]
+        reason: "the provider sandbox is unreachable from CI"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- excused-risk.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        reason: "the cluster tests need three nodes; they run in the nightly job"
+      - tests: ["e2e/extra/*_test.go"]
+        functions: ["TestShip*"]
+        reason: "needs a second shop instance"
+      - tests: ["e2e/suite/outage_test.go"]
+        reason: "the provider sandbox is unreachable from CI"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- nothing.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        reason: "the cluster tests need three nodes; they run in the nightly job"
+      - tests: ["e2e/extra/*_test.go"]
+        functions: ["TestShip*"]
+        reason: "needs a second shop instance"
+      - tests: ["e2e/suite/outage_test.go"]
+        reason: "the provider sandbox is unreachable from CI"
+      - tests: ["e2e/nowhere/*_test.go"]
+        reason: "nothing is there"
+      - tests: ["e2e/cluster/*_test.go"]
+        functions: ["TestNothing*"]
+        reason: "no such test"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- no-reason.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- two-lines.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        reason: "nightly\nonly"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- no-tests.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - reason: "nightly only"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-tests.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/["]
+        reason: "nightly only"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad-functions.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/cluster/*_test.go"]
+        functions: ["Test["]
+        reason: "nightly only"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

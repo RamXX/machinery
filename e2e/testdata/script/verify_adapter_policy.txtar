@@ -149,8 +149,8 @@ stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 3: inv:terminal-is-final: granularity must be function or file, got "line"$'
 stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 4: inv:terminal-is-final: granularity without source: adapter$'
 # a well-formed adapter line, and tags alone, in a run that is no adapter run: refused, not read
-stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 5: inv:terminal-is-final: source, granularity and tags are written only by the run adapter: a test that emits receipts leaves them out$'
-stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 6: inv:terminal-is-final: source, granularity and tags are written only by the run adapter: '
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 5: inv:terminal-is-final: source, granularity, tags and subtests are written only by the run adapter: a test that emits receipts leaves them out$'
+stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 6: inv:terminal-is-final: source, granularity, tags and subtests are written only by the run adapter: '
 stdout '^  ERROR  unproven: inv:terminal-is-final$'
 
 -- k1.txt --

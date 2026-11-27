@@ -208,7 +208,7 @@ func gate(p *project.Project, o Options, argv []string) []string {
 		return []string{"run"}
 	}
 	ctx := &stages.Context{P: p}
-	if failed := printStep(o, "verify", []*report.Stage{stages.Verify(ctx, false)}); len(failed) > 0 || !o.Probe {
+	if failed := printStep(o, "verify", []*report.Stage{stages.Verify(ctx, false, false)}); len(failed) > 0 || !o.Probe {
 		return failed
 	}
 	st := stages.Probe(ctx, probe.Options{Max: o.ProbeMax, Argv: argv, Stack: o.Stack, Stdout: o.Stdout, Stderr: o.Stderr})

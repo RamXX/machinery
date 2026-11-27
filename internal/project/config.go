@@ -401,10 +401,54 @@ type Evidence struct {
 // Adapter is the policy for adapter evidence (section 10.3). A list that is
 // set replaces its default, even when empty.
 type Adapter struct {
-	Allow          *[]string       `yaml:"allow,omitempty"`
-	Tiers          *[]string       `yaml:"tiers,omitempty"`
-	MinGranularity Granularity     `yaml:"min_granularity,omitempty"`
-	Sources        []AdapterSource `yaml:"sources,omitempty"`
+	Allow          *[]string   `yaml:"allow,omitempty"`
+	Tiers          *[]string   `yaml:"tiers,omitempty"`
+	MinGranularity Granularity `yaml:"min_granularity,omitempty"`
+	// Claims is all (the default) or any: whether every claimant of an id
+	// must pass, or one (section 10.3)
+	Claims  string           `yaml:"claims,omitempty"`
+	Sources []AdapterSource  `yaml:"sources,omitempty"`
+	Excused []AdapterExcused `yaml:"excused,omitempty"`
+}
+
+// Values of evidence.adapter.claims.
+const (
+	ClaimsAll = "all"
+	ClaimsAny = "any"
+)
+
+// AdapterExcused leaves claimants that cannot run where the evidence is made
+// out of the rule of every claimant (section 10.3): the test functions of the
+// files its tests globs match, only those its functions patterns match when
+// it has any, with the reason.
+type AdapterExcused struct {
+	Tests     []string `yaml:"tests"`
+	Functions []string `yaml:"functions,omitempty"`
+	Reason    string   `yaml:"reason"`
+}
+
+// Name is how a message names what the entry covers: its tests globs, and
+// its functions patterns when it has any.
+func (e AdapterExcused) Name() string {
+	s := "tests " + strings.Join(e.Tests, ", ")
+	if len(e.Functions) > 0 {
+		s += "; functions " + strings.Join(e.Functions, ", ")
+	}
+	return s
+}
+
+// MatchFunction reports whether a test function name matches one of the
+// functions patterns; true for every name when there is none.
+func (e AdapterExcused) MatchFunction(name string) bool {
+	if len(e.Functions) == 0 {
+		return true
+	}
+	for _, f := range e.Functions {
+		if ok, _ := path.Match(f, name); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // AdapterSource maps test packages built from copies to the test files
@@ -531,6 +575,20 @@ func (c *Config) AdapterPolicy() (kinds, tiers []string, min Granularity) {
 	return kinds, tiers, a.MinGranularity
 }
 
+// AdapterClaimsAll reports whether every claimant of an id must pass for
+// adapter evidence to prove it: evidence.adapter.claims is all, or unset.
+func (c *Config) AdapterClaimsAll() bool {
+	return c.Evidence == nil || c.Evidence.Adapter == nil || c.Evidence.Adapter.Claims != ClaimsAny
+}
+
+// AdapterExcused returns evidence.adapter.excused.
+func (c *Config) AdapterExcused() []AdapterExcused {
+	if c.Evidence == nil || c.Evidence.Adapter == nil {
+		return nil
+	}
+	return c.Evidence.Adapter.Excused
+}
+
 // AdapterSources returns evidence.adapter.sources.
 func (c *Config) AdapterSources() []AdapterSource {
 	if c.Evidence == nil || c.Evidence.Adapter == nil {
@@ -586,6 +644,33 @@ func (c *Config) validateEvidence() error {
 		}
 		if v := g.By[k]; v != GranularityFunction && v != GranularityFile {
 			return Errf("evidence.adapter.min_granularity.%s must be function or file, got %q", k, v)
+		}
+	}
+	if a.Claims != "" && a.Claims != ClaimsAll && a.Claims != ClaimsAny {
+		return Errf("evidence.adapter.claims must be all or any, got %q", a.Claims)
+	}
+	for i, e := range a.Excused {
+		if len(e.Tests) == 0 {
+			return Errf("evidence.adapter.excused: entry %d: tests is required: globs of files under trace.tests", i+1)
+		}
+		for _, g := range e.Tests {
+			if err := CheckPath("evidence.adapter.excused.tests", g); err != nil {
+				return err
+			}
+			if strings.TrimSpace(g) == "" || !ValidGlob(g) {
+				return Errf("evidence.adapter.excused: entry %d: tests %q is not a valid glob", i+1, g)
+			}
+		}
+		for _, f := range e.Functions {
+			if _, err := path.Match(f, ""); err != nil || strings.TrimSpace(f) == "" {
+				return Errf("evidence.adapter.excused: entry %d: functions %q is not a valid pattern", i+1, f)
+			}
+		}
+		switch {
+		case strings.TrimSpace(e.Reason) == "":
+			return Errf("evidence.adapter.excused: entry %d: reason is required: say why these tests cannot run here", i+1)
+		case !OneLine(e.Reason):
+			return Errf("evidence.adapter.excused: entry %d: reason %q has a line break or a control character; a reason is one line", i+1, e.Reason)
 		}
 	}
 	for i, s := range a.Sources {
