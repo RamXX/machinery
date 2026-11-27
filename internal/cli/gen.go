@@ -72,6 +72,9 @@ func GenerateFor(ctx *stages.Context, may func(string) bool) (written []string, 
 	}
 	p := ctx.P
 	for _, rel := range p.Cfg.Design.Models {
+		if !p.Cfg.ToolRenders() {
+			break // the project keeps the renderings, or none are kept (design.rendering, section 5.1)
+		}
 		want, rerr := modelith.Render(p, rel)
 		if rerr != nil {
 			return written, left, nil, rerr

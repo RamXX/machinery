@@ -59,6 +59,9 @@ func pendingGen(d *design.Design, may func(string) bool) ([]string, []Left) {
 	}
 	var left []Left
 	for _, rel := range d.P.Cfg.Design.Models {
+		if !d.P.Cfg.ToolRenders() {
+			break // the project keeps the renderings, or none are kept (design.rendering, section 5.1)
+		}
 		want, err := modelith.Render(d.P, rel)
 		if err != nil {
 			continue

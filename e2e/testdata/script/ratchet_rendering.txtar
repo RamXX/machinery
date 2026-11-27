@@ -1,0 +1,105 @@
+# ratchet: a rendering the tool compared at the base and no longer compares now is reported
+# (section 11.3), as a warn: a project that renders its model through its own pass changes it on purpose
+fixture shop
+exec machinery gen
+gitinit
+exec git tag tool
+
+# unchanged: nothing to report
+exec machinery check --stage ratchet --base tool
+! stdout 'rendering'
+stdout '^passed$'
+
+# tool to project, and to off: reported, not refused
+cp project.yaml machinery.yaml
+exec machinery check --stage ratchet --base tool
+stdout '^  warn   ratchet: rendering switched off: design.rendering was tool at tool and is project now$'
+stdout '^passed$'
+cp off.yaml machinery.yaml
+exec machinery check --stage ratchet --base tool
+stdout '^  warn   ratchet: rendering switched off: design.rendering was tool at tool and is off now$'
+stdout '^passed$'
+
+# a base that kept it with the project has nothing to lose: project to off is not reported
+cp project.yaml machinery.yaml
+gitcommit 'the project renders its model'
+exec git tag project
+exec machinery check --stage ratchet --base project
+! stdout 'rendering'
+cp off.yaml machinery.yaml
+exec machinery check --stage ratchet --base project
+! stdout 'rendering'
+
+# from project or off back to tool, nothing is lost
+cp tool.yaml machinery.yaml
+exec machinery check --stage ratchet --base project
+! stdout 'rendering'
+
+-- tool.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- project.yaml --
+version: 2
+design:
+  rendering: project
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- off.yaml --
+version: 2
+design:
+  rendering: off
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}

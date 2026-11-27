@@ -49,6 +49,8 @@ type Config struct {
 	// ExcusedFile holds the entries of design/excused.yaml (section 2.2),
 	// merged after those of evidence.adapter.excused
 	ExcusedFile []AdapterExcused `yaml:"-"`
+	// HasExcusedFile: design/excused.yaml exists, whatever it holds (section 2.2).
+	HasExcusedFile bool `yaml:"-"`
 }
 
 // Assess is read only by machinery assess (section 18).
@@ -75,6 +77,22 @@ type Design struct {
 	Owed         string   `yaml:"owed,omitempty"`
 	Status       string   `yaml:"status,omitempty"`
 	Gen          string   `yaml:"gen,omitempty"`
+	// Rendering says who keeps the Markdown beside a model (section 5.1):
+	// tool (the default), project or off.
+	Rendering string `yaml:"rendering,omitempty"`
+}
+
+// The values of design.rendering (section 5.1).
+const (
+	RenderingTool    = "tool"    // the tool compares the rendering and gen writes it
+	RenderingProject = "project" // the project's own pass produces it: neither compared nor written
+	RenderingOff     = "off"     // no rendering is kept: neither compared nor written
+)
+
+// ToolRenders reports whether the tool compares and writes the rendering
+// beside a model (design.rendering: tool).
+func (c *Config) ToolRenders() bool {
+	return c.Design.Rendering == "" || c.Design.Rendering == RenderingTool
 }
 
 // Import names design sources kept in the project's own formats (section 2).
@@ -930,6 +948,8 @@ func Load(explicit string) (*Project, error) {
 	if cfg.ExcusedFile, err = ReadExcused(root); err != nil {
 		return nil, err
 	}
+	_, statErr := os.Stat(filepath.Join(root, filepath.FromSlash(ExcusedName)))
+	cfg.HasExcusedFile = statErr == nil
 	p := &Project{Root: root, Cfg: *cfg}
 	if err := p.checkExempt(); err != nil {
 		return nil, err
@@ -1115,6 +1135,11 @@ func (c *Config) validate() error {
 	}
 	if c.Plan != nil && c.Plan.WireMaxFiles < 0 {
 		return Errf("plan.wire_max_files must not be negative")
+	}
+	switch c.Design.Rendering {
+	case "", RenderingTool, RenderingProject, RenderingOff:
+	default:
+		return Errf("design.rendering must be tool, project or off, got %q", c.Design.Rendering)
 	}
 	if c.Backlog != nil && c.Backlog.Tool != "bd" {
 		return Errf("backlog.tool: only bd is supported, got %q", c.Backlog.Tool)
@@ -1433,6 +1458,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.Design.Formal == "" {
 		c.Design.Formal = "design/formal"
+	}
+	if c.Design.Rendering == "" {
+		c.Design.Rendering = RenderingTool
 	}
 	if c.Receipts.Dir == "" {
 		c.Receipts.Dir = ".machinery/receipts"

@@ -110,6 +110,11 @@ func Ratchet(ctx *Context) *report.Stage {
 		}
 	}
 
+	// rendering-off: a rendering the tool compared at the base (design.rendering, section 5.1)
+	if bcfg.ToolRenders() && !p.Cfg.ToolRenders() {
+		s.Warnf("ratchet: rendering switched off: design.rendering was %s at %s and is %s now", project.RenderingTool, ref, p.Cfg.Design.Rendering)
+	}
+
 	ratchetAdapter(s, bcfg, &p.Cfg)
 	if err := ratchetExcused(s, bcfg, p, d); err != nil {
 		s.Errorf("%v", err)

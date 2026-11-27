@@ -1,0 +1,184 @@
+# design.rendering (section 5.1): who keeps the Markdown beside a model. With tool, the default, the
+# tool compares it and gen writes it; with project the project's own filter produces it, and the
+# tool neither compares nor writes it and says so once; with off it says nothing and does neither
+fixture shop
+exec machinery config
+stdout '^  rendering: tool$'
+
+# a house-style pass over the rendering is drift for good under the default
+exec machinery gen
+exec sh -c 'echo "House style: reviewed." >> design/model/shop.modelith.md'
+exec mrun 1 lint --stage model
+stdout '^  DRIFT  design/model/shop\.modelith\.md: stale; run machinery gen$'
+exec cp design/model/shop.modelith.md styled.md
+
+# project: the stage passes, says it once, and gen leaves the file as the project has it
+cp project.yaml machinery.yaml
+exec machinery lint --stage model
+stdout '^  warn   rendering: kept by the project$'
+stdout '^passed$'
+! stdout 'DRIFT'
+exec machinery gen
+! stdout 'shop\.modelith\.md'
+cmp design/model/shop.modelith.md styled.md
+
+# a rendering that is missing is not drift either, and gen does not create it
+rm design/model/shop.modelith.md
+exec machinery lint --stage model
+stdout '^  warn   rendering: kept by the project$'
+stdout '^passed$'
+exec machinery gen
+! exists design/model/shop.modelith.md
+
+# the model is still linted: a model with an error fails the stage, whoever renders it
+cp design/model/shop.modelith.yaml shop.good
+exec sh -c 'sed "s/entity: Order, cardinality/entity: Nowhere, cardinality/" shop.good > design/model/shop.modelith.yaml'
+exec mrun 1 lint --stage model
+stdout '^  ERROR  '
+cp shop.good design/model/shop.modelith.yaml
+
+# several models: the stage says it once
+cp two.yaml machinery.yaml
+cp ledger.modelith.yaml design/model/ledger.modelith.yaml
+exec machinery lint --stage model
+stdout -count=1 'rendering: kept by the project'
+! exists design/model/ledger.modelith.md
+rm design/model/ledger.modelith.yaml
+
+# off: neither compares nor writes, and says nothing
+cp off.yaml machinery.yaml
+exec machinery lint --stage model
+! stdout 'rendering'
+! stdout 'DRIFT'
+stdout '^passed$'
+exec machinery gen
+! exists design/model/shop.modelith.md
+exec machinery config
+stdout '^  rendering: "off"$'
+
+# back to the default: the rendering is the tool's again
+cp tool.yaml machinery.yaml
+exec mrun 1 lint --stage model
+stdout '^  DRIFT  design/model/shop\.modelith\.md: missing; run machinery gen$'
+exec machinery gen
+stdout '^  design/model/shop\.modelith\.md$'
+exec machinery lint --stage model
+stdout '^passed$'
+! stdout 'kept by the project'
+
+# a value that is none of the three is a configuration error
+cp bad.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: design.rendering must be tool, project or off, got "never"$'
+
+-- tool.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- project.yaml --
+version: 2
+design:
+  rendering: project
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- off.yaml --
+version: 2
+design:
+  rendering: off
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- two.yaml --
+version: 2
+design:
+  rendering: project
+  models:
+    - design/model/shop.modelith.yaml
+    - design/model/ledger.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- bad.yaml --
+version: 2
+design:
+  rendering: never
+  models:
+    - design/model/shop.modelith.yaml
+-- ledger.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Ledger
+description: >
+  A tiny ledger used to show a second model.
+
+entities:
+  Entry:
+    definition: >
+      One line of the ledger.
+    attributes:
+      - {name: cents, type: integer}

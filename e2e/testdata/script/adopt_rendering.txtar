@@ -74,6 +74,45 @@ exec machinery -C second adopt --rehearse --paths 'internal/shipping/**' --out o
 stdout '^blocks adoption: nothing$'
 stdout '^note: model/depot\.modelith\.md: missing rendering, the project generates it$'
 
+# design.rendering (section 5.1): a project that renders its model through its own pass says so,
+# and adopt neither lists a stale or a missing rendering nor writes one; the model stage does not
+# compare it, so nothing is left to regenerate
+fixture brownfield third
+fixture brownfield-design third
+cd third
+mkdir model
+exec mv design/model/depot.modelith.yaml model/depot.modelith.yaml
+rm design
+cp ../rendering.md model/depot.modelith.md
+cp ../project-rendering.yaml machinery.yaml
+gitinit
+cd ..
+exec machinery -C third adopt --paths 'internal/shipping/**'
+! stdout 'rendering'
+! stdout 'is stale'
+! stdout 'is missing'
+exec machinery -C third adopt --paths 'internal/shipping/**' --write
+! stdout 'is stale'
+cmp third/model/depot.modelith.md rendering.md
+exec machinery -C third check --stage model
+stdout '^  warn   rendering: kept by the project$'
+stdout '^passed$'
+# a missing one is not reported either, and a rehearsal has no note to make of it
+rm third/model/depot.modelith.md
+exec git -C third commit -q -am 'adopted, no rendering'
+exec machinery -C third adopt --paths 'internal/shipping/**' --write
+! stdout 'is missing'
+! exists third/model/depot.modelith.md
+exec machinery -C third adopt --rehearse --paths 'internal/shipping/**' --out out3
+! stdout '^note: '
+stdout '^blocks adoption: nothing$'
+! grep 'DRIFT' out3/stages/check.txt
+
+-- project-rendering.yaml --
+version: 2
+design:
+  rendering: project
+
 -- rendering.md --
 # Depot
 

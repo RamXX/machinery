@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/v2/internal/modelith"
+	"github.com/RamXX/machinery/v2/internal/project"
 	"github.com/RamXX/machinery/v2/internal/report"
 )
 
@@ -41,6 +42,9 @@ func Model(ctx *Context) *report.Stage {
 				s.Errorf("%s: %s", rel, msg)
 			}
 		}
+		if !p.Cfg.ToolRenders() {
+			continue // the rendering is the project's (design.rendering, section 5.1)
+		}
 		want, err := modelith.Render(p, rel)
 		if err != nil {
 			s.Errorf("%s: %v", rel, err)
@@ -54,6 +58,9 @@ func Model(ctx *Context) *report.Stage {
 		case !bytes.Equal(got, want):
 			s.Driftf("%s: stale; run machinery gen", md)
 		}
+	}
+	if p.Cfg.Design.Rendering == project.RenderingProject {
+		s.Warnf("rendering: kept by the project")
 	}
 	var entities, actions, invs, scs int
 	for _, m := range d.Models {
