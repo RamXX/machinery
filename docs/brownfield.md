@@ -269,7 +269,8 @@ through a parent test records how many subtests ran (`subtests: 2`).
 **Every claimant.** An id that several tests claim is proven by the adapter only when every one
 of them passed at the commit, in this run or another one. One that did not leaves the id
 `partly run: 1 of 2 claimants passed`: not proven, not failed, kept in the owed list. `verify`
-names the first ten claimants without a pass and `verify --partly` every one. The claimants are
+names up to three claimants without a pass for each of the first ten such ids, and how many
+more there are; `verify --partly` names every one. The claimants are
 all the files under `trace.tests` that carry a marker for the id, not only the Go test files: a
 shell script, a test in another language, a Go file that is not named `_test.go`, a file that
 does not parse. The adapter cannot judge such a file, so it needs a receipt its own test emits

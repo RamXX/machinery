@@ -425,6 +425,20 @@ type AdapterExcused struct {
 	Tests     []string `yaml:"tests"`
 	Functions []string `yaml:"functions,omitempty"`
 	Reason    string   `yaml:"reason"`
+	// N is the number of the entry in the file it is written in, from 1,
+	// and From that file when it is not machinery.yaml; Config.AdapterExcused
+	// sets both
+	N    int    `yaml:"-"`
+	From string `yaml:"-"`
+}
+
+// Label is how a message names the entry: "entry <n>" for one of
+// machinery.yaml, "<file>: entry <n>" for one of another file.
+func (e AdapterExcused) Label() string {
+	if e.From != "" {
+		return fmt.Sprintf("%s: entry %d", e.From, e.N)
+	}
+	return fmt.Sprintf("entry %d", e.N)
 }
 
 // Name is how a message names what the entry covers: its tests globs, and
@@ -581,12 +595,17 @@ func (c *Config) AdapterClaimsAll() bool {
 	return c.Evidence == nil || c.Evidence.Adapter == nil || c.Evidence.Adapter.Claims != ClaimsAny
 }
 
-// AdapterExcused returns evidence.adapter.excused.
+// AdapterExcused returns the entries of evidence.adapter.excused, each
+// numbered in the file it is written in.
 func (c *Config) AdapterExcused() []AdapterExcused {
-	if c.Evidence == nil || c.Evidence.Adapter == nil {
-		return nil
+	var res []AdapterExcused
+	if c.Evidence != nil && c.Evidence.Adapter != nil {
+		for i, e := range c.Evidence.Adapter.Excused {
+			e.N, e.From = i+1, ""
+			res = append(res, e)
+		}
 	}
-	return c.Evidence.Adapter.Excused
+	return res
 }
 
 // AdapterSources returns evidence.adapter.sources.

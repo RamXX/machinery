@@ -321,14 +321,7 @@ func StageDoc(s *report.Stage) StageJSON {
 	for _, c := range s.Checked {
 		doc.Checked = append(doc.Checked, CountJSON{c.N, c.Noun})
 	}
-	fs := append([]report.Finding(nil), s.Findings...)
-	sort.SliceStable(fs, func(i, j int) bool {
-		if fs[i].Sev != fs[j].Sev {
-			return fs[i].Sev < fs[j].Sev
-		}
-		return fs[i].Msg < fs[j].Msg
-	})
-	for _, f := range fs {
+	for _, f := range s.Sorted() {
 		sev := map[report.Severity]string{report.Error: "ERROR", report.Drift: "DRIFT", report.Warn: "warn"}[f.Sev]
 		doc.Findings = append(doc.Findings, FindingJSON{sev, f.Msg})
 	}

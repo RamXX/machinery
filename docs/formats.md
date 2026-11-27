@@ -2908,8 +2908,12 @@ excused is not proven by adapter evidence, whatever an excused claimant gave: no
 run here (sections 12 to 15.6); a receipt a test emitted proves such an id as it proves an id
 without adapter evidence. A fail of an excused claimant still fails its id. `verify`
 prints every entry once,
-`warn   adapter excused: entry <n> (tests <globs>[; functions <patterns>]): <k> claimant(s) of <j> id(s): <reason>`,
-`<k>` counting distinct claimants and `<j>` the ids they claim. A glob or a pattern through
+`warn   adapter excused: entry <n>: <k> claimant(s) of <j> id(s), <g> glob(s)[, <f> function pattern(s)]: <reason>`,
+`<k>` counting distinct claimants, `<j>` the ids they claim, `<g>` the globs of its `tests`
+and `<f>` the patterns of its `functions`, printed only when it has some. An entry may hold
+many globs, so the line lists them only under `verify --partly`, after the number:
+`warn   adapter excused: entry <n> (tests <globs>[; functions <patterns>]): <k> claimant(s) of <j> id(s), <g> glob(s)[, <f> function pattern(s)]: <reason>`,
+the globs and the patterns as written, separated by `, `. A glob or a pattern through
 which the entry covers no claimant is an ERROR in every case. A glob covers the claimants the
 entry covers in the files it matches, and a pattern the test functions the entry covers that it
 matches. Each ERROR says why and what to do:
@@ -3144,9 +3148,12 @@ Findings:
   (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
   `<file>::<function>` or `<file>`, and for a file the adapter cannot judge
   `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
-  `<why>` as in section 10.3 ("A file the adapter cannot judge"). The first ten of these lines print, in the order they print, and then
-  `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`;
-  with `--partly` every one of them.
+  `<why>` as in section 10.3 ("A file the adapter cannot judge"). Without `--partly` they
+  print for the first ten partly run ids, sorted, up to three for each id, the first in the
+  order they print; when some are left out,
+  `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`
+  follows them, `<k>` counting every line left out, and it prints after every other line that
+  begins `partly run: `. With `--partly` every one of them prints.
 - `ERROR  no claimant can run here: <id>: <k> claimant(s) excused: run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits`
   for an id every claimant of which is excused and that is not proven otherwise, in place of
   `unproven: <id>`, and the same line as a `warn` for one that is owed (section 10.3).
@@ -3155,8 +3162,9 @@ Findings:
   `adapter: <id> not counted` do not print for it, whatever its adapter passes and the policy
   give. The claimants without a pass and the other findings of the id print as for any id.
 - `warn   excused: <id>: proven (<k> claimant(s) excused)` for a proven id with claimants
-  excused, `warn   adapter excused: entry <n> (...)` once per entry, and the ERRORs of a glob or
-  a pattern through which an entry covers no claimant (section 10.3, with the texts).
+  excused, `warn   adapter excused: entry <n>: ...` once per entry, with its globs and patterns
+  under `--partly`, and the ERRORs of a glob or a pattern through which an entry covers no
+  claimant (section 10.3, with the texts).
 - `warn   adapter environment: <file>: <what the header recorded>`, once for every adapter run
   that is used (section 10.3, with the text). It is a record: environments that differ between
   runs at the same commit are no finding. With `--story` it prints for every such run.
@@ -3174,7 +3182,8 @@ by how many of them that is, each part only when it counts something:
 `14 proven, 3 by adapter at function granularity, 2 by adapter at file granularity, 0 partial`.
 The ids that are partly run follow `partial` when there are any: `0 partial, 2 partly run, 3 owed`.
 
-`--partly` names every claimant without a pass of the partly run ids, and prints on standard
+`--partly` names every claimant without a pass of the partly run ids, lists the globs and
+patterns of every excused entry, and prints on standard
 error, before the stage block, one line per test whose adapter passes at the commit record a
 different number of subtests (section 10.3) in different runs:
 `machinery verify: hint: <test>: subtests differ between runs at <short sha>: <k> in <receipts file>, <k> in <receipts file>`,

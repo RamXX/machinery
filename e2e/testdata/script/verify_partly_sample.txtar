@@ -1,0 +1,279 @@
+# verify names, without --partly, up to three claimants without a pass for each of the first ten
+# partly run ids, and then how many more there are, after them; --partly names every one
+# (section 12)
+fixture shop
+fixture shop-gotests
+cp shop.modelith.yaml design/model/shop.modelith.yaml
+exec machinery gen
+gitinit
+
+# eleven ids with one claimant that runs and four that do not
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/wide
+stderr '^machinery run: adapter: partly run: 11 id\(s\): 11 of 55 claimants passed in this run$'
+exec mrun 1 verify
+stdout -count=11 '^  ERROR  partly run: inv:rule-[0-9]+: 1 of 5 claimants passed: '
+stdout -count=30 '^  warn   partly run: inv:rule-[0-9]+: no verdict: '
+stdout -count=3 '^  warn   partly run: inv:rule-01: no verdict: '
+stdout '^  warn   partly run: inv:rule-01: no verdict: e2e/many/many_test\.go::TestR01a$'
+stdout '^  warn   partly run: inv:rule-01: no verdict: e2e/many/many_test\.go::TestR01c$'
+! stdout 'TestR01d'
+stdout -count=3 '^  warn   partly run: inv:rule-10: no verdict: '
+! stdout 'no verdict: [^\n]*TestR11'
+# the count of the others prints after the lines it follows, and nothing of them after it
+stdout '^  warn   partly run: 14 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
+stdout 'no verdict: e2e/many/many_test\.go::TestR10c\n  warn   partly run: 14 more claimant'
+! stdout 'more claimant[^\n]*\n  warn   partly run: '
+
+exec mrun 1 verify --partly
+stdout -count=44 '^  warn   partly run: inv:rule-[0-9]+: no verdict: '
+stdout '^  warn   partly run: inv:rule-11: no verdict: e2e/many/many_test\.go::TestR11d$'
+! stdout 'more claimant'
+
+-- shop.modelith.yaml --
+kind: DomainModel
+version: v1
+title: Shop
+description: >
+  A minimal order desk used as the shared test fixture. A Customer places an
+  Order, pays for it, and a Clerk ships it. An Order can be cancelled until it
+  ships.
+
+glossary:
+  Clerk: "A staff member who ships a paid `Order`."
+
+enums:
+  OrderStatus:
+    values:
+      - {name: Pending, definition: "Placed, not yet paid."}
+      - {name: Paid, definition: "Payment captured."}
+      - {name: Shipped, definition: "Handed to the carrier; terminal."}
+      - {name: Cancelled, definition: "Abandoned before shipping; terminal."}
+
+entities:
+  Customer:
+    definition: >
+      A person who places and pays for an `Order`.
+    attributes:
+      - {name: email, type: string}
+    relationships:
+      - {entity: Order, cardinality: "1:n", ownership: owned}
+    invariants:
+      - {id: customer-email-unique, statement: "No two `Customer` records share an email."}
+  Order:
+    definition: >
+      A request by one `Customer` to buy goods. Its status follows the order
+      lifecycle from pending to shipped or cancelled.
+    attributes:
+      - {name: status, type: OrderStatus}
+      - {name: totalCents, type: integer}
+    relationships:
+      - {entity: Customer, cardinality: "n:1", ownership: referenced}
+    actions:
+      - {name: place, actor: Customer, description: "Create the `Order` in the pending status."}
+      - {name: pay, actor: Customer, preserves: [paid-before-shipped]}
+      - {name: ship, actor: Clerk, preserves: [paid-before-shipped]}
+      - {name: cancel, actor: Customer, preserves: [terminal-is-final]}
+    invariants:
+      - {id: paid-before-shipped, statement: "An `Order` reaches the shipped status only from the paid status."}
+
+invariants:
+  - {id: terminal-is-final, statement: "A shipped or cancelled `Order` never changes status again."}
+  - {id: rule-01, statement: "Shop rule 1 holds for every `Order`."}
+  - {id: rule-02, statement: "Shop rule 2 holds for every `Order`."}
+  - {id: rule-03, statement: "Shop rule 3 holds for every `Order`."}
+  - {id: rule-04, statement: "Shop rule 4 holds for every `Order`."}
+  - {id: rule-05, statement: "Shop rule 5 holds for every `Order`."}
+  - {id: rule-06, statement: "Shop rule 6 holds for every `Order`."}
+  - {id: rule-07, statement: "Shop rule 7 holds for every `Order`."}
+  - {id: rule-08, statement: "Shop rule 8 holds for every `Order`."}
+  - {id: rule-09, statement: "Shop rule 9 holds for every `Order`."}
+  - {id: rule-10, statement: "Shop rule 10 holds for every `Order`."}
+  - {id: rule-11, statement: "Shop rule 11 holds for every `Order`."}
+
+scenarios:
+  - name: Customer pays and the order ships
+    actors: [Customer, Clerk]
+    steps:
+      - "Customer places an `Order`; it is pending."
+      - "Customer pays; the `Order` becomes paid."
+      - "Clerk ships; the `Order` becomes shipped."
+    invariants_touched: [paid-before-shipped]
+  - name: Cancelled order refuses payment
+    actors: [Customer]
+    steps:
+      - "Customer places an `Order` and cancels it."
+      - "Customer tries to pay; the request is refused and the `Order` stays cancelled."
+    invariants_touched: [terminal-is-final]
+-- e2e/wide/wide_test.go --
+package wide
+
+import "testing"
+
+// machinery:verifies inv:rule-01
+func TestW01(t *testing.T) {}
+
+// machinery:verifies inv:rule-02
+func TestW02(t *testing.T) {}
+
+// machinery:verifies inv:rule-03
+func TestW03(t *testing.T) {}
+
+// machinery:verifies inv:rule-04
+func TestW04(t *testing.T) {}
+
+// machinery:verifies inv:rule-05
+func TestW05(t *testing.T) {}
+
+// machinery:verifies inv:rule-06
+func TestW06(t *testing.T) {}
+
+// machinery:verifies inv:rule-07
+func TestW07(t *testing.T) {}
+
+// machinery:verifies inv:rule-08
+func TestW08(t *testing.T) {}
+
+// machinery:verifies inv:rule-09
+func TestW09(t *testing.T) {}
+
+// machinery:verifies inv:rule-10
+func TestW10(t *testing.T) {}
+
+// machinery:verifies inv:rule-11
+func TestW11(t *testing.T) {}
+-- e2e/many/many_test.go --
+package many
+
+import "testing"
+
+// machinery:verifies inv:rule-01
+func TestR01a(t *testing.T) {}
+
+// machinery:verifies inv:rule-01
+func TestR01b(t *testing.T) {}
+
+// machinery:verifies inv:rule-01
+func TestR01c(t *testing.T) {}
+
+// machinery:verifies inv:rule-01
+func TestR01d(t *testing.T) {}
+
+// machinery:verifies inv:rule-02
+func TestR02a(t *testing.T) {}
+
+// machinery:verifies inv:rule-02
+func TestR02b(t *testing.T) {}
+
+// machinery:verifies inv:rule-02
+func TestR02c(t *testing.T) {}
+
+// machinery:verifies inv:rule-02
+func TestR02d(t *testing.T) {}
+
+// machinery:verifies inv:rule-03
+func TestR03a(t *testing.T) {}
+
+// machinery:verifies inv:rule-03
+func TestR03b(t *testing.T) {}
+
+// machinery:verifies inv:rule-03
+func TestR03c(t *testing.T) {}
+
+// machinery:verifies inv:rule-03
+func TestR03d(t *testing.T) {}
+
+// machinery:verifies inv:rule-04
+func TestR04a(t *testing.T) {}
+
+// machinery:verifies inv:rule-04
+func TestR04b(t *testing.T) {}
+
+// machinery:verifies inv:rule-04
+func TestR04c(t *testing.T) {}
+
+// machinery:verifies inv:rule-04
+func TestR04d(t *testing.T) {}
+
+// machinery:verifies inv:rule-05
+func TestR05a(t *testing.T) {}
+
+// machinery:verifies inv:rule-05
+func TestR05b(t *testing.T) {}
+
+// machinery:verifies inv:rule-05
+func TestR05c(t *testing.T) {}
+
+// machinery:verifies inv:rule-05
+func TestR05d(t *testing.T) {}
+
+// machinery:verifies inv:rule-06
+func TestR06a(t *testing.T) {}
+
+// machinery:verifies inv:rule-06
+func TestR06b(t *testing.T) {}
+
+// machinery:verifies inv:rule-06
+func TestR06c(t *testing.T) {}
+
+// machinery:verifies inv:rule-06
+func TestR06d(t *testing.T) {}
+
+// machinery:verifies inv:rule-07
+func TestR07a(t *testing.T) {}
+
+// machinery:verifies inv:rule-07
+func TestR07b(t *testing.T) {}
+
+// machinery:verifies inv:rule-07
+func TestR07c(t *testing.T) {}
+
+// machinery:verifies inv:rule-07
+func TestR07d(t *testing.T) {}
+
+// machinery:verifies inv:rule-08
+func TestR08a(t *testing.T) {}
+
+// machinery:verifies inv:rule-08
+func TestR08b(t *testing.T) {}
+
+// machinery:verifies inv:rule-08
+func TestR08c(t *testing.T) {}
+
+// machinery:verifies inv:rule-08
+func TestR08d(t *testing.T) {}
+
+// machinery:verifies inv:rule-09
+func TestR09a(t *testing.T) {}
+
+// machinery:verifies inv:rule-09
+func TestR09b(t *testing.T) {}
+
+// machinery:verifies inv:rule-09
+func TestR09c(t *testing.T) {}
+
+// machinery:verifies inv:rule-09
+func TestR09d(t *testing.T) {}
+
+// machinery:verifies inv:rule-10
+func TestR10a(t *testing.T) {}
+
+// machinery:verifies inv:rule-10
+func TestR10b(t *testing.T) {}
+
+// machinery:verifies inv:rule-10
+func TestR10c(t *testing.T) {}
+
+// machinery:verifies inv:rule-10
+func TestR10d(t *testing.T) {}
+
+// machinery:verifies inv:rule-11
+func TestR11a(t *testing.T) {}
+
+// machinery:verifies inv:rule-11
+func TestR11b(t *testing.T) {}
+
+// machinery:verifies inv:rule-11
+func TestR11c(t *testing.T) {}
+
+// machinery:verifies inv:rule-11
+func TestR11d(t *testing.T) {}

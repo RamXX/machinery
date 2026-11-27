@@ -60,7 +60,11 @@ exec sh -c 'cat base.yaml sources.part > machinery.yaml'
 gitcommit 'four more files claim paid before shipped'
 exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
 stderr '^machinery run: adapter: partly run: 1 id\(s\): 2 of 6 claimants passed in this run$'
+# verify names three of the four, --partly every one
 exec mrun 1 verify
+stdout -count=3 '^  warn   partly run: inv:paid-before-shipped: '
+stdout '^  warn   partly run: 1 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
+exec mrun 1 verify --partly
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 6 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/late_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/support/shipping\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
@@ -86,9 +90,9 @@ exec machinery run -- sh e2e/ship.sh
 exec mrun 1 verify
 ! stdout 'partly run'
 stdout '^  warn   excused: inv:paid-before-shipped: proven \(3 claimant\(s\) excused\)$'
-stdout '^  warn   adapter excused: entry 1 \(tests e2e/misnamed/late_tests\.go\): 1 claimant\(s\) of 1 id\(s\): a draft, not a test yet$'
-stdout '^  warn   adapter excused: entry 2 \(tests e2e/support/\*\.go\): 1 claimant\(s\) of 1 id\(s\): a helper that names the invariant it supports$'
-stdout '^  warn   adapter excused: entry 3 \(tests e2e/staged/\*\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\): staged by the nightly wrapper$'
+stdout '^  warn   adapter excused: entry 1: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\): a draft, not a test yet$'
+stdout '^  warn   adapter excused: entry 2: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\): a helper that names the invariant it supports$'
+stdout '^  warn   adapter excused: entry 3: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\), 1 function pattern\(s\): staged by the nightly wrapper$'
 
 -- broken.go.txt --
 package misnamed

@@ -358,6 +358,7 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string, partly
 		}
 	}
 	s.Findings = append(s.Findings, ev.PartlyFindings(sel, partly)...)
+	s.Findings = append(s.Findings, ev.ExcusedFindings(partly)...)
 	for _, id := range ids {
 		if !d.Known(id) {
 			s.Errorf("unknown id in story: %s", id)

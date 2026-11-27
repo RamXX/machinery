@@ -112,9 +112,32 @@ type claimants struct {
 	// unjudged: a file claimant of an id that the adapter cannot give a
 	// verdict (Func "") -> why; only a receipt its own test emits satisfies it
 	unjudged map[claimUnit]string
-	// uses: one line per entry in effect; problems: its patterns that cover
-	// nothing
-	uses, problems []string
+	// uses: what each entry in effect covers; problems: its patterns that
+	// cover nothing
+	uses     []excusedUse
+	problems []string
+}
+
+// excusedUse is what one entry of evidence.adapter.excused covers: distinct
+// claimants, and the ids they claim (section 10.3).
+type excusedUse struct {
+	entry          project.AdapterExcused
+	claimants, ids int
+}
+
+// line is the line verify prints for the entry: its label, what it covers,
+// how many globs and patterns it has, and its reason; with globs it lists
+// them after its label (verify --partly).
+func (u excusedUse) line(globs bool) string {
+	head := "adapter excused: " + u.entry.Label()
+	if globs {
+		head += " (" + u.entry.Name() + ")"
+	}
+	counts := fmt.Sprintf("%d claimant(s) of %d id(s), %d glob(s)", u.claimants, u.ids, len(u.entry.Tests))
+	if n := len(u.entry.Functions); n > 0 {
+		counts += fmt.Sprintf(", %d function pattern(s)", n)
+	}
+	return head + ": " + counts + ": " + u.entry.Reason
 }
 
 // What to do about a partly run id, and about an id no claimant of which can
@@ -282,7 +305,7 @@ func (c *claimants) covers(e project.AdapterExcused, cl Claimant) bool {
 // Each entry is described once, and each of its globs and patterns through
 // which it covers no claimant is a problem.
 func (c *claimants) excuse(entries []project.AdapterExcused) {
-	for i, e := range entries {
+	for _, e := range entries {
 		covered, byID := map[Claimant]bool{}, map[string]bool{}
 		globCovers, fnCovers := map[string]bool{}, map[string]bool{}
 		for id, cls := range c.of {
@@ -304,15 +327,15 @@ func (c *claimants) excuse(entries []project.AdapterExcused) {
 				}
 			}
 		}
-		c.uses = append(c.uses, fmt.Sprintf("adapter excused: entry %d (%s): %d claimant(s) of %d id(s): %s", i+1, e.Name(), len(covered), len(byID), e.Reason))
+		c.uses = append(c.uses, excusedUse{entry: e, claimants: len(covered), ids: len(byID)})
 		for _, g := range e.Tests {
 			if !globCovers[g] {
-				c.problems = append(c.problems, fmt.Sprintf("adapter excused: entry %d: tests %q covers no claimant: %s", i+1, g, c.whyGlob(g)))
+				c.problems = append(c.problems, fmt.Sprintf("adapter excused: %s: tests %q covers no claimant: %s", e.Label(), g, c.whyGlob(g)))
 			}
 		}
 		for _, f := range e.Functions {
 			if !fnCovers[f] {
-				c.problems = append(c.problems, fmt.Sprintf("adapter excused: entry %d: functions %q covers no claimant of its tests: %s", i+1, f, c.whyPattern(e, f)))
+				c.problems = append(c.problems, fmt.Sprintf("adapter excused: %s: functions %q covers no claimant of its tests: %s", e.Label(), f, c.whyPattern(e, f)))
 			}
 		}
 	}
@@ -461,19 +484,26 @@ func FindingID(msg string, prefixes []string) (string, bool) {
 	return "", false
 }
 
-// partlyShown is how many missing claimants verify names without --partly.
-const partlyShown = 10
+// Without --partly verify names up to partlyEach claimants without a pass of
+// each of the first partlyIDs partly run ids (section 12).
+const (
+	partlyIDs  = 10
+	partlyEach = 3
+)
 
-// PartlyFindings names the claimants that are not satisfied of the partly run ids
-// (of only, when it is set): the first ten in the order they print, and every
-// one with all (section 12).
+// PartlyFindings names the claimants that are not satisfied of the partly
+// run ids (of only, when it is set): up to three of each of the first ten
+// ids, in the order they print, and then how many more there are, in a line
+// that prints after them; every one with all (section 12).
 func (e *Evaluation) PartlyFindings(only map[string]bool, all bool) []report.Finding {
-	var msgs []string
+	var res []report.Finding
+	shown, left := 0, 0
 	for _, id := range e.PartlyIDs() {
 		if only != nil && !only[id] {
 			continue
 		}
 		pr := e.partly[id]
+		var msgs []string
 		for _, cl := range pr.Missing {
 			switch why, cannot := pr.Unjudged[cl]; {
 			case cannot:
@@ -484,15 +514,31 @@ func (e *Evaluation) PartlyFindings(only map[string]bool, all bool) []report.Fin
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: no verdict: %s", id, cl))
 			}
 		}
-	}
-	sort.Strings(msgs)
-	var res []report.Finding
-	for i, m := range msgs {
-		if !all && i == partlyShown {
-			res = append(res, report.Finding{Sev: report.Warn, Msg: fmt.Sprintf("partly run: %d more claimant(s) without a pass: machinery verify --partly lists every one", len(msgs)-partlyShown)})
-			break
+		sort.Strings(msgs)
+		shown++
+		for i, m := range msgs {
+			if !all && (shown > partlyIDs || i >= partlyEach) {
+				left++
+				continue
+			}
+			res = append(res, report.Finding{Sev: report.Warn, Msg: m})
 		}
-		res = append(res, report.Finding{Sev: report.Warn, Msg: m})
+	}
+	if left > 0 {
+		// it sorts after every line that begins "partly run: "
+		res = append(res, report.Finding{Sev: report.Warn, Key: "partly run: \uffff",
+			Msg: fmt.Sprintf("partly run: %d more claimant(s) without a pass: machinery verify --partly lists every one", left)})
+	}
+	return res
+}
+
+// ExcusedFindings returns the line of every entry of evidence.adapter.excused
+// in effect (sections 10.3 and 12); with globs each lists its globs and
+// patterns (verify --partly).
+func (e *Evaluation) ExcusedFindings(globs bool) []report.Finding {
+	var res []report.Finding
+	for _, u := range e.excused {
+		res = append(res, report.Finding{Sev: report.Warn, Msg: u.line(globs)})
 	}
 	return res
 }

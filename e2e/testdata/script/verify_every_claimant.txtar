@@ -93,7 +93,7 @@ stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: 
 # covers it, with a reason
 cp broken-excused.yaml machinery.yaml
 exec mrun 1 verify --allow-dirty
-stdout '^  warn   adapter excused: entry 1 \(tests e2e/broken/\*_test\.go\): 1 claimant\(s\) of 1 id\(s\): the broken package runs elsewhere$'
+stdout '^  warn   adapter excused: entry 1: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\): the broken package runs elsewhere$'
 stdout '^  warn   excused: inv:paid-before-shipped: proven \(1 claimant\(s\) excused\)$'
 ! stdout 'partly run: inv:paid-before-shipped'
 exec git checkout -q machinery.yaml
@@ -128,7 +128,8 @@ stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: 
 stdout '^  warn   partly run: inv:paid-before-shipped: skipped: e2e/extra/extra_test\.go::TestShipAgain$'
 ! stdout 'no verdict: e2e/extra/extra_test\.go::TestShipAgain'
 
-# past ten missing claimants verify names the first ten; --partly names every one
+# verify names up to three missing claimants of each of the first ten ids, and then how many
+# more there are, after them; --partly names every one
 rm .machinery/receipts
 exec git tag before-many
 mkdir e2e/many
@@ -138,10 +139,14 @@ exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
 stderr '^machinery run: adapter: partly run: 3 id\(s\): 3 of 17 claimants passed in this run$'
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 13 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout -count=10 '^  warn   partly run: [a-z:-]+: no verdict: '
+stdout -count=5 '^  warn   partly run: [a-z:-]+: no verdict: '
+stdout -count=3 '^  warn   partly run: inv:customer-email-unique: no verdict: '
 stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/many/many_test\.go::TestM01$'
-stdout '^  warn   partly run: 4 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
-! stdout 'TestShipAgain'
+! stdout 'TestM04'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
+stdout '^  warn   partly run: 9 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
+stdout 'no verdict: [^\n]*\n  warn   partly run: 9 more claimant'
+! stdout 'more claimant[^\n]*\n  warn   partly run: '
 exec mrun 1 verify --partly
 stdout -count=14 '^  warn   partly run: [a-z:-]+: no verdict: '
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
@@ -150,8 +155,8 @@ stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/ext
 # only, and drops the partly run ERRORs of the others
 exec mrun 1 verify --affected --base before-many
 stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 13 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout -count=10 '^  warn   partly run: inv:customer-email-unique: no verdict: '
-stdout '^  warn   partly run: 2 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
+stdout -count=3 '^  warn   partly run: inv:customer-email-unique: no verdict: '
+stdout '^  warn   partly run: 9 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
 ! stdout 'partly run: inv:paid-before-shipped'
 ! stdout 'partly run: sc:customer-pays-and-the-order-ships'
 

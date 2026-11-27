@@ -16,10 +16,22 @@ const (
 	Warn
 )
 
-// Finding is one line of a stage block.
+// Finding is one line of a stage block. Key, when set, is what the line
+// sorts by within its severity instead of Msg: a line that must print after
+// the lines it follows (a count of the lines left out) sorts by a key of its
+// own.
 type Finding struct {
 	Sev Severity
 	Msg string
+	Key string
+}
+
+// sortKey is what a finding sorts by within its severity.
+func (f Finding) sortKey() string {
+	if f.Key != "" {
+		return f.Key
+	}
+	return f.Msg
 }
 
 // Count is one entry of the checked line.
@@ -58,17 +70,17 @@ func (s *Stage) Count(n int, noun string) *Stage {
 
 // Errorf adds an ERROR finding.
 func (s *Stage) Errorf(format string, a ...any) {
-	s.Findings = append(s.Findings, Finding{Error, fmt.Sprintf(format, a...)})
+	s.Findings = append(s.Findings, Finding{Sev: Error, Msg: fmt.Sprintf(format, a...)})
 }
 
 // Driftf adds a DRIFT finding.
 func (s *Stage) Driftf(format string, a ...any) {
-	s.Findings = append(s.Findings, Finding{Drift, fmt.Sprintf(format, a...)})
+	s.Findings = append(s.Findings, Finding{Sev: Drift, Msg: fmt.Sprintf(format, a...)})
 }
 
 // Warnf adds a warn finding.
 func (s *Stage) Warnf(format string, a ...any) {
-	s.Findings = append(s.Findings, Finding{Warn, fmt.Sprintf(format, a...)})
+	s.Findings = append(s.Findings, Finding{Sev: Warn, Msg: fmt.Sprintf(format, a...)})
 }
 
 // NotApplicable marks the stage as not applicable and returns it.
@@ -133,14 +145,15 @@ func (s *Stage) OK() bool {
 }
 
 // Sorted returns the findings in the order a stage block prints them: ERROR,
-// then DRIFT, then warn, each group sorted by message.
+// then DRIFT, then warn, each group sorted by message (by its key, when it
+// has one).
 func (s *Stage) Sorted() []Finding {
 	fs := append([]Finding(nil), s.Findings...)
 	sort.SliceStable(fs, func(i, j int) bool {
 		if fs[i].Sev != fs[j].Sev {
 			return fs[i].Sev < fs[j].Sev
 		}
-		return fs[i].Msg < fs[j].Msg
+		return fs[i].sortKey() < fs[j].sortKey()
 	})
 	return fs
 }

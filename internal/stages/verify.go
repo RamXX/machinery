@@ -25,6 +25,7 @@ func VerifyStage(ev *evidence.Evaluation, only map[string]bool, partly bool) *re
 	s := report.New("verify")
 	s.Findings = append(s.Findings, ev.Findings...)
 	s.Findings = append(s.Findings, ev.PartlyFindings(only, partly)...) // section 10.3
+	s.Findings = append(s.Findings, ev.ExcusedFindings(partly)...)
 	if vas := ev.Design().VitalAreas(); len(vas) > 0 {
 		evidence.VitalOf(ev, vas, nil).Warn(s, true) // section 23.2
 	}

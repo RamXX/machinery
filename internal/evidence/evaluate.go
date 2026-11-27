@@ -73,6 +73,8 @@ type Evaluation struct {
 	partly     map[string]Partly
 	excusedOK  map[string]int
 	noClaimant map[string]int
+	// excused: what each entry of evidence.adapter.excused in effect covers
+	excused []excusedUse
 	// seen: the ids a receipt of a usable run names; passes: the adapter
 	// passes of those runs
 	seen   map[string]bool
@@ -322,9 +324,7 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 	if err != nil {
 		return err
 	}
-	for _, u := range cs.uses {
-		add(report.Warn, "%s", u)
-	}
+	ev.excused = cs.uses // printed by verify, with or without the globs (section 12)
 	for _, pr := range cs.problems {
 		add(report.Error, "%s", pr)
 	}

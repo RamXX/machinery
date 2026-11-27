@@ -21,10 +21,16 @@ stdout '^  warn   excused: inv:paid-before-shipped: proven \(2 claimant\(s\) exc
 stdout '^  warn   excused: inv:terminal-is-final: proven \(1 claimant\(s\) excused\)$'
 # an id whose every claimant is excused is not proven, owed or not
 stdout '^  warn   no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused: run a claimant of it here and narrow evidence\.adapter\.excused, or prove it with a receipt a test emits$'
-# every entry in effect, once, with what it covers
-stdout '^  warn   adapter excused: entry 1 \(tests e2e/cluster/\*_test\.go\): 2 claimant\(s\) of 2 id\(s\): the cluster tests need three nodes; they run in the nightly job$'
-stdout '^  warn   adapter excused: entry 2 \(tests e2e/extra/\*_test\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\): needs a second shop instance$'
-stdout '^  warn   adapter excused: entry 3 \(tests e2e/suite/outage_test\.go\): 1 claimant\(s\) of 1 id\(s\): the provider sandbox is unreachable from CI$'
+# every entry in effect, once, with what it covers and how many globs it has; --partly lists
+# the globs
+stdout '^  warn   adapter excused: entry 1: 2 claimant\(s\) of 2 id\(s\), 1 glob\(s\): the cluster tests need three nodes; they run in the nightly job$'
+stdout '^  warn   adapter excused: entry 2: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\), 1 function pattern\(s\): needs a second shop instance$'
+stdout '^  warn   adapter excused: entry 3: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\): the provider sandbox is unreachable from CI$'
+stdout -count=3 'adapter excused: entry'
+! stdout 'adapter excused: entry [0-9]+ \(tests'
+exec mrun 1 verify --partly
+stdout '^  warn   adapter excused: entry 1 \(tests e2e/cluster/\*_test\.go\): 2 claimant\(s\) of 2 id\(s\), 1 glob\(s\): the cluster tests need three nodes; they run in the nightly job$'
+stdout '^  warn   adapter excused: entry 2 \(tests e2e/extra/\*_test\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\), 1 function pattern\(s\): needs a second shop instance$'
 stdout -count=3 'adapter excused: entry'
 exec machinery status --no-backlog
 stdout '^excused: 2 id\(s\) proven with 3 claimant\(s\) excused, 1 id\(s\) with no claimant that can run here$'
@@ -83,7 +89,7 @@ exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 3 claimants passed \(2 claimant\(s\) excused\): run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestPaidOther$'
-stdout '^  warn   adapter excused: entry 2 \(tests e2e/extra/\*_test\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\): needs a second shop instance$'
+stdout '^  warn   adapter excused: entry 2: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\), 1 function pattern\(s\): needs a second shop instance$'
 ! stdout 'no verdict: e2e/extra/extra_test\.go::TestShipAgain'
 
 # a pattern that covers nothing is an error
@@ -96,8 +102,8 @@ stdout '^  ERROR  adapter excused: entry 5: functions "TestNothing\*" covers no 
 stdout '^  ERROR  adapter excused: entry 6: tests "e2e/suite/scenario_test\.go" covers no claimant: its functions leave out every claimant of the files it matches: correct the functions or remove the glob$'
 stdout '^  ERROR  adapter excused: entry 6: functions "TestPayThenShip" covers no claimant of its tests: it matches a function of e2e/suite/scenario_test\.go, whose claim is file-level; a file-level claimant is excused by its file, not by a function: excuse the file in an entry without functions, or move the marker above the function$'
 stdout '^  ERROR  adapter excused: entry 7: functions "Test\*" covers no claimant of its tests: it matches a function of e2e/suite/scenario_test\.go, whose claim is file-level; '
-stdout '^  warn   adapter excused: entry 6 \(tests e2e/suite/scenario_test\.go; functions TestPayThenShip\): 0 claimant\(s\) of 0 id\(s\): the scenario needs a second shop$'
-stdout '^  warn   adapter excused: entry 7 \(tests e2e/suite/scenario_test\.go; functions Test\*\): 0 claimant\(s\) of 0 id\(s\): every scenario test needs a second shop$'
+stdout '^  warn   adapter excused: entry 6: 0 claimant\(s\) of 0 id\(s\), 1 glob\(s\), 1 function pattern\(s\): the scenario needs a second shop$'
+stdout '^  warn   adapter excused: entry 7: 0 claimant\(s\) of 0 id\(s\), 1 glob\(s\), 1 function pattern\(s\): every scenario test needs a second shop$'
 ! stdout 'excused: sc:'
 
 # an entry needs tests and a reason of one line, and patterns that are valid
