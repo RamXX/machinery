@@ -342,6 +342,16 @@ Rules:
   file, the adoption and excused files, receipts files, property records) are exempt anyway and
   are never named. With `trace` set and `trace.code` left out, `trace.code` is the scope
   (below), so a glob over files in the scope is refused until `trace.code` names the code.
+  Submodules are refused too (section 10.1): a glob that matches a submodule pointer the index
+  records (a gitlink, mode `160000`) is
+  `evidence.exempt: "<glob>" would exempt <path>: <path> is a submodule pointer: a change of it voids earlier runs; narrow the glob`,
+  and a glob that can match a path below a submodule (a pointer of the index, or a path
+  `.gitmodules` records at the top of the work tree), whose files machinery never sees, is
+  `evidence.exempt: "<glob>" matches paths below <path>, a submodule whose files machinery never sees: <path> is a submodule pointer: a change of it voids earlier runs; narrow the glob`.
+  A glob can match a path below `<path>` when, read segment by segment with its braces
+  expanded, each segment of `<path>` is matched by the segment of the glob in its place and the
+  glob goes on after them, or a `**` segment comes before their end: `third_party/**` and
+  `**/*.md` reach below `third_party/lib`, `docs/**` and `third_party/*.md` do not.
 - `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
   config error (`plan.wire_max_files must not be negative`).
 - `review.backlog` and `review.design` are `required` or `off`
@@ -2037,7 +2047,7 @@ for such a run too.
 `machinery run`:
 
 1. reads the current commit (`git rev-parse HEAD`) and whether the tree is dirty
-   (`git status --porcelain` not empty, ignoring the owed file, the receipts files (the
+   (`git status --porcelain=v2` not empty, both paths of a rename or a copy read, ignoring the owed file, the receipts files (the
    `.jsonl` files directly in the receipts directory, and nothing else in it) and the property
    records `<gen>/vital/*.json`, whose statuses render the owed file (section 23.4));
 2. deletes receipt files in the receipts directory that are not valid for the current commit
@@ -2100,9 +2110,10 @@ only after its assertions held. Section 10.2 says which receipts are read at all
 Evidence is bound to a commit. A receipts file is **valid for the current commit** when its header
 commit is the current commit, or when its header commit is an ancestor of the current commit and
 every path that differs between the two is **exempt**. The paths are those of
-`git diff --name-only --no-renames <receipt commit> HEAD`: a file renamed since counts by its old
-path and by its new one, so a file moved into an exempt directory from anywhere else voids the
-run. A path is exempt when it is:
+`git diff --raw -M -C --relative <receipt commit> HEAD -- .`, run in the project directory: only
+paths inside the project directory are compared, and a file renamed or copied since counts by
+both of its paths, so a file moved into an exempt directory from anywhere else voids the run. A
+path is exempt when it is:
 
 - **a file of the tool**: the owed file, `design/adoption.yaml` (section 2.1),
   `design/excused.yaml` (section 2.2), a receipts file (a `.jsonl` file directly in the receipts
@@ -2116,6 +2127,14 @@ run. A path is exempt when it is:
   `GNUmakefile`, or whose name ends in `.lock`, `.lockb`, `-lock.json`, `-lock.yaml` or
   `.mk`, in any directory. A glob that matches such a file of the project is a config error
   (section 2); such a path that only the diff names (a file deleted since) is not exempt either.
+
+A path that is a **submodule pointer** (a gitlink, mode `160000`) in either commit is never
+exempt, whatever a glob says, also at the path of a file of the tool:
+`<path> is a submodule pointer: a change of it voids earlier runs`.
+machinery sees the pointer and none of the files of the submodule, and a new pointer can change
+the build (a `replace` directive to the submodule, a vendored library) and what the tests read.
+A glob that matches a submodule pointer, or can match a path below a submodule, is a config
+error (section 2), so that no glob seems to exempt files machinery cannot see.
 
 A run whose commit is **not an ancestor** of the current commit is never valid, even when the two
 trees are the same: an amended or rebased commit is another commit, and a run of a commit outside
@@ -2134,18 +2153,35 @@ changes, an `evidence.exempt` glob or an excused entry written there included.
 `verify` (section 12) and `status` (section 14) say of every run they use that was made at an
 earlier commit how it reaches the current one:
 `run: <file>: made at <short sha>, valid at HEAD through <n> exempt commit(s)`, `<n>` the commits
-from its commit to HEAD (`git rev-list --count <receipt commit>..HEAD`).
+from its commit to HEAD (`git rev-list --count <receipt commit>..HEAD`). `verify` follows that
+line with one line for every glob of `evidence.exempt` in effect, in the order written,
+`run: <file>: evidence.exempt "<glob>" exempted <k> path(s) changed since <short sha>`, `<k>` the
+paths changed between the run's commit and HEAD that the glob matches, `0` included; a file of
+the tool is counted by no glob.
 
 The rule of section 10 for a dirty tree does not change: an uncommitted change to an exempt path
 still makes the tree dirty, and a run made then records `"dirty":true`. Commit the change, and
 the run of the commit before it stays valid.
 
-**What this defends against.** A run is used at a later commit only when nothing that could change
-its verdicts changed since: a test, the code, the design, the configuration, the build. It
-defends against a mistake (a test edited after the run, a dependency bumped, a run copied from
-another branch, a rebase). A glob of `evidence.exempt` is the project's statement that what it
-matches cannot change a verdict; machinery holds it to the files above and to nothing more, and
-the ratchet reports every glob added or widened (section 11.3).
+**What exempt can and cannot protect.** A run is used at a later commit only when every path
+changed since is a file of the tool or a path a glob of `evidence.exempt` matches. The tool
+refuses a glob over what it knows can change a verdict: the tests (`trace.tests`), the code
+(`trace.code`), the design sources, the configuration (`machinery.yaml`), a submodule and its
+pointer, and the build manifests, which it knows by these names only: `go.mod`, `go.sum`,
+`go.work`, `go.work.sum`, `package.json`, `npm-shrinkwrap.json`, `Makefile`, `makefile`,
+`GNUmakefile`, and a name that ends in `.lock`, `.lockb`, `-lock.json`, `-lock.yaml` or `.mk`.
+It **cannot know which other files a test reads**: fixtures, golden files, scripts, data, a file
+the code embeds, a toolchain file, the manifest of another ecosystem (`pyproject.toml`,
+`Cargo.toml`, `requirements.txt`). Exempting such a path keeps the runs valid although their
+outcomes may change: a fixture changed so that its test fails keeps the earlier pass. A glob of
+`evidence.exempt` is the project's statement that what it matches cannot change a verdict;
+machinery holds it to the files above and to nothing more. `verify` prints every exempt glob in
+effect with the count of paths it exempted between each run and HEAD (above), and the ratchet
+reports every glob added or widened (section 11.3). Only paths inside the project directory are
+compared: in a repository that holds the project in a subdirectory, a change outside that
+directory never voids a run. The rule defends against a mistake (a test edited after the run, a
+dependency bumped, a run copied from another branch, a rebase), not against a glob written too
+wide.
 
 ### 10.2 Which receipts count
 
@@ -2513,9 +2549,10 @@ verdict", below) and what a claim of a whole file waits for ("Whose claim"). The
 is a `TestMain` whose parameter is written as a pointer to a type named `M` (`*testing.M`,
 `*M`): it is the test main. A `TestMain` with another parameter, `TestMain(t *testing.T)`
 for one, is a test function, and `go test` runs it as a test. Benchmarks, fuzz tests and
-examples are not test functions. Files are parsed as Go source and never compiled, and their build constraints are not
-read: a file left out of the build is read like any other. machinery never decides which files
-a run built (below).
+examples are not test functions. Files are parsed as Go source and never compiled, and their build
+constraints are never evaluated: a file left out of the build is read like any other, and
+machinery never decides which files a run built (below). It only notes whether a file carries
+one, for the rule of a file with no test function (below).
 
 **Whose claim.** The claims of a file under `trace.tests` are read exactly as stage `trace`
 reads them (sections 8 and 8.1). Each is attributed:
@@ -2545,9 +2582,9 @@ reads them (sections 8 and 8.1). Each is attributed:
 
 **A file with no test function: judged by its set.** A helper staged with a set of tests, or a
 `_test.go` file of helpers, claims ids for the tests it serves and has no test function of its
-own. When such a file (one the adapter reads, that parses, with a claim of the whole file) is a
-candidate of a package the run saw ("Whose verdict", below), the functions its claims belong to
-are **its set**: for every such package, every test function defined in that package's candidate
+own. When such a file (one the adapter reads, that parses, with a claim of the whole file, and
+that carries no build constraint) is a candidate of a package the run saw ("Whose verdict",
+below), the functions its claims belong to are **its set**: for every such package, every test function defined in that package's candidate
 files, each judged by its verdict in that package and by the state of its own file (a fail that
 went to the file by name or from another package included). The table of "Which receipt" applies
 to them as to the functions of a file: the file gets a `pass` only when, in this one run, every
@@ -2565,6 +2602,15 @@ the file at `granularity: file`, and its `observed` says so:
 of the run names every file it judged by its set (below). A file with no test function that is
 a candidate of no package of a run, or only of packages with no test function, is judged by no
 set in that run.
+
+A file **carries a build constraint** when a line before its package clause is a `//go:build` or
+`// +build` line, whatever its expression, or when its name alone keeps it out of some builds:
+a `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` suffix before `_test.go` or `.go`, by the lists of
+known systems of `go/build` (`helper_windows_test.go`, `wire_arm64.go`,
+`helper_linux_amd64_test.go`), or a name that begins with `_` or `.`, which go never builds. Such
+a file with no test function is judged by no set, in any run and whatever the run's system or
+tags: `go test` may not have built it, and the pass of its set says nothing of a file outside the
+build. It stays a claimant the adapter cannot judge ("A file the adapter cannot judge", below).
 
 **Which verdict.** The verdict of a function is its `pass`, `fail` or `skip` event, read with
 those of its subtests (a `Test` that begins with the function's name and a `/`, at any depth)
@@ -2877,6 +2923,7 @@ adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in pa
 adapter: <function>: failed in <where>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
 adapter: <file>: no test function; its claims are judged by its set: every test function of package <import path>
+adapter: <file>: no test function; it carries a build constraint, so no set judges it: its claims count nothing
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: cannot be read as Go (<first parse error>): its claims count as not passed; fix the file or remove its markers
 adapter: streams kept in <dir>/<run id>: <n> file(s)
@@ -2925,7 +2972,8 @@ replayed from the cache, a package that did not end with pass, or an ambiguous n
 above a function the adapter does not judge counts in neither. The `no test function` lines
 name only the candidate files of the packages the run saw: `its claims are judged by its set`
 for one the run judged by its set, with the packages of its set (`packages <a>, <b>` for
-several), and `its claims count nothing` for the others. `in the whole project` counts the
+several), `it carries a build constraint, so no set judges it` for one that carries a build
+constraint, and `its claims count nothing` for the others. `in the whole project` counts the
 ids without a receipt with a claim whose function did not run, the claiming files with no
 test function, and the distinct file, id and function combinations of claims above functions
 the adapter does not judge, across every file the adapter reads. In a run that wrote no receipt
@@ -3023,10 +3071,13 @@ it is satisfied by (b), or excused (below), and by nothing else. `verify` names 
 | `a Go file not named _test.go that no entry of evidence.adapter.sources names` | A Go file the adapter does not read, a test file whose name lacks `_test` included. It is not parsed, so it is the same claimant with a syntax error and without one. |
 | `cannot be read as Go: <first parse error>` | A file the adapter reads that the Go parser refuses, `<first parse error>` as in the run summary (above). The line scan of section 8 still finds its markers. It is the threat model's "a claiming file the run did not build", which the command could not have built either. |
 | `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above a fuzz test, a benchmark or an example and none at file level; the first such function in the file. |
-| `no test function` | A file the adapter reads, with a claim of the whole file for the id and no test function, that no run used at the commit judged by its set. |
+| `it carries a build constraint: it may not have been built` | A file the adapter reads, with a claim of the whole file for the id and no test function, that carries a build constraint ("A file with no test function: judged by its set", above). No run judges it by its set. |
+| `no test function` | A file the adapter reads, with a claim of the whole file for the id and no test function, that carries no build constraint and that no run used at the commit judged by its set. |
 
 The line `verify` prints for such a file (section 12) ends with what to do. For a file that cannot
-be read as Go: fix it so that it can be read as Go, or excuse it with a reason. For any other:
+be read as Go: fix it so that it can be read as Go, or excuse it with a reason. For a file that
+carries a build constraint: put its marker above a test function, emit a receipt from its own
+test, or excuse it with a reason. For any other:
 emit a receipt from its own test, name a staged Go source in `evidence.adapter.sources`, or
 excuse it with a reason; and for a file that is not a Go file, when it is not a test at all (a
 README or a golden file that quotes the marker), remove its marker for the id: it then claims
@@ -3179,8 +3230,9 @@ machinery owed sync [--prune-only] [--allow-dirty]
 
 The owed list records what the committed design, tests and configuration prove, so before it
 reads anything `owed sync` refuses, without `--allow-dirty`, while the working tree has an
-uncommitted change (`git status --porcelain`: changed, added, deleted or untracked) in a file that
-can change a verdict: `machinery.yaml`, `design/adoption.yaml` (section 2.1),
+uncommitted change (`git status --porcelain=v2`: changed, added, deleted or untracked, both paths
+of a rename or a copy, so a test file moved out of `trace.tests` counts by its old path) in a
+file that can change a verdict: `machinery.yaml`, `design/adoption.yaml` (section 2.1),
 `design/excused.yaml` (section 2.2), the status file (section 4.1), a design source (section
 10.1) or a file under `trace.tests`. It prints
 `ERROR  owed sync: uncommitted changes in files that can change a verdict: <files>: commit them, or pass --allow-dirty to sync against the working tree`,
@@ -3347,7 +3399,9 @@ Findings:
   `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); <what to do>`,
   `<why>` as in section 10.3 ("A file the adapter cannot judge"), `<what to do>` as
   `fix the file so that it can be read as Go, or give it an excused entry with a reason` for
-  `cannot be read as Go: ...`, and otherwise as
+  `cannot be read as Go: ...`,
+  `put the marker above a test function, emit a receipt from its own test, or give it an excused entry with a reason`
+  for `it carries a build constraint: it may not have been built`, and otherwise as
   `it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
   followed for `not a Go file` by `; if the file is not a test (a README, a golden file), remove its marker for the id`.
   Without `--partly` they print for the first ten partly run ids, sorted, up to three for each
@@ -3370,8 +3424,10 @@ Findings:
   under `--partly`, and the ERRORs of a glob or a pattern through which an entry covers no
   claimant (section 10.3, with the texts).
 - `warn   run: <file>: made at <short sha>, valid at HEAD through <n> exempt commit(s)`, once for
-  every run used that was made at an earlier commit (section 10.1). It is a record, not a
-  judgment; with `--story` and `--affected` it prints all the same.
+  every run used that was made at an earlier commit (section 10.1), each followed by
+  `warn   run: <file>: evidence.exempt "<glob>" exempted <k> path(s) changed since <short sha>`
+  for every glob of `evidence.exempt`, in the order written (section 10.1). They are a record,
+  not a judgment; with `--story` and `--affected` they print all the same.
 - `warn   adapter environment: <file>: <what the header recorded>`, once for every adapter run
   that is used (section 10.3, with the text). It is a record: environments that differ between
   runs at the same commit are no finding. With `--story` it prints for every such run.
@@ -3424,7 +3480,8 @@ Testing shifts right: per change, run what the change can break; run everything 
 (section 12.2).
 
 `machinery affected --base <ref>` prints, one per line and sorted, the obligation ids touched by
-the difference between `<ref>` and the working tree:
+the difference between `<ref>` and the working tree (untracked files and both paths of a rename
+or a copy included):
 
 1. ids whose entry in `obligations.json` is new or differs from the base (title, effects);
 2. ids named by a `machinery:verifies` tag, or claimed by a verifies or scenarios marker
@@ -4751,7 +4808,7 @@ scopes to find competing writers; stage `scope` holds a story to its own:
 machinery check --base <ref> --story <id>
 ```
 
-The changed files are those of `git diff --name-only --no-renames --cached <merge base>`, the
+The changed files are those of `git diff --raw -M -C --cached <merge base>` (both paths of a rename or a copy), the
 merge base being `git merge-base <ref> HEAD`: what is committed since the branch left the base,
 and what is staged to be committed. The owed list and the tests and architecture baselines are
 not judged: a builder prunes them (`machinery owed sync --prune-only`), and the ratchet holds
