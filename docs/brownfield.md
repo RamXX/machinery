@@ -84,7 +84,10 @@ machinery adopt --paths 'internal/shipping/**' --e2e 'e2e/**'
 ```
 
 The report says what it found: languages, code files in scope, test files (how many are unit
-tests, how many use test doubles), design sources, and the state of the backlog.
+tests, how many use test doubles), design sources, and the state of the backlog. Reading
+the backlog runs `bd`; `adopt`, `status` and `check` skip it with `--no-backlog` or with
+`MACHINERY_NO_BACKLOG=1` in the environment and say `backlog: not read`, and a `bd` that is
+missing or fails is never an error for them (`verify`, `trace` and `owed` never run it).
 
 ## 4. Adopt the area
 

@@ -358,7 +358,7 @@ Rules:
 | `machinery arch` | Stage `arch` (section 9). `--write-baseline` rewrites the baseline file. |
 | `machinery tests` | Stage `tests` (section 9.4). `--write-baseline` rewrites the baseline file. |
 | `machinery trace` | Stage `trace` (section 8). `--non-action-serves` lists the ids that serves tags name and that are not actions, and runs no check. |
-| `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3), and with `--story <id>` as well stage `scope` (section 15.11). |
+| `machinery check` | Every stage of `lint`, then `gen-drift`, `formal`, `checkers`, `arch`, `tests`, `trace`, `contract`, `intake`. With `--base <git-ref>` also stage `ratchet` (section 11.3), and with `--story <id>` as well stage `scope` (section 15.11). `--no-backlog` (section 15.1). |
 | `machinery checks` | Prints the declaration of applicable checks (section 3.4). A report, never a gate. |
 | `machinery run -- <command...>` | Runs a test command and records a receipts file (section 10). `--adapter go-test-json -- go test ...` also writes the receipts of an existing Go suite from its event stream, and with `--streams -- <command>` from the streams a wrapper leaves (section 10.3). |
 | `machinery verify` | Stage `verify` (section 12). `--allow-dirty`, `--affected --base <ref>`, `--story <id>`. |
@@ -367,7 +367,7 @@ Rules:
 | `machinery owed list` | Prints the owed list. |
 | `machinery owed sync` | Rewrites `owed.yaml` from the current evidence (section 11.2). `--prune-only` never adds. |
 | `machinery proof` | Prints a proof block (section 13). `--limit`, `--learning`, `--observation`; `--story <id> --post` writes it to the story. |
-| `machinery status` | Prints a summary (section 14). A report, never a gate. |
+| `machinery status` | Prints a summary (section 14). A report, never a gate. `--no-backlog` (section 15.1). |
 | `machinery probe -- <command...>` | Stage `probe`: mutates the generated tables and expects the tests to notice (section 20). Never part of `check`. |
 | `machinery formal new <spec>` | Scaffolds a spec manifest and a property module (section 16.2). |
 | `machinery formal gen` | Writes the generated skeletons of the formal models (section 16.2). `--check` reports drift. |
@@ -396,7 +396,7 @@ Rules:
 | `machinery checkers run [<id>...]` | Runs the external checkers registered on this machine and records their evidence (section 22). |
 | `machinery checkers list` | Lists the configured checkers, whether each is registered locally, and the state of its evidence. |
 | `machinery init` | Scaffolds a new project (section 17.1). |
-| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3). |
+| `machinery adopt` | Brings an existing project under machinery without touching its code (section 17.2); `--no-backlog` (section 15.1). `--rehearse` adopts a snapshot outside the project and reports what blocks (section 17.3). |
 | `machinery assess` | Reports, read-only, where an existing project stands against its own design (section 18). |
 | `machinery vital candidates` | Lists the design ids that look as if they belong in a vital area and are in none, with the reason (section 23.3). A report, never a gate. |
 | `machinery hook <event>` | Reads a harness's hook JSON on stdin and answers with hook JSON on stdout: `session-start`, `pre-tool`, `stop` (section 21.1). Always exits 0. |
@@ -3031,7 +3031,9 @@ id: the summary line of `machinery intake status` (section 15.7),
 `review <design|intake> <intake id>: <verdict> at <12 hex> by <actor>[, <n> issue(s)]` for the latest
 review of that kind on each open intake item, by intake id, the 12 hex being the contract hash
 the review was for; and then, when a question is open (section 15.9),
-`questions: <n> open, <k> held`. Exit 0 unless the config is invalid (2) or the owed file does
+`questions: <n> open, <k> held`. With `--no-backlog` or `MACHINERY_NO_BACKLOG=1` the backlog is
+not read and, when `backlog.tool` is set, the one line `backlog: not read` stands in their place
+(section 15.1). Exit 0 unless the config is invalid (2) or the owed file does
 not parse (1, section 11.1).
 
 ## 15. Backlog and scheduling
@@ -3047,6 +3049,21 @@ machinery talks to the backlog only by running the `bd` executable (`tools.bd`) 
 directory and reading its JSON output. The backlog is never committed and machinery never writes
 its files directly. When `bd` cannot be run, a command that needs it exits 2 with
 `config: bd not runnable: <reason>`.
+
+**Commands that read only design and evidence.** `adopt`, `status`, `verify`, `check`,
+`trace` and `owed` never need the backlog tool. `verify`, `trace` and `owed` never run it.
+`adopt` (its `backlog:` line, section 17.2), `status` (its intake, review and question lines,
+section 14) and `check` (stage `intake`, section 15.7) run it only for the lines they derive from
+the backlog, and with the flag `--no-backlog`, or with the environment variable
+`MACHINERY_NO_BACKLOG` set to `1`, they do not run it at all: adopt's backlog line is
+`backlog: not read` when a `.beads` directory exists (`backlog: none found` otherwise), status
+prints `backlog: not read` in place of its backlog lines when `backlog.tool` is set, and stage
+`intake` is `not applicable: backlog: not read`. A `bd` that is missing or fails is never an
+error for these commands: adopt's line is `backlog: bd not runnable`, status prints none of its
+backlog lines, and stage `intake` is not applicable (section 15.7). `--story` of `verify` and of
+`check --base` names a story of the backlog and reads it, so with the switch it is refused
+before anything runs:
+`usage: --story reads its story from the backlog, which --no-backlog or MACHINERY_NO_BACKLOG=1 says not to read`.
 
 A story carries machine-readable lines, anywhere in its description or notes. They use the tag
 syntax of section 8:
@@ -3667,7 +3684,8 @@ printed when `<n>` is 0.
 
 **Stage `intake`.** Part of `machinery check`. It reads the backlog with one `bd list`, only when
 `backlog.tool` is set and `bd` is runnable. It is `not applicable: no backlog configured`,
-`not applicable: bd not runnable`, `not applicable: the backlog cannot be read` or
+`not applicable: backlog: not read` (with `check --no-backlog` or `MACHINERY_NO_BACKLOG=1`,
+section 15.1), `not applicable: bd not runnable`, `not applicable: the backlog cannot be read` or
 `not applicable: no open intake item` otherwise. For each open intake item:
 
 - `warn   intake <id>: the design changed and no stories were planned from it; run machinery intake plan <id>`
@@ -4558,7 +4576,7 @@ need a rewrite, a freeze or a migration of the backlog. It starts from the code 
 they are, covers only what it is pointed at, and is widened over time.
 
 ```
-machinery adopt [--paths <glob>]... [--e2e <glob>]... [--write]
+machinery adopt [--paths <glob>]... [--e2e <glob>]... [--write] [--no-backlog]
 ```
 
 Without `--write` it changes nothing and prints the report and the files it would write. The
@@ -4579,7 +4597,8 @@ next:
   <one line per suggested step>
 ```
 
-`backlog:` is `none found` when the project has no `.beads` directory. Files under the gen
+`backlog:` is `none found` when the project has no `.beads` directory, `bd not runnable` when `bd`
+fails, and `not read` with `--no-backlog` or `MACHINERY_NO_BACKLOG=1` (section 15.1). Files under the gen
 directory are generated, never design sources: adopt does not find models, machines or contracts
 there. An `import` section is configured by hand (section 2); adopt detects nothing for it, but
 it works with an existing `machinery.yaml` that has one: `design:` counts the files

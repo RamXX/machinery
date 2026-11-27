@@ -27,6 +27,9 @@ type Options struct {
 	Write bool     // --write
 	// NoBacklog never runs the backlog tool (a rehearsal, section 17.3).
 	NoBacklog bool
+	// SkipBacklog never runs the backlog tool either: --no-backlog or
+	// MACHINERY_NO_BACKLOG=1 (section 15.1).
+	SkipBacklog bool
 	// Commit is the short sha the report and every reason name; empty, the
 	// HEAD of Root. A rehearsal gives the HEAD of the project it snapshotted,
 	// never the snapshot's own commit (section 17.3).
@@ -120,7 +123,7 @@ func Run(o Options) (*Result, error) {
 	if oldP != nil {
 		exe = oldP.Cfg.Tools.BD
 	}
-	res := &Result{Name: filepath.Base(root), Write: o.Write, Sha: "no commit", Backlog: readBacklog(root, exe, o.NoBacklog)}
+	res := &Result{Name: filepath.Base(root), Write: o.Write, Sha: "no commit", Backlog: readBacklog(root, exe, o.NoBacklog, o.SkipBacklog)}
 	head := o.Commit
 	if h, herr := gitx.Head(root); herr == nil && head == "" {
 		head = gitx.Short(h)

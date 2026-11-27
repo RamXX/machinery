@@ -19,12 +19,18 @@ func runStageCommand(e *Env, name string, args []string, all []string, withBase 
 	var want StringList
 	fs.Var(&want, "stage", "run only this stage (repeatable)")
 	base, story := "", ""
+	skip := false
 	if withBase {
 		fs.StringVar(&base, "base", "", "git ref to ratchet against")
 		fs.StringVar(&story, "story", "", "with --base: hold this story to its scope (stage scope)")
+		fs.BoolVar(&skip, "no-backlog", false, "do not run the backlog tool; stage intake says "+notRead)
 	}
 	if !e.Parse(fs, args) {
 		return 2
+	}
+	skip = withBase && noBacklog(skip)
+	if story != "" && skip {
+		return e.Usage("%s", storyNeedsBacklog)
 	}
 	if fs.NArg() > 0 {
 		return e.Usage("machinery %s takes no arguments", name)
@@ -59,7 +65,11 @@ func runStageCommand(e *Env, name string, args []string, all []string, withBase 
 			return code
 		}
 	}
-	return e.RunStages(name, &stages.Context{P: p, Base: base, Story: story}, sel)
+	ctx := &stages.Context{P: p, Base: base, Story: story}
+	if skip {
+		ctx.NoBacklog = notRead
+	}
+	return e.RunStages(name, ctx, sel)
 }
 
 func wants(want []string, stage string) bool {

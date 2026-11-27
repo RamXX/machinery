@@ -1,0 +1,66 @@
+# commands that only read design and evidence never need the backlog tool (section 15.1): verify,
+# trace and owed never run it; adopt, status and check skip it with --no-backlog or
+# MACHINERY_NO_BACKLOG=1 and say "backlog: not read"; a backlog tool that fails is never an error
+# for them. The bd here records every call and fails
+fixture shop
+exec sh -c 'printf "backlog:\n  tool: bd\n" >> machinery.yaml'
+mkdir .beads
+mkdir fakebin
+cp bd.sh fakebin/bd
+chmod 755 fakebin/bd
+env PATH=$WORK/fakebin${:}$PATH
+env BD_LOG=$WORK/.home/bd.log
+exec machinery gen
+gitinit
+
+# verify, trace and owed never run it
+exec machinery run -- sh -c 'exit 0'
+exec mrun 1 verify
+exec machinery trace
+exec machinery owed list
+exec machinery owed sync --prune-only
+! exists .home/bd.log
+
+# with MACHINERY_NO_BACKLOG=1 adopt, status and check do not run it either, and say so
+env MACHINERY_NO_BACKLOG=1
+exec machinery adopt
+stdout '^backlog: not read$'
+exec machinery status
+stdout '^backlog: not read$'
+exec machinery check --stage intake
+stdout '^not applicable: backlog: not read$'
+# --story reads its story from the backlog: it is refused under the switch, before anything runs
+exec mrun 2 verify --story shop-1
+stderr '^usage: --story reads its story from the backlog, which --no-backlog or MACHINERY_NO_BACKLOG=1 says not to read$'
+exec mrun 2 check --base HEAD --story shop-1
+stderr '^usage: --story reads its story from the backlog, which --no-backlog or MACHINERY_NO_BACKLOG=1 says not to read$'
+! exists .home/bd.log
+env MACHINERY_NO_BACKLOG=
+
+# --no-backlog does the same
+exec machinery adopt --no-backlog
+stdout '^backlog: not read$'
+exec machinery status --no-backlog
+stdout '^backlog: not read$'
+exec machinery check --stage intake --no-backlog
+stdout '^not applicable: backlog: not read$'
+exec mrun 2 check --base HEAD --story shop-1 --no-backlog
+stderr '^usage: --story reads its story from the backlog, which --no-backlog or MACHINERY_NO_BACKLOG=1 says not to read$'
+! exists .home/bd.log
+
+# without the switch adopt, status and check run it for their backlog lines; it fails, and that
+# is no error
+exec machinery adopt
+stdout '^backlog: bd not runnable$'
+exec machinery status
+! stdout '^backlog'
+exec machinery check --stage intake
+stdout '^not applicable: bd not runnable$'
+exists .home/bd.log
+
+-- bd.sh --
+#!/bin/sh
+# a backlog tool that records every call and fails
+echo "$*" >> "$BD_LOG"
+echo "bd: no backlog here" >&2
+exit 1

@@ -44,6 +44,10 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - An answer on the owner's behalf comes from a `*-delegate` agent that did not ask the question.
 - `decisions import`: the records of an existing decision file become backlog decisions, once
   each.
+- `adopt`, `status`, `verify`, `check`, `trace` and `owed` never need the backlog tool: the
+  last three never run it, and `adopt`, `status` and `check` skip it with `--no-backlog` or
+  `MACHINERY_NO_BACKLOG=1` and print `backlog: not read`; `--story` is refused under the
+  switch.
 - `adopt --write` writes only `machinery.yaml`, files under `design/` and the gen directory, the
   owed list and the baselines: the rendering beside a model kept elsewhere is the project's file,
   and adopt says `<file> is stale; the project regenerates it` (or `is missing`) and leaves it.

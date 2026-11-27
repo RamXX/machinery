@@ -14,6 +14,7 @@ type Backlog struct {
 	Found    bool // a .beads directory exists
 	Runnable bool // bd answered
 	NotRead  bool // a rehearsal: bd is never run (section 17.3)
+	Skipped  bool // --no-backlog or MACHINERY_NO_BACKLOG=1: bd is never run (section 15.1)
 	Open     int
 	Ready    int
 	Closed   int
@@ -27,6 +28,8 @@ func (b Backlog) Line() string {
 		return "backlog: none found"
 	case b.NotRead:
 		return "backlog: bd, not read in a rehearsal"
+	case b.Skipped:
+		return "backlog: not read"
 	case !b.Runnable:
 		return "backlog: bd not runnable"
 	}
@@ -58,9 +61,10 @@ type rawIssue struct {
 	} `json:"dependencies"`
 }
 
-// readBacklog runs bd in the project directory when a .beads directory exists.
-// A missing or failing bd is reported in the result, never as an error.
-func readBacklog(root, exe string, notRead bool) Backlog {
+// readBacklog runs bd in the project directory when a .beads directory exists,
+// unless notRead (a rehearsal) or skip (the switch of section 15.1) says not
+// to. A missing or failing bd is reported in the result, never as an error.
+func readBacklog(root, exe string, notRead, skip bool) Backlog {
 	var b Backlog
 	if info, err := os.Stat(filepath.Join(root, ".beads")); err != nil || !info.IsDir() {
 		return b
@@ -68,6 +72,10 @@ func readBacklog(root, exe string, notRead bool) Backlog {
 	b.Found = true
 	if notRead {
 		b.NotRead = true
+		return b
+	}
+	if skip {
+		b.Skipped = true
 		return b
 	}
 	out, err := bd(exe, root, "list", "--all", "--json", "--limit", "0")

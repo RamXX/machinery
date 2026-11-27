@@ -20,6 +20,7 @@ var statusKinds = []string{"tc", "sc", "inv", "fm", "fv", "cx", "ck"}
 
 func runStatus(e *Env, args []string) int {
 	fs := e.Flags("status")
+	skip := fs.Bool("no-backlog", false, "do not run the backlog tool; print "+notRead)
 	if !e.Parse(fs, args) {
 		return 2
 	}
@@ -117,6 +118,6 @@ func runStatus(e *Env, args []string) int {
 		}
 		fmt.Fprintf(w, "evidence: %s %s, %d run(s), %d receipt(s)\n", gitx.Short(ev.Head), state, len(ev.Runs), ev.NReceipts)
 	}
-	statusIntakes(e, p)
+	statusIntakes(e, p, noBacklog(*skip))
 	return 0
 }

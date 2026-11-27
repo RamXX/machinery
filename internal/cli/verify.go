@@ -31,6 +31,9 @@ func runVerify(e *Env, args []string) int {
 	if *targeted && *story != "" {
 		return e.Usage("--affected and --story do not combine")
 	}
+	if *story != "" && noBacklog(false) {
+		return e.Usage("%s", storyNeedsBacklog)
+	}
 	p, ok := e.Project()
 	if !ok {
 		return 2

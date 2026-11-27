@@ -20,6 +20,7 @@ func runAdopt(e *Env, args []string) int {
 	fs.Var(&paths, "paths", "code paths to cover (repeatable glob); default every path")
 	fs.Var(&e2e, "e2e", "where end-to-end tests live (repeatable glob); default e2e/**")
 	write := fs.Bool("write", false, "write the files; without it adopt only reports")
+	skip := fs.Bool("no-backlog", false, "do not run the backlog tool; the report says "+notRead)
 	rehearseIt := fs.Bool("rehearse", false, "adopt a snapshot outside the project and report what blocks")
 	config := fs.String("config", "", "with --rehearse: the machinery.yaml to use; it may live outside the project")
 	out := fs.String("out", "", "with --rehearse: the directory for everything it writes, outside the project, absent or empty")
@@ -50,7 +51,7 @@ func runAdopt(e *Env, args []string) int {
 	if root == "" {
 		root = "."
 	}
-	res, err := adopt.Run(adopt.Options{Root: root, Paths: paths, E2E: e2e, Write: *write, Gen: GenerateFor})
+	res, err := adopt.Run(adopt.Options{Root: root, Paths: paths, E2E: e2e, Write: *write, Gen: GenerateFor, SkipBacklog: noBacklog(*skip)})
 	if err != nil {
 		return e.Fail(err)
 	}
