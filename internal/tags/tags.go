@@ -3,6 +3,9 @@
 package tags
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"regexp"
 	"sort"
 	"strings"
@@ -58,6 +61,17 @@ func CodeFiles(p *project.Project) ([]string, error) {
 	return res, nil
 }
 
+// unreadable is the error of a file whose tags cannot be read: a claim it
+// holds cannot be seen, so the command that asked stops (section 10.3).
+func unreadable(file string, err error) error {
+	why := err.Error()
+	var pe *fs.PathError
+	if errors.As(err, &pe) {
+		why = pe.Err.Error()
+	}
+	return fmt.Errorf("%s: cannot be read (%s): its markers cannot be seen; make the file readable", file, why)
+}
+
 // TestFiles lists the files that may carry verifies tags: matched by
 // trace.tests, even when outside scope.
 func TestFiles(p *project.Project) ([]string, error) {
@@ -92,7 +106,7 @@ func Scan(p *project.Project, files []string) ([]Tag, error) {
 		}
 		data, err := p.Read(f)
 		if err != nil {
-			return nil, err
+			return nil, unreadable(f, err)
 		}
 		lists := map[string]bool{} // the marker lists that go on to the next line, by kind
 		scen := append(append([]string{}, mk.Scenarios...), mk.ScenariosExact...)

@@ -16,8 +16,8 @@ stderr '^machinery run: adapter: partly run: 2 id\(s\): 2 of 4 claimants passed 
 
 exec mrun 1 verify
 stdout '^checked: 16 obligations, 3 proven, 2 by adapter at function granularity, 1 by adapter at file granularity, 0 partial, 2 partly run, 2 owed, 5 receipts$'
-stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
-stdout '^  ERROR  partly run: sc:customer-pays-and-the-order-ships: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  ERROR  partly run: sc:customer-pays-and-the-order-ships: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
 stdout '^  warn   partly run: sc:customer-pays-and-the-order-ships: no verdict: e2e/extra/file_test\.go$'
 ! stdout 'unproven: inv:paid-before-shipped'
@@ -39,10 +39,10 @@ stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 1 of 2 claimants p
 
 # the story gate treats it as not proven
 exec mrun 1 story shop-c1
-stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 ! stdout 'unproven: inv:paid-before-shipped'
 exec mrun 1 verify --story shop-c1
-stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
 ! stdout 'sc:customer-pays-and-the-order-ships'
 
@@ -52,7 +52,7 @@ gitcommit 'paid before shipped is owed'
 exec machinery owed sync --prune-only
 stdout '^owed: 3 kept, 0 added, 0 removed$'
 exec mrun 1 verify
-stdout '^  warn   partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
+stdout '^  warn   partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 ! stdout 'ERROR  partly run: inv:paid-before-shipped'
 exec mrun 1 proof --ids inv:paid-before-shipped
 stdout '^  inv:paid-before-shipped \(partly run: 1 of 2 claimants passed, owed\)$'
@@ -70,6 +70,48 @@ stdout '^checked: 16 obligations, 5 proven, 3 by adapter at function granularity
 exec machinery status --no-backlog
 ! stdout '^partly run'
 
+# a claiming file that cannot be read as Go, in a package the command does not name, is a
+# claimant that never passes: the line scan still finds its marker, the id is partly run in
+# verify, status, proof and the story gate, and verify and check name the file
+mkdir e2e/broken
+cp broken_test.go.txt e2e/broken/broken_test.go
+gitcommit 'a claimant in a file that does not parse'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/extra
+stderr '^machinery run: adapter: e2e/broken/broken_test\.go: cannot be read as Go \(10:3: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
+stderr '^machinery run: adapter: partly run: 1 id\(s\): 2 of 3 claimants passed in this run$'
+exec mrun 1 verify
+stdout '^checked: 16 obligations, 4 proven, 2 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 1 partly run, 2 owed, 7 receipts$'
+stdout '^  ERROR  claimant: e2e/broken/broken_test\.go: cannot be read as Go \(10:3: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/broken/broken_test\.go$'
+! stdout 'unproven: inv:paid-before-shipped'
+exec machinery status --no-backlog
+stdout '^partly run: 1 \(inv 1\): 2 of 3 claimants passed$'
+exec mrun 1 proof --ids inv:paid-before-shipped
+stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 2 of 3 claimants passed\)$'
+exec mrun 1 story shop-c1
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  claimant: e2e/broken/broken_test\.go: cannot be read as Go \(10:3: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
+# an entry of evidence.adapter.excused never covers it
+cp broken-excused.yaml machinery.yaml
+exec mrun 1 verify --allow-dirty
+stdout '^  ERROR  adapter excused: entry 1: tests "e2e/broken/\*_test\.go" covers no claimant: e2e/broken/broken_test\.go cannot be read as Go, and a claimant that cannot be read as Go is never excused: fix the file$'
+stdout '^  warn   adapter excused: entry 1 \(tests e2e/broken/\*_test\.go\): 0 claimant\(s\) of 0 id\(s\): the broken package runs elsewhere$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+exec git checkout -q machinery.yaml
+# a file under trace.tests that cannot be read at all hides its markers: the commands that read
+# them fail, and nothing is judged without it
+chmod 000 e2e/broken/broken_test.go
+exec mrun 1 verify
+stdout '^  ERROR  e2e/broken/broken_test\.go: cannot be read \(permission denied\): its markers cannot be seen; make the file readable$'
+! stdout '^passed$'
+exec mrun 1 status --no-backlog
+stderr '^machinery: e2e/broken/broken_test\.go: cannot be read \(permission denied\): its markers cannot be seen; make the file readable$'
+chmod 644 e2e/broken/broken_test.go
+rm e2e/broken
+gitcommit 'the file that does not parse is gone'
+
 # a claimant with a fail fails the id, whatever the others passed
 env SHOP_AGAIN=fail
 exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/extra
@@ -77,6 +119,17 @@ env SHOP_AGAIN=
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:paid-before-shipped \(e2e/extra/extra_test\.go::TestShipAgain\)$'
 ! stdout 'partly run: inv:paid-before-shipped'
+
+# a claimant whose receipt is a skip is named as skipped
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
+env SHOP_AGAIN=skip
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/extra
+env SHOP_AGAIN=
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  warn   partly run: inv:paid-before-shipped: skipped: e2e/extra/extra_test\.go::TestShipAgain$'
+! stdout 'no verdict: e2e/extra/extra_test\.go::TestShipAgain'
 
 # a receipt a test emits itself proves its id whatever the adapter claimants say
 rm .machinery/receipts
@@ -88,13 +141,14 @@ stdout '^passed$'
 
 # past ten missing claimants verify names the first ten; --partly names every one
 rm .machinery/receipts
+exec git tag before-many
 mkdir e2e/many
 cp many_test.go.txt e2e/many/many_test.go
 gitcommit 'twelve more claimants of the email invariant'
 exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
 stderr '^machinery run: adapter: partly run: 3 id\(s\): 3 of 17 claimants passed in this run$'
 exec mrun 1 verify
-stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 13 claimants passed$'
+stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 13 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout -count=10 '^  warn   partly run: [a-z:-]+: no verdict: '
 stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/many/many_test\.go::TestM01$'
 stdout '^  warn   partly run: 4 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
@@ -103,6 +157,29 @@ exec mrun 1 verify --partly
 stdout -count=14 '^  warn   partly run: [a-z:-]+: no verdict: '
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/extra/extra_test\.go::TestShipAgain$'
 ! stdout 'more claimant'
+# a targeted verify keeps the partly run ERROR of an id the change touches, names its claimants
+# only, and drops the partly run ERRORs of the others
+exec mrun 1 verify --affected --base before-many
+stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 13 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout -count=10 '^  warn   partly run: inv:customer-email-unique: no verdict: '
+stdout '^  warn   partly run: 2 more claimant\(s\) without a pass: machinery verify --partly lists every one$'
+! stdout 'partly run: inv:paid-before-shipped'
+! stdout 'partly run: sc:customer-pays-and-the-order-ships'
+
+# a pass the policy does not count still satisfies its claimant: with min_granularity function
+# the file-level claimant's pass proves nothing, and the id is proven by its other claimant
+rm .machinery/receipts
+cp function.yaml machinery.yaml
+mkdir e2e/gran
+cp gran_test.go.txt e2e/gran/gran_test.go
+gitcommit 'a file-level claimant of the final-state invariant; function granularity'
+exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/gran
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+exec mrun 1 verify
+! stdout 'partly run: inv:terminal-is-final'
+! stdout 'inv:terminal-is-final not counted'
+exec machinery proof --ids inv:terminal-is-final
+stdout '^  inv:terminal-is-final -> e2e/suite/order_test\.go::TestCancelIsFinal -> pass: go test: TestCancelIsFinal passed \(subtests: 2\) \(by adapter at function granularity\)$'
 
 # claims: any is the rule of one claimant: any pass proves the id
 cp any.yaml machinery.yaml
@@ -139,12 +216,15 @@ import (
 )
 
 // TestShipAgain is a second claimant of the invariant, in a package of its own. SHOP_AGAIN=fail
-// fails it.
+// fails it and SHOP_AGAIN=skip skips it.
 //
 // machinery:verifies inv:paid-before-shipped
 func TestShipAgain(t *testing.T) {
-	if os.Getenv("SHOP_AGAIN") == "fail" {
+	switch os.Getenv("SHOP_AGAIN") {
+	case "fail":
 		t.Fatal("an unpaid order shipped")
+	case "skip":
+		t.Skip("no second shop in this run")
 	}
 }
 -- e2e/extra/file_test.go --
@@ -174,6 +254,27 @@ import "testing"
 //
 // machinery:verifies inv:terminal-is-final
 func BenchmarkFinal(b *testing.B) {}
+-- broken_test.go.txt --
+package broken
+
+import "testing"
+
+// TestShipBroken would be a claimant of the invariant, but its file does not parse.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestShipBroken(t *testing.T) {
+	if true {
+}
+-- gran_test.go.txt --
+package gran
+
+// The marker of this file stands above no function: the file is a claimant of the invariant.
+//
+// machinery:verifies inv:terminal-is-final
+
+import "testing"
+
+func TestFinalAgain(t *testing.T) {}
 -- many_test.go.txt --
 package many
 
@@ -283,6 +384,62 @@ trace:
 evidence:
   adapter:
     claims: some
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- broken-excused.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    excused:
+      - tests: ["e2e/broken/*_test.go"]
+        reason: "the broken package runs elsewhere"
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- function.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    min_granularity: function
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}

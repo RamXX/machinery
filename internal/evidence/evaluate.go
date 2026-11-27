@@ -294,9 +294,9 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		switch {
 		case !ev.HasEvidence:
 		case st == PartlyRun:
-			add(sev, "partly run: %s: %s", o.ID, ev.partly[o.ID].Text())
+			add(sev, "partly run: %s: %s: %s", o.ID, ev.partly[o.ID].Text(), PartlyRemedy)
 		case noneOK:
-			add(sev, "no claimant can run here: %s: %d claimant(s) excused", o.ID, none)
+			add(sev, "no claimant can run here: %s: %d claimant(s) excused: %s", o.ID, none, NoClaimantRemedy)
 		case (st == Unproven || st == Partial) && !isOwed:
 			add(report.Error, "unproven: %s", o.ID)
 		case st == Proven && ev.excusedOK[o.ID] > 0:
@@ -319,6 +319,9 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add fu
 	cs, err := readClaimants(p, d)
 	if err != nil {
 		return err
+	}
+	for _, u := range cs.unreadable {
+		add(report.Error, "%s", u)
 	}
 	for _, u := range cs.uses {
 		add(report.Warn, "%s", u)
@@ -366,8 +369,9 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, add fu
 		default:
 			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}}
 			for _, cl := range open {
+				_, bad := cs.broken[cl.File] // never passed (section 10.3)
 				switch {
-				case passed[o.ID][cl]:
+				case passed[o.ID][cl] && !bad:
 					pr.Passed++
 				default:
 					pr.Missing = append(pr.Missing, cl)

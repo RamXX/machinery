@@ -109,9 +109,25 @@ type claimants struct {
 	of      map[string][]Claimant // id -> its claimants, sorted
 	excused map[Claimant]bool     // covered by an entry
 	files   map[string]*goTestFile
-	// uses: one line per entry in effect; problems: its patterns that cover
-	// nothing
-	uses, problems []string
+	// broken: a claiming file that cannot be read as Go -> why; it is a
+	// claimant of each id it claims, never passed and never excused
+	broken map[string]string
+	// unreadable: one line per broken claiming file; uses: one line per
+	// entry in effect; problems: its patterns that cover nothing
+	unreadable, uses, problems []string
+}
+
+// What to do about a partly run id, and about an id no claimant of which can
+// run here (sections 12 and 15.6).
+const (
+	PartlyRemedy     = "run the claimants without a pass at this commit, or excuse those that cannot run here in evidence.adapter.excused"
+	NoClaimantRemedy = "run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits"
+)
+
+// unreadableClaimant is what verify and the run summary say of a claiming
+// file that cannot be read as Go (section 10.3).
+func unreadableClaimant(file, why string) string {
+	return fmt.Sprintf("%s: cannot be read as Go (%s): its claims count as not passed; fix the file or remove its markers", file, why)
 }
 
 // readClaimants reads the claimants of the project's Go test files: the
@@ -124,7 +140,7 @@ func readClaimants(p *project.Project, d *design.Design) (*claimants, error) {
 // readClaimantsWith reads the claimants, and with excuse applies the entries
 // of evidence.adapter.excused to them.
 func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*claimants, error) {
-	c := &claimants{of: map[string][]Claimant{}, excused: map[Claimant]bool{}, files: map[string]*goTestFile{}}
+	c := &claimants{of: map[string][]Claimant{}, excused: map[Claimant]bool{}, files: map[string]*goTestFile{}, broken: map[string]string{}}
 	if p.Cfg.Trace == nil || len(p.Cfg.Trace.Tests) == 0 {
 		return c, nil
 	}
@@ -141,12 +157,20 @@ func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*clai
 	if err != nil {
 		return nil, err
 	}
+	// the line scan finds the markers of a file the parser cannot read: its
+	// claim is the whole file's, and it never passes (section 10.3)
 	units, _, _, _ := readClaims(d, files, found)
 	for _, u := range units {
-		if f := files[u.File]; u.Func == "" && (f.Broken || len(f.Funcs) == 0) {
+		switch f := files[u.File]; {
+		case f.Broken:
+			c.broken[u.File] = f.Err
+		case u.Func == "" && len(f.Funcs) == 0:
 			continue // no test function: no claimant
 		}
 		c.of[u.ID] = append(c.of[u.ID], Claimant{File: u.File, Func: u.Func})
+	}
+	for _, file := range sortedKeys(c.broken) {
+		c.unreadable = append(c.unreadable, "claimant: "+unreadableClaimant(file, c.broken[file]))
 	}
 	if excuse {
 		c.excuse(p.Cfg.AdapterExcused())
@@ -154,71 +178,141 @@ func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*clai
 	return c, nil
 }
 
-// covers reports whether an entry of evidence.adapter.excused covers a
-// claimant: its file matches the tests of the entry, and its function, or
-// for a file every test function of it, a functions pattern when the entry
-// has any.
-func (c *claimants) covers(e project.AdapterExcused, cl Claimant) bool {
-	if !project.Match(e.Tests, cl.File) {
-		return false
+// UnreadableClaimants names, for stage trace (section 8), each claiming file
+// under trace.tests that cannot be read as Go: a claimant of the ids it
+// claims that never passes (section 10.3). Only the files with a verifies
+// tag are parsed; nothing with evidence.adapter.claims any.
+func UnreadableClaimants(p *project.Project, d *design.Design, found []tags.Tag) []string {
+	if !p.Cfg.AdapterClaimsAll() || p.Cfg.Trace == nil {
+		return nil
 	}
-	for _, fn := range functionsOf(cl, c.files) {
-		if !e.MatchFunction(fn) {
-			return false
+	staged := stagedSource(p)
+	var list []string
+	seen := map[string]bool{}
+	for _, t := range found {
+		if t.Kind == tags.Verifies && !seen[t.File] && project.Match(p.Cfg.Trace.Tests, t.File) {
+			seen[t.File] = true
+			list = append(list, t.File)
 		}
 	}
-	return true
+	files, err := readGoTests(p, list, staged)
+	if err != nil {
+		return nil // never: a file it cannot read is broken
+	}
+	units, _, _, _ := readClaims(d, files, found)
+	broken := map[string]string{}
+	for _, u := range units {
+		if f := files[u.File]; f.Broken {
+			broken[u.File] = f.Err
+		}
+	}
+	var res []string
+	for _, file := range sortedKeys(broken) {
+		res = append(res, "claimant: "+unreadableClaimant(file, broken[file]))
+	}
+	return res
+}
+
+// covers reports whether an entry of evidence.adapter.excused covers a
+// claimant: its file matches the tests of the entry and, when the entry has
+// functions, it is a test function a pattern matches. A file-level claimant
+// is excused by its file, never by a function, and a claimant that cannot be
+// read as Go is never excused (section 10.3).
+func (c *claimants) covers(e project.AdapterExcused, cl Claimant) bool {
+	if _, bad := c.broken[cl.File]; bad || !project.Match(e.Tests, cl.File) {
+		return false
+	}
+	if len(e.Functions) == 0 {
+		return true
+	}
+	return cl.Func != "" && e.MatchFunction(cl.Func)
 }
 
 // excuse applies the entries of evidence.adapter.excused (section 10.3).
-// Each entry is described once, and each of its patterns that covers no
-// claimant is a problem.
+// Each entry is described once, and each of its globs and patterns through
+// which it covers no claimant is a problem.
 func (c *claimants) excuse(entries []project.AdapterExcused) {
-	files := c.files
 	for i, e := range entries {
 		covered, byID := map[Claimant]bool{}, map[string]bool{}
-		globHit, fnHit := map[string]bool{}, map[string]bool{}
+		globCovers, fnCovers := map[string]bool{}, map[string]bool{}
 		for id, cls := range c.of {
 			for _, cl := range cls {
+				if !c.covers(e, cl) {
+					continue
+				}
+				covered[cl], byID[id] = true, true
+				c.excused[cl] = true
 				for _, g := range e.Tests {
 					if project.Match([]string{g}, cl.File) {
-						globHit[g] = true
-						for _, f := range e.Functions {
-							for _, fn := range functionsOf(cl, files) {
-								if ok, _ := path.Match(f, fn); ok {
-									fnHit[f] = true
-								}
-							}
-						}
+						globCovers[g] = true
 					}
 				}
-				if c.covers(e, cl) {
-					covered[cl], byID[id] = true, true
-					c.excused[cl] = true
+				for _, f := range e.Functions {
+					if ok, _ := path.Match(f, cl.Func); ok {
+						fnCovers[f] = true
+					}
 				}
 			}
 		}
 		c.uses = append(c.uses, fmt.Sprintf("adapter excused: entry %d (%s): %d claimant(s) of %d id(s): %s", i+1, e.Name(), len(covered), len(byID), e.Reason))
 		for _, g := range e.Tests {
-			if !globHit[g] {
-				c.problems = append(c.problems, fmt.Sprintf("adapter excused: entry %d: tests %q covers no claimant: correct the glob or remove it", i+1, g))
+			if !globCovers[g] {
+				c.problems = append(c.problems, fmt.Sprintf("adapter excused: entry %d: tests %q covers no claimant: %s", i+1, g, c.whyGlob(g)))
 			}
 		}
 		for _, f := range e.Functions {
-			if !fnHit[f] {
-				c.problems = append(c.problems, fmt.Sprintf("adapter excused: entry %d: functions %q covers no claimant of its tests: correct the pattern or remove it", i+1, f))
+			if !fnCovers[f] {
+				c.problems = append(c.problems, fmt.Sprintf("adapter excused: entry %d: functions %q covers no claimant of its tests: %s", i+1, f, c.whyPattern(e, f)))
 			}
 		}
 	}
 }
 
-// functionsOf returns the test functions a claimant stands for: its own,
-// or every one of its file.
-func functionsOf(cl Claimant, files map[string]*goTestFile) []string {
-	if cl.Func != "" {
-		return []string{cl.Func}
+// whyGlob says why a tests glob of an entry covers no claimant, and what to
+// do: the functions of the entry leave out every claimant of its files, its
+// files cannot be read as Go, or it matches no claiming file.
+func (c *claimants) whyGlob(g string) string {
+	broken := ""
+	for _, cls := range c.of {
+		for _, cl := range cls {
+			if !project.Match([]string{g}, cl.File) {
+				continue
+			}
+			if _, bad := c.broken[cl.File]; !bad {
+				return "its functions leave out every claimant of the files it matches: correct the functions or remove the glob"
+			}
+			if broken == "" || cl.File < broken {
+				broken = cl.File
+			}
+		}
 	}
-	return files[cl.File].Funcs
+	if broken != "" {
+		return broken + " cannot be read as Go, and a claimant that cannot be read as Go is never excused: fix the file"
+	}
+	return "correct the glob or remove it"
+}
+
+// whyPattern says why a functions pattern of an entry covers no claimant,
+// and what to do: it matches only functions of files whose claim is
+// file-level (the first such file), or nothing.
+func (c *claimants) whyPattern(e project.AdapterExcused, f string) string {
+	file := ""
+	for _, cls := range c.of {
+		for _, cl := range cls {
+			if cl.Func != "" || !project.Match(e.Tests, cl.File) {
+				continue
+			}
+			for _, fn := range c.files[cl.File].Funcs {
+				if ok, _ := path.Match(f, fn); ok && (file == "" || cl.File < file) {
+					file = cl.File
+				}
+			}
+		}
+	}
+	if file != "" {
+		return "it matches a function of " + file + ", whose claim is file-level; a file-level claimant is excused by its file, not by a function: excuse the file in an entry without functions, or move the marker above the function"
+	}
+	return "correct the pattern or remove it"
 }
 
 // CoveredIDs reads the claimants of the project and returns a function that

@@ -16,7 +16,7 @@ stderr '^machinery run: adapter: needs a receipt with effects: 1 tc id\(s\)$'
 stderr '^machinery run: adapter: needs a receipt with a replay: 1 cx id\(s\)$'
 # a claiming file with no test function, and one that does not parse
 stderr '^machinery run: adapter: e2e/suite/helpers_test\.go: no test function; its claims count nothing$'
-stderr '^machinery run: adapter: e2e/drafts/broken_test\.go: not Go source that parses; its claims count nothing$'
+stderr '^machinery run: adapter: e2e/drafts/broken_test\.go: cannot be read as Go \(4:32: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
 # without -tags on the command line the tags of GOFLAGS are recorded
 exec sh -c 'grep -c "\"source\":\"adapter\",\"granularity\":\"[a-z]*\",\"tags\":\[\"faults\"\]" .machinery/receipts/*.jsonl'
 stdout '^6$'
@@ -29,7 +29,10 @@ stdout '"type":"end"'
 exec mrun 1 verify
 ! stdout 'ERROR  receipt'
 ! stdout 'malformed'
-stdout '^checked: 17 obligations, 7 proven, 3 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 owed, 7 receipts$'
+# the claimant in the file that does not parse never passes: the id it claims is partly run
+stdout '^checked: 17 obligations, 6 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 1 partly run, 2 owed, 7 receipts$'
+stdout '^  ERROR  claimant: e2e/drafts/broken_test\.go: cannot be read as Go \(4:32: expected ''\}'', found ''EOF''\): its claims count as not passed; fix the file or remove its markers$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  ERROR  unproven: cx:order-payment:race$'
 ! stdout 'unproven: tc:ORDE-1ded14'
 exec machinery proof --ids tc:ORDE-1ded14

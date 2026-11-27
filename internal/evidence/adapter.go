@@ -1216,7 +1216,7 @@ func (a *GoTest) Receipts() [][]byte {
 	for _, rel := range sortedKeys(claiming) {
 		switch f := a.files[rel]; {
 		case f.Broken:
-			broken = append(broken, fmt.Sprintf("adapter: %s: not Go source that parses; its claims count nothing", rel))
+			broken = append(broken, "adapter: "+unreadableClaimant(rel, f.Err))
 		case len(f.Funcs) == 0:
 			a.emptyAll++
 			if scope[rel] {
@@ -1362,6 +1362,8 @@ func (a *GoTest) parsed(file string) *goTestFile {
 	f := &goTestFile{Path: file, Broken: true}
 	if data, err := a.p.Read(file); err == nil {
 		f = parseGoTest(file, data)
+	} else {
+		f.Err = readError(err)
 	}
 	a.other[file] = f
 	return f

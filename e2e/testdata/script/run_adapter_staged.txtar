@@ -33,10 +33,10 @@ exec mrun 1 verify
 # the suite claims the same ids and did not run: every claimant of them must pass, so each is
 # partly run, the pass of its set counted among its claimants
 stdout '^checked: 16 obligations, 0 proven, 0 partial, 3 partly run, 2 owed, 3 receipts$'
-stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/email_test\.go::TestEmailUnique$'
-stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed$'
-stdout '^  ERROR  partly run: inv:terminal-is-final: 1 of 2 claimants passed$'
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
+stdout '^  ERROR  partly run: inv:terminal-is-final: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 
 # Relabeling the Package field of go test -json events gives the same receipts as test2json -p.
 exec bash latest-receipts.sh

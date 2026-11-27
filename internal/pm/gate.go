@@ -278,10 +278,10 @@ func judgeID(s *report.Stage, d *design.Design, ev *evidence.Evaluation, owed ma
 		s.Errorf("failed: %s", id)
 	case evidence.PartlyRun: // section 10.3: a claimant has no pass
 		pr, _ := ev.Partly(id)
-		s.Errorf("partly run: %s: %s", id, pr.Text())
+		s.Errorf("partly run: %s: %s: %s", id, pr.Text(), evidence.PartlyRemedy)
 	default:
 		if n, none := ev.NoClaimant(id); none {
-			s.Errorf("unproven: %s; no claimant can run here: %d claimant(s) excused", id, n)
+			s.Errorf("unproven: %s; no claimant can run here: %d claimant(s) excused: %s", id, n, evidence.NoClaimantRemedy)
 			return
 		}
 		if n, held := ev.AdapterNotCounted(id); held { // section 10.3
