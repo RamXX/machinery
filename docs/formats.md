@@ -520,8 +520,10 @@ After the last stage a command prints one summary line:
 machinery <command>: <p> passed, <f> failed, <d> not demonstrated, <n> not applicable
 ```
 
-Messages name files by project-relative path. Stage output is deterministic: no timestamps, no absolute
-paths, stable ordering.
+For the same inputs, the stage blocks and the final command summary on stdout are deterministic.
+They have stable ordering and omit timestamps. Messages name files by project-relative path.
+The `machinery version` and `machinery --version` line includes the build date recorded by the
+binary (section 3.1).
 
 ### 3.3 Exit codes
 
@@ -2670,7 +2672,9 @@ and with `--streams`
 Of the two `name no package` lines the first prints in direct mode and the second with
 `--streams`; the events that name no package count in neither the packages nor the functions
 of the first line. In the ambiguous line a file that does not parse is followed by ` (does not parse)`. A package that did not end with pass is named when it failed in a
-run or did not end with pass in one that gives it verdicts. After those lines, one line per
+run or did not end with pass in one that gives it verdicts. The `pass(es) not counted` line
+counts passing functions from a successful run of a package that failed in another run.
+Passing functions seen only in failed runs do not count on that line. After those lines, one line per
 package names the functions a failure stopped after they started, and then one line per
 package that did not run its tests names the functions that failed with it, each list sorted,
 the first five and then `and <n> more`; a function a failure stopped is also counted as failed in the first
@@ -3381,8 +3385,9 @@ The Markdown plan ends with the same count lines that `--apply` prints after its
 created/existing/edges line. The first is `stories by kind: <kind>: <n>, ...`, sorted by kind
 and listing only the kinds with stories, by obligation prefix or `wire` for wire-evidence
 stories. When the plan has wire-evidence stories, the next line is
-`wire evidence: <n> stories for <m> claimed id(s)`. The counts cover every story in the plan,
-including groups that `--apply` finds in the backlog.
+`wire evidence: <n> stories for <m> claimed id(s), one per test <file|directory>` (with `1 story`
+for a single story). The counts cover every story in the plan, including groups that `--apply`
+finds in the backlog.
 `machinery plan --summary` prints only these count lines and does not read or write the backlog.
 `--summary` cannot be combined with `--apply`, `--json` or `--link`.
 

@@ -138,8 +138,9 @@ command, output line and exit code.
   freeze (stage `contract`), `brief` by file pointer with model routing, and tier gates
   (`predict`, `accept`, `story`): from consequential up, a fresh verifier predicts before
   reading the proof.
-- `machinery plan` prints the same story counts as `plan --apply`, including wire evidence
-  totals. `plan --summary` prints just the counts.
+- Markdown `machinery plan` output gains story count lines. `plan --apply` gains counts by
+  kind and prints its wire totals on the shared `wire evidence:` line, including the grouping
+  by test file or directory. `plan --summary` prints just the count lines.
 - `adopt`, `status`, `verify`, `check`, `trace` and `owed` never need the backlog tool: the
   last three never run it, and `adopt`, `status` and `check` skip it with `--no-backlog` or
   `MACHINERY_NO_BACKLOG=1` and print `backlog: not read`; `--story` is refused under the

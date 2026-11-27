@@ -98,7 +98,7 @@ func (r *rehearsal) markdown() string {
 			p("")
 		}
 		if r.planWire != "" {
-			p("- wire evidence: %s", r.planWire)
+			p("- %s", r.planWire)
 		}
 		if r.plannedIDs > 0 {
 			p("- already planned in the project: %d id(s) planned at adoption keep the story the project gave them; no story is planned for them", r.plannedIDs)

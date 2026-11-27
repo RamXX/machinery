@@ -1,30 +1,54 @@
-# Both forms report the version and the VCS data embedded in the binary.
-exec bash expected-version.sh
-cp stdout version.want
-exec machinery --version
-cmp stdout version.want
+# Build a source-only copy first, then build it again from clean and dirty Git trees.
+mkdir source
+cd source
+exec cp -R $REPO/cmd $REPO/internal $REPO/pkg .
+exec cp $REPO/Makefile $REPO/go.mod $REPO/go.sum $REPO/.gitignore .
+cp ../clean.txt tracked.txt
+exec go build -o ../machinery-archive ./cmd/machinery
+exec ../machinery-archive version
+stdout -count=1 '^machinery dev \(unknown, unknown\)$'
 ! stderr .
-exec machinery version
-cmp stdout version.want
+
+gitinit
+exec git status --porcelain
+! stdout .
+exec make build VERSION=dev BUILD_DATE=2001-02-03
+exec bash ../expected-version.sh
+cp stdout ../version.want
+exec ./.bin/machinery --version
+cmp stdout ../version.want
 ! stderr .
+exec ./.bin/machinery version
+cmp stdout ../version.want
+! stderr .
+
+cp ../dirty.txt tracked.txt
+exec git status --porcelain
+stdout '^ M tracked.txt$'
+exec make build VERSION=dev BUILD_DATE=2001-02-03
+exec bash ../expected-version.sh -dirty
+cp stdout ../version.want
+exec ./.bin/machinery --version
+cmp stdout ../version.want
+! stderr .
+cd ..
 
 # The receipt names the tool build, separately from the project under test.
-fixture shop
+fixture shop project
+cd project
 gitinit
-exec machinery run -- true
-exec bash check-header.sh
+exec ../source/.bin/machinery run -- true
+exec bash ../check-header.sh
 
+-- clean.txt --
+committed
+-- dirty.txt --
+modified
 -- expected-version.sh --
 set -eu
-info=$(go version -m "$(command -v machinery)")
-revision=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*build[[:space:]]vcs\.revision=//p')
-test -n "$revision"
-if printf '%s\n' "$info" | grep -q 'vcs\.modified=true$'; then
-    revision=$revision-dirty
-fi
-printf 'machinery dev (%s, unknown)\n' "$revision"
+revision=$(git rev-parse HEAD)
+printf 'machinery dev (%s%s, 2001-02-03)\n' "$revision" "${1:-}"
 -- check-header.sh --
 set -eu
-commit=$(sed -n 's/^machinery dev (\([^,]*\), unknown)$/\1/p' version.want)
-test -n "$commit"
+commit=$(git -C ../source rev-parse HEAD)-dirty
 head -n 1 .machinery/receipts/*.jsonl | grep -F "\"tool\":{\"version\":\"dev\",\"commit\":\"$commit\"}"

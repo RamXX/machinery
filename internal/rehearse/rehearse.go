@@ -185,7 +185,7 @@ func Run(o Options) error {
 		fmt.Fprintf(w, "plan: %s\n", r.planLine())
 	}
 	if r.planWire != "" {
-		fmt.Fprintf(w, "wire evidence: %s\n", r.planWire)
+		fmt.Fprintln(w, r.planWire)
 	}
 	if len(r.blocks) == 0 {
 		fmt.Fprintln(w, "blocks adoption: nothing")
@@ -443,7 +443,7 @@ func (r *rehearsal) plan(out string, d *design.Design) error {
 	for _, s := range plan.Stories {
 		counts[[2]string{s.Kind(), s.Tier}]++
 	}
-	r.planWire = plan.WireLine("story", "stories")
+	r.planWire = plan.WireLine()
 	r.wireStories, r.wireIDs = plan.WireCounts()
 	r.wireBy = plan.WireBy
 	for k, n := range counts {

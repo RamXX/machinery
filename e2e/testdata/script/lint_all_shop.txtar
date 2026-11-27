@@ -21,7 +21,16 @@ stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 1 invokes, 1 dependenc
 exec machinery lint --stage xref-failure --stage risk
 stdout '(?s)== risk ==.*== xref-failure =='
 ! stdout '== model =='
-stdout 'machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable'
+stdout '^machinery lint: 2 passed, 0 failed, 0 not demonstrated, 0 not applicable$'
+
+# The stage blocks and final summary have the same bytes after moving the project.
+cp stdout lint.want
+mkdir relocated
+exec cp -R design contracts machinery.yaml relocated
+cd relocated
+exec machinery lint --stage risk --stage xref-failure
+cmp stdout ../lint.want
+cd ..
 
 # dropping the abuse case for the consequential action fails the cross-reference tier only
 cp failure-modes-no-abuse.yaml design/failure-modes.yaml

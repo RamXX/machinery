@@ -66,11 +66,12 @@ stdout '^## Wire evidence e2e/more/$'
 stdout '^The tests under e2e/more/ emit a receipt for each id they already claim\.$'
 stdout '^- tc:ORDE-2e883d: claimed by e2e/more/pay.sh; '
 stdout '^machinery:ids inv:paid-before-shipped tc:ORDE-2e883d tc:ORDE-e6d28f$'
+stdout -count=1 '^wire evidence: 2 stories for 4 claimed id\(s\), one per test directory$'
 exec machinery plan --summary
 stdout '^stories by kind: fm: 1, fv: 1, inv: 1, sc: 1, wire: 2$'
-stdout '^wire evidence: 2 stories for 4 claimed id\(s\)$'
+stdout -count=1 '^wire evidence: 2 stories for 4 claimed id\(s\), one per test directory$'
 # at the limit they stay one per file
-exec sh -c 'sed "s/wire_max_files: 2/wire_max_files: 3/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec bash set-wire-limit.sh 3
 exec machinery plan
 stdout '^## Wire evidence e2e/more/pay.sh$'
 ! stdout '^## Wire evidence e2e/$'
@@ -111,8 +112,13 @@ exec machinery plan --apply
 stdout '^plan: 0 created, 7 existing, 0 edge\(s\)$'
 ! stdout 'external story'
 
+# Apply reports directory grouping too, even when each id already has a story.
+exec bash set-wire-limit.sh 2
+exec machinery plan --apply
+stdout -count=1 '^wire evidence: 2 stories for 4 claimed id\(s\), one per test directory$'
+
 # the limit is a count
-exec sh -c 'sed "s/wire_max_files: 3/wire_max_files: -1/" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
+exec bash set-wire-limit.sh -1
 exec mrun 2 plan
 stderr '^config: plan.wire_max_files must not be negative$'
 
@@ -140,7 +146,11 @@ owed:
     reason: "claimed at adoption (abc1234)"
 -- counts.want --
 stories by kind: fm: 1, fv: 1, inv: 1, sc: 1, wire: 3
-wire evidence: 3 stories for 4 claimed id(s)
+wire evidence: 3 stories for 4 claimed id(s), one per test file
+-- set-wire-limit.sh --
+set -eu
+sed "s/wire_max_files: .*/wire_max_files: $1/" machinery.yaml > c.tmp
+mv c.tmp machinery.yaml
 -- risk-cfg.yaml --
   risk: design/risk.yaml
 -- risk.yaml --

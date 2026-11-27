@@ -26,10 +26,10 @@ exec sh -c '! grep -l "^model:" $REPO/agents/*.md'
 # the delegate is marked experimental
 grep 'Experimental' $REPO/agents/machinery-delegate.md
 
-# A release build reports the version declared by the manifests.
+# A release build reports the version declared by the manifests, even from an archive.
 exec make -C $REPO build TOOLS=$WORK/release VERSION=2.0.0 BUILD_DATE=2026-01-02
 exec $WORK/release/machinery --version
-stdout '^machinery 2\.0\.0 \([0-9a-f]{40}(-dirty)?, 2026-01-02\)$'
+stdout '^machinery 2\.0\.0 \(([0-9a-f]{40}(-dirty)?|unknown), 2026-01-02\)$'
 
 # every command the skill and the agent prompts name exists
 exec machinery

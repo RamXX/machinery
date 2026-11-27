@@ -1,6 +1,6 @@
-# version prints the version and needs no project
+# version works without a project. The harness build may come from a source archive.
 exec machinery version
-stdout '^machinery dev \([0-9a-f]{40}(-dirty)?, unknown\)$'
+stdout '^machinery dev \(([0-9a-f]{40}(-dirty)?|unknown), unknown\)$'
 
 # no arguments prints help and exits 0
 exec machinery

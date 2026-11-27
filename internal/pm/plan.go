@@ -97,15 +97,16 @@ func (plan *Plan) WireCounts() (stories, ids int) {
 
 // WireLine says how many stories wire evidence, for how many claimed ids
 // and how they are cut, or "" without one.
-func (plan *Plan) WireLine(noun, plural string) string {
+func (plan *Plan) WireLine() string {
 	stories, ids := plan.WireCounts()
 	if stories == 0 {
 		return ""
 	}
-	if stories > 1 {
-		noun = plural
+	noun := "stories"
+	if stories == 1 {
+		noun = "story"
 	}
-	return fmt.Sprintf("%d %s for %d claimed id(s), one per test %s", stories, noun, ids, plan.WireBy)
+	return fmt.Sprintf("wire evidence: %d %s for %d claimed id(s), one per test %s", stories, noun, ids, plan.WireBy)
 }
 
 // Summary writes the count lines shared by the print and apply modes.
@@ -122,8 +123,8 @@ func (plan *Plan) Summary(w io.Writer) {
 		counts = append(counts, fmt.Sprintf("%s: %d", kind, byKind[kind]))
 	}
 	fmt.Fprintf(w, "stories by kind: %s\n", strings.Join(counts, ", "))
-	if stories, ids := plan.WireCounts(); stories > 0 {
-		fmt.Fprintf(w, "wire evidence: %d stories for %d claimed id(s)\n", stories, ids)
+	if line := plan.WireLine(); line != "" {
+		fmt.Fprintln(w, line)
 	}
 }
 

@@ -5,6 +5,12 @@ exec machinery gen
 exec bash add-sources.sh
 gitinit
 
+# A passing function in the failing stream does not count as a pass from another run.
+exec mrun 1 run --adapter go-test-json --streams -- bash runs.sh single
+stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 1 package\(s\), 2 test function\(s\) with a verdict: 1 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+! stderr 'not counted because another run of this package failed'
+
 exec mrun 1 run --adapter go-test-json --streams -- bash runs.sh
 stderr '^machinery run: adapter go-test-json: 3 stream\(s\), 1 package\(s\), 2 test function\(s\) with a verdict: 1 passed, 1 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
@@ -32,6 +38,9 @@ evidence:
       - {package: example.test/shop/second-run, files: ["e2e/suite/email_test.go"]}
 -- runs.sh --
 set -eu
+if [ "${1:-}" = single ]; then
+  exec env SHOP_EMAIL=fail go test -json -count=1 -run '^(TestShipNeedsPayment|TestEmailUnique)$' ./e2e/suite > "$MACHINERY_GO_TEST_JSON/single.json"
+fi
 for run in first repeat; do
   go test -json -count=1 -run '^TestShipNeedsPayment$' ./e2e/suite > "$MACHINERY_GO_TEST_JSON/$run.json"
 done
