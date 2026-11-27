@@ -301,8 +301,9 @@ tiers the adapter may prove, and whether a marker at the top of a file is enough
 must stand above the function (`min_granularity: function`). If your suite runs through a make target or a script that starts
 `go test` itself, run that through `machinery run --adapter go-test-json --streams -- make e2e`
 and have it write each `go test -json` output to a file in the directory machinery names in
-`MACHINERY_GO_TEST_JSON` (a file may hold several runs, appended: each is judged on its own, and a
-fail in any of them is a fail); there the wrapper must pass `-count=1` itself, and because machinery
+`MACHINERY_GO_TEST_JSON` (a file may hold several runs, appended one after the other: each is
+judged on its own, and a fail in any of them is a fail; a run that starts before the one before
+it ended, a killed run and its retry or two runs writing at once, leaves the run incomplete); there the wrapper must pass `-count=1` itself, and because machinery
 cannot see what such a run built, every package it tests needs an entry in
 `evidence.adapter.sources` naming the files it is built from. If you build your tests from
 copies staged in another directory, `evidence.adapter.sources` maps the staged package back to

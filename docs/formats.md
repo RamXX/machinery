@@ -2194,7 +2194,12 @@ verdict of any run is dropped because the package was cached somewhere else.
 of the package (an event with no `Test` whose action is `pass`, `fail` or `skip`), as when
 a wrapper appends the output of two `go test -json` commands to one file: the events of the
 package up to and including its first end event are its first run, the events after that up to
-and including the next end event its second, and so on. Each run is judged by the rules of this
+and including the next end event its second, and so on. `go test -json` and `go tool test2json`
+begin each run of a package with a package-level `start` event; a `start` event of a package
+whose current run in the stream has events and no end event yet (a run that was killed and then
+started again, two runs of the package writing into one file at the same time) leaves the run
+incomplete (below), since the events of the two runs can no longer be told apart. A stream
+without `start` events (lines typed by hand) is split at its end events alone. Each run is judged by the rules of this
 section exactly as the runs of several streams are ("One package in several runs", below), so
 a fail, a crash or a missing verdict in any run of the package is a fail of the function,
 whatever another run gave it. A package fails in a run when the run's end event is `fail`: a
@@ -2225,10 +2230,16 @@ end line and exits with the command's exit code, or 1 when that was 0. It prints
 and with `--streams` `machinery: run: stream <file>: package <import path> has no end event; the run is left incomplete: fix what writes the stream, delete <receipts> and run again`,
 where `<receipts>` is the receipts file of the run by its project-relative path; for events
 after the last end event the message says `has events after its last end event` instead of
-`has no end event`. `verify` reports the file as an incomplete run (section 12). So within
+`has no end event`. A `start` event before the end of the run it would interrupt is read where
+it stands, before the lines after it:
+`machinery: run: stream <file>: line <n>: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete <receipts> and run again`,
+and in direct mode
+`machinery: run: go test -json: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test, delete <receipts> and run again`.
+`verify` reports the file as an incomplete run (section 12). So within
 the threat model no fail is lost: a failed function, a function a failure stopped and the
 claims of a package that failed all write fails, in whichever run of the package they happened,
-and a stream that does not say how its packages ended counts for nothing. A fail of any run,
+and a stream that does not say how its packages ended, or that mixes two runs of one, counts
+for nothing. A fail of any run,
 of any stream and of any package writes a fail receipt for every id its function's claims name
 ("Which receipt", below).
 
@@ -2401,7 +2412,8 @@ the directory is read. The directory is removed after reading, whatever was foun
   recorded as `"unknown"`.
 - **A stream must be well formed.** Every line that is not blank is a JSON object with an
   `Action`, the file has at least one, and every package it names has a package-level end
-  event, with no event of the package after its last one ("A package that failed", above). Otherwise the run is left incomplete: machinery
+  event, with no event of the package after its last one and no `start` event of the package
+  before the end of its current run ("A package that failed", above). Otherwise the run is left incomplete: machinery
   writes no receipt and no end line, prints
   `machinery: run: stream <file>: line <n>: not a go test -json event; the run is left incomplete: fix what writes the stream, delete <receipts> and run again`
   (`stream <file>: no event; ...` for a file without one), `<receipts>` as above, and exits with the command's exit

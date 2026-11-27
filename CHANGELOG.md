@@ -129,7 +129,9 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `os.Exit`, a panic, a build failure) writes a fail for every claimed function without a
   verdict and no pass; a stream without a package end leaves the run incomplete, and the error
   names the receipts file. A stream file that holds several runs of one package is judged run by
-  run, so a fail, a crash or a missing verdict in any of them is a fail. A marker directly above a
+  run, so a fail, a crash or a missing verdict in any of them is a fail; a run that starts again
+  before the one before it ended (a killed run and its retry, two runs writing at once) leaves
+  the run incomplete. A marker directly above a
   fuzz test, a benchmark or any other function that is no test counts nothing and is named in the
   summary. A parent
   with a skipped subtest is a skip, and direct mode refuses a `-run` or `-skip` that selects
