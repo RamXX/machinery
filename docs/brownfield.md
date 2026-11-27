@@ -269,17 +269,21 @@ machinery adds `-json`, reads the event stream and writes the receipts itself
 (`docs/formats.md` section 10.3). An id gets a pass when every test function its marker belongs
 to passed and the package ended ok: the function under the marker when the marker is in the
 comment directly above it, every test function of the file otherwise. A failed function writes
-a fail, a skipped one a skip, and one that did not run writes nothing; a pass answered from
+a fail, a skipped one a skip (a parent with a skipped subtest too), and one that did not run
+writes nothing. A package that failed (a test that hangs past `-timeout`, calls `os.Exit` or
+panics, a build that fails) writes a fail for every claimed function without a verdict, and a
+stream cut short leaves the run incomplete; a pass answered from
 the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
 verdict belongs to a file only when no other Go file of its directory defines a function of the
 same name that begins with `Test` and takes one parameter, whatever its build tags or the
 way its parameter is written: rename such a twin, or neither counts. The summary of the run
 says how many ids were claimed and not run. The command is held narrow on purpose, against
 mistakes: `go test` with relative package patterns and the usual test flags, in the module of
-the project root, for the machine it runs on; `-C`, `-modfile`, `-exec` and the like run
-through `--streams` (below). A module path that two `go.mod` files declare, or a `go.work`
-that leaves out the module of the claiming test files, is refused, and `machinery check`
-reports both (stage `trace`). The run's header records the go version, the `go` binary,
+the project root, for the machine it runs on; `-C`, `-modfile`, `-exec`, a `-run` that
+selects subtests and the like run through `--streams` (below). A module path that two tracked
+`go.mod` files outside `testdata` and `vendor` declare, or a tracked `go.work` that leaves out
+the module of the claiming test files, is refused, and once `machinery.yaml` has an
+`evidence.adapter` block `machinery check` reports both (stage `trace`). The run's header records the go version, the `go` binary,
 `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod` and `go.work`, and
 `verify` and `proof` print them. The adapter trusts your test code and the environment of the
 run exactly as much as a receipt a test emits: it catches a stale cache, a twin test, a file

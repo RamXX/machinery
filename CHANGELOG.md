@@ -125,7 +125,14 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   planted code or a controlled environment. With
   `--streams` (a wrapper that starts `go test` itself and leaves the streams in
   `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
-  mode only. A pass replayed from the cache counts nothing, and a fail is never dropped. A
+  mode only. A pass replayed from the cache counts nothing. A package that failed (a timeout,
+  `os.Exit`, a panic, a build failure) writes a fail for every claimed function without a
+  verdict and no pass; a stream without a package end leaves the run incomplete. A parent
+  with a skipped subtest is a skip, and direct mode refuses a `-run` or `-skip` that selects
+  subtests. Stage `trace` reports the module layout rules only for a project that configures
+  `evidence.adapter`, and they read only tracked `go.mod` and `go.work` files outside
+  `testdata` and `vendor`, with `GOWORK=off` honoured: a project without that block sees
+  no change. A
   receipt a test appends with the adapter's fields is refused. The ratchet compares the policy
   by what it admits (`adapter-widened`), an error for a critical or vital tier.
 
