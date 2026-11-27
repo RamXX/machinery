@@ -2004,8 +2004,9 @@ that would go unnoticed. It does not defend against a party who adds decoy code 
 to the project, or who controls the environment of the run (the `go` it finds, the variables of
 `go`, the toolchain, the machine). What such a party plants is the business of review, of the
 ratchet (section 11.3), and of the rule that by default an id of a critical or vital area never
-accepts adapter evidence (below). Every rule of this section closes a mistake, none closes a
-deliberate decoy, and what a run used is recorded in its header so that a reader sees it.
+accepts adapter evidence (below). The rules of this section are aimed at mistakes, and a party
+who plants content can get around them; what a run used is recorded in its header so that a
+reader sees it.
 
 **What adapter evidence is, and what it is not.** An adapter receipt says that a test which
 names the id passed in this run. It does not say that the test checked the id. A receipt a test
