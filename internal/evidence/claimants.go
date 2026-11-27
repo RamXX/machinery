@@ -133,7 +133,7 @@ func unreadableClaimant(file, why string) string {
 // cannotJudge is what verify says of a file claimant the adapter cannot
 // judge (sections 10.3 and 12).
 func cannotJudge(file, why string) string {
-	return fmt.Sprintf("%s: cannot be judged by the adapter (%s); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason", file, why)
+	return fmt.Sprintf("%s: cannot be judged by the adapter (%s); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test (a README, a golden file), remove its marker for the id", file, why)
 }
 
 // readClaimants reads the claimants of the project: every file under
