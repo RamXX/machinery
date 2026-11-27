@@ -1735,6 +1735,9 @@ machinery:verifies tc:ORDE-*
 - `machinery:serves` is read from files matched by `trace.code`. `machinery:verifies` is read
   from files matched by `trace.tests`. A file both match is read once, so a finding in it is
   reported once.
+- Only regular files are read. A symbolic link, to a file or to a directory, is never followed:
+  the markers behind it are not read by stage `trace`, by the claimants of section 10.3 or by any
+  other command ("Symbolic links", below).
 
 Stage `trace` rules:
 
@@ -1746,7 +1749,26 @@ Stage `trace` rules:
 | `proposed` | No tag or marker names a proposed id (section 4.1): `ERROR  proposed: <id> is claimed by <file>; commit it first`, once per id and file. |
 | `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
+| `trace` | No symbolic link is under `trace.tests` or `trace.code` ("Symbolic links", below): `ERROR  trace: <path> is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace.tests`, with `trace.code`, or `trace.code and trace.tests`, for the list or lists that reach the link. One finding per link, sorted by path. No waiver covers it. |
 | `adapter` | Only in a project that configures `evidence.adapter`, and when a `_test.go` file under `trace.tests` claims an id of kind `inv`, `sc`, `fm` or `ck`: the layout of the Go modules is one the adapter can attribute by import path (section 10.3, "The layout of the modules", with the files it reads): `ERROR  adapter: module <path> is declared by <a> and <b>: give each module its own path, or move the copy under a testdata directory` for every module path two tracked `go.mod` files declare, and `ERROR  adapter: <workspace> does not use the module of <file> (<go.mod>): add the module to the workspace, or set GOWORK=off` for every module of a claiming file the workspace leaves out, naming its first claiming file. |
+
+**Symbolic links.** The scan does not follow a symbolic link, while a test runner may build what
+the link points to: a failing test in a linked directory is a verdict that no file under
+`trace.tests` owns (section 10.3, "Whose verdict"), and the project would still pass. So every link
+that a list reaches is a finding of stage `trace`, and the stage fails with `check`.
+
+- A list reaches a link when one of its globs matches the path of the link, whatever the link
+  points to (a file, a directory, a path that is not there, a place outside the project). It also
+  reaches a link to a directory when a glob matches `<link>/<path>` for a file under the target,
+  listed as the scan lists files (nothing under `.git`, `node_modules`, `.machinery`, `.beads`,
+  `.worktrees` or `.bin`).
+- `trace.code` reaches only links inside `scope`.
+- A link that no glob reaches (a link to a README, when `trace.tests` names test files only) is no
+  finding. A project without `trace:` has none.
+- No waiver covers it (section 6.7: only cross-reference rules are waived). The fix is the one
+  the line says: put the files where the link is, or leave the link out of the globs.
+- `machinery trace --non-action-serves` lists the tags that are read, so it lists none behind a
+  link.
 
 A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
 which is not an `act` id is no ERROR and no credit. The stage says so once per run, in one
@@ -2805,9 +2827,12 @@ claimant (below) holds for it.
 one of them once adapter evidence is used for it.
 
 *Who the claimants are.* The claimants of an id are derived from the claims of section 8 and
-from nothing else: every file under `trace.tests` that carries a tag or a marker for the id,
+from nothing else: every regular file under `trace.tests` that carries a tag or a marker for the id,
 read and resolved exactly as stage `trace` reads them (sections 8 and 8.1), holds a claimant of
-the id, whatever the file is called and whatever language it is written in.
+the id, whatever the file is called and whatever language it is written in. A symbolic link is
+no file here: it is not read, holds no claimant and is a finding of stage `trace` (section 8,
+"Symbolic links"), so a verdict of a test that the runner built through a link is a verdict in no
+file under `trace.tests`.
 
 - Where the marker stands directly above a test function ("Test functions" and "Whose claim",
   above) of a file the adapter reads, the claimant is that function, `<file>::<function>`. The
@@ -2857,6 +2882,11 @@ it is satisfied by (b), or excused (below), and by nothing else. `verify` names 
 | `cannot be read as Go: <first parse error>` | A file the adapter reads that the Go parser refuses, `<first parse error>` as in the run summary (above). The line scan of section 8 still finds its markers. It is the threat model's "a claiming file the run did not build", which the command could not have built either. |
 | `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above functions the adapter does not judge, and above no test function for the file claimant in question; the first such function in the file. |
 | `no test function` | A file the adapter reads, with a marker for the id above no function, and no test function. |
+
+The line `verify` prints for such a file (section 12) ends with what to do: emit a receipt from its own
+test, name a staged Go source in `evidence.adapter.sources`, excuse it with a reason, or, when
+the file is not a test at all (a README or a golden file that quotes the marker), remove its marker
+for the id: it then claims nothing and is no claimant.
 
 A file under `trace.tests` that cannot be read at all (its permissions, say) is stricter
 still: its markers cannot be seen, so every command that reads them (`verify`, `status` and
@@ -3143,7 +3173,7 @@ Findings:
   `warn   partly run: <id>: no verdict: <claimant>` for one the adapter can judge
   (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
   `<file>::<function>` or `<file>`, and for a file the adapter cannot judge
-  `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
+  `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test (a README, a golden file), remove its marker for the id`,
   `<why>` as in section 10.3 ("A file the adapter cannot judge"). The first ten of these lines print, in the order they print, and then
   `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`;
   with `--partly` every one of them.
