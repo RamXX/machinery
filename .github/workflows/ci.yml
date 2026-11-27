@@ -62,5 +62,7 @@ jobs:
           java-version: 21
       - name: Install the pinned tools
         run: make tools
+      - name: Allow the browser sandbox (Ubuntu 24.04 runners restrict unprivileged user namespaces)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Reference project (real Postgres in Docker)
         run: make crm
