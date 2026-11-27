@@ -48,6 +48,23 @@ stdout '^  ERROR  malformed receipts file: \.machinery/receipts/.*: line 2: inv:
 stdout '^  ERROR  unproven: inv:customer-email-unique$'
 stdout '^checked: 17 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
 
+# a marker directly above a fuzz test or a benchmark belongs to that function, which the adapter
+# does not judge: the claim counts nothing and never falls back to the file, whose
+# TestHelperCheck passed. The fuzz seed is skipped under -short, the benchmark never runs
+rm .machinery/receipts
+cp fuzz_test.go e2e/suite/fuzz_test.go
+gitcommit 'a fuzz test and a benchmark with markers'
+exec machinery run --adapter go-test-json -- go test -short -run 'TestHelperCheck|FuzzEmail' ./e2e/suite
+stderr '^machinery run: adapter: e2e/suite/fuzz_test\.go: inv:customer-email-unique: the adapter does not judge FuzzEmail; put the marker above a Test function or at file level$'
+stderr '^machinery run: adapter: e2e/suite/fuzz_test\.go: inv:paid-before-shipped: the adapter does not judge BenchmarkShip; put the marker above a Test function or at file level$'
+! stderr 'fuzz_test\.go: no test function'
+cp stderr fuzz.err
+exec sh -c 'test "$(grep -c "does not judge" fuzz.err)" = 2'
+exec sh -c '! grep -q fuzz_test .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  unproven: inv:customer-email-unique$'
+stdout '^  ERROR  unproven: inv:paid-before-shipped$'
+
 -- design/formal/traces/order-payment.race.trace.json --
 {
   "version": 1,
@@ -74,6 +91,38 @@ import "testing"
 
 // machinery:verifies cx:order-payment:race
 func TestReplayRace(t *testing.T) {}
+-- fuzz_test.go --
+package suite
+
+import "testing"
+
+// FuzzEmail feeds addresses to the customer store; under -short its seed is skipped.
+//
+// machinery:verifies inv:customer-email-unique
+func FuzzEmail(f *testing.F) {
+	f.Add("a@example.test")
+	f.Fuzz(func(t *testing.T, email string) {
+		if testing.Short() {
+			t.Skip("no customer store under -short")
+		}
+	})
+}
+
+// BenchmarkShip runs only with -bench, which direct mode does not accept.
+//
+// machinery:verifies inv:paid-before-shipped
+func BenchmarkShip(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		settle("ship")
+	}
+}
+
+// TestHelperCheck checks a helper and claims nothing.
+func TestHelperCheck(t *testing.T) {
+	if settle("pay") != "pay" {
+		t.Fatal("settle changed the event")
+	}
+}
 -- e2e/suite/helpers_test.go --
 package suite
 

@@ -134,7 +134,7 @@ rm .machinery/receipts
 env SHOP_EMAIL=kill
 exec mrun 137 run --adapter go-test-json -- go test ./e2e/suite
 env SHOP_EMAIL=
-stderr '^machinery: run: go test -json: package example\.test/shop/e2e/suite has no end event; the run is left incomplete: find what stopped go test, delete the receipts file and run again$'
+stderr '^machinery: run: go test -json: package example\.test/shop/e2e/suite has no end event; the run is left incomplete: find what stopped go test, delete \.machinery/receipts/[^ ]+\.jsonl and run again$'
 ! stderr 'receipts written'
 # the killed go left its work directory under TMPDIR, which is in the project here
 exec sh -c 'sleep 1; rm -rf .tmp/go-build*'
