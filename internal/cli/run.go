@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/affected"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/affected"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/evidence"
 )
 
 func init() {

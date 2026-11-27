@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/pm"
 )
 
 // write saves rehearsal.md and rehearsal.json (section 17.3).

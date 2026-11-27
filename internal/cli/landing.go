@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/landing"
+	"github.com/RamXX/machinery/v2/internal/landing"
 )
 
 func init() {

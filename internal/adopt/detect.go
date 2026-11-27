@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/testpolicy"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/testpolicy"
 )
 
 // Sources are the design files found in the project.

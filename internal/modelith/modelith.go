@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/version"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/version"
 )
 
 // InstallHint is printed when the tool is missing or too old.

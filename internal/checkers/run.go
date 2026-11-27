@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Outcome is the result of running one checker.

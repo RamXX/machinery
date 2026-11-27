@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RamXX/machinery/pkg/receipt"
+	"github.com/RamXX/machinery/v2/pkg/receipt"
 )
 
 // change is the Change schema of the contract.

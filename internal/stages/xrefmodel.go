@@ -6,11 +6,11 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/ir"
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("xref-model-machine", XrefModelMachine) }

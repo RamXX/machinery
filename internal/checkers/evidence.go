@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"sort"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Finding is one finding of a checker (section 22.4).

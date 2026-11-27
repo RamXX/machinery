@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/ir"
 )
 
 // Fail closed by contract. A component that reports a verdict reports

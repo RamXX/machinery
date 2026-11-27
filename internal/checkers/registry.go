@@ -10,7 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // DefaultRegistry is the machine-local registry, relative to the project.

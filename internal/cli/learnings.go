@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/pm"
 )
 
 func init() {

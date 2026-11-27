@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // The statuses design/status.yaml gives (section 4.1). An id without one is

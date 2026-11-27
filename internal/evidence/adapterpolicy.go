@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // NotCounted is an adapter pass the policy does not let count (section 10.3).

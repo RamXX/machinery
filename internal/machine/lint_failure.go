@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // tagFailure marks a state that records that something went wrong

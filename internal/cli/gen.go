@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/RamXX/machinery/internal/adopt"
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/modelith"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/v2/internal/adopt"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/modelith"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/stages"
 )
 
 func init() {

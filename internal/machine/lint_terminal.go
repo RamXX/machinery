@@ -3,7 +3,7 @@ package machine
 import (
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/ir"
 )
 
 // TerminalStates returns the dotted paths of the states that declare

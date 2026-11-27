@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/gitx"
 )
 
 // census counts the lines, the words and the lines a record expression

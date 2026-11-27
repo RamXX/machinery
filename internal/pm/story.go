@@ -4,9 +4,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/evidence"
 )
 
 // StoryTier returns the tier of a story: the highest tier among its ids,

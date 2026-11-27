@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/version"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/version"
 )
 
 // RunOptions configures Run.

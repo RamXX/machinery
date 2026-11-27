@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // FailureMode is one entry of failure-modes.yaml (section 5.4).

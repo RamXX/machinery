@@ -10,13 +10,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/baseline"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/stages"
-	"github.com/RamXX/machinery/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/baseline"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/stages"
+	"github.com/RamXX/machinery/v2/internal/tags"
 )
 
 // Options are the arguments of machinery adopt.

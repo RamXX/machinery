@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 func init() {

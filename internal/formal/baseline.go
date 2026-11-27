@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Baseline is baseline.json (section 16.6).

@@ -3,9 +3,9 @@ package stages
 import (
 	"sort"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("machines", Machines) }

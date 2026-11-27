@@ -3,8 +3,8 @@ package checkers
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // FindingLine renders a finding the way the stage and the run command print it.

@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/machine"
 )
 
 // File is one generated file, by project-relative path.

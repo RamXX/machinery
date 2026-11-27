@@ -1,8 +1,8 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/checkers"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/checkers"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("checkers", Checkers) }

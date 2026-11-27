@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // The snapshot code of sections 18.1 and 18.2, shared by machinery assess and

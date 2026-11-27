@@ -3,7 +3,7 @@ module github.com/RamXX/machinery/examples/crm
 go 1.27.4
 
 require (
-	github.com/RamXX/machinery v0.0.0-00010101000000-000000000000
+	github.com/RamXX/machinery/v2 v2.0.0-00010101000000-000000000000
 	github.com/chromedp/chromedp v0.24.0
 	github.com/jackc/pgx/v5 v5.12.0
 )
@@ -18,4 +18,4 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 )
 
-replace github.com/RamXX/machinery => ../..
+replace github.com/RamXX/machinery/v2 => ../..

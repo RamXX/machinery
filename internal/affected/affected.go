@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/tags"
 )
 
 type baseEntry struct {

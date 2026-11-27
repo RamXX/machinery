@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Red is <git common dir>/machinery/red.json: the integration branch is red

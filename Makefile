@@ -3,7 +3,7 @@ SHELL := /bin/sh
 JOBS ?= 4
 VERSION ?= dev
 BUILD_DATE ?= $(shell date -u +%Y-%m-%d)
-VERSION_PKG := github.com/RamXX/machinery/internal/version
+VERSION_PKG := github.com/RamXX/machinery/v2/internal/version
 TOOLS := $(CURDIR)/.bin
 export MACHINERY_TOOLS := $(TOOLS)
 

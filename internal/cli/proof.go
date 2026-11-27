@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/evidence"
-	"github.com/RamXX/machinery/internal/formal"
-	"github.com/RamXX/machinery/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/formal"
+	"github.com/RamXX/machinery/v2/internal/pm"
 )
 
 func init() {

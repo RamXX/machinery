@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RamXX/machinery/pkg/receipt"
+	"github.com/RamXX/machinery/v2/pkg/receipt"
 )
 
 const (

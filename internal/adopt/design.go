@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"sort"
 
-	"github.com/RamXX/machinery/internal/arch"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/modelith"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/testpolicy"
-	"github.com/RamXX/machinery/internal/vital"
+	"github.com/RamXX/machinery/v2/internal/arch"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/modelith"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/testpolicy"
+	"github.com/RamXX/machinery/v2/internal/vital"
 )
 
 // baselines is step 2: the tests baseline and, when constraints are

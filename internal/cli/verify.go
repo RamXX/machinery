@@ -3,12 +3,12 @@ package cli
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/affected"
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/evidence"
-	"github.com/RamXX/machinery/internal/pm"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/v2/internal/affected"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/stages"
 )
 
 func init() {

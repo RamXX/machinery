@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/dialect"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/dialect"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Link gives one imported failure-mode row (id) or many (ids) a subject, a

@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/pm"
 )
 
 func init() {

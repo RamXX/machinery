@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // The wording of the evidence of a vital area (section 23.2).

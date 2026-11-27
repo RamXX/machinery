@@ -6,12 +6,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/formal"
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/formal"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Roles of a brief (section 15.5).

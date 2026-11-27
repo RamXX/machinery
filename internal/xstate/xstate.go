@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 //go:embed conformance.cjs

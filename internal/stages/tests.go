@@ -1,9 +1,9 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/baseline"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/testpolicy"
+	"github.com/RamXX/machinery/v2/internal/baseline"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/testpolicy"
 )
 
 func init() { Bind("tests", Tests) }

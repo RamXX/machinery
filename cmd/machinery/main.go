@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/RamXX/machinery/internal/cli"
+	"github.com/RamXX/machinery/v2/internal/cli"
 )
 
 func main() {

@@ -1,8 +1,8 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/evidence"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("verify", func(ctx *Context) *report.Stage { return Verify(ctx, false, false) }) }

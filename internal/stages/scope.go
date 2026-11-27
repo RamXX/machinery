@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/RamXX/machinery/internal/arch"
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/testpolicy"
+	"github.com/RamXX/machinery/v2/internal/arch"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/testpolicy"
 )
 
 func init() { Bind("scope", Scope) }

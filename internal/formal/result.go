@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // RunResult is the recorded outcome of one run (section 16.9).

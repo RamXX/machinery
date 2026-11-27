@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/dialect"
-	"github.com/RamXX/machinery/internal/ir"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/dialect"
+	"github.com/RamXX/machinery/v2/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Suffix of a machine file.

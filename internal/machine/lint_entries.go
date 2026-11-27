@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/ir"
 )
 
 // Entries returns the entry states of the machine (root _entries): the

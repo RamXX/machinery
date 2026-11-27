@@ -3,7 +3,7 @@ package machine
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/ir"
 )
 
 // lintGuards holds the root _guards declaration (docs/formats.md section 7.2):

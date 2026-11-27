@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/pm"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 func init() {

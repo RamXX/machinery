@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"regexp"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gen"
 )
 
 func init() { gen.Extra = append(gen.Extra, Records) }

@@ -1,8 +1,8 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("gen-drift", GenDrift) }

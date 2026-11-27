@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // wild reports whether a name matches a pattern in which "*" stands for any

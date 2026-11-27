@@ -3,8 +3,8 @@ package evidence
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // Vital is what keeps the evidence of vital areas from reading as more than

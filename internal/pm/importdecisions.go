@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/tags"
 )
 
 // DecisionRecord is one record of an existing decision file (section 15.8).

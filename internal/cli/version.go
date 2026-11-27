@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/version"
+	"github.com/RamXX/machinery/v2/internal/version"
 )
 
 func init() {

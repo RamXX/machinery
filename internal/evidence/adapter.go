@@ -13,9 +13,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/tags"
 )
 
 // GoTestJSON is the name of the run adapter for go test (section 10.3).

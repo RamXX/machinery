@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/stages"
 )
 
 func init() {

@@ -11,10 +11,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/tags"
 )
 
 // Story is one story of a plan (section 15.2).

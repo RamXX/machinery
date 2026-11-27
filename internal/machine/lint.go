@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/ir"
 )
 
 // Supported keys of the XState v5 subset (docs/machine-format.md). Any other

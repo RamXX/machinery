@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/machine"
 )
 
 func tlaSet(items []string) string {
