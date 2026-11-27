@@ -16,7 +16,7 @@ This branch is machinery v2, experimental. v1 is on `main`.
 
 ```
 make tools     # modelith 0.6.0, xstate 5.33.4 and the formal jars into .bin/ (needs Go, Node, Java)
-make check     # gofmt, go vet, build
+make check     # gofmt, go vet, build, and machinery check on this repository
 make e2e-one S=gen_shop    # one script
 make e2e       # the whole suite, once, at the end
 make verify    # check, e2e and the reference project (needs Docker)

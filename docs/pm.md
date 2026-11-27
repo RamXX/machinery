@@ -89,8 +89,10 @@ machinery plan --apply         # create them in the backlog, with edges
 machinery plan --link <story> <id>...   # attach ids to a story that already exists
 ```
 
-An edge means one story needs a named output of another: a proof story of a critical area needs
-the area's formal model; a failure-mode story needs the invoke path it is induced on.
+An edge means one story needs a named output of another: a proof story of a critical area needs the
+area's formal model; a failure-mode story needs the invoke path it is induced on. An id a test
+claimed at adoption gets no story of its own: it joins one `Wire evidence <test file>` story, which
+makes that test emit receipts (`docs/brownfield.md`).
 
 ## Waves
 
@@ -145,15 +147,16 @@ machinery accept <id> --verdict accept --observed "..." --close
 machinery story <id>                     # the gate, by tier
 ```
 
-Routine stories pass on evidence. Consequential, critical and vital ones need a verifier who is
-not the builder, a prediction for the same commit, and then the verdict. Critical and vital ones
-also need their formal model proven and its counterexamples replayed; vital ones also need the
-evidence of every assumption proven. A proof obligation never blocks a story and never counts as
-proven. When the harness sets `MACHINERY_SESSION` (the Claude Code plugin's hooks do, see
-`docs/hooks.md`), the proof, the prediction and the verdict record it, and the gate refuses a
-verifier who predicted from the builder's session and agent. Subagents share their parent's
-session, so a worker exports the `MACHINERY_AGENT` its brief names; the same session with
-different agents passes.
+Routine stories pass on evidence: receipts `machinery run` wrote for the story's commit, each from a
+test file that claims its id. A receipts file typed or edited after its run fails the gate.
+Consequential, critical and vital ones need a verifier who is not the builder, a prediction for the
+same commit, and then the verdict. Critical and vital ones also need their formal model proven and
+its counterexamples replayed; vital ones also need the evidence of every assumption proven. A proof
+obligation never blocks a story and never counts as proven. When the harness sets
+`MACHINERY_SESSION` (the Claude Code plugin's hooks do, see `docs/hooks.md`), the proof, the
+prediction and the verdict record it, and the gate refuses a verifier who predicted from the
+builder's session and agent. Subagents share their parent's session, so a worker exports the
+`MACHINERY_AGENT` its brief names; the same session with different agents passes.
 
 The builder posts the proof with what it does not prove and what it learned:
 `--limit "<claim still unproven>"`, `--learning "<rule for the next story>"`,

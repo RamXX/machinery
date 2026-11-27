@@ -35,6 +35,8 @@ hooks:
   missing, Claude Code shows a hook error notice and the action goes ahead.
 - Best effort on what counts as a git command: the `if` filter and the tool read the command
   line, not the shell. `sh -c "git commit"` is not seen.
+- Not yet confirmed in a live session. The scripts `hook_*.txtar` run `machinery hook` with
+  hook JSON on stdin; try the plugin in a session of your own before you rely on it.
 
 ## Sessions and the verifier
 
