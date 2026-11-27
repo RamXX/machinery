@@ -21,6 +21,17 @@ import (
 // leaves the runs of earlier commits valid (section 10.1).
 const ExcusedName = "design/excused.yaml"
 
+// ExcusedPlace names where the entries of evidence.adapter.excused go: the
+// excused file when the project has one (section 2.2), the configuration key
+// otherwise. Every piece of advice that tells the project to excuse a
+// claimant, or to narrow what it excused, takes the place from here.
+func (c *Config) ExcusedPlace() string {
+	if c.HasExcusedFile {
+		return ExcusedName
+	}
+	return "evidence.adapter.excused"
+}
+
 // ExcusedFile mirrors design/excused.yaml.
 type ExcusedFile struct {
 	Version int              `yaml:"version"`

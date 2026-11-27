@@ -17,7 +17,7 @@ stdout '^  warn   adapter excused: entry 1: 2 claimant\(s\) of 2 id\(s\), 1 glob
 stdout '^  warn   adapter excused: design/excused\.yaml: entry 1: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\), 1 function pattern\(s\): needs a second shop instance$'
 stdout '^  warn   adapter excused: design/excused\.yaml: entry 2: 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\): the provider sandbox is unreachable from CI$'
 stdout '^  warn   excused: inv:paid-before-shipped: proven \(2 claimant\(s\) excused\)$'
-stdout '^  warn   no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused: '
+stdout '^  warn   no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused: run a claimant of it here and narrow design/excused\.yaml, or prove it with a receipt a test emits$'
 exec mrun 1 verify --partly
 stdout '^  warn   adapter excused: design/excused\.yaml: entry 1 \(tests e2e/extra/\*_test\.go; functions TestShip\*\): 1 claimant\(s\) of 1 id\(s\), 1 glob\(s\), 1 function pattern\(s\): needs a second shop instance$'
 
@@ -79,6 +79,13 @@ stdout '^  warn   ratchet: adapter widened: design/excused\.yaml: entry 2 added:
 ! stdout 'evidence\.adapter\.excused: entry 1'
 stdout '^passed$'
 
+# the advice of a partly run id names where excused entries go: the excused file, as the project has one
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+cp excused-outage-only.yaml design/excused.yaml
+gitcommit 'the second shop is no longer excused'
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed \(1 claimant\(s\) excused\): run the claimants without a pass at this commit, or excuse those that cannot run here in design/excused\.yaml$'
+
 -- e2e/cluster/cluster_test.go --
 package cluster
 
@@ -110,6 +117,11 @@ excused:
     reason: "needs a second shop instance"
   - tests: ["e2e/suite/outage_test.go"]
     reason: "the provider sandbox is unreachable from CI"
+-- excused-outage-only.yaml --
+version: 1
+excused:
+  - tests: ["e2e/suite/outage_test.go"]
+    reason: "the provider sandbox answers only inside the office network"
 -- excused-reworded.yaml --
 version: 1
 excused:

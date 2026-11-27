@@ -144,12 +144,15 @@ func (u excusedUse) line(globs bool) string {
 	return head + ": " + counts + ": " + u.entry.Reason
 }
 
-// What to do about a partly run id, and about an id no claimant of which can
-// run here (sections 12 and 15.6).
-const (
-	PartlyRemedy     = "run the claimants without a pass at this commit, or excuse those that cannot run here in evidence.adapter.excused"
-	NoClaimantRemedy = "run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits"
-)
+// PartlyRemedy is what to do about a partly run id (sections 12 and 15.6).
+func PartlyRemedy(c *project.Config) string {
+	return "run the claimants without a pass at this commit, or excuse those that cannot run here in " + c.ExcusedPlace()
+}
+
+// NoClaimantRemedy is what to do about an id no claimant of which can run here.
+func NoClaimantRemedy(c *project.Config) string {
+	return "run a claimant of it here and narrow " + c.ExcusedPlace() + ", or prove it with a receipt a test emits"
+}
 
 // unreadableClaimant is what the run summary says of a claiming file the
 // adapter reads that cannot be read as Go (section 10.3).
@@ -163,6 +166,7 @@ const (
 	whyNotGo       = "not a Go file"
 	whyBroken      = "cannot be read as Go: "
 	whyConstrained = "it carries a build constraint: it may not have been built"
+	whySetCut      = "no test function; its set did not run in full"
 )
 
 // cannotJudge is what verify says of a file claimant the adapter cannot
@@ -174,6 +178,8 @@ func cannotJudge(file, why string) string {
 	switch {
 	case strings.HasPrefix(why, whyBroken):
 		todo = "fix the file so that it can be read as Go, or give it an excused entry with a reason"
+	case why == whySetCut:
+		todo = "run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason"
 	case why == whyConstrained:
 		todo = "put the marker above a test function, emit a receipt from its own test, or give it an excused entry with a reason"
 	case why == whyNotGo:

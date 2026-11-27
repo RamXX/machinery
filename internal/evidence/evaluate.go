@@ -310,9 +310,9 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		switch {
 		case !ev.HasEvidence:
 		case st == PartlyRun:
-			add(sev, "partly run: %s: %s: %s", o.ID, ev.partly[o.ID].Text(), PartlyRemedy)
+			add(sev, "partly run: %s: %s: %s", o.ID, ev.partly[o.ID].Text(), PartlyRemedy(&p.Cfg))
 		case noneOK:
-			add(sev, "no claimant can run here: %s: %d claimant(s) excused: %s", o.ID, none, NoClaimantRemedy)
+			add(sev, "no claimant can run here: %s: %d claimant(s) excused: %s", o.ID, none, NoClaimantRemedy(&p.Cfg))
 		case (st == Unproven || st == Partial) && !isOwed:
 			add(report.Error, "unproven: %s", o.ID)
 		case st == Proven && ev.excusedOK[o.ID] > 0:
@@ -409,7 +409,8 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 			for _, c := range open {
 				unit := claimUnit{ID: o.ID, File: c.File, Func: c.Func}
 				why, cannot := cs.unjudged[unit]
-				set := cs.bySet[unit] && sets[c.File] // a helper a run judged by its set
+				set := cs.bySet[unit] && sets[c.File] // a helper a run met a package of
+				cut := set && !passed[o.ID][c] && !skipped[o.ID][c]
 				if set {
 					cannot = false
 				}
@@ -422,8 +423,12 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 				default:
 					pr.Missing = append(pr.Missing, c)
 					pr.Skipped[c] = skipped[o.ID][c]
-					pr.BySet[c] = set
-					if cannot {
+					// judged by its set only when a run judged the set in full: it left a verdict
+					pr.BySet[c] = set && !cut
+					switch {
+					case cut:
+						pr.Unjudged[c] = whySetCut
+					case cannot:
 						pr.Unjudged[c] = why
 					}
 				}

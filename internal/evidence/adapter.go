@@ -1075,6 +1075,8 @@ func (a *GoTest) Receipts() [][]byte {
 	// a helper judged by its set (section 10.3): its file -> the packages of
 	// its set
 	sets := map[string][]string{}
+	// the helpers whose set ran in full here: a receipt was written for them
+	setJudged := map[string]bool{}
 	for _, u := range a.units {
 		f := a.files[u.File]
 		var funcs []fileFn
@@ -1187,6 +1189,7 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 		wrote[r.Outcome]++
 		has[u.ID] = true
+		setJudged[u.File] = setJudged[u.File] || bySet
 		lines = append(lines, jsonLine(r))
 		switch r.Outcome {
 		case Pass:
@@ -1272,8 +1275,10 @@ func (a *GoTest) Receipts() [][]byte {
 			case !scope[rel]:
 			case f.Constrained:
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; it carries a build constraint, so no set judges it: its claims count nothing", rel))
-			case len(sets[rel]) > 0:
+			case setJudged[rel]:
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims are judged by its set: every test function of %s", rel, packageWords(sets[rel])))
+			case len(sets[rel]) > 0: // a candidate of a package of the run whose set did not run in full
+				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its set did not run in full in this run: its claims count nothing", rel))
 			default:
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims count nothing", rel))
 			}

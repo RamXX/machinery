@@ -33,13 +33,17 @@ exec machinery proof --ids inv:paid-before-shipped
 stdout '^  inv:paid-before-shipped -> e2e/suite/order_test\.go::TestShipNeedsPayment -> pass: '
 
 # a -run filter leaves the set without a verdict for some of its functions: the helper has no
-# pass, and verify says it is judged by its set
+# pass, and neither the run nor verify says it is judged by its set: the set did not run in full
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test -tags faults -run 'TestEmailUnique|TestCancelIsFinal|TestShipNeedsPayment' ./e2e/suite
+stderr '^machinery run: adapter: e2e/suite/support_test\.go: no test function; its set did not run in full in this run: its claims count nothing$'
+! stderr 'judged by its set'
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '"adapter_sets":\["e2e/suite/support_test.go"\]'
 exec sh -c '! grep -q "\"test\":\"e2e/suite/support_test.go\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 2 claimants passed: '
-stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/support_test\.go \(by its set\)$'
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/support_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/suite/ship_helper_test\.go$'
 ! stdout 'by its set: inv:'
 # the rest of the set in another run at the same commit does not make it whole: a set is judged
@@ -47,13 +51,13 @@ stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/suite/shi
 exec machinery run --adapter go-test-json -- go test -tags faults -skip 'TestEmailUnique|TestCancelIsFinal|TestShipNeedsPayment' ./e2e/suite
 exec sh -c '! grep -q "\"test\":\"e2e/suite/support_test.go\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify
-stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/support_test\.go \(by its set\)$'
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/support_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
 
 # so does a build tag that leaves a test function of the set out of the build
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/suite
 exec mrun 1 verify
-stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/support_test\.go \(by its set\)$'
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/support_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
 
 # a fail of the set fails the ids of the helper, also a fail of a test that claims nothing
 rm .machinery/receipts
@@ -189,8 +193,28 @@ env TWO_RUN=
 stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 3 test function\(s\) with a verdict: 3 passed, 0 failed, 0 skipped$'
 exec sh -c '! grep "\"test\":\"e2e/set/helper_test.go\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify --partly
-stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/set/helper_test\.go \(by its set\)$'
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/set/helper_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
 ! stdout 'by its set: inv:customer-email-unique: e2e/set/helper_test\.go'
+
+# a set that ran in full with a function that skipped is judged by its set: its receipt is a skip
+# and verify says so. The same set cut by a -run filter is not: it says its set did not run in full
+rm .machinery/receipts
+mkdir e2e/skipset
+cp skipset_a_test.go.txt e2e/skipset/a_test.go
+cp skipset_b_test.go.txt e2e/skipset/b_test.go
+cp skipset_helper_test.go.txt e2e/skipset/helper_test.go
+gitcommit 'a set with a test that skips'
+exec machinery run --adapter go-test-json -- go test ./e2e/skipset
+stderr '^machinery run: adapter: e2e/skipset/helper_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/skipset$'
+exec mrun 1 verify --partly
+stdout '^  warn   partly run: inv:paid-before-shipped: skipped: e2e/skipset/helper_test\.go \(by its set\)$'
+! stdout 'inv:paid-before-shipped: e2e/skipset/helper_test\.go: cannot be judged'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -run TestB ./e2e/skipset
+stderr '^machinery run: adapter: e2e/skipset/helper_test\.go: no test function; its set did not run in full in this run: its claims count nothing$'
+exec mrun 1 verify --partly
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/skipset/helper_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); '
+! stdout 'skipset/helper_test\.go \(by its set\)'
 
 -- e2e/suite/support_test.go --
 package suite
@@ -349,6 +373,25 @@ evidence:
     sources:
       - {package: example.test/shop/stage/one, files: ["e2e/set/*_test.go"]}
       - {package: example.test/shop/stage/two, files: ["e2e/set/*_test.go"]}
+-- skipset_a_test.go.txt --
+package skipset
+
+import "testing"
+
+func TestA(t *testing.T) { t.Skip("needs the sandbox") }
+-- skipset_b_test.go.txt --
+package skipset
+
+import "testing"
+
+// machinery:verifies inv:paid-before-shipped
+func TestB(t *testing.T) {}
+-- skipset_helper_test.go.txt --
+package skipset
+
+// A helper of the set; it has no test function of its own.
+//
+// machinery:verifies inv:paid-before-shipped
 -- lone_test.go.txt --
 package lone
 
