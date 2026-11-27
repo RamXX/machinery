@@ -3,8 +3,8 @@
 A new project, from an empty directory to a proven design, in ten minutes. Every command in a
 `sh` block on this page is executed, in order, by the test suite (`docs_getting_started.txtar`).
 
-You need `machinery` and `modelith` 0.6.0 on your PATH, and git. The example project is a ticket
-desk whose whole system is one shell script; the files are in
+You need `machinery` and `modelith` 0.6.0 on your PATH (`README.md`, "Install"), and git. The
+example project is a ticket desk whose whole system is one shell script; the files are in
 `e2e/testdata/fixtures/starter/` of the machinery repository (`MACHINERY_REPO` below is a checkout
 of it).
 
@@ -95,5 +95,5 @@ machinery checks
   `machinery intake new`, changes the design, and only then becomes stories, all at once, with
   `machinery intake plan --apply`.
 - A formal model for a critical area: `docs/formal.md`.
-- An existing project: `docs/brownfield.md`.
+- An existing project, and evidence from a Go suite you already have: `docs/brownfield.md`.
 - Every format, output line and exit code: `docs/formats.md`.

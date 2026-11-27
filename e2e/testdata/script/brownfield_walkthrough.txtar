@@ -15,38 +15,58 @@ stdout '^out: .*/depot-assessment$'
 stdout '^tests: failed: 2 finding\(s\); checked: 2 test files, 1 files under e2e roots, 12 markers$'
 stdout '^assess: 10 sections, '
 exists ../depot-assessment/report.md
-# 2. the rehearsal adopts a snapshot, checks and plans it, and writes outside the project
+# 3. the rehearsal adopts a snapshot, checks and plans it, and writes outside the project
 stdout '^out: .*/depot-rehearsal$'
 stdout '^adopt: wrote [0-9]+ file\(s\), [0-9]+ waiver\(s\), [0-9]+ owed$'
 stdout '^rehearse: rehearsal.md, rehearsal.json$'
 exists ../depot-rehearsal/rehearsal.md
 exists ../depot-rehearsal/rehearsal.json
 grep '^Nothing: every stage passed or was not applicable.$' ../depot-rehearsal/rehearsal.md
-# 3. the dry run reports and writes nothing
+# 5. the dry run reports and writes nothing; adoption writes config and baseline only, and says
+# what it leaves to the team
 stdout 'backlog: bd, 4 open, [0-9]+ ready, 1 closed, cycles: none'
 stdout 'test files: 0 under e2e roots, 1 elsewhere \(unit tests\), 1 with test doubles'
-# 4. adoption writes config and baseline only, and says what it leaves to the team
 stdout 'note: add .machinery/ to .gitignore'
 stdout 'warn   baselined: unit-test: internal/shipping/shipment_test.go'
-# 5. the modeled area is owed in full
-stdout 'tc:SHIP-422414  unproven at adoption \([0-9a-f]+\)'
-# 6. stories are created beside the existing ones
-stdout 'plan: [0-9]+ created, 0 existing, [0-9]+ edge\(s\)'
-stdout 'Prove shipment pack'
-# 7. one story proven end to end
+# the modeled area is owed in full: what a test already claims apart from what none names
+stdout '^tc:SHIP-422414  claimed at adoption \([0-9a-f]+\)$'
+stdout '^tc:SHIP-58b48e  claimed at adoption \([0-9a-f]+\)$'
+stdout '^inv:terminal-is-final  claimed at adoption \([0-9a-f]+\)$'
+stdout '^tc:SHIP-15814c  unproven at adoption \([0-9a-f]+\)$'
+stdout '^act:Shipment.pack  unproven at adoption \([0-9a-f]+\)$'
+stdout '^owed: 21 entries$'
+# 6. the Go suite through the adapter, direct and through its wrapper; the shell test emits its
+# own receipts
+stdout '^--- PASS: TestDelivery '
+stderr -count=1 '^machinery run: adapter go-test-json: 1 package\(s\), 2 test function\(s\) with a verdict: 2 passed, 0 failed, 0 skipped$'
+stderr -count=1 '^machinery run: adapter go-test-json: 1 stream\(s\), 1 package\(s\), 2 test function\(s\) with a verdict: 2 passed, 0 failed, 0 skipped$'
+stderr -count=2 '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
+stderr -count=2 '^machinery run: adapter: needs a receipt with effects: 1 tc id\(s\)$'
 stdout 'shipment_e2e: ok'
-stdout 'owed: [0-9]+ kept, 0 added, 3 removed'
+# 7. the owed list loses exactly what the runs proved, and verify counts the adapter apart
+stdout '^owed: 14 kept, 0 added, 7 removed$'
+stdout '^checked: 16 obligations, 7 proven, 4 by adapter at function granularity, 0 partial, 14 owed, 7 receipts$'
+stdout '^  warn   adapter environment: \.machinery/receipts/[^ ]+\.jsonl: not recorded: the command ran through --streams$'
 stdout 'machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
-stdout 'tc:SHIP-422414 -> shipment_e2e.sh -> pass: Created -> Packed; packing recorded in the store history'
-stdout '== story =='
-# 8. the ratchet holds and the scope widens
+# 8. stories beside the existing ones, one of them to wire the claimed id the adapter cannot prove
+stdout '^plan: [0-9]+ created, 0 existing, [0-9]+ edge\(s\)$'
+stdout '^plan: 1 wire-evidence story for 1 claimed id\(s\), one per test file$'
+stdout '  routine  Wire evidence e2e/shipment_test.go$'
+stdout '  routine  Serve Shipment actions$'
+# 9. what stays owed, and why
+stdout '^proven: 7 \(4 by adapter at function granularity\)  partial: 0  failed: 0  owed: 14  '
+stdout '^owed, claimed by a test, no receipt yet: 1 \(tc 1\)$'
+stdout '^owed, no test names it: 8 \(tc 8\)$'
+stdout '^owed, actions: 0 served by code, 5 not served$'
+# 10. the ratchet holds and names the adapter sources added since; the scope widens
 stdout '== ratchet =='
+stdout '^  warn   ratchet: adapter widened: evidence.adapter.sources: example.test/depot/e2e <- e2e/\*_test.go added$'
 stdout 'internal/billing'
 
 # the project's own stories are still there, and the existing code was never rewritten
 exec bd list --all --json --limit 0
 stdout 'Dispatch rules'
-stdout 'Prove shipment pack'
+stdout 'Wire evidence e2e/shipment_test.go'
 exec git log --oneline -- internal/shipping/shipment.go internal/billing cmd
 stdout -count=1 '^[0-9a-f]+ '
 grep 'internal/billing/\*\*' machinery.yaml

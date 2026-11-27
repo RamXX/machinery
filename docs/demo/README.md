@@ -16,9 +16,11 @@ that hold it. Run one script with `make e2e-one S=<name>`; the scripts are in
 | Formal models that cannot quietly lie (real TLC, real Alloy) | `machinery formal check` | `formal_*` (12 scripts), `ratchet_spec_weakened` |
 | The backlog bridge on a real bd database | `machinery plan --apply`, `waves`, `brief` | `backlog_adapter`, `plan_*`, `waves_*`, `contract_freeze`, `brief_roles` |
 | Tier gates and the fresh verifier | `machinery predict`, `accept`, `story` | `story_routine`, `story_consequential`, `story_critical`, `proof_story`, `verify_story` |
-| Adoption in an existing project | `machinery adopt` | `adopt_*`, `bfix_builds`, `brownfield_walkthrough` |
+| Adoption in an existing project | `machinery assess`, `machinery adopt --rehearse`, `machinery adopt` | `assess_*`, `adopt_*`, `bfix_builds`, `brownfield_walkthrough` |
+| A design kept in the project's own formats | `import` and `trace.markers` in `machinery.yaml` | `import_*`, `adopt_import` |
+| Evidence from an existing Go suite | `machinery run --adapter go-test-json` | `run_adapter_*`, `verify_adapter_*`, `ratchet_adapter`, `trace_adapter_layout` |
 | A checker of your own, from design to proven obligation | `machinery checkers run` | `checkers_*` |
-| Guides whose commands are executed | `docs/getting-started.md`, `docs/brownfield.md` | `docs_getting_started`, `brownfield_walkthrough` |
+| Guides whose commands are executed | `README.md`, `docs/getting-started.md`, `docs/brownfield.md` | `docs_readme`, `docs_getting_started`, `brownfield_walkthrough` |
 | Agent surfaces, and hooks that only call the tool | `skills/`, `agents/`, `hooks/`, `machinery hook` | `plugins_manifest`, `hook_*` |
 | machinery checking itself | `make check` | `self_check` |
 | The whole loop on a real service and a real Postgres | `make crm` | `examples/crm/DEMO.md` |
@@ -42,8 +44,10 @@ predicates, and shows that the pure stage then passes with no Java on the machin
 make e2e-one S=brownfield_walkthrough
 ```
 
-It takes an existing Go project with unit tests and its own backlog from the first dry run to a
-proven story and a widened scope, executing `docs/brownfield.md` command by command.
+It takes an existing Go project with unit tests and its own backlog from a read-only assessment
+and a rehearsal to adoption, evidence from its own tests (a Go suite through the run adapter,
+direct and through a wrapper, and a script that emits receipts), a plan beside its own stories
+and a widened scope, executing `docs/brownfield.md` command by command.
 
 **Tier gates** (needs `bd`, Java):
 
