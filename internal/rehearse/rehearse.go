@@ -101,6 +101,11 @@ type rehearsal struct {
 	fixFirst             [][2]string
 	adoptLine            string
 	backlogLine          string
+	// notes: the renderings adopt left to the project (section 17.2), and
+	// leftDrift the DRIFT of stage model that each is; it blocks nothing
+	notes     []string
+	leftDrift map[string]bool
+	leftOnly  bool // stage model failed on those renderings alone
 }
 
 type planCount struct {
@@ -186,6 +191,9 @@ func Run(o Options) error {
 		}
 		fmt.Fprintf(w, "blocks adoption: %d stage(s): %s\n", len(r.blocks), strings.Join(names, ", "))
 	}
+	for _, n := range r.notes {
+		fmt.Fprintf(w, "note: %s\n", n)
+	}
 	if len(r.fixFirst) > 0 {
 		fmt.Fprintf(w, "fix in the project first: %d finding(s)\n", len(r.fixFirst))
 	}
@@ -232,6 +240,16 @@ func (r *rehearsal) rehearse(o Options, root, out, snap string) error {
 	}
 	r.blocked = res.BlockedLines()
 	r.backlogLine = res.Backlog.Line()
+	r.leftDrift = map[string]bool{}
+	for _, l := range res.Left {
+		if l.Missing {
+			r.notes = append(r.notes, l.Path+": missing rendering, the project generates it")
+			r.leftDrift[l.Path+": missing; run machinery gen"] = true
+		} else {
+			r.notes = append(r.notes, l.Path+": stale rendering, the project regenerates it")
+			r.leftDrift[l.Path+": stale; run machinery gen"] = true
+		}
+	}
 	if err := gitx.CommitAll(snap, "rehearsed adoption"); err != nil {
 		return err
 	}
@@ -351,9 +369,13 @@ func (r *rehearsal) findings(sts []*report.Stage) {
 		if s.OK() {
 			continue
 		}
+		if r.onlyLeft(s) {
+			r.leftOnly = true
+			continue
+		}
 		b := block{Stage: s.Name, Outcome: outcome}
 		for _, f := range s.Sorted() {
-			if f.Sev == report.Warn {
+			if f.Sev == report.Warn || r.left(s, f) {
 				continue
 			}
 			if len(b.Findings) == firstFindings {
@@ -366,6 +388,23 @@ func (r *rehearsal) findings(sts []*report.Stage) {
 		}
 		r.blocks = append(r.blocks, b)
 	}
+}
+
+// left reports a DRIFT of stage model about a rendering adopt left to the
+// project: a note, not a finding of what blocks (section 17.3).
+func (r *rehearsal) left(s *report.Stage, f report.Finding) bool {
+	return s.Name == "model" && f.Sev == report.Drift && r.leftDrift[f.Msg]
+}
+
+// onlyLeft reports a stage that would pass but for the renderings adopt
+// left: adopt --write does not stop on them, and the project regenerates them.
+func (r *rehearsal) onlyLeft(s *report.Stage) bool {
+	for _, f := range s.Findings {
+		if f.Sev != report.Warn && !r.left(s, f) {
+			return false
+		}
+	}
+	return s.NA == "" && s.ND == "" && len(s.Checked) > 0
 }
 
 // disposition says what to do about a blocking finding: fix it in the

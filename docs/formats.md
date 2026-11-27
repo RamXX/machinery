@@ -4719,7 +4719,7 @@ anything new in scope is held to the rules. There are two exceptions. In a desig
 machine is the lifecycle machine of a model entity nothing about the machines has been compared
 with the model yet, so `xref-model-machine` is not demonstrated until the first one is bound.
 And a rendering adopt left stale or missing (above) is a DRIFT of stage `model` until the
-project regenerates it. From there:
+project regenerates it; a rehearsal reports it as a note, not as a block (section 17.3). From there:
 
 - the area's design is written or extended a piece at a time (the riskiest stateful resource
   first), and each `machinery gen` plus `machinery adopt --write` owes the new obligations;
@@ -4776,19 +4776,26 @@ timestamp or an absolute path:
 | `check` | The summary line of `machinery check` and the outcome line of each stage. |
 | `plan` | The stories `machinery plan` would create, by kind (the kind of their ids, and `wire`, listed last, for a wire-evidence story) and tier, with counts, their total and the number of edges. The total is exact unless every id of a story carries a story already: `--apply` skips such a group when that story is in the backlog, which a rehearsal never reads, so the line then starts `Up to <n> stories` and ends `; <m> may exist already: every id of the group carries a story, and a rehearsal never reads the backlog.` Both groups show: when the plan has a wire-evidence story, `- wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>` (`1 story`), and when ids were planned at adoption, `- already planned in the project: <n> id(s) planned at adoption keep the story the project gave them; no story is planned for them`. |
 | `blocks` | What blocks adoption: each stage of the check that failed or was not demonstrated, with its outcome line and its first 5 findings, and the number of the others. |
+| `notes` | The renderings adopt left to the project (section 17.2), one line each, sorted: `<file>: stale rendering, the project regenerates it`, or `<file>: missing rendering, the project generates it`. |
 | `fix_first` | Fix in the project first: every ERROR of stage `model`, `machines`, `failure-modes` or `risk`. No waiver covers one (section 6.7); a finding about the form of an imported failure catalog is one of them. |
 
 A finding under `blocks` carries its disposition: `fix in the project first` for an ERROR of the
 stages of `fix_first`; for an ERROR of a cross-reference rule (sections 6.4 to 6.6, the message
 `<rule>: <subject>: <what>`), the waiver that would cover it, offered and never written:
 `waivable: - {rule: <rule>, id: "<subject>", reason: "found at adoption (<short sha>)"}`; none
-otherwise. `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links, files:
+otherwise. A rendering beside a model kept outside `design/` that adopt left stale or missing
+is a DRIFT of stage `model` (sections 6.1 and 17.2), and in a rehearsal it is a note, not a
+finding of `blocks`: `adopt --write` does not stop on it, and the project's own
+`machinery gen` writes the file. Stage `model` then blocks only when it has another ERROR or
+DRIFT or is not demonstrated, and the summary line of the check still counts it as failed. With
+no block, `rehearsal.md` says
+`Nothing: stage model failed only on the renderings of the notes below, and every other stage passed or was not applicable.` `rehearsal.json` is `{version, project, head, config, backlog, dirty, outside_links, files:
 [{path, bytes}], waivers: [{rule, count}], baselines: [{path, entries}], owed: {by_kind, total,
 claimed: {by_kind, total}, unnamed: {by_kind, total}, planned: {by_kind, total}, proven: {by_kind, total},
 actions: {served, unserved}},
 blocked: [<line>], check: {result, stages: [{name, outcome}]}, plan: {stories: [{kind, tier,
 count}], total, edges, planned_ids, may_exist, wire: {stories, ids, by}}, blocks: [{stage, outcome, findings: [{severity, message, disposition,
-waiver}], more}], fix_first: [{stage, message}]}`, keys sorted.
+waiver}], more}], notes: [<line>], fix_first: [{stage, message}]}`, keys sorted.
 
 stdout:
 
@@ -4804,6 +4811,7 @@ plan: <n> stories, <n> edge(s)
 plan: up to <n> stories, <n> edge(s); <m> may exist already: a rehearsal never reads the backlog
 wire evidence: <n> stories for <n> claimed id(s), one per test <file|directory>
 blocks adoption: <n> stage(s): <stage>, <stage>
+note: <file>: stale rendering, the project regenerates it
 fix in the project first: <n> finding(s)
 rehearse: rehearsal.md, rehearsal.json
 ```
@@ -4811,7 +4819,9 @@ rehearse: rehearsal.md, rehearsal.json
 One of the two `adopt:` lines and one of the two `plan:` lines print (the second when a story's
 ids all carry a story already); the `wire evidence` line only when the plan has such a
 story (`1 story`); `blocks adoption: nothing` when every stage passed or was
-not applicable, and the `fix in the project first` line only when there is one. Exit 0 when the
+not applicable, or failed only on a rendering adopt left; one `note:` line per such rendering,
+the line of `notes` (`missing rendering, the project generates it` for one that is missing);
+and the `fix in the project first` line only when there is one. Exit 0 when the
 rehearsal ran, whatever it found; 1 when the snapshot could not be taken; 2 for a usage or config
 error, nothing written.
 

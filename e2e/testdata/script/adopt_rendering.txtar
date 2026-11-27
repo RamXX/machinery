@@ -45,6 +45,35 @@ stdout '^  model/depot\.modelith\.md$'
 exists model/depot.modelith.md
 exec mrun 0 check --stage model
 
+# a rehearsal adopts a snapshot the same way: the stale rendering stays, and stage model reports it
+# as a DRIFT. adopt --write does not stop on it and the project's machinery gen writes it, so it
+# blocks nothing: the rehearsal says so in a note (section 17.3)
+fixture brownfield second
+fixture brownfield-design second
+cd second
+mkdir model
+exec mv design/model/depot.modelith.yaml model/depot.modelith.yaml
+rm design
+cp ../rendering.md model/depot.modelith.md
+gitinit
+cd ..
+exec machinery -C second adopt --rehearse --paths 'internal/shipping/**' --out out
+stdout '^check: machinery check: [0-9]+ passed, 1 failed, '
+stdout '^blocks adoption: nothing$'
+stdout '^note: model/depot\.modelith\.md: stale rendering, the project regenerates it$'
+grep '^  DRIFT  model/depot\.modelith\.md: stale; run machinery gen$' out/stages/check.txt
+grep '^Nothing: stage model failed only on the renderings of the notes below, and every other stage passed or was not applicable\.$' out/rehearsal.md
+grep '^- model/depot\.modelith\.md: stale rendering, the project regenerates it$' out/rehearsal.md
+grep '"notes": \[\n    "model/depot\.modelith\.md: stale rendering, the project regenerates it"\n  \]' out/rehearsal.json
+grep '"blocks": \[\]' out/rehearsal.json
+cmp second/model/depot.modelith.md rendering.md
+# and a missing one
+rm second/model/depot.modelith.md
+exec git -C second commit -q -am 'no rendering'
+exec machinery -C second adopt --rehearse --paths 'internal/shipping/**' --out out2
+stdout '^blocks adoption: nothing$'
+stdout '^note: model/depot\.modelith\.md: missing rendering, the project generates it$'
+
 -- rendering.md --
 # Depot
 

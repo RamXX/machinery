@@ -115,7 +115,10 @@ func (r *rehearsal) markdown() string {
 	p("")
 	p("## What blocks adoption")
 	p("")
-	if len(r.blocks) == 0 {
+	switch {
+	case len(r.blocks) == 0 && r.leftOnly:
+		p("Nothing: stage model failed only on the renderings of the notes below, and every other stage passed or was not applicable.")
+	case len(r.blocks) == 0:
 		p("Nothing: every stage passed or was not applicable.")
 	}
 	for i, bl := range r.blocks {
@@ -135,6 +138,16 @@ func (r *rehearsal) markdown() string {
 		}
 		if bl.More > 0 {
 			p("- %d more finding(s): `stages/check.txt`", bl.More)
+		}
+	}
+	if len(r.notes) > 0 {
+		p("")
+		p("## Notes")
+		p("")
+		p("Stage model reports these as a DRIFT; adopt --write leaves them to the project, and they block nothing.")
+		p("")
+		for _, n := range r.notes {
+			p("- %s", n)
 		}
 	}
 	if len(r.fixFirst) > 0 {
@@ -207,12 +220,13 @@ func (r *rehearsal) doc() map[string]any {
 	}
 	blocked := append([]string{}, r.blocked...)
 	outside := append([]string{}, r.outside...)
+	notes := append([]string{}, r.notes...)
 	return map[string]any{
 		"version": 1, "project": r.name, "head": r.head, "config": r.cfgLabel, "backlog": r.backlogLine,
 		"dirty":         map[string]any{"changed": r.changed, "untracked": r.untracked},
 		"outside_links": outside, "files": files, "waivers": waivers, "baselines": baselines,
 		"owed":    owed,
 		"blocked": blocked, "check": map[string]any{"result": r.checkLine, "stages": stageList},
-		"plan": plan, "blocks": blocks, "fix_first": fixFirst,
+		"plan": plan, "blocks": blocks, "fix_first": fixFirst, "notes": notes,
 	}
 }
