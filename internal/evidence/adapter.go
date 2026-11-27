@@ -84,6 +84,10 @@ type goStream struct {
 	// package-level end event ends a run (section 10.3)
 	pkgs     map[string][]*goPackage
 	nameless int // verdicts of test functions that name no package
+	// unnamed: the runs of the events that name no package, split at their
+	// end events and at a start event after other events (section 10.3,
+	// "A fail goes by name")
+	unnamed []*goPackage
 	// restarted: the first package with a start event before the end of
 	// its current run; the run is left incomplete (section 10.3)
 	restarted string
@@ -91,6 +95,7 @@ type goStream struct {
 
 // goPackage is what a stream said about one run of a package.
 type goPackage struct {
+	events   int                 // the events read into the run
 	end      string              // the package-level pass, fail or skip
 	cached   bool                // answered from the test cache
 	verdicts map[string][]string // test function -> its pass, fail and skip events
@@ -626,25 +631,41 @@ func (a *GoTest) ReadStreams(dir string) error {
 
 func isVerdict(action string) bool { return action == Pass || action == Fail || action == Skip }
 
+func newRun() *goPackage {
+	return &goPackage{verdicts: map[string][]string{}, started: map[string]int{}, subs: map[string]string{}}
+}
+
 func (s *goStream) read(ev goEvent) {
+	start := ev.Action == "start" && ev.Test == ""
 	if ev.Package == "" {
+		// a test binary under test2json without -p: a pass of these events
+		// counts nothing, a fail goes by name (section 10.3)
 		if ev.Test != "" && isVerdict(ev.Action) && !strings.Contains(ev.Test, "/") {
 			s.nameless++
 		}
+		if n := len(s.unnamed); n == 0 || s.unnamed[n-1].end != "" || (start && s.unnamed[n-1].events > 0) {
+			s.unnamed = append(s.unnamed, newRun())
+		}
+		s.unnamed[len(s.unnamed)-1].read(ev)
 		return
 	}
 	runs := s.pkgs[ev.Package]
-	if ev.Action == "start" && ev.Test == "" && len(runs) > 0 && runs[len(runs)-1].end == "" && s.restarted == "" {
+	if start && len(runs) > 0 && runs[len(runs)-1].end == "" && s.restarted == "" {
 		// a run killed and started again, or two runs writing at once
 		s.restarted = ev.Package
 	}
 	if len(runs) == 0 || runs[len(runs)-1].end != "" {
 		// the first event of the package, or one after its end event: a run
 		// of its own (section 10.3)
-		runs = append(runs, &goPackage{verdicts: map[string][]string{}, started: map[string]int{}, subs: map[string]string{}})
+		runs = append(runs, newRun())
 		s.pkgs[ev.Package] = runs
 	}
-	pkg := runs[len(runs)-1]
+	runs[len(runs)-1].read(ev)
+}
+
+// read adds one event to the run.
+func (pkg *goPackage) read(ev goEvent) {
+	pkg.events++
 	verdict := isVerdict(ev.Action)
 	parent, _, sub := strings.Cut(ev.Test, "/")
 	switch {
@@ -897,6 +918,22 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 	}
 
+	// with streams a fail needs no package: the fails of the events that name
+	// none go by name too (section 10.3), under the package ""
+	if a.fromDir {
+		for _, s := range a.streams {
+			for _, run := range s.unnamed {
+				for fn, isExplicit := range run.failed() {
+					if failedIn[fn] == nil {
+						failedIn[fn] = map[string]bool{}
+					}
+					failedIn[fn][""] = true
+					failEvent[fn] = failEvent[fn] || isExplicit
+				}
+			}
+		}
+	}
+
 	// a package that did not run its tests: every test function of its
 	// candidate files under trace.tests failed, whatever another run gave it.
 	// A function without a run event in a run where another has one was not
@@ -943,7 +980,7 @@ func (a *GoTest) Receipts() [][]byte {
 				reached = append(reached, file)
 			}
 			if len(reached) > 0 {
-				byName = append(byName, fmt.Sprintf("adapter: %s: failed in package(s) %s, so read as failed in %s: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated", fn, nameList(sortedKeys(failedIn[fn])), nameList(reached)))
+				byName = append(byName, fmt.Sprintf("adapter: %s: failed in %s, so read as failed in %s: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated", fn, failedWhere(failedIn[fn]), nameList(reached)))
 			}
 		}
 	}
@@ -1119,11 +1156,59 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 		a.summary = append(a.summary, fmt.Sprintf("adapter: %d test function(s) with a verdict are in no file under trace.tests: package(s) %s; %s", homeless, nameList(sortedKeys(lost)), todo))
 	}
-	add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
+	if a.fromDir {
+		add(nameless, "adapter: %d verdict(s) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>")
+	} else {
+		add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
+	}
 	sort.Strings(differ)
 	a.summary = append(append(append(append(append(a.summary, refused...), ambiguous...), differ...), byName...), sortedKeys(a.unjudged)...)
 	a.summary = append(append(a.summary, empty...), broken...)
 	return lines
+}
+
+// failed returns the test functions a run of the events that name no
+// package read as failed (section 10.3, "A fail goes by name"): true for a
+// fail event, its own or a subtest's, and false for a function the run
+// started and gave no verdict when it did not end with pass.
+func (pkg *goPackage) failed() map[string]bool {
+	res := map[string]bool{}
+	for fn, vs := range pkg.verdicts {
+		if contains(vs, Fail) {
+			res[fn] = true
+		}
+	}
+	for fn, sub := range pkg.subs {
+		if sub == Fail {
+			res[fn] = true
+		}
+	}
+	if pkg.end != Pass {
+		for fn, n := range pkg.started {
+			if _, seen := res[fn]; !seen && len(pkg.verdicts[fn]) < n {
+				res[fn] = false
+			}
+		}
+	}
+	return res
+}
+
+// failedWhere says where a function failed, for the summary: its packages,
+// sorted, and "" for the events that name no package.
+func failedWhere(in map[string]bool) string {
+	var pkgs, parts []string
+	for name := range in {
+		if name != "" {
+			pkgs = append(pkgs, name)
+		}
+	}
+	if len(pkgs) > 0 {
+		parts = append(parts, "package(s) "+nameList(pkgs))
+	}
+	if in[""] {
+		parts = append(parts, "events that name no package")
+	}
+	return strings.Join(parts, " and in ")
 }
 
 // parsed returns a Go file of the project, read once: a file under

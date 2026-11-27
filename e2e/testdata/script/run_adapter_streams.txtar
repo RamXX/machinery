@@ -172,12 +172,19 @@ env SHOP_ROUTING=
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
 stderr 'package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
-# without -p its events name no package: the verdicts are used for nothing
+# without -p its events name no package: a pass of them counts nothing
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh direct.sh
 stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 0 package\(s\), 0 test function\(s\) with a verdict: 0 passed, 0 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: 6 verdict\(s\) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>$'
+stderr '^machinery run: adapter: 6 verdict\(s\) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>$'
+# and a fail of them goes by name to the files of the entries that define the function
+rm .machinery/receipts
+env SHOP_EMAIL=fail
+exec machinery run --adapter go-test-json --streams -- sh direct.sh
+env SHOP_EMAIL=
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: TestEmailUnique: failed in events that name no package, so read as failed in e2e/suite/email_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 
 # a file that is not a well-formed stream: the run is left incomplete and nothing of it counts
 rm .machinery/receipts

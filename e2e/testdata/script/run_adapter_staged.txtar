@@ -99,6 +99,20 @@ exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
 stdout '"test":"e2e/more/more_test\.go::TestEmailUnique"'
 stdout '"test":"e2e/suite/email_test\.go::TestEmailUnique"'
 
+# a fail goes by name to the files of a dir: true entry too: e2e/more/more_test.go copied into
+# stage/x, a package no entry matches, fails there, and e2e/more passes. Both files that define
+# TestEmailUnique fail, and the name gets no pass
+rm .machinery/receipts
+env MORE_FAILS_IN=x
+exec mrun 1 run --adapter go-test-json --streams -- sh more.sh
+env MORE_FAILS_IN=
+stderr '^machinery run: adapter: TestEmailUnique: failed in package\(s\) example\.test/shop/stage/x, so read as failed in e2e/more/more_test\.go, e2e/suite/email_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+! stderr 'in no file under'
+exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/more/more_test\.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
+stdout '"outcome":"fail","test":"e2e/suite/email_test\.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
+
 # a pattern x/... matches the package x itself, as it does for go
 exec sh -c 'cat base.yaml suite-dir.part > machinery.yaml'
 gitcommit 'dir: true for e2e/suite/...'
@@ -135,6 +149,52 @@ stdout -count=1 receipt
 stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra failed"'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/testdata/staged/extra_test\.go::TestExtra\)$'
+
+# a function that started and gave no verdict goes by name as a fail does: the copy staged into
+# e2e/suite ends the test binary with os.Exit, and the copy in a directory of its own passes
+rm .machinery/receipts
+env EXTRA_EXITS_IN=suite
+exec mrun 1 run --adapter go-test-json --streams -- sh extra.sh e2e/suite e2e/run/extra
+env EXTRA_EXITS_IN=
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestExtra$'
+stderr '^machinery run: adapter: TestExtra: failed in package\(s\) example\.test/shop/e2e/suite, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra: started, no verdict; the package failed"'
+
+# a fail needs no package: the copy in a directory of its own passes, and the same file built
+# into a test binary and run under go tool test2json without -p fails, by t.Fatal and by
+# os.Exit, in events that name no package. The fail goes by name, the name gets no pass, and
+# verify fails the id
+rm .machinery/receipts
+env EXTRA_FAILS_IN=x
+exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh
+env EXTRA_FAILS_IN=
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+stderr '^machinery run: adapter: 1 verdict\(s\) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/testdata/staged/extra_test\.go::TestExtra\)$'
+rm .machinery/receipts
+env EXTRA_EXITS_IN=x
+exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh
+env EXTRA_EXITS_IN=
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+# a function those events started and gave no verdict, in a run of them that did not end with
+# pass, fails by name too
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh cut
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra: started, no verdict; the package failed"'
+# with a package of the run in which the name failed as well, the line names both
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh both
+stderr '^machinery run: adapter: TestExtra: failed in package\(s\) example\.test/shop/stage/y and in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 
 # an entry whose package has no wildcard names one package and maps every file to it: the
 # staged copy's pass in e2e/suite goes to the file under testdata
@@ -240,14 +300,64 @@ import (
 )
 
 // TestExtra is kept under testdata and copied into a package before go test runs. It fails in
-// the directory EXTRA_FAILS_IN names.
+// the directory EXTRA_FAILS_IN names, and ends the test binary in the one EXTRA_EXITS_IN names.
 //
 // machinery:verifies inv:terminal-is-final
 func TestExtra(t *testing.T) {
-	if wd, _ := os.Getwd(); filepath.Base(wd) == os.Getenv("EXTRA_FAILS_IN") {
+	wd, _ := os.Getwd()
+	switch filepath.Base(wd) {
+	case os.Getenv("EXTRA_FAILS_IN"):
 		t.Fatal("a cancelled order changed status")
+	case os.Getenv("EXTRA_EXITS_IN"):
+		os.Exit(1)
 	}
 }
+-- nameless.sh --
+#!/bin/sh
+# copies the staged test into e2e/run/extra and runs go test there, then builds the same file
+# into a test binary in stage/x and runs it under go tool test2json without -p, so that its
+# events name no package. With "cut" the second stream holds the events of such a binary that
+# started TestExtra and stopped there, typed as the wrapper saw them; with "both" a run of a
+# copy in stage/y comes first, whose package failed after it started TestExtra
+set -u
+status=0
+mkdir -p e2e/run/extra stage/x
+cp e2e/testdata/staged/extra_test.go e2e/run/extra/extra_test.go
+go test -json -count=1 ./e2e/run/extra > "$MACHINERY_GO_TEST_JSON/1.json" || status=1
+rm -r e2e/run
+cut='{"Action":"start"}
+{"Action":"run","Test":"TestExtra"}'
+y='{"Action":"start","Package":"example.test/shop/stage/y"}
+{"Action":"run","Package":"example.test/shop/stage/y","Test":"TestExtra"}
+{"Action":"fail","Package":"example.test/shop/stage/y"}'
+case "${1:-}" in
+cut)
+  printf '%s\n' "$cut" > "$MACHINERY_GO_TEST_JSON/2.json"
+  status=1
+  ;;
+both)
+  printf '%s\n%s\n' "$y" "$cut" > "$MACHINERY_GO_TEST_JSON/2.json"
+  status=1
+  ;;
+*)
+  cp e2e/testdata/staged/extra_test.go stage/x/extra_test.go
+  go test -c -o stage/x.test ./stage/x > /dev/null 2>&1 || status=1
+  (cd stage/x && go tool test2json -t ../x.test -test.v=test2json) > "$MACHINERY_GO_TEST_JSON/2.json" || status=1
+  ;;
+esac
+rm -rf stage
+exit $status
+-- more.sh --
+#!/bin/sh
+# runs e2e/more, then a copy of its test in stage/x, a package no entry matches
+set -u
+status=0
+go test -json -count=1 ./e2e/more > "$MACHINERY_GO_TEST_JSON/more.json" || status=1
+mkdir -p stage/x
+cp e2e/more/more_test.go stage/x/more_test.go
+go test -json -count=1 ./stage/x > "$MACHINERY_GO_TEST_JSON/x.json" || status=1
+rm -rf stage
+exit $status
 -- loose.sh --
 #!/bin/sh
 # the same sets, each tested by go test on its loose files
@@ -309,12 +419,21 @@ func TestBroken(t *testing.T) {
 -- more_test.go --
 package more
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
-// TestEmailUnique has the name of a function of the suite.
+// TestEmailUnique has the name of a function of the suite. It fails in the directory
+// MORE_FAILS_IN names.
 //
 // machinery:verifies inv:customer-email-unique
-func TestEmailUnique(t *testing.T) {}
+func TestEmailUnique(t *testing.T) {
+	if wd, _ := os.Getwd(); filepath.Base(wd) == os.Getenv("MORE_FAILS_IN") {
+		t.Fatal("second customer with the same email accepted")
+	}
+}
 -- doc_test.go --
 package more
 

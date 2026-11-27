@@ -2264,8 +2264,9 @@ all write fails, in whichever run of the package they happened; a function a fil
 keeps its id without evidence from that run, while no pass of the package counts; and a stream
 that does not say how its packages ended, or that mixes two runs of one, counts for nothing. A fail of any run,
 of any stream and of any package writes a fail receipt for every id its function's claims name
-("Which receipt", below), and with `--streams` in every file of `evidence.adapter.sources`
-that defines a test function of its name ("A fail goes by name", below).
+("Which receipt", below). With `--streams` a fail needs no package: it goes by name to every
+file of `evidence.adapter.sources` that defines a test function of its name, also a fail in
+events that name no package ("A fail goes by name", below).
 
 **Test functions.** The adapter counts as a test function every top-level function without a
 receiver whose name begins with `Test` and that has exactly one parameter, whatever its type is
@@ -2382,19 +2383,29 @@ is the project's statement that the package is built from its files and from no 
 their directories; machinery cannot check that, and a same-named function copied into the
 package from another directory is not seen.
 
-**A fail goes by name (`--streams`).** A pass counts only through the exact mapping above. A
-fail is matched loosely, so that it never falls through the mapping: a copy staged into a
-directory that holds files of a wildcard entry, or into a package that no entry matches, would
-otherwise lose it. A function that failed in a package of the run, whether or not an entry maps
-that package (a `fail` event, its own or a subtest's, verdicts that differ, or a `run` event
-with no verdict where its package failed), fails in every file under `trace.tests` that an
+**A fail goes by name (`--streams`).** A pass needs a package and the exact mapping above. A
+fail needs neither: it is matched by the name of its function, so that it never falls through
+the mapping (a copy staged into a directory that holds files of a wildcard entry, or into a
+package that no entry matches, would otherwise lose it) and never waits for the name of a
+package (a test binary run under `go tool test2json` without `-p`, whose events name none).
+A function read as failed anywhere in the run fails in every file under `trace.tests` that an
 entry names and that defines a test function of that name: a Go file the `files` of an entry
 match, or a `_test.go` file of a directory whose import path the pattern of an entry with
-`dir: true` matches. In that run the name gets no pass from any package, and every id that a
-function of that name claims in those files gets a `fail` receipt ("Which receipt", below). A
-package that did not run its tests fails the candidates of that package only (above). When the
-fail reaches a file the mapping did not give it to, the summary names the function:
-`adapter: <function>: failed in package(s) <import paths>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated`.
+`dir: true` matches. Read as failed means, in a package whether or not an entry maps it, a
+`fail` event (its own or a subtest's), verdicts that differ, or a `run` event with no verdict
+in a run where its package failed; and in the events that name no package, a `fail` event (its
+own or a subtest's) or a `run` event with no verdict in a run of them that did not end with
+`pass`. Those events are split into runs as the events of a package are, at their
+package-level end events (an event with no `Package` and no `Test`) and also at a `start`
+event that follows other events of the current run, which leaves nothing incomplete; a run of
+them without an end event did not end with `pass`. The name then gets no pass from any package
+in that `machinery run`, and every id that a function of that name claims in those files gets a `fail` receipt
+("Which receipt", below). A package that did not run its tests fails the candidates of that
+package only (above). When the fail reaches a file the mapping did not give it to, the summary
+names the function:
+`adapter: <function>: failed in <where>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated`,
+where `<where>` is `package(s) <import paths>`, `events that name no package`, or the two
+joined by ` and in `.
 This can give a false fail: two unrelated staged sets that share the name of a test fail
 together when one of them fails. Renaming one of the two functions is the remedy.
 
@@ -2404,7 +2415,7 @@ functions the claim belongs to, in this order:
 
 | The functions | The adapter writes |
 |---|---|
-| One of them failed, an ambiguous name, a function a package failure read as failed and, with `--streams`, one whose name failed in another package of the run included. | A `fail` receipt. |
+| One of them failed, an ambiguous name, a function a package failure read as failed and, with `--streams`, one whose name failed elsewhere in the run (in another package, or in events that name no package) included. | A `fail` receipt. |
 | One of them has an ambiguous name. | Nothing. |
 | One of them was skipped. | A `skip` receipt. |
 | One of them did not run. | Nothing: the id stays without evidence. |
@@ -2504,8 +2515,9 @@ the directory is read. The directory is removed after reading, whatever was foun
   or `fail` event, and it is never answered from a cache. It is read under the same rules and
   nothing more is asked of it. What it says is weaker in one respect, and no rule can check
   it: the package is the one the wrapper named, not one `go test` resolved and built. Without
-  `-p` the events name no package: their verdicts belong to no file, are used for nothing, and
-  are counted in the summary.
+  `-p` the events name no package: a pass or a skip of them belongs to no file and counts for
+  nothing, a fail of them, or a function they started and gave no verdict, goes by name ("A fail
+  goes by name", above), and their verdicts are counted in the summary.
 - **Naming a staged set.** `go test` run on files rather than on a package names every such set
   of tests `command-line-arguments`, so several sets of one run cannot be told apart and an
   entry for that name maps every set to every file it names. A wrapper names each set by
@@ -2550,6 +2562,7 @@ adapter: needs a receipt with effects: <n> tc id(s)
 adapter: needs a receipt with a replay: <n> cx id(s)
 adapter: <n> test function(s) with a verdict are in no file under trace.tests: package(s) <import paths>; <what to do>
 adapter: <n> verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>
+adapter: <n> verdict(s) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>
 adapter: package <import path>: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1
 adapter: package <import path>: did not end with pass; no pass is written from it
 adapter: package <import path>: <n> test function(s) started and gave no verdict, read as failed: <functions>
@@ -2557,7 +2570,7 @@ adapter: package <import path>: did not run its tests: <n> test function(s) read
 adapter: <import path>.<function>: defined in <file>, <file>: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions
 adapter: <import path>.<function>: <verdict> in <file>, <verdict> in <file>: verdicts differ, read as fail
 adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in package <import path>: verdicts differ, read as fail
-adapter: <function>: failed in package(s) <import paths>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
+adapter: <function>: failed in <where>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: not Go source that parses; its claims count nothing
@@ -2568,13 +2581,15 @@ order, the named ones sorted. `<what to do>` is
 `a package's verdicts go to the files under trace.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence.adapter.sources`,
 and with `--streams`
 `with --streams a package's verdicts go only to the files of its entry in evidence.adapter.sources: add one`.
-In the ambiguous line a file that does not parse is followed by ` (does not parse)`. A package that did not end with pass is named when it failed in a
+Of the two `name no package` lines the first prints in direct mode and the second with
+`--streams`; the events that name no package count in neither the packages nor the functions
+of the first line. In the ambiguous line a file that does not parse is followed by ` (does not parse)`. A package that did not end with pass is named when it failed in a
 run or did not end with pass in one that gives it verdicts. After those lines, one line per
 package names the functions a failure stopped after they started, and then one line per
 package that did not run its tests names the functions that failed with it, each list sorted,
 the first five and then `and <n> more`; a function a failure stopped is also counted as failed in the first
 line, and a function of a package that did not run its tests is not. The packages of the
-`in no file` line, and the packages and files of the `failed in package(s)` line, are sorted,
+`in no file` line, and the packages and files of the `failed in` line, are sorted,
 the first five and then `and <n> more`. Packages and functions are counted over the whole stream.
 `claimed, not run` counts the ids for which no receipt was written and a function of one of
 their claims did not run, among the claims of the files of the packages the run saw: their

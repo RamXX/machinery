@@ -283,7 +283,9 @@ matches the test files of its own directory. Tests staged as copies elsewhere ma
 `files`, which may name sources kept under `trace.tests` without the `_test.go` name. When the
 wrapper tests several staged sets, name each one: `go test -c` the set, then run the binary under
 `go tool test2json -t -p <name>`, named by the import path of the directory its sources are kept
-in, and one entry with a wildcard maps each set to its own sources. The summary counts what was
+in, and one entry with a wildcard maps each set to its own sources. A pass needs its package and
+its entry; a fail goes by function name to every file of the entries that defines it, also from a
+test binary run without `-p`, and that name gets no pass in the run. The summary counts what was
 claimed and not run for the packages of the run, and the number for the whole project once.
 
 **A test that emits receipts.** A transition case (`tc`) needs the effects the test observed,

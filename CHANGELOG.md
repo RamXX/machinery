@@ -65,7 +65,10 @@ command, output line and exit code.
   same name in another file. No fail is lost: in a package that failed, a function with a run
   event and no verdict (a timeout, `os.Exit`, a panic) fails, a function a filter left out or a
   crash never reached gets nothing, and no pass counts; a package that ran none of its tests (a
-  build failure, a `TestMain` that exits first) fails every claimed function. A stream cut
+  build failure, a `TestMain` that exits first) fails every claimed function. With `--streams`
+  a fail needs no package and no exact entry: it goes by function name to every file of the
+  sources that defines it, also from a test binary run under `test2json` without `-p`, and
+  that name gets no pass in the run; a pass needs its package and its entry. A stream cut
   short or holding two interleaved runs leaves the run incomplete. A cached pass counts
   nothing, and `tc` and `cx` ids are never proven this way. The rules aim at mistakes, not at
   planted code or a controlled environment.
