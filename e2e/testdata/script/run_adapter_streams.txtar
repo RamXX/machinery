@@ -26,6 +26,8 @@ stdout '"outcome":"pass","test":"e2e/suite/outage_test.go"'
 exec mrun 1 verify
 stdout '^checked: 16 obligations, 6 proven, 3 by adapter at function granularity, 3 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
 stdout '^  ERROR  stale owed entry: fm:payment-provider-down is proven$'
+# machinery did not run go: the run records no go environment
+stdout '^  warn   adapter environment: \.machinery/receipts/[^:]+\.jsonl: not recorded: the command ran through --streams$'
 
 # no stream: the command ran nothing the adapter can read. A file of another name is not read.
 # The directory is machinery's own, it starts empty, and it is gone after the run

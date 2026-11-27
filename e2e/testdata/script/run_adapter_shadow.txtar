@@ -169,6 +169,23 @@ stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: claimed, not run: 2 id\(s\)$'
 exec sh -c '! grep -q sc:customer-pays-and-the-order-ships .machinery/receipts/*.jsonl'
 
+# a TestMain whose parameter is not written *M is a test go runs: the marker above it gives a
+# receipt at function granularity. A function that begins with Test and takes no parameter, or
+# two, is no test function: a claim of its whole file does not wait for it
+rm .machinery/receipts
+cp globbed.yaml machinery.yaml
+cp scenario_helpers_test.go e2e/suite/scenario_test.go
+cp testmain_t_test.go e2e/suite/testmain_test.go
+gitcommit 'TestMain as a test, helpers without one parameter'
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr 'with a verdict: 8 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 7 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+exec sh -c 'grep -h testmain_test .machinery/receipts/*.jsonl'
+stdout '"id":"inv:terminal-is-final","outcome":"pass","test":"e2e/suite/testmain_test\.go::TestMain","observed":"go test: TestMain passed","source":"adapter","granularity":"function"'
+exec sh -c 'grep -h sc:customer-pays-and-the-order-ships .machinery/receipts/*.jsonl'
+stdout '"outcome":"pass","test":"e2e/suite/scenario_test\.go","observed":"go test: all 2 test function\(s\) of the file passed"'
+
 -- shadow_test.go --
 //go:build !faults
 
@@ -294,6 +311,51 @@ func TestCancelledRefusesPay(t *testing.T) {
 	}
 	if got := api.Handle("pay"); got != "pay" {
 		t.Fatalf("Handle(pay) = %q", got)
+	}
+}
+-- scenario_helpers_test.go --
+package suite
+
+// The markers of this file stand above no function: they belong to every test function in it.
+//
+// machinery:verifies sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
+
+import (
+	"path"
+	"testing"
+
+	"example.test/shop/internal/api"
+)
+
+// TestdataDir and TestdataJoin are helpers that begin with Test: no parameter, and two.
+func TestdataDir() string { return "testdata" }
+
+func TestdataJoin(dir, name string) string { return path.Join(dir, name) }
+
+func TestPayThenShip(t *testing.T) {
+	for _, event := range []string{"pay", "ship"} {
+		if got := api.Handle(event); got != event {
+			t.Fatalf("Handle(%s) = %q", event, got)
+		}
+	}
+}
+
+func TestCancelledRefusesPay(t *testing.T) {
+	if got := api.Handle("pay"); got != "pay" {
+		t.Fatalf("Handle(pay) = %q", got)
+	}
+}
+-- testmain_t_test.go --
+package suite
+
+import "testing"
+
+// TestMain takes a *testing.T here: go test runs it as a test, and it is no test main.
+//
+// machinery:verifies inv:terminal-is-final
+func TestMain(t *testing.T) {
+	if TestdataJoin(TestdataDir(), "x") != "testdata/x" {
+		t.Fatal("helpers broken")
 	}
 }
 -- named.yaml --
