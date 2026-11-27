@@ -27,6 +27,10 @@ type Options struct {
 	Write bool     // --write
 	// NoBacklog never runs the backlog tool (a rehearsal, section 17.3).
 	NoBacklog bool
+	// Commit is the short sha the report and every reason name; empty, the
+	// HEAD of Root. A rehearsal gives the HEAD of the project it snapshotted,
+	// never the snapshot's own commit (section 17.3).
+	Commit string
 	// Gen writes the generated files (machinery gen). It refuses, returning
 	// the blocking stages, when the design has errors.
 	Gen func(*stages.Context) (written []string, blocked []*report.Stage, err error)
@@ -97,9 +101,11 @@ func Run(o Options) (*Result, error) {
 		exe = oldP.Cfg.Tools.BD
 	}
 	res := &Result{Name: filepath.Base(root), Write: o.Write, Sha: "no commit", Backlog: readBacklog(root, exe, o.NoBacklog)}
-	var head string
-	if h, herr := gitx.Head(root); herr == nil {
+	head := o.Commit
+	if h, herr := gitx.Head(root); herr == nil && head == "" {
 		head = gitx.Short(h)
+	}
+	if head != "" {
 		res.Sha = head
 	}
 

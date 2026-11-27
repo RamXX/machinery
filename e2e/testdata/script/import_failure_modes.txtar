@@ -9,7 +9,7 @@ cp docs/risks.md risks.orig
 # two rows are linked and two are not: the catalog is read, and xref-failure is not demonstrated
 # while a row names no subject
 exec mrun 1 lint --stage failure-modes --stage xref-failure
-stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 1 abuse cases, 4 imported, 2 unlinked\npassed\n'
+stdout '(?s)== failure-modes ==\nchecked: 4 failure modes, 1 abuse cases, 4 imported, 2 linked, 2 unlinked\npassed\n'
 stdout '(?s)== xref-failure ==\nchecked: 4 failure modes, 2 linked, 2 unlinked, 1 invokes, 0 dependencies, 0 tiered actions, 0 failure states, 0 failure events\nnot demonstrated: 2 of 4 failure modes name no subject; link each in design/risk-links.yaml or declare it there with no_subject and a reason\n'
 ! stdout 'RISK-99'
 ! stdout 'risk-99'
@@ -37,7 +37,7 @@ stdout '^passed$'
 # an unlinked row covers nothing: the invoke it would name has no failure mode
 cp links-no-invoke.yaml design/risk-links.yaml
 exec mrun 1 lint --stage failure-modes --stage xref-failure
-stdout 'checked: 4 failure modes, 1 abuse cases, 4 imported, 3 unlinked'
+stdout 'checked: 4 failure modes, 1 abuse cases, 4 imported, 1 linked, 3 unlinked'
 stdout 'ERROR  invoke-failure-mode: invoke:order.chargePayment: no failure mode names this invoke; declare what happens when it fails in design/risk-links.yaml'
 
 # a linked row takes part in every rule: its subject must resolve
@@ -48,7 +48,7 @@ stdout 'ERROR  subject-resolves: invoke:order.refundPayment: failure mode risk-1
 # without a links file every row is unlinked, and the finding says where links go
 exec sh -c 'grep -v "links: design/risk-links.yaml" machinery.yaml > c.tmp && mv c.tmp machinery.yaml'
 exec mrun 1 lint --stage failure-modes --stage xref-failure
-stdout 'checked: 4 failure modes, 0 abuse cases, 4 imported, 4 unlinked'
+stdout 'checked: 4 failure modes, 0 abuse cases, 4 imported, 0 linked, 4 unlinked'
 stdout 'ERROR  invoke-failure-mode: invoke:order.chargePayment: no failure mode names this invoke; declare what happens when it fails in a links file \(import.failure_modes.links\)'
 
 # the native file and the catalog together: both count, and a native failure mode covers the invoke
@@ -57,7 +57,7 @@ cp import.yaml imp.tmp
 exec sh -c 'cat imp.tmp >> machinery.yaml'
 cp links.yaml design/risk-links.yaml
 exec mrun 1 lint --stage failure-modes --stage xref-failure
-stdout 'checked: 5 failure modes, 1 abuse cases, 4 imported, 2 unlinked'
+stdout 'checked: 5 failure modes, 1 abuse cases, 4 imported, 3 linked, 2 unlinked'
 stdout 'checked: 5 failure modes, 3 linked, 2 unlinked, 1 invokes'
 ! stdout 'ERROR'
 stdout '^not demonstrated: 2 of 5 failure modes name no subject; link each in design/risk-links.yaml or declare it there with no_subject and a reason$'

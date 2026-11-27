@@ -41,81 +41,16 @@ func XrefFailure(ctx *Context) *report.Stage {
 		return s.Count(len(fstates), "failure states").Count(len(fevents), "failure events")
 	}
 	w := waiversFor(p, xrefFailureRules...)
-
-	invokes := map[string]bool{} // invoke:<machine id>.<src>
-	for _, m := range d.Machines {
-		for _, st := range m.Table.States {
-			for _, src := range st.Invoke {
-				invokes["invoke:"+m.ID+"."+src] = true
-			}
-		}
-	}
-	deps := map[string]bool{}
-	for _, dep := range p.Cfg.Dependencies {
-		deps["dependency:"+dep.Name] = true
-	}
-	systems := map[string]bool{}
-	for _, sy := range p.Cfg.Systems {
-		systems["system:"+sy.Name] = true
-	}
-	named, abused := map[string]bool{}, map[string]bool{}
-	// linked: the failure mode names a subject of a known form that resolves
-	// in the design, with a required value. unlinked: every other one that is
-	// not declared subject-less: an imported row no entry names, a subject
-	// that is missing, malformed or resolves to nothing, a no_subject without
-	// a reason or beside a subject.
-	// noRequired: of the unlinked, those whose subject resolves and that
-	// only lack a valid required value.
-	linked, unlinked, subjectLess, unlinkedRows, noRequired := 0, 0, 0, 0, 0
-	for _, fm := range d.FailureModes {
-		if fm.SubjectLess() {
-			subjectLess++
-			continue // names nothing, and says why (section 5.4)
-		}
-		// valued: the subject comes with a required value; without one the
-		// subject is looked up all the same, and stage failure-modes has
-		// the finding
-		resolves, valued := fm.NamesSubject(), fm.WellFormed()
-		switch {
-		case !resolves:
-			// stage failure-modes has the finding, when there is one
-		case strings.HasPrefix(fm.Subject, "system:"):
-			if !systems[fm.Subject] {
-				resolves = false
-				if !valued {
-					break
-				}
-				// not a subject-resolves finding: no waiver covers an unknown system
-				s.Errorf("unknown-system: %s: failure mode %s: %s is not a configured system; declare it under systems in machinery.yaml (no waiver covers an unknown system)",
-					fm.Subject, fm.ID, strings.TrimPrefix(fm.Subject, "system:"))
-			}
-		default:
-			if why := unresolved(d, fm.Subject, invokes, deps, fstates, fevents); why != "" {
-				resolves = false
-				if valued {
-					// waived or not, the subject names nothing: the row is not linked
-					w.find(s, "subject-resolves", fm.Subject, "failure mode %s: %s", fm.ID, why)
-				}
-			}
-		}
-		if resolves && !valued {
-			// it names something of the design and does not say what the
-			// system must do: counted on its own, and still not linked
-			noRequired++
-			resolves = false
-		}
-		if !resolves {
-			unlinked++
-			if fm.Imported {
-				unlinkedRows++
-			}
+	a := ctx.failureAccount()
+	invokes, deps, named, abused := a.invokes, a.deps, a.named, a.abused
+	for _, u := range a.unresolved {
+		if u.system {
+			// not a subject-resolves finding: no waiver covers an unknown system
+			s.Errorf("unknown-system: %s: failure mode %s: %s; declare it under systems in machinery.yaml (no waiver covers an unknown system)",
+				u.subject, u.fm, u.why)
 			continue
 		}
-		linked++
-		named[fm.Subject] = true
-		if fm.Kind == "abuse" {
-			abused[fm.Subject] = true
-		}
+		w.find(s, "subject-resolves", u.subject, "failure mode %s: %s", u.fm, u.why)
 	}
 	for _, id := range sortedSet(invokes) {
 		if !named[id] {
@@ -148,35 +83,27 @@ func XrefFailure(ctx *Context) *report.Stage {
 	})
 	w.stale(s)
 	s.Count(len(d.FailureModes), "failure modes")
-	if d.ImportsFM || unlinked > 0 {
-		s.Count(linked, "linked").Count(unlinked, "unlinked")
-	}
-	if noRequired > 0 {
-		s.Count(noRequired, "name a subject and no required value")
-	}
-	if subjectLess > 0 {
-		s.Count(subjectLess, "subject-less")
-	}
+	a.count(s, d.ImportsFM)
 	s.Count(len(invokes), "invokes").Count(len(deps), "dependencies").Count(tiered, "tiered actions").
 		Count(len(fstates), "failure states").Count(len(fevents), "failure events")
 	if len(d.FailureModes) == 0 && len(invokes) == 0 && len(deps) == 0 && tiered == 0 && len(fstates) == 0 && len(fevents) == 0 && len(d.FMProblems) == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
 	switch {
-	case unlinked > 0:
+	case a.unlinked > 0:
 		// a row that names nothing and does not say why was not compared
 		// with the design: one linked row among many is no pass
 		todo := "give each a subject in " + d.FailureModeTarget()
-		if unlinkedRows > 0 {
+		if a.unlinkedRows > 0 {
 			todo = "link each in " + linksTarget(p)
 		}
 		reason := fmt.Sprintf("%d of %d failure modes name no subject; %s or declare it there with no_subject and a reason",
-			unlinked, len(d.FailureModes), todo)
-		if noRequired > 0 {
-			reason += fmt.Sprintf("; %d of them name a subject and no required value: add required to each", noRequired)
+			a.unlinked, len(d.FailureModes), todo)
+		if a.noRequired > 0 {
+			reason += fmt.Sprintf("; %d of them name a subject and no required value: add required to each", a.noRequired)
 		}
 		s.NotDemonstrated(reason)
-	case len(d.FailureModes) > 0 && linked == 0:
+	case len(d.FailureModes) > 0 && a.linked == 0:
 		// every failure mode is declared subject-less: none was compared
 		s.NotDemonstrated("no failure mode names a subject")
 	}
@@ -231,13 +158,8 @@ func UnmodeledFailures(ctx *Context) []project.Waiver {
 	if len(d.FMProblems) > 0 {
 		return nil
 	}
-	states, events := failureSubjects(d)
-	named := map[string]bool{}
-	for _, fm := range d.FailureModes {
-		if fm.WellFormed() {
-			named[fm.Subject] = true
-		}
-	}
+	a := ctx.failureAccount()
+	states, events, named := a.fstates, a.fevents, a.named
 	waived := map[string]bool{}
 	for _, wv := range ctx.P.Cfg.Waivers {
 		waived[wv.Rule+" "+wv.ID] = true

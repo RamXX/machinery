@@ -17,7 +17,8 @@ type Context struct {
 	// NoBacklog, when set, is why no stage may run the backlog tool.
 	NoBacklog string
 
-	d *design.Design
+	d  *design.Design
+	fa *failureAccount // the account of the failure modes, once per design
 }
 
 // Design loads the design once per command.
@@ -29,7 +30,7 @@ func (c *Context) Design() *design.Design {
 }
 
 // Reload drops the cached design (after a command wrote design files).
-func (c *Context) Reload() { c.d = nil }
+func (c *Context) Reload() { c.d, c.fa = nil, nil }
 
 // Def declares a stage and the product behavior it protects.
 type Def struct {

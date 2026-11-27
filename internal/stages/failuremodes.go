@@ -11,7 +11,7 @@ func FailureModes(ctx *Context) *report.Stage {
 	if !d.HasFailureModes() {
 		return s.NotApplicable("no design.failure_modes configured")
 	}
-	abuse, imported, unlinked := 0, 0, 0
+	abuse, imported := 0, 0
 	for _, fm := range d.FailureModes {
 		if fm.Kind == "abuse" {
 			abuse++
@@ -19,14 +19,13 @@ func FailureModes(ctx *Context) *report.Stage {
 		if fm.Imported {
 			imported++
 		}
-		if fm.Unlinked() {
-			unlinked++
-		}
 	}
 	s.Count(len(d.FailureModes), "failure modes").Count(abuse, "abuse cases")
 	if d.ImportsFM {
-		s.Count(imported, "imported").Count(unlinked, "unlinked")
+		s.Count(imported, "imported")
 	}
+	// the same account stage xref-failure gives (section 6.6)
+	ctx.failureAccount().count(s, d.ImportsFM)
 	for _, p := range d.FMProblems {
 		s.Errorf("%s", p)
 	}
