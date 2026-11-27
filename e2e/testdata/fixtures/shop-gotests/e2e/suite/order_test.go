@@ -31,6 +31,9 @@ func TestCancelIsFinal(t *testing.T) {
 			if state == os.Getenv("SHOP_FAIL_SUBTEST") {
 				t.Fatalf("%s order changed status", state)
 			}
+			if state == os.Getenv("SHOP_SKIP_SUBTEST") {
+				t.Skipf("no %s order in this run", state)
+			}
 		})
 	}
 }

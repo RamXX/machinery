@@ -159,6 +159,66 @@ rm .machinery/receipts
 exec mrun 3 run --adapter go-test-json --streams -- sh -c ': > "$MACHINERY_GO_TEST_JSON/empty.json"; exit 3'
 stderr '^machinery: run: stream empty\.json: no event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again$'
 
+# the verifier's rerun: the wrapper runs the suite, then reruns TestEmailUnique, which hangs past
+# -timeout: in the second stream it has a run event and no verdict and its package failed, so
+# its verdicts differ and it failed. No pass of the package counts, and the function no stream
+# gave a verdict (the file behind faults) fails with it
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh rerun.sh
+stderr '^machinery run: adapter: example\.test/shop/stage/suite\.TestEmailUnique: pass in 1-plain\.json, no verdict in 2-rerun\.json: verdicts differ, read as fail$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: did not end with pass; no pass is written from it$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 2 test function\(s\) without a verdict, read as failed: TestEmailUnique, TestProviderDown$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: no verdict; the package failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+! stdout ' [1-9][0-9]* proven'
+
+# os.Exit in the suite's first stream: the test failed, and so did every function of the package
+# no stream gave a verdict; TestProviderDown passed in the second stream, which counts nothing
+rm .machinery/receipts
+env SHOP_EMAIL=exit
+exec mrun 1 run --adapter go-test-json --streams -- sh run-suite.sh
+env SHOP_EMAIL=
+stderr '^machinery run: adapter: receipts written: 0 pass, 5 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 6 test function\(s\) without a verdict, read as failed: '
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+
+# an earlier pass at the same commit does not stand against a later run whose test panicked in a
+# goroutine: the later fail receipts fail the ids
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+env SHOP_EMAIL=panic
+exec mrun 1 run --adapter go-test-json --streams -- sh run-suite.sh
+env SHOP_EMAIL=
+stderr '^machinery run: adapter: receipts written: 0 pass, 5 fail, 0 skip$'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
+stdout '^  ERROR  failed: sc:customer-pays-and-the-order-ships \(e2e/suite/scenario_test\.go\)$'
+stdout '^checked: 16 obligations, 1 proven, 1 by adapter at file granularity, '
+
+# a stream cut short, here because the test killed the go command that wrote it, names a package
+# with no end event: the run is left incomplete
+rm .machinery/receipts
+env SHOP_EMAIL=kill
+exec mrun 137 run --adapter go-test-json --streams -- sh run-suite.sh
+env SHOP_EMAIL=
+stderr '^machinery: run: stream 1-plain\.json: package example\.test/shop/stage/suite has no end event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again$'
+exec sh -c '! grep -q "\"type\":\"end\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  incomplete run: \.machinery/receipts/'
+
+# a skipped subtest skips its parent in a stream too
+rm .machinery/receipts
+env SHOP_SKIP_SUBTEST=cancelled
+exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
+env SHOP_SKIP_SUBTEST=
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 1 skip$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout '"outcome":"skip","test":"e2e/suite/order_test.go::TestCancelIsFinal"'
+
 # a same-named function in a mapped file that claims nothing: ambiguous, counts nothing. The
 # claiming file was not built in this run, and machinery has no way to know
 cp shadow_test.go e2e/suite/shadow_test.go
@@ -190,6 +250,18 @@ exec machinery run --adapter go-test-json --streams -- sh once.sh
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
 
+-- rerun.sh --
+#!/bin/sh
+# the suite, then TestEmailUnique again, which hangs past -timeout
+set -u
+rm -rf stage
+mkdir -p stage/suite
+cp e2e/suite/*_test.go stage/suite/
+status=0
+go test -json -count=1 ./stage/suite > "$MACHINERY_GO_TEST_JSON/1-plain.json" || status=$?
+SHOP_EMAIL=hang go test -json -count=1 -timeout 3s -run TestEmailUnique ./stage/suite > "$MACHINERY_GO_TEST_JSON/2-rerun.json" || status=$?
+rm -rf stage
+exit $status
 -- once.sh --
 #!/bin/sh
 set -eu

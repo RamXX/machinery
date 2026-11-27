@@ -6,80 +6,91 @@ mkdir proj
 cd proj
 fixture shop
 fixture shop-gotests
+exec sh -c 'printf "evidence:\n  adapter: {}\n" >> machinery.yaml'
 exec machinery gen
 gitinit
 
-# the project's own module, its failing test: a fail receipt
+# the project's own module, its failing test: a fail receipt, and one for the file behind the
+# tag faults, which has no verdict in a package that failed
 env SHOP_EMAIL=fail
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 rm .machinery/receipts
 
 # go test -C into another directory is refused
 exec mrun 2 run --adapter go-test-json -- go test -C decoy ./e2e/suite
 stderr '^usage: --adapter go-test-json: -C: not accepted by the adapter in direct mode; run the command through --streams$'
 
-# the verifier's decoy: a nested module of the same module path with empty tests, under a
-# workspace that uses it and leaves the project's module out. go would build the decoy as the
-# package example.test/shop/e2e/suite; the module path declared twice is refused first
+# the verifier's decoy, committed: a nested module of the same module path with empty tests,
+# under a workspace that uses it and leaves the project's module out. go would build the decoy
+# as the package example.test/shop/e2e/suite; the module path declared twice is refused first
 mkdir decoy/e2e/suite
 cp $WORK/decoy.mod decoy/go.mod
 cp $WORK/decoy_test.go decoy/e2e/suite/decoy_test.go
 cp $WORK/inside.work decoy.work
+gitcommit 'a decoy module and a workspace that uses it'
 env GOWORK=$WORK/proj/decoy.work
 exec mrun 2 run --adapter go-test-json -- go test ./decoy/e2e/suite
-stderr '^usage: --adapter go-test-json: module example\.test/shop is declared by decoy/go\.mod and go\.mod: give each module its own path, or run the command through --streams$'
+stderr '^usage: --adapter go-test-json: module example\.test/shop is declared by decoy/go\.mod and go\.mod: give each module its own path, or move the copy under a testdata directory$'
 exec mrun 2 run --adapter go-test-json -- go test example.test/shop/e2e/suite
 stderr '^usage: --adapter go-test-json: example\.test/shop/e2e/suite: not accepted by the adapter in direct mode; run the command through --streams$'
+# stage trace reports the rules from the files alone, the workspace GOWORK names included
+exec mrun 1 check --stage trace
+stdout '^  ERROR  adapter: module example\.test/shop is declared by decoy/go\.mod and go\.mod: give each module its own path, or move the copy under a testdata directory$'
+stdout '^  ERROR  adapter: decoy\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
 env GOWORK=
-# the same workspace committed as go.work at the project root: refused the same way, and stage
-# trace reports both rules from the files alone
+# the same workspace committed as go.work at the project root: refused the same way
 cp $WORK/inside.work go.work
-gitcommit 'a decoy module and a workspace that uses it'
+gitcommit 'the workspace at the root'
 exec mrun 2 run --adapter go-test-json -- go test ./decoy/e2e/suite
 stderr '^usage: --adapter go-test-json: module example\.test/shop is declared by decoy/go\.mod and go\.mod: '
 exec mrun 1 check --stage trace
-stdout '^  ERROR  adapter: module example\.test/shop is declared by decoy/go\.mod and go\.mod$'
-stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\)$'
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
 ! exists .machinery/receipts
 
-# without the decoy, a workspace that leaves the project's module out is refused on its own,
-# wherever it is: the go.work of the project root, or a file GOWORK names
+# without the decoy, a workspace that leaves the project's module out is refused on its own
 rm decoy decoy.work
 mkdir tools
 cp $WORK/tools.mod tools/go.mod
 cp $WORK/tools.work go.work
-gitcommit 'a workspace of a tools module only'
+cp $WORK/both.work both.work
+cp $WORK/one.work one.work
+gitcommit 'a workspace of a tools module only, and two that use the project'
 exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^usage: --adapter go-test-json: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or run the command with GOWORK=off$'
+stderr '^usage: --adapter go-test-json: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or set GOWORK=off$'
 exec mrun 1 check --stage trace
-stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\)$'
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): '
 ! stdout 'is declared by'
+# a workspace git does not track is not read: go itself refuses this one, which leaves the
+# project's directory out, and nothing runs
 env GOWORK=$WORK/outside.work
-exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^usage: --adapter go-test-json: .*/outside\.work does not use the module of e2e/suite/email_test\.go \(go\.mod\): add the module to the workspace, or run the command with GOWORK=off$'
-# a workspace that uses the project's module is accepted, outside the project too, and the
-# header records it; GOWORK=off leaves the go.work of the root out
-env GOWORK=$WORK/both.work
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+rm .machinery/receipts
+# a workspace that uses the project's module is accepted, and the header records it; GOWORK=off
+# leaves the go.work of the root out, in the run and in stage trace
+env GOWORK=$WORK/proj/both.work
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
 stdout '"GOWORK":"[^"]*/both\.work",'
 stdout '"go_work_sha256":"[0-9a-f]{64}"\}\}$'
 rm .machinery/receipts
 # one use directive on its line, quoted, with comments
-env GOWORK=$WORK/one.work
+env GOWORK=$WORK/proj/one.work
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 rm .machinery/receipts
 env GOWORK=off
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
 stdout '"GOWORK":"off",.*"go_work_sha256":""\}\}$'
+exec machinery check --stage trace
+! stdout 'ERROR  adapter'
 rm .machinery/receipts
 env GOWORK=
-rm go.work tools
+rm go.work tools both.work one.work
 gitcommit 'no workspace'
 
 # a nested module under trace.tests whose test file claims an id is a module of a claiming
@@ -91,13 +102,13 @@ cp $WORK/extra_inv_test.go e2e/extra/extra_test.go
 cp $WORK/root.work go.work
 gitcommit 'a nested module with a claim'
 exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^usage: --adapter go-test-json: go\.work does not use the module of e2e/extra/extra_test\.go \(e2e/extra/go\.mod\): add the module to the workspace, or run the command with GOWORK=off$'
+stderr '^usage: --adapter go-test-json: go\.work does not use the module of e2e/extra/extra_test\.go \(e2e/extra/go\.mod\): add the module to the workspace, or set GOWORK=off$'
 exec mrun 1 check --stage trace
-stdout '^  ERROR  adapter: go\.work does not use the module of e2e/extra/extra_test\.go \(e2e/extra/go\.mod\)$'
+stdout '^  ERROR  adapter: go\.work does not use the module of e2e/extra/extra_test\.go \(e2e/extra/go\.mod\): '
 cp $WORK/extra_test.go e2e/extra/extra_test.go
 gitcommit 'a nested module with a tc claim only'
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 exec machinery check --stage trace
 ! stdout 'ERROR  adapter'
 rm .machinery/receipts
@@ -230,14 +241,14 @@ use ./proj/tools
 go 1.27
 
 use (
-	./proj
-	./proj/tools
+	.
+	./tools
 )
 -- one.work --
 go 1.27
 
 // the project's module
-use "./proj" // quoted
+use "." // quoted
 -- root.work --
 go 1.27
 

@@ -112,10 +112,12 @@ run adapter (section 10.3).
 | `scenario_test.go` | `TestPayThenShip`, `TestCancelledRefusesPay`; and `TestMain`, which is none | Above no function: both `sc` ids. |
 | `outage_test.go` (build tag `faults`) | `TestProviderDown` | Above no function: `fm:payment-provider-down`. |
 
-Environment switches, read by the tests: `SHOP_EMAIL=fail|skip` (`TestEmailUnique`),
-`SHOP_SCENARIO=fail|skip` (`TestCancelledRefusesPay`), `SHOP_FAIL_SUBTEST=shipped|cancelled` (a
-subtest of `TestCancelIsFinal`), `SHOP_ROUTING=fail` (`TestRouting`, which claims nothing) and
-`SHOP_OUTAGE=fail` (`TestProviderDown`).
+Environment switches, read by the tests: `SHOP_EMAIL=fail|skip|hang|exit|panic|kill`
+(`TestEmailUnique`: fails, skips, blocks past `-timeout`, calls `os.Exit`, panics in a goroutine,
+or kills the `go` command that runs it), `SHOP_SCENARIO=fail|skip` (`TestCancelledRefusesPay`),
+`SHOP_FAIL_SUBTEST=shipped|cancelled` and `SHOP_SKIP_SUBTEST=shipped|cancelled` (a subtest of
+`TestCancelIsFinal` fails or skips), `SHOP_ROUTING=fail` (`TestRouting`, which claims nothing)
+and `SHOP_OUTAGE=fail` (`TestProviderDown`).
 
 Without a tag the suite has 6 test functions with a verdict; with `-tags faults`, 7.
 

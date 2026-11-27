@@ -71,6 +71,18 @@ env GOFLAGS=-mod=mod
 exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
 stderr '^usage: --adapter go-test-json: -mod=mod in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
 env GOFLAGS=
+# a -run or -skip that selects subtests: a parent whose subtests a filter left out passes with
+# nothing checked. The verifier's typo in a subtest filter, and -skip of the failing subtest
+exec mrun 2 run --adapter go-test-json -- go test -run TestCancelIsFinal/nomatch ./e2e/suite
+stderr '^usage: --adapter go-test-json: -run=TestCancelIsFinal/nomatch: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -skip=TestCancelIsFinal/shipped ./e2e/suite
+stderr '^usage: --adapter go-test-json: -skip=TestCancelIsFinal/shipped: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test --test.run=TestCancelIsFinal/shipped ./e2e/suite
+stderr '^usage: --adapter go-test-json: -test\.run=TestCancelIsFinal/shipped: not accepted '
+env GOFLAGS=-skip=TestCancelIsFinal/shipped
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: -skip=TestCancelIsFinal/shipped in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
+env GOFLAGS=
 # nothing ran and nothing was recorded
 ! exists .machinery/receipts
 ! exists .git/machinery/runs
