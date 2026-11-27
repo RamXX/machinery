@@ -207,7 +207,7 @@ func shortErr(err error) string {
 // rehearse adopts the snapshot, checks it and builds the plan.
 func (r *rehearsal) rehearse(o Options, root, out, snap string) error {
 	before := waiverCounts(snap)
-	res, err := adopt.Run(adopt.Options{Root: snap, Paths: o.Paths, E2E: o.E2E, Write: true, Gen: o.Gen, NoBacklog: true})
+	res, err := adopt.Run(adopt.Options{Root: snap, Paths: o.Paths, E2E: o.E2E, Write: true, Gen: o.Gen, NoBacklog: true, Commit: r.head})
 	if err != nil {
 		return err
 	}

@@ -79,6 +79,8 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   its reason and counts it, and it is neither hinted nor asked for a failure mode.
 - An aliased event may be listed in `_failure_events` when the action it stands for is itself
   the failing outcome.
+- A rehearsal names the project's HEAD in every reason and waivable line it writes, never the
+  commit of its snapshot.
 - An owed file that does not parse is never read as empty: every command refuses with the
   parse error, and machinery writes the file through a YAML encoder.
 - Stage `xref-failure` prints how many failure modes are linked and how many are not, and is

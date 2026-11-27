@@ -4007,6 +4007,14 @@ machinery adopt --rehearse [--config <file>] [--out <dir>] [--paths <glob>]... [
   `not applicable: a rehearsal never reads the backlog`.
 - Nothing is written in the project. The output of adopt and of check is saved as
   `<out>/stages/adopt.txt` and `<out>/stages/check.txt`.
+- Every commit a file of the rehearsal names is the project's HEAD that was snapshotted, the
+  `<short sha>` of `project: <directory name> at <short sha>`: in the reasons adopt writes to
+  `owed.yaml` (`planned at adoption (<short sha>)`, `claimed at ...`, `unproven at ...`), in the
+  reasons of the waivers it adds to the snapshot's `machinery.yaml` (`unmodeled at adoption
+  (<short sha>)`, `unbound at ...`) and in every `waivable:` line (`found at adoption
+  (<short sha>)`). The commits of the snapshot itself (`snapshot of <sha>`, then `rehearsed
+  adoption`) exist so that the stages have a commit to read; no file of the out directory names
+  one, outside the snapshot's own `.git`.
 
 `<out>/rehearsal.md` (for people) and `<out>/rehearsal.json` hold the same content, without a
 timestamp or an absolute path:
