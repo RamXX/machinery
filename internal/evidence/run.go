@@ -200,14 +200,15 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		io.Copy(io.Discard, stream) // never leave the command blocked on a full pipe
 	}
 	exit = exitCode(cmd.Wait())
-	if streamsDir != "" {
-		if err := opts.Adapter.ReadStreams(streamsDir); err != nil {
-			// nothing of this run counts: no receipt, no end line (section 10.3)
-			if exit == 0 {
-				exit = 1
-			}
-			return exit, file, err
+	if streamsDir != "" && streamErr == nil {
+		streamErr = opts.Adapter.ReadStreams(streamsDir)
+	}
+	if streamErr != nil {
+		// nothing of this run counts: no receipt, no end line (section 10.3)
+		if exit == 0 {
+			exit = 1
 		}
+		return exit, file, streamErr
 	}
 	f, err = os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
@@ -218,10 +219,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	if opts.Adapter != nil {
 		// the adapter's receipts and the end line that counts them go in
 		// one append, after the command has exited
-		var lines [][]byte
-		if streamErr == nil {
-			lines = opts.Adapter.Receipts()
-		}
+		lines := opts.Adapter.Receipts()
 		n := len(lines)
 		end.Adapter = &n
 		tail = bytes.Join(lines, nil)
@@ -232,9 +230,6 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	}
 	if err == nil && ledger {
 		err = finishEntry(p, file, ledgerEntry{Commit: head, Dir: ledgerDir(p)})
-	}
-	if err == nil && streamErr != nil {
-		err = fmt.Errorf("reading the event stream: %v", streamErr)
 	}
 	return exit, file, err
 }

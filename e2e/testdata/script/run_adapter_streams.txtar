@@ -115,12 +115,14 @@ exec machinery run --adapter go-test-json --streams -- sh two.sh
 stderr '^machinery run: adapter: e2e/suite/email_test\.go::TestEmailUnique: pass in package example\.test/shop/stage/a, skip in package example\.test/shop/stage/b: verdicts differ, read as fail$'
 stderr '^machinery run: adapter: receipts written: 4 pass, 1 fail, 0 skip$'
 # and with equal verdicts the worst of what each package gives stands: one of the two did not
-# end with pass, so the passes of the other do not count
+# end with pass, so the passes of the other do not count, and the function of its entry's files
+# that no stream gave a verdict (two.sh does not stage the file behind faults) failed
 rm .machinery/receipts
 env TWO_ENV=SHOP_ROUTING=fail
 exec machinery run --adapter go-test-json --streams -- sh two.sh
 env TWO_ENV=
-stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/b: 1 test function\(s\) without a verdict, read as failed: TestProviderDown$'
 stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
 stderr 'package example\.test/shop/stage/b: did not end with pass; no pass is written from it$'
 
@@ -129,12 +131,13 @@ rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh direct.sh -p example.test/shop/e2e/suite
 stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 1 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
-# its package did not end with pass: no pass from it
+# its package did not end with pass: no pass from it, and the function of the package without
+# a verdict (the file behind faults) failed
 rm .machinery/receipts
 env SHOP_ROUTING=fail
 exec machinery run --adapter go-test-json --streams -- sh direct.sh -p example.test/shop/e2e/suite
 env SHOP_ROUTING=
-stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 stderr 'package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
 # without -p its events name no package: the verdicts are used for nothing
 rm .machinery/receipts
@@ -206,6 +209,8 @@ env SHOP_EMAIL=kill
 exec mrun 137 run --adapter go-test-json --streams -- sh run-suite.sh
 env SHOP_EMAIL=
 stderr '^machinery: run: stream 1-plain\.json: package example\.test/shop/stage/suite has no end event; the run is left incomplete: fix what writes the stream, delete the receipts file and run again$'
+# the killed go left its work directory under TMPDIR, which is in the project here
+exec sh -c 'sleep 1; rm -rf .tmp/go-build*'
 exec sh -c '! grep -q "\"type\":\"end\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify
 stdout '^  ERROR  incomplete run: \.machinery/receipts/'
@@ -218,6 +223,12 @@ env SHOP_SKIP_SUBTEST=
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 1 skip$'
 exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
 stdout '"outcome":"skip","test":"e2e/suite/order_test.go::TestCancelIsFinal"'
+# and a failed subtest fails its parent, also when the lines of a stream say the parent passed
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh sub.sh
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal failed"'
 
 # a same-named function in a mapped file that claims nothing: ambiguous, counts nothing. The
 # claiming file was not built in this run, and machinery has no way to know
@@ -250,6 +261,16 @@ exec machinery run --adapter go-test-json --streams -- sh once.sh
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/e2e/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
 
+-- sub.sh --
+#!/bin/sh
+# typed lines: a subtest failed, its parent passed
+cat > "$MACHINERY_GO_TEST_JSON/sub.json" <<'EOF'
+{"Action":"run","Package":"example.test/shop/stage/suite","Test":"TestCancelIsFinal"}
+{"Action":"fail","Package":"example.test/shop/stage/suite","Test":"TestCancelIsFinal/shipped"}
+{"Action":"pass","Package":"example.test/shop/stage/suite","Test":"TestCancelIsFinal"}
+{"Action":"pass","Package":"example.test/shop/stage/suite"}
+EOF
+exit 1
 -- rerun.sh --
 #!/bin/sh
 # the suite, then TestEmailUnique again, which hangs past -timeout

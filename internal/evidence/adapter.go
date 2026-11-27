@@ -83,6 +83,8 @@ type goPackage struct {
 	end      string              // the package-level pass, fail or skip
 	cached   bool                // answered from the test cache
 	verdicts map[string][]string // test function -> its pass, fail and skip events
+	started  map[string]bool     // test functions with a run event
+	subs     map[string]string   // test function -> the worst verdict of its subtests, fail or skip
 }
 
 // NewGoTest reads the command and the claims of the test files, and refuses
@@ -204,11 +206,15 @@ func (a *GoTest) checkLayout(claiming []string) error {
 		return err
 	}
 	if len(dups) > 0 {
-		return refuse("%s: give each module its own path, or run the command through --streams", dups[0])
+		return refuse("%s", dups[0])
 	}
 	if work := a.env.GOWORK; work != "" && work != "off" {
-		if unused := unusedModules(a.p, claiming, work); len(unused) > 0 {
-			return refuse("%s: add the module to the workspace, or run the command with GOWORK=off", unused[0])
+		unused, err := unusedModules(a.p, claiming, work)
+		if err != nil {
+			return err
+		}
+		if len(unused) > 0 {
+			return refuse("%s", unused[0])
 		}
 		a.env.WorkSum = fileSum(work)
 	}
@@ -259,6 +265,16 @@ func wordSet(words ...string) map[string]bool {
 		m[w] = true
 	}
 	return m
+}
+
+// subtestFilter reports a -run or -skip value that selects subtests: a parent
+// whose subtests it leaves out passes with nothing checked (section 10.3).
+func subtestFilter(name, val string) bool {
+	switch name {
+	case "run", "skip", "test.run", "test.skip":
+		return strings.Contains(val, "/")
+	}
+	return false
 }
 
 func notAccepted(word string) error {
@@ -328,6 +344,9 @@ func (a *GoTest) readCommand(argv []string) error {
 				hasCount = true
 			case "tags":
 				tagList = val
+			}
+			if subtestFilter(name, val) {
+				return notAccepted("-" + name + "=" + val)
 			}
 		case switchFlags[name]:
 			if name == "json" && hasVal && isFalse(val) {
@@ -399,7 +418,7 @@ func (a *GoTest) checkGoEnv(goBin string) (string, error) {
 		switch {
 		case (name == "count" || name == "test.count") && val != "1":
 			return "", refuse("GOFLAGS has -%s=%s, which is refused: take it out of GOFLAGS", name, val)
-		case !valueFlags[name] && !switchFlags[name]: // -json=false is harmless: the command has -json
+		case !valueFlags[name] && !switchFlags[name], subtestFilter(name, val): // -json=false is harmless: the command has -json
 			return "", refuse("%s in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams", w)
 		}
 	}
@@ -473,12 +492,26 @@ func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
 			}
 		}
 		if err == io.EOF {
+			if pkg := st.unended(); pkg != "" {
+				return fmt.Errorf("go test -json: package %s has no end event; the run is left incomplete: find what stopped go test, delete the receipts file and run again", pkg)
+			}
 			return nil
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("reading the event stream: %v; %s", err, leftIncomplete)
 		}
 	}
+}
+
+// unended returns the first package, by name, that has events in the
+// stream and no package-level end event, or "".
+func (s *goStream) unended() string {
+	for _, name := range sortedKeys(s.pkgs) {
+		if s.pkgs[name].end == "" {
+			return name
+		}
+	}
+	return ""
 }
 
 // StreamsEnv names the directory a wrapper leaves its streams in.
@@ -517,6 +550,9 @@ func (a *GoTest) ReadStreams(dir string) error {
 		if events == 0 {
 			return fmt.Errorf("stream %s: no event; %s", name, leftIncomplete)
 		}
+		if pkg := st.unended(); pkg != "" {
+			return fmt.Errorf("stream %s: package %s has no end event; %s", name, pkg, leftIncomplete)
+		}
 		a.streams = append(a.streams, st)
 	}
 	return nil
@@ -535,10 +571,11 @@ func (s *goStream) read(ev goEvent) {
 	}
 	pkg := s.pkgs[ev.Package]
 	if pkg == nil {
-		pkg = &goPackage{verdicts: map[string][]string{}}
+		pkg = &goPackage{verdicts: map[string][]string{}, started: map[string]bool{}, subs: map[string]string{}}
 		s.pkgs[ev.Package] = pkg
 	}
 	verdict := isVerdict(ev.Action)
+	parent, _, sub := strings.Cut(ev.Test, "/")
 	switch {
 	case ev.Test == "" && verdict:
 		pkg.end = ev.Action
@@ -547,7 +584,14 @@ func (s *goStream) read(ev goEvent) {
 		if strings.HasPrefix(ev.Output, "ok") && contains(strings.Split(strings.TrimSpace(ev.Output), "\t"), "(cached)") {
 			pkg.cached = true
 		}
-	case verdict && !strings.Contains(ev.Test, "/"): // a subtest has its parent's verdict
+	case ev.Test == "":
+	case ev.Action == "run" && !sub:
+		pkg.started[ev.Test] = true
+	case verdict && sub: // read with its parent: a fail fails it, a skip skips it
+		if ev.Action == Fail || (ev.Action == Skip && pkg.subs[parent] != Fail) {
+			pkg.subs[parent] = ev.Action
+		}
+	case verdict:
 		pkg.verdicts[ev.Test] = append(pkg.verdicts[ev.Test], ev.Action)
 	}
 }
@@ -588,6 +632,17 @@ func (a *GoTest) Receipts() [][]byte {
 			state[file][fn] = st
 		}
 	}
+	// a fail that is no fail event: a function without a verdict in a package
+	// that failed (section 10.3), by file, and by package for the summary
+	silent, explicit := map[string]map[string]bool{}, map[string]map[string]bool{}
+	mark := func(m map[string]map[string]bool, file, fn string) {
+		if m[file] == nil {
+			m[file] = map[string]bool{}
+		}
+		m[file][fn] = true
+	}
+	silentBy := map[string]map[string]bool{}
+	failedPkgs := map[string]bool{}
 	var passed, failed, skipped, homeless, nameless int
 	var ambiguous, refused, differ []string
 	lost := map[string]bool{} // packages with a verdict that found no file
@@ -605,6 +660,7 @@ func (a *GoTest) Receipts() [][]byte {
 		cached, notOK := false, false
 		type seen struct {
 			verdict, stream string
+			silent          bool // a run event and no verdict, in a stream where the package failed
 		}
 		read := map[string][]seen{}
 		replayed := map[string]bool{}
@@ -614,16 +670,28 @@ func (a *GoTest) Receipts() [][]byte {
 				continue
 			}
 			cached = cached || pkg.cached
-			if pkg.end != Pass && len(pkg.verdicts) > 0 {
-				notOK = true
-			}
+			notOK = notOK || pkg.end == Fail || (pkg.end != Pass && len(pkg.verdicts) > 0)
 			for fn, vs := range pkg.verdicts {
 				for _, v := range vs {
+					switch sub := pkg.subs[fn]; {
+					case sub == Fail:
+						v = Fail
+					case sub == Skip && v == Pass:
+						v = Skip
+					}
 					if pkg.cached && v == Pass {
 						replayed[fn] = true
 						continue
 					}
-					read[fn] = append(read[fn], seen{v, s.name})
+					read[fn] = append(read[fn], seen{verdict: v, stream: s.name})
+				}
+			}
+			if pkg.end == Fail { // whatever stopped the binary stopped these
+				failedPkgs[name] = true
+				for fn := range pkg.started {
+					if len(pkg.verdicts[fn]) == 0 {
+						read[fn] = append(read[fn], seen{verdict: Fail, stream: s.name, silent: true})
+					}
 				}
 			}
 		}
@@ -642,17 +710,28 @@ func (a *GoTest) Receipts() [][]byte {
 		sort.Strings(fns)
 		for _, fn := range fns {
 			verdict := "" // only a pass replayed from the cache
+			isSilent, isExplicit := false, false
 			if got := read[fn]; len(got) > 0 {
 				verdict = got[0].verdict
 				same := true
 				var parts []string
 				for _, g := range got {
 					same = same && g.verdict == verdict
-					if g.stream != "" {
-						parts = append(parts, g.verdict+" in "+g.stream)
-					} else {
-						parts = append(parts, g.verdict)
+					label := g.verdict
+					if g.silent {
+						label = "no verdict"
+						isSilent = true
+						if silentBy[name] == nil {
+							silentBy[name] = map[string]bool{}
+						}
+						silentBy[name][fn] = true
+					} else if g.verdict == Fail {
+						isExplicit = true
 					}
+					if g.stream != "" {
+						label += " in " + g.stream
+					}
+					parts = append(parts, label)
 				}
 				if !same { // verdicts that differ: a fail, whichever they are
 					verdict = Fail
@@ -673,6 +752,14 @@ func (a *GoTest) Receipts() [][]byte {
 				}
 				passed++
 			}
+			markFail := func(file string) {
+				switch {
+				case isExplicit:
+					mark(explicit, file, fn)
+				case isSilent:
+					mark(silent, file, fn)
+				}
+			}
 			defs, cands := a.definers(name, fn)
 			switch {
 			case len(defs) > 1 || (len(defs) == 1 && a.parsed(defs[0]).Broken):
@@ -692,6 +779,7 @@ func (a *GoTest) Receipts() [][]byte {
 					}
 					if st == stFail {
 						set(f, fn, stFail)
+						markFail(f)
 					} else {
 						set(f, fn, stAmbiguous)
 					}
@@ -709,11 +797,38 @@ func (a *GoTest) Receipts() [][]byte {
 					raw[file][fn] = [2]string{verdict, name}
 				}
 				set(file, fn, st)
+				if st == stFail {
+					markFail(file)
+				}
 			default:
 				homeless++
 				lost[name] = true
 			}
 		}
+	}
+
+	// a package that failed: every test function of its candidate files
+	// under trace.tests without a verdict in any stream failed (section 10.3)
+	for _, name := range sortedKeys(failedPkgs) {
+		for _, file := range a.candidates(name) {
+			f := a.files[file]
+			if f == nil {
+				continue
+			}
+			for _, fn := range f.Funcs {
+				if _, has := state[file][fn]; !has {
+					set(file, fn, stFail)
+					mark(silent, file, fn)
+					if silentBy[name] == nil {
+						silentBy[name] = map[string]bool{}
+					}
+					silentBy[name][fn] = true
+				}
+			}
+		}
+	}
+	for _, name := range sortedKeys(silentBy) {
+		refused = append(refused, fmt.Sprintf("adapter: package %s: %d test function(s) without a verdict, read as failed: %s", name, len(silentBy[name]), nameList(sortedKeys(silentBy[name]))))
 	}
 
 	// one receipt per attribution of a claimed id
@@ -732,7 +847,7 @@ func (a *GoTest) Receipts() [][]byte {
 			continue // no test function, or a file that does not parse: named in the summary
 		}
 		st := stPass
-		var failedFns, skippedFns []string
+		var failedFns, silentFns, skippedFns []string
 		for _, fn := range funcs {
 			fst, ran := state[u.File][fn]
 			if !ran {
@@ -741,10 +856,12 @@ func (a *GoTest) Receipts() [][]byte {
 			if fst < st {
 				st = fst
 			}
-			switch fst {
-			case stFail:
+			switch {
+			case fst == stFail && silent[u.File][fn] && !explicit[u.File][fn]:
+				silentFns = append(silentFns, fn)
+			case fst == stFail:
 				failedFns = append(failedFns, fn)
-			case stSkip:
+			case fst == stSkip:
 				skippedFns = append(skippedFns, fn)
 			}
 		}
@@ -764,6 +881,9 @@ func (a *GoTest) Receipts() [][]byte {
 			}
 		case stFail:
 			r.Outcome, r.Observed = Fail, "go test: "+nameList(failedFns)+" failed"
+			if len(failedFns) == 0 {
+				r.Observed = "go test: " + nameList(silentFns) + ": no verdict; the package failed"
+			}
 		case stSkip:
 			r.Outcome, r.Observed = Skip, "go test: "+nameList(skippedFns)+" skipped"
 		case stNotRun:

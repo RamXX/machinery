@@ -7,9 +7,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/internal/gitx"
 	"github.com/RamXX/machinery/internal/project"
 	"github.com/RamXX/machinery/internal/tags"
 )
@@ -75,10 +77,15 @@ func ClaimingGoTests(d *design.Design, found []tags.Tag) []string {
 }
 
 // GoLayout returns the problems of the layout of the Go modules (section
-// 10.3) as stage trace reports them: a module path declared by two go.mod
-// files, and a module of a claiming file that the go.work of the project
-// root does not use.
+// 10.3) as stage trace reports them, for a project that configures
+// evidence.adapter: a module path declared by two go.mod files, and a module
+// of a claiming file that the workspace does not use. The workspace is the
+// file GOWORK names, or else the go.work of the project root; none with
+// GOWORK=off.
 func GoLayout(p *project.Project, d *design.Design, found []tags.Tag) ([]string, error) {
+	if p.Cfg.Evidence == nil || p.Cfg.Evidence.Adapter == nil {
+		return nil, nil
+	}
 	claiming := ClaimingGoTests(d, found)
 	if len(claiming) == 0 {
 		return nil, nil
@@ -87,27 +94,44 @@ func GoLayout(p *project.Project, d *design.Design, found []tags.Tag) ([]string,
 	if err != nil {
 		return nil, err
 	}
-	if p.Exists("go.work") {
-		res = append(res, unusedModules(p, claiming, p.Abs("go.work"))...)
+	work := os.Getenv("GOWORK")
+	switch work {
+	case "off":
+		return res, nil
+	case "":
+		work = p.Abs("go.work")
 	}
-	return res, nil
+	unused, err := unusedModules(p, claiming, work)
+	return append(res, unused...), err
 }
 
-// duplicateModules returns "module <path> is declared by <a> and <b>" for
-// every module path two go.mod files of the project declare, sorted.
+// countsAsModule reports a project-relative path of a go.mod or go.work file
+// the layout rules read: not under testdata or vendor (section 10.3).
+func countsAsModule(rel string) bool {
+	for _, el := range strings.Split(rel, "/") {
+		if el == "testdata" || el == "vendor" {
+			return false
+		}
+	}
+	return true
+}
+
+// duplicateModules returns, sorted, the finding for every module path two
+// go.mod files of the project declare: those git tracks, outside testdata
+// and vendor.
 func duplicateModules(p *project.Project) ([]string, error) {
-	files, err := p.Files()
+	files, err := gitx.Tracked(p.Root, "*go.mod")
 	if err != nil {
 		return nil, err
 	}
 	by := map[string][]string{}
 	for _, rel := range files {
-		if path.Base(rel) != "go.mod" {
+		if path.Base(rel) != "go.mod" || !countsAsModule(rel) {
 			continue
 		}
 		data, err := p.Read(rel)
 		if err != nil {
-			return nil, err
+			continue // tracked and deleted: no module
 		}
 		if mod := modulePath(data); mod != "" {
 			by[mod] = append(by[mod], rel)
@@ -116,16 +140,25 @@ func duplicateModules(p *project.Project) ([]string, error) {
 	var res []string
 	for _, mod := range sortedKeys(by) {
 		if rels := by[mod]; len(rels) > 1 {
-			res = append(res, fmt.Sprintf("module %s is declared by %s and %s", mod, strings.Join(rels[:len(rels)-1], ", "), rels[len(rels)-1]))
+			sort.Strings(rels)
+			res = append(res, fmt.Sprintf("module %s is declared by %s and %s: give each module its own path, or move the copy under a testdata directory", mod, strings.Join(rels[:len(rels)-1], ", "), rels[len(rels)-1]))
 		}
 	}
 	return res, nil
 }
 
-// unusedModules returns "<workspace> does not use the module of <file>
-// (<go.mod>)" for every module of a claiming file that the workspace file
-// does not use, naming its first claiming file.
-func unusedModules(p *project.Project, claiming []string, work string) []string {
+// unusedModules returns the finding for every module of a claiming file that
+// the workspace file does not use, naming its first claiming file. The
+// workspace is read only when git tracks it in the project, outside testdata
+// and vendor.
+func unusedModules(p *project.Project, claiming []string, work string) ([]string, error) {
+	rel, in := inside(p.Root, work)
+	if !in || !countsAsModule(rel) {
+		return nil, nil
+	}
+	if tracked, err := gitx.Tracked(p.Root, ":(literal)"+rel); err != nil || len(tracked) == 0 {
+		return nil, err
+	}
 	uses := useDirs(work)
 	var res []string
 	seen := map[string]bool{}
@@ -136,10 +169,10 @@ func unusedModules(p *project.Project, claiming []string, work string) []string 
 		}
 		seen[mod] = true
 		if !uses[filepath.Dir(mod)] {
-			res = append(res, fmt.Sprintf("%s does not use the module of %s (%s)", shown(p, work), file, shown(p, mod)))
+			res = append(res, fmt.Sprintf("%s does not use the module of %s (%s): add the module to the workspace, or set GOWORK=off", rel, file, shown(p, mod)))
 		}
 	}
-	return res
+	return res, nil
 }
 
 // useDirs reads the use directives of a workspace file: the directories they
