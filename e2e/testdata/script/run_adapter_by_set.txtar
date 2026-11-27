@@ -146,20 +146,27 @@ stdout '^  warn   by its set: inv:terminal-is-final: e2e/suite/staged_support\.g
 ! stdout 'partly run: inv:terminal-is-final'
 
 # a source that imports "C" carries a build constraint too: go leaves it out of a build with cgo
-# off, as here, and the pass of its set says nothing of it
+# off, as here, and the pass of its set says nothing of it. So does one whose import of C is a
+# raw string, and one that imports C in a grouped import
 rm .machinery/receipts
 cp cgo_support.go.txt e2e/suite/cgo_support.go
-gitcommit 'a staged helper that uses cgo'
+cp cgo_raw.go.txt e2e/suite/cgo_raw.go
+cp cgo_grouped.go.txt e2e/suite/cgo_grouped.go
+gitcommit 'staged helpers that use cgo'
 env CGO_ENABLED=0
 exec machinery run --adapter go-test-json --streams -- sh suite.sh
 env CGO_ENABLED=
 stderr '^machinery run: adapter: e2e/suite/cgo_support\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
-exec sh -c '! grep -q "\"test\":\"e2e/suite/cgo_support.go\"" .machinery/receipts/*.jsonl'
+stderr '^machinery run: adapter: e2e/suite/cgo_raw\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+stderr '^machinery run: adapter: e2e/suite/cgo_grouped\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+exec sh -c '! grep -q "\"test\":\"e2e/suite/cgo_[a-z]*.go\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify --partly
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/cgo_support\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
-! stdout 'by its set: inv:paid-before-shipped: e2e/suite/cgo_support\.go'
-rm e2e/suite/cgo_support.go
-gitcommit 'the cgo helper is gone'
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/cgo_raw\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+stdout '^  warn   partly run: inv:terminal-is-final: e2e/suite/cgo_grouped\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+! stdout 'by its set: [a-z:-]+: e2e/suite/cgo_[a-z]+\.go'
+rm e2e/suite/cgo_support.go e2e/suite/cgo_raw.go e2e/suite/cgo_grouped.go
+gitcommit 'the cgo helpers are gone'
 
 # a set is judged in each of its packages: one helper and two test files mapped to two packages,
 # each built from copies of them. When both run every test function, the helper passes by the
@@ -245,6 +252,29 @@ import "C"
 // machinery:verifies inv:paid-before-shipped
 
 func cgoSupport() bool { return true }
+-- cgo_raw.go.txt --
+package suite
+
+import `C`
+
+// A source that imports C through a raw string; it has no test function.
+//
+// machinery:verifies inv:customer-email-unique
+
+func cgoRaw() bool { return true }
+-- cgo_grouped.go.txt --
+package suite
+
+import (
+	"C"
+	"strings"
+)
+
+// A source that imports C in a grouped import; it has no test function.
+//
+// machinery:verifies inv:terminal-is-final
+
+func cgoGrouped() string { return strings.ToUpper("c") }
 -- plusbuild_test.go.txt --
 // +build ignore
 

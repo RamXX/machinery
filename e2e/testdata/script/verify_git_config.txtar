@@ -3,8 +3,9 @@
 # hides from git diff and git status still makes the tree dirty while the submodule is checked
 # out at another commit, and still voids the runs of earlier commits once committed.
 # status.renames, diff.renames, core.quotepath and color.ui change no finding: a rename is read
-# by both of its paths and a name that is not ASCII as it is, in the dirty check and in the
-# commit diff
+# by both of its paths, a copy by its new path, and a name that is not ASCII as it is, in the
+# dirty check and in the commit diff. core.fileMode is honoured: where it is true, a change of
+# only the executable bit of a test file makes the tree dirty; where it is false, it does not
 fixture shop
 cp exempt.yaml machinery.yaml
 mkdir docs notes
@@ -94,6 +95,44 @@ exec mrun 1 verify
 stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
 exec git mv docs/plän.txt notes/plän.txt
 gitcommit 'the plan moves back'
+# a copy counts by its new path only, since its source did not change: a test file copied into
+# an exempt directory keeps the run valid
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+cp e2e/orders.sh docs/orders-copy.sh
+gitcommit 'a copy of a test into the docs'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: [^\n]*: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
+stdout '^passed$'
+rm docs/orders-copy.sh
+gitcommit 'the copy is gone'
+
+# core.fileMode = true, git's default where the filesystem has executable bits: a test file
+# whose executable bit is taken off in the work tree makes the tree dirty, and a run then records
+# "dirty":true
+exec git config core.fileMode true
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+chmod 644 e2e/orders.sh
+exec mrun 1 verify
+stdout '^  ERROR  working tree has uncommitted changes$'
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"dirty":true'
+# core.fileMode = false, as git sets it on a filesystem without executable bits: the same change
+# is not seen, and a run then records the tree as clean (section 10.1)
+exec git config core.fileMode false
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
+stdout '"dirty":false'
+exec machinery verify
+stdout '^passed$'
+chmod 755 e2e/orders.sh
+exec git config --unset core.fileMode
 
 # status.renames = copies: the same findings
 exec git config status.renames copies

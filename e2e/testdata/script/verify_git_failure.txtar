@@ -1,0 +1,51 @@
+# a git command that fails stops the command with one line that names the git command with its
+# arguments, the directory it ran in, what git said and what to do; nothing reads as passed
+# (section 10.1). Here an object the comparison needs is missing: the tree of the commit a run
+# was made at, a loose object, is removed
+fixture shop
+cp exempt.yaml machinery.yaml
+mkdir docs
+cp notes.md docs/notes.md
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+exec sh -c 'echo "more notes" >> docs/notes.md'
+gitcommit 'more notes'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)$'
+stdout '^passed$'
+exec sh -c 'tree=$(git rev-parse HEAD~1^{tree}) && rm .git/objects/$(echo $tree | cut -c1-2)/$(echo $tree | cut -c3-)'
+exec mrun 1 verify
+stdout '^  ERROR  git diff-tree -r -z --raw --relative --no-ext-diff --no-textconv --no-color --ignore-submodules=none --no-renames [0-9a-f]{40} [0-9a-f]{40} -- \. failed in /.*/script-verify_git_failure: fatal: unable to read tree \(?[0-9a-f]{40}\)?; the repository may be shallow or damaged: run git fsck there, and git fetch --unshallow if it is a shallow clone$'
+! stdout 'passed'
+exec mrun 1 status --no-backlog
+stderr '^machinery: git diff-tree .* failed in /.*/script-verify_git_failure: fatal: unable to read tree \(?[0-9a-f]{40}\)?; the repository may be shallow or damaged: run git fsck there, and git fetch --unshallow if it is a shallow clone$'
+
+-- exempt.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**"]
+-- notes.md --
+# Notes
+
+Nothing here changes what the tests check.
