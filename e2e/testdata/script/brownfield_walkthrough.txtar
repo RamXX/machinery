@@ -50,7 +50,8 @@ stdout '^  warn   adapter environment: \.machinery/receipts/[^ ]+\.jsonl: not re
 stdout 'machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable'
 # 8. stories beside the existing ones, one of them to wire the claimed id the adapter cannot prove
 stdout '^plan: [0-9]+ created, 0 existing, [0-9]+ edge\(s\)$'
-stdout '^plan: 1 wire-evidence story for 1 claimed id\(s\), one per test file$'
+stdout '^stories by kind: .*wire: 1$'
+stdout '^wire evidence: 1 stories for 1 claimed id\(s\)$'
 stdout '  routine  Wire evidence e2e/shipment_test.go$'
 stdout '  routine  Serve Shipment actions$'
 # 9. what stays owed, and why

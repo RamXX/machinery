@@ -1,6 +1,6 @@
 # version prints the version and needs no project
 exec machinery version
-stdout '^machinery 2\.0\.0$'
+stdout '^machinery dev \([0-9a-f]{40}(-dirty)?, unknown\)$'
 
 # no arguments prints help and exits 0
 exec machinery
