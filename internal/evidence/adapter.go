@@ -57,6 +57,9 @@ type GoTest struct {
 	units    []claimUnit
 	effects  map[string]bool // claimed tc ids
 	replay   map[string]bool // claimed cx ids
+	// unjudged: the summary lines of claims above a function the adapter
+	// does not judge (section 10.3, "Whose claim")
+	unjudged map[string]bool
 
 	// streams are the event streams read: the command's standard output, or
 	// with fromDir the files the command left in MACHINERY_GO_TEST_JSON
@@ -73,12 +76,14 @@ type GoTest struct {
 
 // goStream is one stream of go test -json.
 type goStream struct {
-	name     string // the file, in streams mode
-	pkgs     map[string]*goPackage
+	name string // the file, in streams mode
+	// pkgs: the runs of each package, in the order of the stream. A
+	// package-level end event ends a run (section 10.3)
+	pkgs     map[string][]*goPackage
 	nameless int // verdicts of test functions that name no package
 }
 
-// goPackage is what a stream said about one package.
+// goPackage is what a stream said about one run of a package.
 type goPackage struct {
 	end      string              // the package-level pass, fail or skip
 	cached   bool                // answered from the test cache
@@ -93,7 +98,7 @@ type goPackage struct {
 // With streams the command is any command: it is not read, and the streams
 // are the files it leaves in MACHINERY_GO_TEST_JSON.
 func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool) (*GoTest, error) {
-	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, fromDir: streams,
+	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, unjudged: map[string]bool{}, fromDir: streams,
 		pkgFiles: map[string][]string{}, pkgDir: map[string]string{}, dirGo: map[string][]string{}}
 	if streams {
 		// the command is not read and its build tags are not known; GOFLAGS of
@@ -171,7 +176,13 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 				case o.Kind == "cx":
 					a.replay[id] = true
 				case contains(project.AdapterKinds, o.Kind):
-					if u := (claimUnit{ID: id, File: t.File, Func: a.files[t.File].owner(t.Line)}); !seen[u] {
+					fn, test := a.files[t.File].owner(t.Line)
+					if fn != "" && !test {
+						// above a function the adapter does not judge: it counts nothing
+						a.unjudged[fmt.Sprintf("adapter: %s: %s: the adapter does not judge %s; put the marker above a Test function or at file level", t.File, id, fn)] = true
+						continue
+					}
+					if u := (claimUnit{ID: id, File: t.File, Func: fn}); !seen[u] {
 						seen[u] = true
 						a.units = append(a.units, u)
 					}
@@ -477,7 +488,7 @@ type goEvent struct {
 // Consume reads the event stream to its end. It prints the output text of
 // every event, and a line that is no event as it is.
 func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
-	st := &goStream{pkgs: map[string]*goPackage{}}
+	st := &goStream{pkgs: map[string][]*goPackage{}}
 	a.streams = append(a.streams, st)
 	r := bufio.NewReader(stream)
 	for {
@@ -492,27 +503,45 @@ func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
 			}
 		}
 		if err == io.EOF {
-			if pkg := st.unended(); pkg != "" {
-				return fmt.Errorf("go test -json: package %s has no end event; the run is left incomplete: find what stopped go test, delete the receipts file and run again", pkg)
+			if what := st.unended(); what != "" {
+				return &Incomplete{What: "go test -json: " + what, Todo: "find what stopped go test"}
 			}
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("reading the event stream: %v; %s", err, leftIncomplete)
+			return &Incomplete{What: fmt.Sprintf("reading the event stream: %v", err), Todo: fixStream}
 		}
 	}
 }
 
-// unended returns the first package, by name, that has events in the
-// stream and no package-level end event, or "".
+// unended says of the first package, by name, whose last run in the stream
+// has no package-level end event what is missing, or returns "".
 func (s *goStream) unended() string {
 	for _, name := range sortedKeys(s.pkgs) {
-		if s.pkgs[name].end == "" {
-			return name
+		switch runs := s.pkgs[name]; {
+		case runs[len(runs)-1].end != "":
+		case len(runs) == 1:
+			return "package " + name + " has no end event"
+		default:
+			return "package " + name + " has events after its last end event"
 		}
 	}
 	return ""
 }
+
+// Incomplete is a stream that leaves the run incomplete (section 10.3): no
+// receipt and no end line are written. Run sets File, the receipts file the
+// message tells to delete.
+type Incomplete struct {
+	What, Todo string
+	File       string // project-relative
+}
+
+func (e *Incomplete) Error() string {
+	return fmt.Sprintf("%s; the run is left incomplete: %s, delete %s and run again", e.What, e.Todo, e.File)
+}
+
+const fixStream = "fix what writes the stream"
 
 // StreamsEnv names the directory a wrapper leaves its streams in.
 const StreamsEnv = "MACHINERY_GO_TEST_JSON"
@@ -534,7 +563,7 @@ func (a *GoTest) ReadStreams(dir string) error {
 		if err != nil {
 			return err
 		}
-		st := &goStream{name: name, pkgs: map[string]*goPackage{}}
+		st := &goStream{name: name, pkgs: map[string][]*goPackage{}}
 		events := 0
 		for i, line := range strings.Split(string(data), "\n") {
 			if strings.TrimSpace(line) == "" {
@@ -542,23 +571,21 @@ func (a *GoTest) ReadStreams(dir string) error {
 			}
 			var ev goEvent
 			if json.Unmarshal([]byte(line), &ev) != nil || ev.Action == "" {
-				return fmt.Errorf("stream %s: line %d: not a go test -json event; %s", name, i+1, leftIncomplete)
+				return &Incomplete{What: fmt.Sprintf("stream %s: line %d: not a go test -json event", name, i+1), Todo: fixStream}
 			}
 			events++
 			st.read(ev)
 		}
 		if events == 0 {
-			return fmt.Errorf("stream %s: no event; %s", name, leftIncomplete)
+			return &Incomplete{What: "stream " + name + ": no event", Todo: fixStream}
 		}
-		if pkg := st.unended(); pkg != "" {
-			return fmt.Errorf("stream %s: package %s has no end event; %s", name, pkg, leftIncomplete)
+		if what := st.unended(); what != "" {
+			return &Incomplete{What: "stream " + name + ": " + what, Todo: fixStream}
 		}
 		a.streams = append(a.streams, st)
 	}
 	return nil
 }
-
-const leftIncomplete = "the run is left incomplete: fix what writes the stream, delete the receipts file and run again"
 
 func isVerdict(action string) bool { return action == Pass || action == Fail || action == Skip }
 
@@ -569,11 +596,14 @@ func (s *goStream) read(ev goEvent) {
 		}
 		return
 	}
-	pkg := s.pkgs[ev.Package]
-	if pkg == nil {
-		pkg = &goPackage{verdicts: map[string][]string{}, started: map[string]bool{}, subs: map[string]string{}}
-		s.pkgs[ev.Package] = pkg
+	runs := s.pkgs[ev.Package]
+	if len(runs) == 0 || runs[len(runs)-1].end != "" {
+		// the first event of the package, or one after its end event: a run
+		// of its own (section 10.3)
+		runs = append(runs, &goPackage{verdicts: map[string][]string{}, started: map[string]bool{}, subs: map[string]string{}})
+		s.pkgs[ev.Package] = runs
 	}
+	pkg := runs[len(runs)-1]
 	verdict := isVerdict(ev.Action)
 	parent, _, sub := strings.Cut(ev.Test, "/")
 	switch {
@@ -655,8 +685,8 @@ func (a *GoTest) Receipts() [][]byte {
 	}
 	raw := map[string]map[string][2]string{} // file -> function -> its verdict and the package it came from
 	for _, name := range sortedKeys(names) {
-		// what each stream says of the package. A pass replayed from the
-		// cache is not read; every other verdict of every stream is
+		// what each run of each stream says of the package. A pass replayed
+		// from the cache is not read; every other verdict of every run is
 		cached, notOK := false, false
 		type seen struct {
 			verdict, stream string
@@ -665,32 +695,30 @@ func (a *GoTest) Receipts() [][]byte {
 		read := map[string][]seen{}
 		replayed := map[string]bool{}
 		for _, s := range a.streams {
-			pkg := s.pkgs[name]
-			if pkg == nil {
-				continue
-			}
-			cached = cached || pkg.cached
-			notOK = notOK || pkg.end == Fail || (pkg.end != Pass && len(pkg.verdicts) > 0)
-			for fn, vs := range pkg.verdicts {
-				for _, v := range vs {
-					switch sub := pkg.subs[fn]; {
-					case sub == Fail:
-						v = Fail
-					case sub == Skip && v == Pass:
-						v = Skip
+			for _, pkg := range s.pkgs[name] {
+				cached = cached || pkg.cached
+				notOK = notOK || pkg.end == Fail || (pkg.end != Pass && len(pkg.verdicts) > 0)
+				for fn, vs := range pkg.verdicts {
+					for _, v := range vs {
+						switch sub := pkg.subs[fn]; {
+						case sub == Fail:
+							v = Fail
+						case sub == Skip && v == Pass:
+							v = Skip
+						}
+						if pkg.cached && v == Pass {
+							replayed[fn] = true
+							continue
+						}
+						read[fn] = append(read[fn], seen{verdict: v, stream: s.name})
 					}
-					if pkg.cached && v == Pass {
-						replayed[fn] = true
-						continue
-					}
-					read[fn] = append(read[fn], seen{verdict: v, stream: s.name})
 				}
-			}
-			if pkg.end == Fail { // whatever stopped the binary stopped these
-				failedPkgs[name] = true
-				for fn := range pkg.started {
-					if len(pkg.verdicts[fn]) == 0 {
-						read[fn] = append(read[fn], seen{verdict: Fail, stream: s.name, silent: true})
+				if pkg.end == Fail { // whatever stopped the binary stopped these
+					failedPkgs[name] = true
+					for fn := range pkg.started {
+						if len(pkg.verdicts[fn]) == 0 {
+							read[fn] = append(read[fn], seen{verdict: Fail, stream: s.name, silent: true})
+						}
 					}
 				}
 			}
@@ -942,7 +970,7 @@ func (a *GoTest) Receipts() [][]byte {
 	}
 	add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
 	sort.Strings(differ)
-	a.summary = append(append(append(a.summary, refused...), ambiguous...), differ...)
+	a.summary = append(append(append(append(a.summary, refused...), ambiguous...), differ...), sortedKeys(a.unjudged)...)
 	claiming := map[string]bool{}
 	for _, u := range a.units {
 		claiming[u.File] = true

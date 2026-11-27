@@ -208,6 +208,10 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		if exit == 0 {
 			exit = 1
 		}
+		var inc *Incomplete
+		if errors.As(streamErr, &inc) {
+			inc.File = p.Rel(file)
+		}
 		return exit, file, streamErr
 	}
 	f, err = os.OpenFile(file, os.O_WRONLY|os.O_APPEND, 0o644)

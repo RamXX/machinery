@@ -13,10 +13,17 @@ import (
 // goTestFile is one _test.go file under trace.tests, read statically
 // (section 10.3). It is parsed, never compiled.
 type goTestFile struct {
-	Path   string            // project-relative
-	Funcs  []string          // the test functions, sorted
-	doc    map[string][2]int // test function -> first and last line of its doc comment
-	Broken bool              // not Go source that parses
+	Path   string    // project-relative
+	Funcs  []string  // the test functions, sorted
+	docs   []funcDoc // the doc comment of each top-level function that has one
+	Broken bool      // not Go source that parses
+}
+
+// funcDoc is the doc comment of a top-level function: its first and last line.
+type funcDoc struct {
+	fn          string
+	test        bool // a test function (isTestFunc)
+	first, last int
 }
 
 // defines reports whether the file has the test function.
@@ -25,15 +32,16 @@ func (f *goTestFile) defines(fn string) bool {
 	return i < len(f.Funcs) && f.Funcs[i] == fn
 }
 
-// owner returns the test function whose doc comment holds the line, or ""
-// when the line is anywhere else in the file.
-func (f *goTestFile) owner(line int) string {
-	for fn, span := range f.doc {
-		if line >= span[0] && line <= span[1] {
-			return fn
+// owner returns the top-level function whose doc comment holds the line and
+// whether it is a test function, or "" when the line is anywhere else in the
+// file.
+func (f *goTestFile) owner(line int) (fn string, test bool) {
+	for _, d := range f.docs {
+		if line >= d.first && line <= d.last {
+			return d.fn, d.test
 		}
 	}
-	return ""
+	return "", false
 }
 
 // readGoTests parses the Go test files among files.
@@ -52,9 +60,10 @@ func readGoTests(p *project.Project, files []string) (map[string]*goTestFile, er
 	return res, nil
 }
 
-// parseGoTest reads the test functions of one file and the comment above each.
+// parseGoTest reads the test functions of one file and the comment above
+// each top-level function.
 func parseGoTest(name string, data []byte) *goTestFile {
-	f := &goTestFile{Path: name, doc: map[string][2]int{}}
+	f := &goTestFile{Path: name}
 	fset := token.NewFileSet()
 	tree, err := parser.ParseFile(fset, name, data, parser.ParseComments|parser.SkipObjectResolution)
 	if err != nil {
@@ -63,12 +72,16 @@ func parseGoTest(name string, data []byte) *goTestFile {
 	}
 	for _, decl := range tree.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
-		if !ok || !isTestFunc(fn) {
+		if !ok {
 			continue
 		}
-		f.Funcs = append(f.Funcs, fn.Name.Name)
+		test := isTestFunc(fn)
+		if test {
+			f.Funcs = append(f.Funcs, fn.Name.Name)
+		}
 		if fn.Doc != nil {
-			f.doc[fn.Name.Name] = [2]int{fset.Position(fn.Doc.Pos()).Line, fset.Position(fn.Doc.End()).Line}
+			f.docs = append(f.docs, funcDoc{fn: fn.Name.Name, test: test,
+				first: fset.Position(fn.Doc.Pos()).Line, last: fset.Position(fn.Doc.End()).Line})
 		}
 	}
 	sort.Strings(f.Funcs)
