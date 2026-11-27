@@ -79,6 +79,14 @@ exec machinery proof --ids inv:paid-before-shipped
 ! stdout '^adapter:'
 stdout '^  inv:paid-before-shipped -> orders\.sh -> pass: ship from Pending refused$'
 
+# go test ./... with -p 4: the events of the packages interleave and the packages without test
+# files end with skip; each package is one complete run
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -count=1 -p 4 ./...
+! stderr 'incomplete'
+stderr '^machinery run: adapter go-test-json: 3 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
 -- want-receipts.jsonl --
 {"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"pass","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique passed","source":"adapter","granularity":"function","tags":[]}
 {"v":1,"type":"receipt","id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment passed","source":"adapter","granularity":"function","tags":[]}
