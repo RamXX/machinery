@@ -127,6 +127,9 @@ func ProofFor(w io.Writer, d *design.Design, ev *Evaluation, ids, tierIDs, extra
 	}
 	for _, r := range ev.Runs {
 		fmt.Fprintf(w, "command:  %s\n", strings.Join(r.Command, " "))
+		if r.Adapter {
+			fmt.Fprintln(w, EnvLine(r.File, r.Env)) // section 13
+		}
 	}
 	var p, f, s int
 	for _, id := range ids {

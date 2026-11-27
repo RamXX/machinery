@@ -48,6 +48,9 @@ type RunAdapter interface {
 	Receipts() [][]byte
 	// ReadStreams reads the stream files of a directory instead of Consume.
 	ReadStreams(dir string) error
+	// Environment is what the header records of the environment of the
+	// run, nil for nothing.
+	Environment() any
 }
 
 // ExitNotStarted is the exit code when the command could not be started.
@@ -65,6 +68,8 @@ type header struct {
 	Stack   string   `json:"stack"`
 	Started string   `json:"started"`
 	Adapter string   `json:"adapter,omitempty"`
+	// Environment is the go environment of a direct-mode adapter run (section 10.3)
+	Environment any `json:"environment,omitempty"`
 }
 
 type endLine struct {
@@ -127,7 +132,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 	h := header{V: 1, Type: "run", Commit: head, Dirty: dirty, Command: argv,
 		Stack: opts.Stack, Started: now.Format(time.RFC3339)}
 	if opts.Adapter != nil {
-		h.Adapter = opts.Adapter.Name()
+		h.Adapter, h.Environment = opts.Adapter.Name(), opts.Adapter.Environment()
 	}
 	head1 := jsonLine(h)
 	_, err = f.Write(head1)

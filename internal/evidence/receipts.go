@@ -52,6 +52,10 @@ type RunInfo struct {
 	Exit     int
 	Dirty    bool
 	Receipts int
+	// Adapter is set for a run of the adapter, with the go environment its
+	// header recorded (nil for a run through --streams)
+	Adapter bool
+	Env     *GoEnv
 }
 
 // line is any line of a receipts file.
@@ -75,8 +79,9 @@ type line struct {
 	Tags        any    `json:"tags"`
 	// Adapter names the run adapter in a header; AdapterReceipts counts, on
 	// the end line, the lines that adapter wrote right before it (section 10.3)
-	Adapter         any  `json:"adapter"`
-	AdapterReceipts *int `json:"adapter_receipts"`
+	Adapter         any    `json:"adapter"`
+	AdapterReceipts *int   `json:"adapter_receipts"`
+	Environment     *GoEnv `json:"environment"`
 }
 
 // fileData is a parsed receipts file.

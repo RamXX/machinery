@@ -176,8 +176,13 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 		if *fd.End.Exit != 0 {
 			add(report.Warn, "run exited %d: %s", *fd.End.Exit, rel)
 		}
-		ev.Runs = append(ev.Runs, RunInfo{File: rel, Commit: fd.Header.Commit, Command: fd.Header.Command,
-			Stack: fd.Header.Stack, Exit: *fd.End.Exit, Dirty: fd.Header.Dirty, Receipts: len(fd.Receipts)})
+		run := RunInfo{File: rel, Commit: fd.Header.Commit, Command: fd.Header.Command, Stack: fd.Header.Stack,
+			Exit: *fd.End.Exit, Dirty: fd.Header.Dirty, Receipts: len(fd.Receipts), Adapter: fd.Header.Adapter == GoTestJSON}
+		if run.Adapter {
+			run.Env = fd.Header.Environment
+			add(report.Warn, "%s", EnvLine(rel, run.Env)) // a record, not a judgment (section 10.3)
+		}
+		ev.Runs = append(ev.Runs, run)
 		recs = append(recs, fd.Receipts...)
 	}
 	// a run the ledger holds for this directory and commit whose file is gone

@@ -64,6 +64,11 @@ type GoTest struct {
 	fromDir  bool
 	summary  []string
 	receipts [][]byte
+
+	// env is the go environment of a direct-mode run, recorded in the
+	// header; gomod is the go.mod go env names
+	env   *GoEnv
+	gomod string
 }
 
 // goStream is one stream of go test -json.
@@ -182,7 +187,42 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 		}
 		return x.Func < y.Func
 	})
+	if !streams {
+		if err := a.checkLayout(ClaimingGoTests(d, found)); err != nil {
+			return nil, err
+		}
+	}
 	return a, nil
+}
+
+// checkLayout holds the go.mod files of the project and the workspace in
+// effect to a layout direct mode attributes by import path (section 10.3),
+// and records the digests of go.mod and go.work.
+func (a *GoTest) checkLayout(claiming []string) error {
+	dups, err := duplicateModules(a.p)
+	if err != nil {
+		return err
+	}
+	if len(dups) > 0 {
+		return refuse("%s: give each module its own path, or run the command through --streams", dups[0])
+	}
+	if work := a.env.GOWORK; work != "" && work != "off" {
+		if unused := unusedModules(a.p, claiming, work); len(unused) > 0 {
+			return refuse("%s: add the module to the workspace, or run the command with GOWORK=off", unused[0])
+		}
+		a.env.WorkSum = fileSum(work)
+	}
+	a.env.GoModSum = fileSum(a.gomod)
+	return nil
+}
+
+// Environment is what the run header records of the go environment
+// (section 10.3); nil with --streams, where machinery does not run go.
+func (a *GoTest) Environment() any {
+	if a.env == nil {
+		return nil
+	}
+	return a.env
 }
 
 func contains(list []string, s string) bool {
@@ -258,7 +298,7 @@ func (a *GoTest) readCommand(argv []string) error {
 		return refuse("the command must be go test, got %s: run go test itself, or add --streams and have the command leave its go test -json output in %s", strings.Join(argv[:n], " "), StreamsEnv)
 	}
 	goBin := a.goBinary(argv[0])
-	if rel, inside := a.inProject(goBin); inside {
+	if rel, in := inside(a.p.Root, goBin); in {
 		return refuse("%s: a go inside the project is not accepted by the adapter in direct mode; run the command through --streams", rel)
 	}
 	rest := argv[2:]
@@ -314,8 +354,8 @@ func (a *GoTest) readCommand(argv []string) error {
 	return nil
 }
 
-// goBinary returns the go of the command as a path, links followed: found
-// on PATH for a bare name, from the project root for a relative path.
+// goBinary returns the go of the command as a path: found on PATH for a bare
+// name, from the project root for a relative path. Links are not followed.
 func (a *GoTest) goBinary(argv0 string) string {
 	bin := argv0
 	if !strings.Contains(argv0, "/") {
@@ -331,41 +371,18 @@ func (a *GoTest) goBinary(argv0 string) string {
 	} else if !filepath.IsAbs(bin) {
 		bin = filepath.Join(a.p.Root, bin)
 	}
-	if r, err := filepath.EvalSymlinks(bin); err == nil {
-		bin = r
-	}
 	return bin
 }
 
-// inProject reports whether an absolute path is inside the project, links
-// followed, and its project-relative form.
-func (a *GoTest) inProject(abs string) (string, bool) {
-	if !filepath.IsAbs(abs) {
-		return "", false
-	}
-	root := a.p.Root
-	if r, err := filepath.EvalSymlinks(root); err == nil {
-		root = r
-	}
-	if r, err := filepath.EvalSymlinks(abs); err == nil {
-		abs = r
-	}
-	rel, err := filepath.Rel(root, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
-		return "", false
-	}
-	return filepath.ToSlash(rel), true
-}
-
 // checkGoEnv asks go env, in the project root and with the environment of
-// the run, for GOFLAGS, GOMOD and GOWORK, and holds them to direct mode
-// (section 10.3). It returns GOFLAGS.
+// the run, for the go environment, holds it to direct mode and keeps it for
+// the header (section 10.3). It returns GOFLAGS.
 func (a *GoTest) checkGoEnv(goBin string) (string, error) {
-	cmd := exec.Command(goBin, "env", "-json", "GOFLAGS", "GOMOD", "GOWORK")
+	cmd := exec.Command(goBin, "env", "-json", "GOFLAGS", "GOMOD", "GOWORK", "GOOS", "GOARCH", "GOHOSTOS", "GOHOSTARCH", "GOVERSION")
 	cmd.Dir = a.p.Root
 	var out, errOut strings.Builder
 	cmd.Stdout, cmd.Stderr = &out, &errOut
-	var env struct{ GOFLAGS, GOMOD, GOWORK string }
+	var env struct{ GOFLAGS, GOMOD, GOWORK, GOOS, GOARCH, GOHOSTOS, GOHOSTARCH, GOVERSION string }
 	runErr := cmd.Run()
 	if runErr == nil {
 		runErr = json.Unmarshal([]byte(out.String()), &env)
@@ -382,20 +399,19 @@ func (a *GoTest) checkGoEnv(goBin string) (string, error) {
 		switch {
 		case (name == "count" || name == "test.count") && val != "1":
 			return "", refuse("GOFLAGS has -%s=%s, which is refused: take it out of GOFLAGS", name, val)
-		case name == "json" && isFalse(val), !valueFlags[name] && !switchFlags[name]:
+		case !valueFlags[name] && !switchFlags[name]: // -json=false is harmless: the command has -json
 			return "", refuse("%s in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams", w)
 		}
 	}
-	want := filepath.Join(a.p.Root, "go.mod")
-	_, wantOK := os.Stat(want)
-	if rel, inside := a.inProject(env.GOMOD); wantOK != nil || !inside || rel != "go.mod" {
+	if rel, in := inside(a.p.Root, env.GOMOD); !fileExists(env.GOMOD) || !in || rel != "go.mod" {
 		return "", refuse("go env GOMOD is %q, not the go.mod of the project root: run the command through --streams", env.GOMOD)
 	}
-	if env.GOWORK != "" && env.GOWORK != "off" {
-		if _, inside := a.inProject(env.GOWORK); !inside {
-			return "", refuse("go env GOWORK is %q, a file outside the project root: run the command through --streams", env.GOWORK)
-		}
+	if env.GOOS != env.GOHOSTOS || env.GOARCH != env.GOHOSTARCH {
+		return "", refuse("go env GOOS/GOARCH is %s/%s, not the host's %s/%s: go would run the test binary through go_%s_%s_exec; unset GOOS and GOARCH, or run the command through --streams",
+			env.GOOS, env.GOARCH, env.GOHOSTOS, env.GOHOSTARCH, env.GOOS, env.GOARCH)
 	}
+	a.env = &GoEnv{Version: env.GOVERSION, Binary: goBin, GOFLAGS: env.GOFLAGS, GOWORK: env.GOWORK, GOOS: env.GOOS, GOARCH: env.GOARCH}
+	a.gomod = env.GOMOD
 	return env.GOFLAGS, nil
 }
 
@@ -920,24 +936,23 @@ func (a *GoTest) goFiles(dir string) []string {
 // importPath returns the import path of a directory: the module path of the
 // nearest go.mod at or above it, then the path of the directory below it.
 func importPath(abs string) (string, bool) {
-	for dir := abs; ; {
-		if data, err := os.ReadFile(filepath.Join(dir, "go.mod")); err == nil {
-			mod := modulePath(data)
-			rel, err := filepath.Rel(dir, abs)
-			switch {
-			case mod == "" || err != nil:
-				return "", false
-			case rel == ".":
-				return mod, true
-			}
-			return mod + "/" + filepath.ToSlash(rel), true
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", false
-		}
-		dir = parent
+	file, ok := moduleFile(abs)
+	if !ok {
+		return "", false
 	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return "", false
+	}
+	mod := modulePath(data)
+	rel, err := filepath.Rel(filepath.Dir(file), abs)
+	switch {
+	case mod == "" || err != nil:
+		return "", false
+	case rel == ".":
+		return mod, true
+	}
+	return mod + "/" + filepath.ToSlash(rel), true
 }
 
 // modulePath reads the module line of a go.mod file.
