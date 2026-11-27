@@ -85,13 +85,17 @@ command, output line and exit code.
   or a file with a file-level marker and a test function, has a pass at the commit. Otherwise
   it is `partly run: <n> of <m> claimants passed` in `verify`, `status`, `proof` and the run
   summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names the
-  first ten claimants without a pass, `verify --partly` every one. A receipt a test emits is
-  not affected. `claims: any` is the rule of one claimant, and the ratchet reports it.
+  first ten claimants without a pass, `verify --partly` every one, and says what to do. A
+  claiming file that does not parse is a claimant that never passes (`ERROR  claimant: <file>:
+  cannot be read as Go (...)`), and a file under `trace.tests` that cannot be read fails the
+  commands that read markers. A receipt a test emits is not affected. `claims: any` is the rule
+  of one claimant, and the ratchet reports it.
 - `evidence.adapter.excused` leaves claimants that cannot run here out of that rule, each entry
-  with globs of test files, optional function patterns and a one-line reason. `verify` prints
-  every entry with the claimants it covers and an ERROR for a pattern that covers nothing; an
-  id whose claimants are all excused is not proven; the ratchet names an entry added or widened,
-  an ERROR when it covers a claimant of a critical or vital id.
+  with globs of test files, optional function patterns and a one-line reason; a file-level
+  claimant is excused by its file, never by a function. `verify` prints every entry with the
+  claimants it covers and an ERROR, with why, for each glob or pattern through which it covers
+  nothing; an id whose claimants are all excused is not proven; the ratchet names an entry
+  added or widened, an ERROR when it covers a claimant of a critical or vital id.
 - A `--streams` run that reads no stream exits 1 (the wrapper ran no `go test`, or cleared the
   environment with `env -i`); `--allow-no-streams` accepts a wrapper that may run nothing.
   `--keep-streams <dir>` copies every stream read into `<dir>/<run id>/` and records it in the

@@ -268,7 +268,8 @@ through a parent test records how many subtests ran (`subtests: 2`).
 **Every claimant.** An id that several tests claim is proven by the adapter only when every one
 of them passed at the commit, in this run or another one. One that did not leaves the id
 `partly run: 1 of 2 claimants passed`: not proven, not failed, kept in the owed list. `verify`
-names the first ten claimants without a pass and `verify --partly` every one. A test that
+names the first ten claimants without a pass and `verify --partly` every one. A claiming file
+that does not parse is a claimant that never passes, and `verify` names it. A test that
 cannot run where you make the evidence goes into `evidence.adapter.excused` with a reason:
 
 ```yaml
