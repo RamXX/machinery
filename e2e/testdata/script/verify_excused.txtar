@@ -37,6 +37,11 @@ gitcommit 'the provider outage is no longer owed'
 exec mrun 1 verify
 stdout '^  ERROR  no claimant can run here: fm:payment-provider-down: 1 claimant\(s\) excused: run a claimant of it here and narrow evidence\.adapter\.excused, or prove it with a receipt a test emits$'
 ! stdout 'unproven: fm:payment-provider-down'
+# the story gate fails it, and says what to do
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-e1 --title 'Survive a provider outage' --body-file e1.txt --silent
+exec mrun 1 story shop-e1
+stdout '^  ERROR  unproven: fm:payment-provider-down; no claimant can run here: 1 claimant\(s\) excused: run a claimant of it here and narrow evidence\.adapter\.excused, or prove it with a receipt a test emits$'
 
 # a claimant that is not excused and has no verdict leaves the id partly run; the excused ones
 # are not counted
@@ -117,6 +122,9 @@ stdout '^  ERROR  ratchet: adapter widened: evidence\.adapter\.excused: entry 2 
 stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.excused: entry 3 added: '
 stdout '^failed: 2 finding\(s\)$'
 
+-- e1.txt --
+machinery:ids fm:payment-provider-down
+machinery:scope internal/domain/**
 -- owed-tc.yaml --
 version: 1
 owed:
