@@ -2047,9 +2047,11 @@ for such a run too.
 `machinery run`:
 
 1. reads the current commit (`git rev-parse HEAD`) and whether the tree is dirty
-   (`git status --porcelain=v2` not empty, both paths of a rename or a copy read, ignoring the owed file, the receipts files (the
-   `.jsonl` files directly in the receipts directory, and nothing else in it) and the property
-   records `<gen>/vital/*.json`, whose statuses render the owed file (section 23.4));
+   (`git status --porcelain=v2` not empty, read as section 10.1 says: a rename by both of its
+   paths, a submodule checked out at another commit or with changed files included), ignoring
+   the owed file, the receipts files (the `.jsonl` files directly in the receipts directory, and
+   nothing else in it) and the property records `<gen>/vital/*.json`, whose statuses render the
+   owed file (section 23.4));
 2. deletes receipt files in the receipts directory that are not valid for the current commit
    (section 10.1), and their entries in the run ledger, together with the entries of this
    receipts directory whose file is no longer there (section 10.2);
@@ -2110,10 +2112,10 @@ only after its assertions held. Section 10.2 says which receipts are read at all
 Evidence is bound to a commit. A receipts file is **valid for the current commit** when its header
 commit is the current commit, or when its header commit is an ancestor of the current commit and
 every path that differs between the two is **exempt**. The paths are those of
-`git diff --raw -M -C --relative <receipt commit> HEAD -- .`, run in the project directory: only
-paths inside the project directory are compared, and a file renamed or copied since counts by
-both of its paths, so a file moved into an exempt directory from anywhere else voids the run. A
-path is exempt when it is:
+`git diff-tree -r --relative <receipt commit> HEAD -- .`, run in the project directory and read
+as "How machinery reads git" below says: only paths inside the project directory are compared,
+and a file renamed or copied since counts by both of its paths, so a file moved into an exempt
+directory from anywhere else voids the run. A path is exempt when it is:
 
 - **a file of the tool**: the owed file, `design/adoption.yaml` (section 2.1),
   `design/excused.yaml` (section 2.2), a receipts file (a `.jsonl` file directly in the receipts
@@ -2140,6 +2142,29 @@ A run whose commit is **not an ancestor** of the current commit is never valid, 
 trees are the same: an amended or rebased commit is another commit, and a run of a commit outside
 the history of HEAD says nothing about it. Evidence from any other commit says nothing about the
 current one.
+
+**How machinery reads git.** Every git command machinery runs starts in one place. It reads
+with plumbing (`rev-parse`, `symbolic-ref`, `diff-tree`, `diff-index`, `ls-files`, `ls-tree`,
+`cat-file`, `rev-list`, `merge-base`, `for-each-ref`, `check-ignore`, `config`), with
+`git status` only as `--porcelain=v2`, and every list NUL-separated (`-z`), so no path is
+quoted and a name that is not ASCII reads as it is. What a configuration could change is fixed on
+the command line, whatever the user's, the system's or the repository's configuration says:
+optional locks are off (a read never rewrites the index); `-c core.quotepath=off`,
+`-c core.fsmonitor=false`, `-c diff.ignoreSubmodules=none`, `-c diff.renames=false`,
+`-c status.renames=false`, `-c color.ui=never` and `-c submodule.recurse=false` are set; git's
+messages are in the C locale; and every comparison passes `--ignore-submodules=none`,
+`--no-renames`, `--no-ext-diff`, `--no-textconv` and `--no-color`. So a submodule pointer is
+compared even when `submodule.<name>.ignore` (in `.gitmodules` or `.git/config`) or
+`diff.ignoreSubmodules` says to hide it, and a submodule checked out at another commit than its
+pointer, or with changed or untracked files, makes the tree dirty. No rename or copy is detected,
+on purpose: a renamed file is its old path deleted and its new path added, both read, and no
+threshold or setting can pair them or leave one out. The configuration itself is kept, so
+`safe.directory` (a repository another user owns), `user.name`, worktrees and the ignore rules
+work as they do for git. A git command that fails stops the command with git's message. Only the
+"no" a yes-or-no query documents (`merge-base --is-ancestor`, `merge-base` of histories with no
+common commit, `check-ignore`, `symbolic-ref` of a detached HEAD, `rev-parse --verify --quiet`,
+`config --get` of an unset key, `rev-parse` outside a work tree) is read as an answer: no
+failure is read as "nothing changed".
 
 A property record changes on its own only when the owed file does: any other change to it comes
 from a risk file, a design source or a core file, which are not exempt. Receipts are not meant to
@@ -2607,10 +2632,11 @@ A file **carries a build constraint** when a line before its package clause is a
 `// +build` line, whatever its expression, or when its name alone keeps it out of some builds:
 a `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` suffix before `_test.go` or `.go`, by the lists of
 known systems of `go/build` (`helper_windows_test.go`, `wire_arm64.go`,
-`helper_linux_amd64_test.go`), or a name that begins with `_` or `.`, which go never builds. Such
-a file with no test function is judged by no set, in any run and whatever the run's system or
-tags: `go test` may not have built it, and the pass of its set says nothing of a file outside the
-build. It stays a claimant the adapter cannot judge ("A file the adapter cannot judge", below).
+`helper_linux_amd64_test.go`), or a name that begins with `_` or `.`, which go never builds, or
+when it imports `"C"` (cgo), which go leaves out of a build with cgo off. Such a file with no test
+function is judged by no set, in any run and whatever the run's system or tags: `go test` may
+not have built it, and the pass of its set says nothing of a file outside the build. It stays a
+claimant the adapter cannot judge ("A file the adapter cannot judge", below).
 
 **Which verdict.** The verdict of a function is its `pass`, `fail` or `skip` event, read with
 those of its subtests (a `Test` that begins with the function's name and a `/`, at any depth)
@@ -3230,15 +3256,16 @@ machinery owed sync [--prune-only] [--allow-dirty]
 
 The owed list records what the committed design, tests and configuration prove, so before it
 reads anything `owed sync` refuses, without `--allow-dirty`, while the working tree has an
-uncommitted change (`git status --porcelain=v2`: changed, added, deleted or untracked, both paths
-of a rename or a copy, so a test file moved out of `trace.tests` counts by its old path) in a
+uncommitted change (`git status --porcelain=v2`, read as section 10.1 says: changed, added,
+deleted or untracked, a rename by both of its paths, so a test file moved out of `trace.tests`
+counts by its old path) in a
 file that can change a verdict: `machinery.yaml`, `design/adoption.yaml` (section 2.1),
 `design/excused.yaml` (section 2.2), the status file (section 4.1), a design source (section
 10.1) or a file under `trace.tests`. It prints
 `ERROR  owed sync: uncommitted changes in files that can change a verdict: <files>: commit them, or pass --allow-dirty to sync against the working tree`,
-`<files>` sorted, the first five and then `and <n> more`, writes nothing and exits 1. A change
-anywhere else, in the code say, does not stop it: the evidence of a run says what it says
-whatever the code is now, and the commit that carries the pruned list is held to section 10.1
+`<files>` sorted and each once, the first five and then `and <n> more`, writes nothing and exits
+1. A change anywhere else, in the code say, does not stop it: the evidence of a run says what it
+says whatever the code is now, and the commit that carries the pruned list is held to section 10.1
 like any other. With `--allow-dirty` it does not refuse, and it reads the evidence as
 `verify --allow-dirty` does: a run whose header says `"dirty":true` is used. Without it such a
 run is not evidence, as for `verify` (section 12).
@@ -3265,7 +3292,8 @@ tests twice.
 
 ### 11.3 Stage `ratchet` (`machinery check --base <git-ref>`)
 
-Compares the current state with the same files at `<git-ref>` (read with `git show`). Nothing
+Compares the current state with the same files at `<git-ref>` (read with `git ls-tree` and
+`git cat-file`, section 10.1). Nothing
 that was established at the base may quietly stop being established:
 
 | Rule | Finding |
@@ -3480,8 +3508,9 @@ Testing shifts right: per change, run what the change can break; run everything 
 (section 12.2).
 
 `machinery affected --base <ref>` prints, one per line and sorted, the obligation ids touched by
-the difference between `<ref>` and the working tree (untracked files and both paths of a rename
-or a copy included):
+the difference between `<ref>` and the working tree: what is committed or staged since `<ref>`
+(`git diff-index --cached <ref>`) and what `git status` reports, read as section 10.1 says
+(untracked files and both paths of a rename or a copy included):
 
 1. ids whose entry in `obligations.json` is new or differs from the base (title, effects);
 2. ids named by a `machinery:verifies` tag, or claimed by a verifies or scenarios marker
@@ -4268,16 +4297,16 @@ intake <id>: 6 of 7 steps done; next: planned
 `machinery:no-design-change <reason>` is written by the planner on the item's notes
 (`bd update <id> --append-notes "machinery:no-design-change <reason>"`). The **new ids** are the
 `act` and obligation ids now (section 4) that are not in the generated obligation list at the base
-commit, read with `git show <base>:<gen>/obligations.json` (the gen directory of the base's own
-`machinery.yaml`); a base without that file has no ids, so every id is new. A proposed id (section
-4.1) yields no obligation and is never new: the proposed ids now that are neither in that list nor
-proposed in the base's status file print on one line under the step,
+commit, `<gen>/obligations.json` read at `<base>` with `git ls-tree` and `git cat-file` (the gen
+directory of the base's own `machinery.yaml`); a base without that file has no ids, so every id is
+new. A proposed id (section 4.1) yields no obligation and is never new: the proposed ids now that
+are neither in that list nor proposed in the base's status file print on one line under the step,
 `proposed, not planned: <id> <id>`, left out when there is none, and `intake plan` plans none of
-them. The new ids print sorted, each with its tier and the areas that give it. Under `tiers`, the new `act` ids that are in no area
-print as `routine by default`, so the planner sees what was left routine; the line is left out
-when there is none. An item without a `machinery:intake-base` line (one not made by `intake new`)
-has neither `design changed` nor `new ids` done, and while the new ids are not known `planned`
-is missing too.
+them. The new ids print sorted, each with its tier and the areas that give it. Under `tiers`, the
+new `act` ids that are in no area print as `routine by default`, so the planner sees what was left
+routine; the line is left out when there is none. An item without a `machinery:intake-base` line
+(one not made by `intake new`) has neither `design changed` nor `new ids` done, and while the new
+ids are not known `planned` is missing too.
 
 The last line is the summary: `intake <id>: <n> of 7 steps done`, followed by
 `; next: <first missing step>` when a step is missing. Exit 0 when every step is done, 1
@@ -4808,11 +4837,12 @@ scopes to find competing writers; stage `scope` holds a story to its own:
 machinery check --base <ref> --story <id>
 ```
 
-The changed files are those of `git diff --raw -M -C --cached <merge base>` (both paths of a rename or a copy), the
-merge base being `git merge-base <ref> HEAD`: what is committed since the branch left the base,
-and what is staged to be committed. The owed list and the tests and architecture baselines are
-not judged: a builder prunes them (`machinery owed sync --prune-only`), and the ratchet holds
-them. For every other changed file, in path order:
+The changed files are those of `git diff-index --cached <merge base>` (read as section 10.1 says:
+both paths of a rename or a copy), the merge base being `git merge-base <ref> HEAD`: what is
+committed since the branch left the base, and what is staged to be committed. The owed list and the
+tests and architecture baselines are not judged: a builder prunes them
+(`machinery owed sync --prune-only`), and the ratchet holds them. For every other changed file, in
+path order:
 
 - a design source (a file of the contract hash, section 15.4), unless the story carries
   `machinery:intake-design` (section 15.7):
@@ -5571,24 +5601,28 @@ Each refusal exits 2 before anything is written:
 
 ### 18.2 The snapshot
 
-assess pipes `git archive HEAD`, run in the project root (a project inside a larger repository
-is archived alone), into an extraction at `<out>/snapshot`: no worktree and no checkout. It
-writes the config there as `machinery.yaml` and the project's `design/adoption.yaml` as it is in
-the work tree (the one of `HEAD` is removed when the work tree has none), runs `git init` and one commit inside the snapshot
-(hooks and signing off) so that stages that need a commit work, and runs every section there.
+assess lists the tree of `HEAD` with `git ls-tree -r HEAD`, run in the project root (a project
+inside a larger repository is taken alone), and writes each entry into `<out>/snapshot` from
+`git cat-file --batch`: no worktree, no checkout and no attributes, so `export-ignore`,
+`export-subst`, filters and line-ending settings change nothing and every file is written as it
+is committed; a submodule is an empty directory. It writes the config there as `machinery.yaml`
+and the project's `design/adoption.yaml` as it is in the work tree (the one of `HEAD` is removed
+when the work tree has none), runs `git init` and one commit inside the snapshot (hooks and
+signing off) so that stages that need a commit work, and runs every section there.
 
 The extraction writes through a root bound to `<out>/snapshot`, so nothing lands outside it. A
 symbolic link of `HEAD` whose target is absolute, or resolves outside the snapshot (by `..`, or
 through another link), is not created: what it points at is not assessed. stdout and the report
 say `outside links: <n> symbolic link(s) leave the project and are not in the snapshot: <paths>`,
 and the inventory has `warn   outside-link: <path>: leaves the project; not in the snapshot, not
-assessed` for each. Links that stay inside are kept. An archive entry whose name is absolute or
-holds a `..` segment stops the snapshot (exit 1).
+assessed` for each. Links that stay inside are kept. A tree entry whose name is absolute or holds
+a `..` segment stops the snapshot (exit 1).
 
-What assess reads of the project itself: `git` commands that write nothing (`archive`, `show`,
-`log`, `rev-parse`, `for-each-ref`, and `status` with optional locks off, so the index is
-not refreshed), the config file, `design/adoption.yaml` and the tracker export (section 18.8). When the work tree
-differs from `HEAD` the report says `dirty: <n> changed, <n> untracked file(s) are not
+What assess reads of the project itself: `git` commands that write nothing, run with optional
+locks off so the index is not refreshed (`ls-tree`, `cat-file`, `rev-parse`, `rev-list`,
+`diff-tree`, `symbolic-ref`, `for-each-ref` and `status`, section 10.1), the config file,
+`design/adoption.yaml` and the tracker export (section 18.8). When the work tree differs from
+`HEAD` the report says `dirty: <n> changed, <n> untracked file(s) are not
 assessed`: changed counts the tracked files that differ, untracked the files git neither tracks
 nor ignores. They are not in the snapshot.
 
@@ -5674,7 +5708,9 @@ models.
 
 For each `--since` ref, or by default for each configured model file the first commit that adds
 it (one comparison per distinct commit), assess compares the ids of the models at that commit,
-read with `git show <ref>:<path>` on the project, with those at `HEAD`:
+read with `git ls-tree` and `git cat-file` on the project (the first commit that adds a file is
+the oldest of `git rev-list HEAD -- <path>` whose `git diff-tree --diff-filter=A` names it),
+with those at `HEAD`:
 
 | Kind | Id | Its text |
 |---|---|---|
