@@ -390,8 +390,8 @@ func diffRaw(root, command string, args ...string) ([]Change, error) {
 }
 
 // DiffChanges lists the project-relative paths that differ between two
-// commits: both paths of a rename or a copy, each with whether it is a
-// submodule pointer in either commit.
+// commits: both paths of a rename, the new path of a copy, each with whether
+// it is a submodule pointer in either commit.
 func DiffChanges(root, a, b string) ([]Change, error) {
 	if err := revs(a, b); err != nil {
 		return nil, err
@@ -401,7 +401,7 @@ func DiffChanges(root, a, b string) ([]Change, error) {
 
 // StagedSince lists, sorted and each once, the project-relative paths that
 // differ between a commit and the index: what is committed since it and
-// what is staged, both paths of a rename or a copy.
+// what is staged, both paths of a rename, the new path of a copy.
 func StagedSince(root, commit string) ([]string, error) {
 	if err := revs(commit); err != nil {
 		return nil, err
@@ -420,7 +420,7 @@ func StagedSince(root, commit string) ([]string, error) {
 // ChangedSince lists, sorted and each once, the project-relative paths that
 // differ between a ref and the working tree: what is committed or staged
 // since the ref, and what git status reports (untracked files and both paths
-// of a rename or a copy included).
+// of a rename included, a copy by its new path).
 func ChangedSince(root, ref string) ([]string, error) {
 	staged, err := StagedSince(root, ref)
 	if err != nil {
