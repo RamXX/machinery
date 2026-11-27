@@ -1,7 +1,7 @@
 # a symbolic link under trace.tests or trace.code is not followed by stage trace nor by the claimant
 # rule, while the test runner may build what it points to: every such link is a finding of stage
-# trace, with no waiver (section 8). A failing test behind a linked directory never leaves the
-# project passing check
+# trace, with no waiver (section 8), at any depth, a link inside a linked directory included. A
+# failing test behind a linked directory never leaves the project passing check
 fixture shop
 fixture shop-gotests
 cp base.yaml machinery.yaml
@@ -32,10 +32,11 @@ stdout '^  ERROR  trace: e2e/linked is a symbolic link; markers behind it are no
 stdout -count=1 'ERROR  trace:'
 exec mrun 1 check --stage trace
 stdout -count=1 'ERROR  trace:'
-# a waiver cannot cover it: trace is no rule that can be waived
+# a waiver cannot cover it: one that names rule trace is refused with what to do instead
 cp waived.yaml machinery.yaml
 ! exec machinery check --stage trace
-stderr 'waivers: "trace" is not a rule that can be waived'
+stderr '^config: waivers: trace: e2e/linked: no waiver covers a symbolic link under trace\.tests or trace\.code: replace it with the files, or leave it out of the globs$'
+! stderr 'is not a rule that can be waived'
 cp base.yaml machinery.yaml
 # replaced with the files, the failing test is under trace.tests and the run fails the id
 rm e2e/linked
@@ -75,8 +76,45 @@ stdout '^  ERROR  trace: e2e/linked is a symbolic link; markers behind it are no
 ! stdout 'e2e/notes'
 stdout -count=1 'ERROR  trace:'
 
-# a link outside every glob is no finding
+# the verifier's two hops: the failing test is behind a link inside a linked directory. Links are
+# found at any depth, under the path the runner sees, and a link back to a directory the walk is
+# inside ends the walk and is a finding too; the links where they are, under suites, no glob reaches
 rm e2e/linked
+mkdir suites/outer
+symlink suites/outer/inner -> ../failing
+symlink suites/outer/back -> .
+symlink e2e/linked -> ../suites/outer
+gitcommit 'a link inside a linked directory'
+exec mrun 1 check
+stdout '^machinery check: [0-9]+ passed, 1 failed, '
+stdout '^  ERROR  trace: e2e/linked is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout '^  ERROR  trace: e2e/linked/back is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout '^  ERROR  trace: e2e/linked/inner is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+! stdout 'suites/outer'
+stdout -count=3 'ERROR  trace:'
+rm e2e/linked
+rm suites/outer
+
+# the directories the scan never walks are not walked for links either, in the tree or behind a
+# link, and a link named like one of them is no finding
+mkdir e2e/node_modules
+symlink e2e/node_modules/dep -> ../../suites/failing
+symlink e2e/.bin -> ../suites/failing
+mkdir suites/withmods/node_modules/dep
+cp fail_test.go.txt suites/withmods/node_modules/dep/fail_test.go
+symlink suites/withmods/.worktrees -> ../failing
+cp README.txt suites/withmods/README.md
+symlink e2e/withmods -> ../suites/withmods
+gitcommit 'links where the scan never walks'
+exec machinery check --stage trace
+stdout '^passed$'
+! stdout 'symbolic link'
+rm e2e/node_modules
+rm e2e/.bin
+rm e2e/withmods
+rm suites/withmods
+
+# a link outside every glob is no finding
 rm e2e/notes
 mkdir tools
 symlink docs-link -> suites/docs
@@ -105,6 +143,21 @@ gitcommit 'both lists reach internal/domain'
 exec mrun 1 check --stage trace
 stdout '^  ERROR  trace: internal/domain/alias\.go is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.code and trace\.tests$'
 stdout -count=1 'ERROR  trace:'
+
+# machinery trace --non-action-serves lists the tags that are read: a serves tag behind a link is
+# not listed, beside the same tag in a regular file, and the command says the link was not read
+cp base.yaml machinery.yaml
+rm internal/domain/alias.go
+mkdir suites/tagged
+cp extra.go.txt suites/tagged/extra.go
+cp extra.go.txt internal/domain/extra_read.go
+symlink internal/domain/extra.go -> ../../suites/tagged/extra.go
+gitcommit 'a serves tag behind a link'
+exec machinery trace --non-action-serves
+cmp stdout serves-list.txt
+cmp stderr serves-links.txt
+rm internal/domain/extra.go
+rm internal/domain/extra_read.go
 
 # a project that names no trace has no finding
 cp notrace.yaml machinery.yaml
@@ -226,6 +279,14 @@ func TestLinkedShip(t *testing.T) {
 		t.Fatal("shipped without payment")
 	}
 }
+-- extra.go.txt --
+package domain
+
+// machinery:serves inv:paid-before-shipped
+-- serves-list.txt --
+internal/domain/extra_read.go:3: inv:paid-before-shipped
+-- serves-links.txt --
+machinery: trace --non-action-serves: internal/domain/extra.go is a symbolic link; tags behind it are not listed
 -- README.txt --
 Notes on the shipping rules. No test lives here.
 -- code.yaml --

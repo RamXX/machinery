@@ -875,6 +875,11 @@ func cleanYAMLError(err error) string {
 var (
 	checkerIDRe  = regexp.MustCompile(`^[a-z][a-z0-9-]+$`)
 	systemNameRe = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+	// unwaivable are rules a waiver may name by mistake, with what to do
+	// instead (sections 6.7 and 8).
+	unwaivable = map[string]string{
+		"trace": "no waiver covers a symbolic link under trace.tests or trace.code: replace it with the files, or leave it out of the globs",
+	}
 	// WaivableRules are the cross-reference rules a waiver may name (section 6.7).
 	WaivableRules = map[string]bool{
 		"machine-binding": true, "state-enum": true, "event-action": true, "action-event": true,
@@ -1081,6 +1086,13 @@ func (c *Config) validate() error {
 		}
 	}
 	for _, w := range c.Waivers {
+		if todo, ok := unwaivable[w.Rule]; ok {
+			subject := w.Rule
+			if w.ID != "" {
+				subject += ": " + w.ID
+			}
+			return Errf("waivers: %s: %s", subject, todo)
+		}
 		if !WaivableRules[w.Rule] {
 			return Errf("waivers: %q is not a rule that can be waived", w.Rule)
 		}
