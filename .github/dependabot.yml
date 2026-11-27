@@ -1,0 +1,49 @@
+# Dependabot opens weekly, grouped pull requests that keep the Go modules and
+# the pinned actions current. No package.json is tracked, so there is no npm
+# entry: make tools pins xstate itself.
+version: 2
+updates:
+  # The machinery module.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
+  # The reference project, a module of its own.
+  - package-ecosystem: gomod
+    directory: "/examples/crm"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      go-dependencies:
+        patterns: ["*"]
+
+  # The actions the workflows pin by commit.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    groups:
+      github-actions:
+        patterns: ["*"]
