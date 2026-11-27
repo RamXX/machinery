@@ -30,7 +30,11 @@ jobs:
           distribution: temurin
           java-version: 21
       - name: Install bd (the backlog tool the bridge scripts drive)
-        run: go install github.com/gastownhall/beads/cmd/bd@v1.3.4
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libicu-dev
+          go install github.com/steveyegge/beads/cmd/bd@v1.3.4
+          bd --version
       - name: Install the pinned tools
         run: make tools
       - name: Check
