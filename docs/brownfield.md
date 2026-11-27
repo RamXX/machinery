@@ -268,11 +268,13 @@ machinery status
 machinery adds `-json`, reads the event stream and writes the receipts itself
 (`docs/formats.md` section 10.3). An id gets a pass when every test function its marker belongs
 to passed and the package ended ok: the function under the marker when the marker is in the
-comment directly above it, every test function of the file otherwise. A failed function writes
+comment directly above it, every test function of the file when it stands above no function. A
+marker directly above a fuzz test, a benchmark or any other function that is no test counts
+nothing, and the summary of the run names it. A failed function writes
 a fail, a skipped one a skip (a parent with a skipped subtest too), and one that did not run
 writes nothing. A package that failed (a test that hangs past `-timeout`, calls `os.Exit` or
 panics, a build that fails) writes a fail for every claimed function without a verdict, and a
-stream cut short leaves the run incomplete; a pass answered from
+stream cut short leaves the run incomplete, naming the receipts file to delete; a pass answered from
 the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
 verdict belongs to a file only when no other Go file of its directory defines a function of the
 same name that begins with `Test` and takes one parameter, whatever its build tags or the
@@ -299,7 +301,8 @@ tiers the adapter may prove, and whether a marker at the top of a file is enough
 must stand above the function (`min_granularity: function`). If your suite runs through a make target or a script that starts
 `go test` itself, run that through `machinery run --adapter go-test-json --streams -- make e2e`
 and have it write each `go test -json` output to a file in the directory machinery names in
-`MACHINERY_GO_TEST_JSON`; there the wrapper must pass `-count=1` itself, and because machinery
+`MACHINERY_GO_TEST_JSON` (a file may hold several runs, appended: each is judged on its own, and a
+fail in any of them is a fail); there the wrapper must pass `-count=1` itself, and because machinery
 cannot see what such a run built, every package it tests needs an entry in
 `evidence.adapter.sources` naming the files it is built from. If you build your tests from
 copies staged in another directory, `evidence.adapter.sources` maps the staged package back to

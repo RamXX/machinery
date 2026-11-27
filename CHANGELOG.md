@@ -127,7 +127,11 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
   mode only. A pass replayed from the cache counts nothing. A package that failed (a timeout,
   `os.Exit`, a panic, a build failure) writes a fail for every claimed function without a
-  verdict and no pass; a stream without a package end leaves the run incomplete. A parent
+  verdict and no pass; a stream without a package end leaves the run incomplete, and the error
+  names the receipts file. A stream file that holds several runs of one package is judged run by
+  run, so a fail, a crash or a missing verdict in any of them is a fail. A marker directly above a
+  fuzz test, a benchmark or any other function that is no test counts nothing and is named in the
+  summary. A parent
   with a skipped subtest is a skip, and direct mode refuses a `-run` or `-skip` that selects
   subtests. Stage `trace` reports the module layout rules only for a project that configures
   `evidence.adapter`, and they read only tracked `go.mod` and `go.work` files outside
