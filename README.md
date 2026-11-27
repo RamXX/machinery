@@ -3,9 +3,15 @@
 machinery joins a project's design to evidence from its running system, plans what is unproven
 as a backlog graph, and adds formality where the risk calls for it.
 
-This branch is **v2, experimental**. Nothing is released from it. v1 is on `main`.
+This branch is **machinery v2**: a new tool, not an upgrade of v1. v1 is on `main`.
 
-## The idea
+## Status
+
+v2 is experimental and not released yet. `machinery version` prints `machinery 2.0.0`, the version
+`CHANGELOG.md` lists as unreleased. Formats and commands may still change; `docs/formats.md`
+always describes the tool on this branch.
+
+## What it does
 
 A project keeps a small, structured design: a domain model ([Modelith](https://github.com/stacklok/modelith)
 0.6.0), state machines (the XState v5 JSON subset, checked against XState 5.33.4), API contracts,
@@ -15,11 +21,12 @@ failure modes and a risk file. One command-line tool does the rest:
 |---|---|---|
 | Lint and cross-check the design | `machinery lint` | Every state answers every event; model, machines and contracts agree. |
 | Generate what follows from it | `machinery gen` | Runtime transition tables and a list of obligations with stable ids. |
-| Check the code against it | `machinery check` | Static stages: trace, layering, tests policy, drift, ratchet. |
+| Check the code against it | `machinery check` | Static stages: trace, layering, tests policy, drift; with `--base`, the ratchet. |
 | Prove it on the real system | `machinery run`, `machinery verify` | Receipts from real end-to-end runs, joined to the obligations at one commit. |
-| Take in a new requirement | `machinery intake` | The design changes first; then every story of the change is written at once, with a capstone that shows it on the running system. |
+| Take in a new requirement | `machinery intake new` | The design changes first; then every story of the change is written at once, with a capstone that shows it on the running system. |
 | Plan what is unproven | `machinery plan`, `machinery waves` | Backlog stories with a dependency graph, scheduled in parallel waves. |
 | Accept by risk | `machinery story`, `machinery landing` | A tier gate per story; one full verification at the head that is ready. |
+| Adopt an existing project | `machinery assess`, `machinery adopt` | A read-only report, a rehearsal, then one area at a time without a rewrite. |
 
 Three rules shape it:
 
@@ -27,32 +34,61 @@ Three rules shape it:
   Consequential work adds a fresh verifier who predicts before reading the proof. Critical work
   adds a formal model: TLA+ for ordering, concurrency and recovery, Alloy for structure. Vital
   work, the few paths that must never go wrong, adds exact properties over its ids, a small core
-  shaped for a later machine-checked proof, and its assumptions with evidence; nothing reports
-  it as more proven than its tests and model make it.
+  shaped for a later machine-checked proof, and its assumptions with evidence.
 - **Evidence comes from the real system.** No unit tests and no test doubles, in machinery or in
-  a project that uses it. Test quality is measured by `machinery probe`, which gives the system
-  a wrong transition table and expects the tests to notice.
+  a project that uses it. A receipt counts only from a run of `machinery run` and only for a
+  test file that claims the id. Test quality is measured by `machinery probe`, which gives the
+  system a wrong transition table and expects the tests to notice.
 - **A blocking check protects a named product behavior.** `machinery checks` lists every stage
   and what it protects. Nothing checks that a ritual was followed.
 
-Formal models carry the checks that keep them from lying: reach predicates (no vacuous pass),
-numbered assumptions, a mutation list per spec, a baseline that makes weakening visible, a sync
-marker against the source, and replay of every counterexample against the real code.
+## Install
 
-## Start
+From a checkout of this branch, with Go 1.27.4 and git:
 
 ```
-make tools && make build        # in this repository: pinned tools into .bin/, then the binary
+go install ./cmd/machinery                                    # into your Go bin directory
+go install github.com/stacklok/modelith/cmd/modelith@v0.6.0   # the model linter it runs
 ```
+
+Optional, by feature: Node and `xstate` 5.33.4 (stage `xstate`), Java 21 and the pinned TLA+
+and Alloy jars (`machinery formal tools` fetches them by checksum), and `bd` (the backlog
+bridge). In this repository, `make tools && make build` puts the pinned tools and the binary in
+`.bin/`.
+
+## Ten minutes
+
+A ticket desk, from an empty directory to a proven design. `MACHINERY_REPO` is your checkout;
+`docs/getting-started.md` explains each step. The test suite runs this block
+(`docs_readme.txtar`):
+
+```sh
+machinery init
+cp -R "$MACHINERY_REPO/e2e/testdata/fixtures/starter/." .
+machinery gen
+git init -q -b main
+git add -A
+git commit -q -m "ticket desk"
+machinery check
+machinery run -- sh e2e/tickets_test.sh
+machinery verify
+machinery status
+```
+
+`verify` ends with `machinery verify: 1 passed, 0 failed, 0 not demonstrated, 0 not applicable`:
+six obligations, each observed on the running system at that commit.
+
+## Where to read next
 
 | You have | Read |
 |---|---|
 | A new project | [docs/getting-started.md](docs/getting-started.md) |
-| Existing code and a backlog | [docs/brownfield.md](docs/brownfield.md): assess read-only first, then adopt one area at a time, no rewrite |
+| Existing code and a backlog | [docs/brownfield.md](docs/brownfield.md): assess, rehearse, adopt one area at a time, evidence from the suite you have |
 | A backlog to plan and schedule | [docs/pm.md](docs/pm.md) |
 | A critical or vital area to model | [docs/formal.md](docs/formal.md) |
+| Machines to write | [docs/machine-format.md](docs/machine-format.md) |
 | A deterministic checker of your own | [docs/external-checkers.md](docs/external-checkers.md) |
-| A question about any format or output line | [docs/formats.md](docs/formats.md), the contract |
+| A question about any format, command, output line or exit code | [docs/formats.md](docs/formats.md), the contract |
 
 The reference project, a small CRM on a real Postgres built with this method from the design up,
 is in [examples/crm](examples/crm).
@@ -66,11 +102,17 @@ The plugin ships one small skill (`skills/machinery/SKILL.md`), one prompt per r
 `git commit` and `git push`, and after a turn that changed files. Checks are commands, not prose;
 the hooks only call them. Workers are briefed by pointer with `machinery brief <story>`.
 
-## Requirements
+## Limits and what v2 does not do
 
-Go 1.27, git, `modelith` 0.6.0. Optional, by feature: Node and `xstate` 5.33.4 (stage
-`xstate`), Java 21 with the pinned `tla2tools` and Alloy jars (formal models), `bd` (the backlog
-bridge). `make tools` installs the pinned ones into `.bin/`.
+| Area | Limit |
+|---|---|
+| Hooks | Wired in `hooks/hooks.json`, and `machinery hook` is tested with hook JSON on stdin. They are not yet confirmed in a live harness session: try them in one of yours before you rely on them. The Codex plugin wires no hooks. |
+| Vital cores | Denied imports, function sizes and entry symbols of a core are read in Go files only. A core in another language is not demonstrated. |
+| Adapter evidence | Weaker than a receipt a test emits: it shows that a test which names the id passed, not that the test checked it. It never proves a `tc` or `cx` id, and by default no id of a critical or vital area. |
+| Proof obligations | None is discharged. Each property of a vital area prints as awaiting proof, and an id it is over reads `(by test and model; proof awaited)`. |
+| Delegate | Experimental: its commands and the policy format may change in any release. |
+| Evidence rules | They catch mistakes and casual edits, not a party who can run commands as the tool or plant code in the project (`docs/formats.md` sections 10.2 and 10.3). |
+| Backlog | `bd` is the only backlog tool. |
 
 ## Development
 
