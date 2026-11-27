@@ -1,26 +1,31 @@
 # Adopting machinery in an existing project
 
 You have code, tests, a way of working and a `bd` backlog, and work is in flight. This guide
-brings one area of the project under machinery without a rewrite, without a freeze and without
-touching the backlog you have. Every command in a `sh` block is executed, in order, by the test
-suite (`brownfield_walkthrough.txtar`) on a small existing Go project, the `brownfield` fixture:
-a depot with a shipping area and a billing area, unit tests, a smoke script and its own backlog.
+brings one area under machinery without a rewrite, a freeze or a migration of the backlog.
+Every command in a `sh` block runs, in order, in the test suite (`brownfield_walkthrough.txtar`)
+on the `brownfield` fixture: a small Go depot with a shipping and a billing area, unit tests, a
+smoke script and its own backlog. The contract is `docs/formats.md`.
 
-The contract is `docs/formats.md` sections 18 (`assess`), 17.3 (`adopt --rehearse`) and 17.2
-(`adopt`). The order is assess, rehearse, then adopt. Three properties hold at every step:
+| Step | Command | Writes in the project | Contract |
+|---|---|---|---|
+| 1. Assess | `machinery assess --config <file> --out <dir>` | Nothing | 18 |
+| 2. Config | a `machinery.yaml` kept outside the project until you adopt | Nothing | 2 |
+| 3. Rehearse | `machinery adopt --rehearse --config <file> --out <dir>` | Nothing | 17.3 |
+| 4. Links file | the subject and required value of each catalog row | One design file | 5.4.1 |
+| 5. Adopt | `machinery adopt --paths <glob> --write` | `machinery.yaml`, `design/` | 17.2 |
+| 6. Evidence | `machinery run`, with `--adapter go-test-json` for a Go suite | Receipts, never committed | 10 |
+| 7. Owed sync, verify | `machinery owed sync --prune-only`, `machinery verify` | `design/owed.yaml` | 11, 12 |
+| 8. Plan | `machinery plan --apply` | Stories in your backlog | 15.2 |
+| 9. What stays owed | `machinery status` | Nothing | 14 |
 
-- `assess` and `adopt --rehearse` write nothing in the project, and `adopt` never changes existing
-  code: it writes `machinery.yaml` and files under `design/`.
-- Only the paths you point it at are covered. Everything else is left alone.
-- Coverage only grows: the scope does not narrow, baselines do not grow without a wider scope,
-  and nothing proven becomes owed (`machinery check --base <ref>`).
+`assess` and the rehearsal write nothing in the project, not even in `.git`. `adopt` never
+changes existing code. Coverage only grows: the scope does not narrow, baselines do not grow
+without a wider scope, and nothing proven becomes owed (`machinery check --base <ref>`).
 
-## 1. Assess before you adopt
+## 1. Assess
 
-Before anything is written into the project, see where it stands against the design it already
-has. Write a first `machinery.yaml` by hand and keep it outside the project: the scope you care
-about, where the end-to-end tests live, and the design you already keep in your own formats
-(`import` and `trace.markers`, `docs/formats.md` section 2). Then assess:
+Write a first `machinery.yaml` by hand, outside the project: the scope you care about and
+where the end-to-end tests live. Then assess:
 
 ```sh
 cat > ../depot.machinery.yaml <<'EOF'
@@ -32,63 +37,130 @@ EOF
 machinery assess --config ../depot.machinery.yaml --out ../depot-assessment
 ```
 
-`assess` takes a snapshot of `HEAD` with `git archive` into the out directory and runs
-everything there: the inventory `adopt` would report, every lint stage, `gen`, the trace, tests
-and arch stages, a sanity run of the formal tools on every machine and model, how the model
-changed since it was first committed, a census of decision records (`assess.decisions`) and agent
-instruction files, and the tracker export, read as a file. Nothing in the project changes, not
-even `.git`. Files you have not committed are not assessed; the report counts them.
+`assess` runs on a snapshot of `HEAD` (`git archive`): the inventory, every lint stage, `gen`,
+the trace, tests and arch stages, the formal tools, the history of the model, a census of
+decision records (`assess.decisions`) and agent instruction files, and the tracker export, read
+as a file. `report.md` is for the team, `report.json` for tools, `stages/` holds every output.
+Here the tests section fails with two `unit-test` findings: what adoption will baseline.
 
-`report.md` in the out directory is for the team, `report.json` for tools, and `stages/` holds
-the full output of every stage. Here the tests section fails with two `unit-test` findings, one
-per area: what adoption will baseline rather than delete.
+## 2. Say where your design already lives
 
-## 2. Rehearse the adoption
+A design you keep in formats of your own is read as it is, never converted and never written:
 
-`assess` says where the project stands; `adopt --rehearse` says what adopting it would take. It
-takes another snapshot, runs `adopt --write`, `machinery check` and `machinery plan` there, and
-never runs the backlog tool:
+| Key | Reads |
+|---|---|
+| `import.machines` | Machines in a JSON dialect of your own: `files` (globs anywhere), `states` (`capitalize`, `pascal`, `keep`), `rename` per level, `terminal.from_root`, `register` (the transitions your code makes, checked both ways) and `bind` (`lifecycle_of`, with an `aspect`, or `serves`). |
+| `import.machines.annotate` | What the dialect has no key for, per glob of files or machine id: `external_events`, `failure_events` and `failure_states` (names and `*` patterns), `aliases` (an event that is a model action under another name), `refusal_events` (an event that writes the refusal of an action, with a reason) and `not_failures` (a failure-looking name dismissed, with a reason). |
+| `import.failure_modes` | A failure catalog kept as Markdown tables: `file`, the `id` pattern, `columns` (`failure`, `behavior`, and `required` when the catalog has one) and `links` (step 4). |
+| `import.planned` | Your own planned marks: `in` (`model-statement`, `scenario-description` or `failure-row`) and a `pattern` whose group `story` names the story. |
+| `trace.markers` | Your own markers in comments: `serves`, `verifies`, `scenarios`, and `scenarios_exact` for a marker that also carries other text. |
+| `systems` | Parts of the system a failure mode may be about that the design does not model. |
+
+```yaml
+import:
+  machines:
+    files: ["machines/*.json"]
+    states: pascal
+    rename:
+      state: {skip: _ignores}
+    bind:
+      "machines/loan-desk.json": {lifecycle_of: Loan}
+      hold_queue: {serves: ["act:Loan.lend"]}
+    annotate:
+      "machines/*.json":
+        failure_events: ["*_failed"]
+      loan_desk:
+        external_events: ["due_*"]
+        failure_states: ["*_failed"]
+        aliases: {handed_back: giveBack}
+      hold_queue:
+        external_events: [notice_sent]
+        aliases: {lend_requested: lend}
+  failure_modes:
+    file: docs/risks.md
+    id: "^RISK-[0-9]+$"
+    columns:
+      failure: ["Failure", "What goes wrong"]
+      behavior: ["Required behavior", "Expected"]
+      required: ["Required"]
+    links: design/risk-links.yaml
+  planned:
+    - {in: scenario-description, pattern: '^Planned \(story (?P<story>[a-z0-9-]+)\)\.'}
+systems:
+  - {name: build, about: "how the desk is built and released"}
+trace:
+  markers:
+    serves: ["Implements:"]
+    verifies: ["Checks:", "Proves:"]
+    scenarios_exact: ["Objective:"]
+```
+
+The config cannot hide a command: an event that is an action of the model stays a finding
+whether you list it as external or alias it. A pattern that matches nothing in a machine it
+applies to is an error, and a pattern of `*` alone is refused. An event that moves the machine
+into a failure state it was not in is no refusal event. Stage `xref-model-machine` prints every
+alias and refusal event in effect, with its reason. The fixture `library` is read this way.
+
+## 3. Rehearse
+
+The rehearsal takes another snapshot, runs `adopt --write`, `machinery check` and
+`machinery plan` there, and never runs the backlog tool:
 
 ```sh
 machinery adopt --rehearse --config ../depot.machinery.yaml --out ../depot-rehearsal
 ```
 
-A rehearsal reads only what is committed. To try a links file before adopting it, commit it on
-a scratch branch of a clone of the project and rehearse there. Every reason and offered waiver
-it writes names the commit of your project that it rehearsed, never the commit of its snapshot.
+`rehearsal.md` (and `rehearsal.json`) holds:
 
-`rehearsal.md` (and `rehearsal.json`) lists the files adoption would write with their sizes, the
-waivers it would add by rule, the baselines, what it would owe by kind, the result of the check,
-the stories `plan` would create by kind and tier, and what blocks adoption: each stage that fails
-or is not demonstrated, with its first findings. A finding of a cross-reference rule comes with
-the waiver that would cover it, offered and never written. A finding about the sources
-themselves, such as a machine that does not lint or a failure catalog with a row outside its
-tables or an id listed twice, is listed under "Fix in the project first": no waiver covers it,
-and `adopt --write` owes nothing until it is fixed. Fix those in the project, commit, and
-rehearse again until nothing you did not choose blocks.
+| Part | What |
+|---|---|
+| Files, waivers, baselines | What adopt would write, with sizes, the waivers by rule and the baseline entries. |
+| Owed | By kind, then by claim: claimed by a test with no receipt yet, named by no test, planned. |
+| Check | The result of `machinery check` and each stage's outcome. |
+| Plan | The stories `plan` would create, by kind and tier, wire-evidence stories last. |
+| Blocks adoption | Each stage that fails or is not demonstrated; a cross-reference finding comes with the waiver that would cover it, offered and never written. |
+| Fix in the project first | Findings about the sources themselves (a machine that does not lint, a catalog row outside its tables): no waiver covers them, and `adopt --write` owes nothing until they are fixed. |
 
-The rehearsal also tells apart what your tests already claim. Under "Owed" it counts the ids a
-test names (`claimed by a test, no receipt yet`), the ids no test names, and the ids your own
-sources mark as planned; the plan has the usual stories for the ids no test names, one `Wire evidence`
-story per test file for the claimed ones and none for an id you had planned, so a project with a thousand claimed ids is not asked
-for a thousand stories. A claim is not evidence: every one of them is still owed until its test
-emits a receipt, or, for a Go suite, until a run through the adapter sees the test pass
-(section 7).
+Every reason and offered waiver names the commit of your project, never that of the snapshot.
+A rehearsal reads only what is committed: to try a config or a links file first, commit it on a
+scratch branch of a clone and rehearse there.
 
-## 3. Look before you write
+## 4. Link the failure catalog
+
+A catalog read through `import.failure_modes` owes every row. Stage `xref-failure` prints how
+many rows are linked and is not demonstrated while one is unlinked: one linked row among
+hundreds is no pass. The links file gives each row its subject and required value:
+
+```yaml
+version: 1
+links:
+  - {id: RISK-1, kind: abuse, subject: "act:Loan.lend", required: refuse}
+  - {id: RISK-2, subject: "state:loan_desk.ScanFailed", required: surface}
+  - {id: RISK-3, subject: "event:loan_desk.scan_failed"}
+  - {id: RISK-4, subject: "event:hold_queue.notice_failed", required: retry-bounded}
+  - {ids: [RISK-10..RISK-24, RISK-31], subject: "system:build", required: fail-closed}
+  - {id: RISK-32, subject: "machine:hold_queue", required: surface}
+  - {id: RISK-40, no_subject: "the shelf list is kept on paper, outside the system"}
+```
+
+| Entry | Means |
+|---|---|
+| `id` or `ids` | One row, or many: ids and inclusive ranges (`RISK-10..RISK-24`). Two entries that name one row are a finding that names both. |
+| `subject` | `act:`, `entity:`, `invoke:`, `dependency:`, `state:`, `event:`, `machine:<id>` (the machine as a whole, covering none of its states, events or invokes) or `system:<name>` (declared under `systems`; an unknown name has no waiver). |
+| `required` | `fail-closed`, `retry-bounded`, `surface` or `refuse` (abuse only). Left out, the row's `columns.required` cell gives it (RISK-3 above). |
+| `no_subject` | The row names nothing in the system, with the reason. |
+
+A row is linked when its subject resolves and it has a required value. A row with a subject and
+no required value is no error: `gen` and `adopt` go on, the row is owed, and stages
+`failure-modes` and `xref-failure` count it apart (`name a subject and no required value`). It
+is unlinked all the same. A `required` that is given and is none of the four is an error.
+
+## 5. Adopt
 
 Point `adopt` at the area that hurts most. Without `--write` it changes nothing:
 
 ```sh
 machinery adopt --paths 'internal/shipping/**' --e2e 'e2e/**'
-```
-
-The report says what it found: languages, code files in scope, test files (how many are unit
-tests, how many use test doubles), design sources, and the state of the backlog.
-
-## 4. Adopt the area
-
-```sh
 machinery adopt --paths 'internal/shipping/**' --e2e 'e2e/**' --write
 echo '.machinery/' >> .gitignore
 git add -A
@@ -96,224 +168,170 @@ git commit -q -m "adopt machinery for the shipping area"
 machinery check
 ```
 
-`adopt` does not edit `.gitignore`; it tells you to add `.machinery/`, where the receipts of test
-runs are kept. Receipts are evidence of one run at one commit and are not committed.
+The report counts languages, code files, test files (unit tests, those with test doubles),
+design sources and the backlog. `adopt` never edits `.gitignore`: it tells you to add
+`.machinery/`, where receipts are kept. `check` passes on day one: the unit tests of the area
+are listed in `design/tests-baseline.yaml` and print as warnings, and a new unit test or test
+double in the area fails from now on.
 
-`check` passes on day one. The unit tests the area already has are listed in
-`design/tests-baseline.yaml` and print as warnings; nobody has to delete them today. A new unit
-test or a new test double in the area fails from now on: new evidence comes from the real
-system. The billing area is outside the scope and is not looked at.
-
-## 5. Model the riskiest stateful resource
-
-Not the whole system: the one resource whose legal next step depends on its past. Here it is the
-shipment. Write its Modelith model and its machine from the code as it is (the fixture
-`brownfield-design` holds them), and say why creation has no event:
+Now model the riskiest stateful resource, the shipment, from the code as it is (fixture
+`brownfield-design`), and name the ids in the end-to-end tests that check them (fixture
+`brownfield-tests`: a shell script that emits receipts and a Go test that emits none):
 
 ```sh
 cp -R "$MACHINERY_REPO/e2e/testdata/fixtures/brownfield-design/." .
+cp -R "$MACHINERY_REPO/e2e/testdata/fixtures/brownfield-tests/." .
 printf 'waivers:\n  - {rule: action-event, id: "act:Shipment.create", reason: "creation enters the initial state"}\n' >> machinery.yaml
 machinery adopt --write
+machinery owed list
 machinery check
 git add -A
 git commit -q -m "model the shipment lifecycle"
 ```
 
-The second `adopt --write` finds the new design sources, adds them to `machinery.yaml`, runs
-`machinery gen` and puts every obligation into `design/owed.yaml` with the reason `unproven at
-adoption`. That list is your baseline of what was never proven. Nothing fails; nothing is
-claimed.
+The second `adopt --write` adds the new sources to `machinery.yaml`, runs `gen`, and owes every
+obligation in `design/owed.yaml` with the first reason that applies:
 
-Here no test names an id yet. In a project whose tests already point at the design, an id a
-test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as
-planned (`import.planned`: a sentence that opens an invariant's statement or a scenario's
-description, a cell of a row of your failure catalog, each naming its story) is owed with `planned
-at adoption` and that story.
-`machinery status` then counts the owed ids by what stands behind each: claimed by a test with
-no receipt yet, named by no test, planned, and, once a run has proven some, proven and still
-listed. A story id your mark names is kept as it is: `plan --apply` creates nothing for an id
-whose story is not in this backlog and says so, and a mark that captures more than a story id
-stops `adopt` before it writes.
+| Reason | For |
+|---|---|
+| `planned at adoption` | An id your own mark says is planned (`import.planned`), with its story. A mark that captures more than a story id stops `adopt` before it writes. |
+| `claimed at adoption` | An id a test already claims. A claim is not evidence: it stays owed until a receipt proves it. |
+| `unproven at adoption` | Every other obligation, and every action no code serves. |
 
-**Mark the failures.** The code you model already fails somewhere: a status value such as
-`failed`, a worker that reports a crash, a lease that runs out. Tag the state that records it with
-`"tags": "failure"` and list the events that report it in the root `_failure_events`
-(`docs/machine-format.md`, "Failure idioms"); `machinery lint` warns about a state or event whose
-name looks like a failure and is not marked. Each failure state and failure event then needs a
-failure mode in `design.failure_modes`. The next `adopt --write` waives the ones that have none,
-with the reason `unmodeled at adoption`, so the check still passes; when you write a failure mode
-for one, its waiver becomes a `stale waiver` ERROR and you delete it. The list only shrinks.
+It also waives what the design already had, so the check passes: a failure state or event with
+no failure mode yet (`unmodeled at adoption`), and a machine that binds to nothing or an entity
+with actions and no lifecycle machine (`unbound at adoption`). A waiver whose cause is fixed is
+a `stale waiver` ERROR, so the list only shrinks.
 
-**Bind every machine.** Each machine says what in the model it is for: a lifecycle machine names
-its entity, and an operational machine lists in `_serves` the entities and actions it exists for
-(`docs/formats.md` section 5.2). Machines read through `import` get their binding from
-`import.machines.bind` when the source does not say. `adopt --write` waives the machines that
-bind to nothing yet and the entities that have actions and no lifecycle machine, with the reason
-`unbound at adoption`; a waiver goes stale when its machine is bound or its lifecycle written.
-An entity whose state lives in two attributes (an order's payment and its delivery) gets one
-lifecycle machine per attribute, each an aspect with its own `_aspect` name
-(`{lifecycle_of, aspect}` in `import.machines.bind`). An operational machine's events are held to what it serves: an action
-it serves, or an event it lists in `_external_events`.
+Mark failures where the code records them: tag the state `failure` and list the events in
+`_failure_events` (`docs/machine-format.md`, "Failure idioms"), or say it in
+`import.machines.annotate`. Bind every machine: a lifecycle machine names its entity, an
+operational one lists in `_serves` what it exists for, and an entity whose state lives in two
+attributes gets one lifecycle machine per `_aspect`.
 
-**Link the failure catalog.** A catalog read through `import.failure_modes` owes every row, and
-stage `xref-failure` is not demonstrated while one row names no subject: it prints how many are
-linked and how many are not, and one linked row among hundreds is no pass. The links file
-(`docs/formats.md` section 5.4.1) takes many rows per entry, `ids: [RISK-10..RISK-24, RISK-31]`,
-so a catalog is linked group by group. A row about the system as a whole or a part of it that
-is no entity, dependency or machine (a build, a deployment) takes the subject `system:<name>`,
-with the name declared under `systems` in `machinery.yaml`; a row about a machine as a whole (a
-queue that stalls) takes `machine:<id>`, which covers none of the machine's failure states,
-failure events and invokes; a row that names nothing in the system at all is declared
-`no_subject`, with the reason. A catalog that has a column for the required behavior names it
-in `columns.required`, and an entry may then leave `required` out. A row whose entry names a
-subject and gives no required value is counted on its own (`name a subject and no required
-value`), so the rows that only wait for that value are told apart from the rows nobody linked;
-it is unlinked all the same. It is no error: `gen` and `adopt` go on, the row is owed like any
-other, and stages `failure-modes` and `xref-failure` print the same counts of linked, unlinked,
-subject-only and subject-less rows. A `required` value that is given and is none of the four is
-an error, fixed in the links file or the cell.
+## 6. Evidence
 
-**Read your machines as they are.** `import.machines` (`docs/formats.md` section 5.2.1) takes
-globs anywhere in the project, so a lifecycle file kept beside its service is read with the
-rest. `states: pascal` turns `on_hold` into the domain state `OnHold`;
-`terminal: {from_root: <key>}` turns a root note that a machine never ends into `_terminal` on
-the states it is never left in; and a register that lists the transitions your code makes
-(`import.machines.register`) is checked both ways against the machines.
+A receipt proves only when `machinery run` wrote its file, nothing changed it since, and its
+`test` names a test file that claims the id (`docs/formats.md` section 10.2). A file typed by
+hand or edited after the run is refused, and a refused file fails `verify`, the story gate and
+`owed sync`. That guards against mistakes, not against someone who can run commands as the tool.
 
-**Say which events are not caller actions.** A dialect of your own rarely has a key for it, and
-you do not have to add one to every file. `import.machines.annotate` says it per glob of files
-or per machine id: `external_events` for what arrives from outside the caller (a timer, a
-callback, another machine), `failure_events` and `failure_states` for what reports and records
-a failure, each a list of names and `*` patterns (`"*_refused"`, `"*_failed"`), and `aliases`
-for an event that is a model action under another name (`handed_back: giveBack`). The
-"not an action" findings stop for the names you declare, and the "looks like a failure" warnings
-for the failures you declare. An external or aliased event whose name looks like a failure is
-still hinted: list it in `failure_events`, or dismiss the hint by name in `not_failures`, with
-the reason. An alias and `failure_events` go together when the action is itself the failing
-outcome (the model action `fail`, the events `send_failed` and `verify_failed`). A machine that
-writes the refusal of a command as an event of its own (`cancel` and `cancel_refused`) declares
-it in `refusal_events`, with the action and the reason
-(`cancel_refused: {action: cancel, reason: "a paid order is not cancelled"}`): it is no event
-from outside and no alias, and a declared refusal is neither hinted nor asked for a failure
-mode. That holds only for a refusal, where nothing failed: an event on which the machine
-moves into a failure state it was not in is refused as one (from a state that is not a failure
-state, or from one failure state into another), while one that leaves a failure state where it
-is (`failed` on `cancel_refused` stays `failed`) is a refusal, and every declaration is printed
-with its reason. A
-pattern that matches nothing in a machine it is applied to is an error, a pattern
-of `*` only is refused, and an event that is an action of the model stays a finding whether you
-list it as external or give it an alias: the config cannot hide a command. Every alias and every
-refusal event in effect
-is a line of `xref-model-machine`, so the list of names you bridged stays in view.
-
-## 6. Turn what is owed into stories, beside the ones you have
+**A Go suite, direct.** Tests that name their ids in comments get evidence without a change:
 
 ```sh
-machinery owed list
+machinery run --adapter go-test-json -- go test ./e2e/...
+```
+
+machinery adds `-json` and `-count=1`, reads the event stream and writes the receipts itself.
+The command is held narrow: `go test` with relative package patterns and the usual test flags,
+in the module of the project root, for the machine it runs on. `-C`, `-modfile`, `-exec`, a
+`-run` that selects subtests and the like go through `--streams`. The header records the go
+version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod` and `go.work`.
+
+| What the run saw | Receipt |
+|---|---|
+| Every function the claim belongs to passed, and its package ended with pass | `pass` |
+| A function failed, or its package failed (a timeout, `os.Exit`, a panic, a build failure) | `fail`, also for claimed functions without a verdict |
+| A function, or one of its subtests, skipped | `skip` |
+| A function did not run, or its pass came from the test cache | none |
+| Two Go files of the directory define the same `Test` function, whatever their build tags | none for a pass or a skip; a fail fails both |
+| The stream ended before its package did | none: the run is incomplete; delete its receipts file |
+
+A marker directly above a test function claims for that function (`granularity: function`); a
+marker above no function claims for every test function of the file (`granularity: file`); one
+above a fuzz test, a benchmark or a helper counts nothing and is named in the summary.
+
+**A Go suite behind a wrapper: `--streams`.** When a make target or a script starts `go test`
+itself, machinery cannot add `-json`. The wrapper writes each stream to a file in the directory
+machinery names in `MACHINERY_GO_TEST_JSON`, and `evidence.adapter.sources` names the files each
+package is built from. The smallest wrapper:
+
+```sh
+cat > e2e/go-suite.sh <<'EOF'
+#!/bin/sh
+set -eu
+go test -count=1 -json ./e2e/... > "${MACHINERY_GO_TEST_JSON:?}/e2e.json"
+EOF
+cat >> machinery.yaml <<'EOF'
+evidence:
+  adapter:
+    sources:
+      - {package: example.test/depot/e2e, files: ["e2e/*_test.go"]}
+EOF
+git add -A
+git commit -q -m "run the Go suite through a wrapper"
+machinery run --adapter go-test-json --streams -- sh e2e/go-suite.sh
+```
+
+The wrapper passes `-count=1` itself: machinery reads only `GOFLAGS`. A file may hold several runs
+appended one after the other, each judged on its own, and a fail in any of them is a fail; a run
+that starts again before the one before it ended (a killed run and its retry, two runs writing at
+once) leaves the run incomplete. The entries of `evidence.adapter.sources` are read only in this
+mode, and a direct run refuses an entry for a package tested in its own directory: pick one way per
+package. Tests staged as copies elsewhere map back the same way.
+
+**A test that emits receipts.** A transition case (`tc`) needs the effects the test observed,
+which a verdict of `go test` does not carry. `e2e/shipment_e2e.sh` drives the real binary,
+asserts, and only then appends one receipt per id to `MACHINERY_RECEIPTS` (`pkg/receipt` does
+that for a Go test):
+
+```sh
+machinery run -- sh e2e/shipment_e2e.sh
+```
+
+## 7. Sync the owed list, then verify
+
+```sh
+machinery owed sync --prune-only
+git add -A
+git commit -q -m "prune the owed list"
+machinery verify
+```
+
+`owed sync --prune-only` removes exactly the ids the runs proved and adds nothing. Prune before
+you verify: `verify` fails on an owed id that is proven (`stale owed entry`). Pruning changes
+only the owed file, so the runs stay valid at the new commit. `verify` counts adapter evidence
+apart (`4 by adapter at function granularity`) and prints the go environment of each adapter run.
+
+## 8. Plan: stories beside the ones you have
+
+```sh
 machinery plan --apply
 machinery waves
 ```
 
 `plan --apply` adds one story per group of owed ids to the same backlog, with dependency edges
-and a tier label. Your existing stories are untouched. To attach ids to a story you already have,
-use `machinery plan --link <story> <id>...`. `waves` shows what can run in parallel. Ids a test
-claimed at adoption get no story of their own: `plan` adds one `Wire evidence <test file>` story
-per file (per directory past `plan.wire_max_files` files) that lists the ids the file must emit
-receipts for.
+and a tier label; your stories are untouched. An id a test claimed at adoption gets no story of
+its own: one `Wire evidence <test file>` story per file (per directory past
+`plan.wire_max_files`) makes the tests that exist emit receipts. An id planned at adoption keeps
+the story your mark names. `machinery plan --link <story> <id>...` attaches ids to a story you
+have. Decisions kept in a file move into the backlog with `machinery decisions import`. An
+adopted project may set `review.backlog` and `review.design` to `off` until the checker reviews
+its plans; the ratchet reports turning one off later.
 
-Decisions you already keep in a file move into the backlog record by record:
-`machinery decisions import --file docs/DECISIONS.md --record '^## D[0-9]+'` prints one decision
-per record, with the design ids its text names, and `--apply` creates them; the file is never
-touched, and the last line says how many lines your instructions would shed once agents stop
-loading it. With a backlog, `machinery waves --freeze` and `machinery intake plan --apply` wait
-for the checker's review (`machinery review`); an adopted project may set `review.backlog` and
-`review.design` to `off` until it plans that way, and the ratchet reports turning one off later.
-
-## 7. Prove one story end to end
-
-A story is done when its ids are observed on the real system. The fixture `brownfield-proof` adds
-what the story "Prove shipment pack" needs: a `machinery:serves` comment in the shipping package
-and an end-to-end script that builds the real binary, drives it and emits receipts.
+## 9. What stays owed, and why
 
 ```sh
-cp -R "$MACHINERY_REPO/e2e/testdata/fixtures/brownfield-proof/." .
-git add -A
-git commit -q -m "prove packing end to end"
-machinery run -- sh e2e/shipment_e2e.sh
-machinery owed sync --prune-only
-git add -A
-git commit -q -m "prune the owed list"
-machinery verify
-STORY=$(machinery waves | awk '/Prove shipment pack/ {print $1; exit}')
-machinery proof --story "$STORY" --post
-machinery story "$STORY"
 machinery status
 ```
 
-A receipt proves only when `machinery run` wrote its file and its `test` names a test file that
-claims the id (`docs/formats.md` section 10.2): the script's receipts name
-`shipment_e2e.sh`, the file that carries the `machinery:verifies` comment. A receipts file typed
-by hand, or edited after the run, is refused and proves nothing. That guards against mistakes,
-not against someone who can run commands as the tool.
+`status` counts the owed ids by what stands behind each: claimed by a test with no receipt yet,
+named by no test, planned, and actions by whether code serves them.
 
-**A Go suite you already have.** When your tests already name the ids they verify in comments,
-you do not have to rewrite them to get evidence. Run the suite through the adapter:
+| Still owed | Why | What ends it |
+|---|---|---|
+| A `tc` id a Go test claims | The adapter never proves a `tc` or `cx` id: a verdict carries no effects and no replay. | Its `Wire evidence` story: the test emits receipts. |
+| An id of a critical or vital area | By default adapter evidence proves routine and consequential ids only (`warn   adapter: <id> not counted`). | A receipt the test emits after its own assertions. |
+| An id no test names | Nothing claims it. | Its `Prove` story. |
+| A claimed id with no verdict | Its test did not run, was cached, or has a twin (`claimed, not run`, `claimed, verdict not counted`). | Run it, or rename the twin. |
+| An id planned at adoption | Your project said it is not delivered. | The story your mark names. |
+| An action | No `machinery:serves` in the code yet. | The `Serve <Entity> actions` story. |
 
-```
-machinery run --adapter go-test-json -- go test -count=1 ./e2e/...
-machinery owed sync --prune-only
-machinery status
-```
+`evidence.adapter` changes what adapter evidence proves: `allow` (kinds), `tiers` and
+`min_granularity` (`function` asks for the marker above the function). The ratchet compares the
+policy by what it admits: `adapter widened` warns, and is an ERROR for a critical or vital tier.
 
-machinery adds `-json`, reads the event stream and writes the receipts itself
-(`docs/formats.md` section 10.3). An id gets a pass when every test function its marker belongs
-to passed and the package ended ok: the function under the marker when the marker is in the
-comment directly above it, every test function of the file when it stands above no function. A
-marker directly above a fuzz test, a benchmark or any other function that is no test counts
-nothing, and the summary of the run names it. A failed function writes
-a fail, a skipped one a skip (a parent with a skipped subtest too), and one that did not run
-writes nothing. A package that failed (a test that hangs past `-timeout`, calls `os.Exit` or
-panics, a build that fails) writes a fail for every claimed function without a verdict, and a
-stream cut short leaves the run incomplete, naming the receipts file to delete; a pass answered from
-the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
-verdict belongs to a file only when no other Go file of its directory defines a function of the
-same name that begins with `Test` and takes one parameter, whatever its build tags or the
-way its parameter is written: rename such a twin, or neither counts. The summary of the run
-says how many ids were claimed and not run. The command is held narrow on purpose, against
-mistakes: `go test` with relative package patterns and the usual test flags, in the module of
-the project root, for the machine it runs on; `-C`, `-modfile`, `-exec`, a `-run` that
-selects subtests and the like run through `--streams` (below). A module path that two tracked
-`go.mod` files outside `testdata` and `vendor` declare, or a tracked `go.work` that leaves out
-the module of the claiming test files, is refused, and once `machinery.yaml` has an
-`evidence.adapter` block `machinery check` reports both (stage `trace`). The run's header records the go version, the `go` binary,
-`GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod` and `go.work`, and
-`verify` and `proof` print them. The adapter trusts your test code and the environment of the
-run exactly as much as a receipt a test emits: it catches a stale cache, a twin test, a file
-that was not built, a wrong directory or a lost fail, not code or modules planted on purpose.
-
-This evidence is weaker than a receipt, and every report says so. It shows that a test which
-names the id passed, not that the test checked the id. `status`, `verify` and `proof` count it
-apart (`proven: 40 (31 by adapter at file granularity)`), a transition case (`tc`) is never
-proven this way because it needs the effects the test observed, and by default an id of a
-critical or vital area is not either: those need a receipt the test emits after its own
-assertions. `evidence.adapter` in `machinery.yaml` tightens or widens this: which kinds and
-tiers the adapter may prove, and whether a marker at the top of a file is enough or the marker
-must stand above the function (`min_granularity: function`). If your suite runs through a make target or a script that starts
-`go test` itself, run that through `machinery run --adapter go-test-json --streams -- make e2e`
-and have it write each `go test -json` output to a file in the directory machinery names in
-`MACHINERY_GO_TEST_JSON` (a file may hold several runs, appended one after the other: each is
-judged on its own, and a fail in any of them is a fail; a run that starts before the one before
-it ended, a killed run and its retry or two runs writing at once, leaves the run incomplete); there the wrapper must pass `-count=1` itself, and because machinery
-cannot see what such a run built, every package it tests needs an entry in
-`evidence.adapter.sources` naming the files it is built from. If you build your tests from
-copies staged in another directory, `evidence.adapter.sources` maps the staged package back to
-the files that carry the markers; it is read only with `--streams`.
-
-`owed sync --prune-only` removes exactly the ids the run proved. `verify` passes: everything is
-proven or still owed. `story` is the gate for that one story; a consequential or critical story
-would also need a fresh verifier (`docs/pm.md`).
-
-## 8. Hold the line, then widen
+## 10. Hold the line, then widen
 
 ```sh
 machinery check --base HEAD~2
@@ -321,19 +339,11 @@ machinery adopt --paths 'internal/billing/**' --write
 machinery check
 ```
 
-The ratchet compares with an earlier commit: nothing that was proven there is owed now. When the
-team is ready, a second `adopt` widens the scope to the next area; its unit tests join the
-baseline, and from then on the area is held to the same rules.
+The ratchet compares with an earlier commit: nothing proven there is owed now, and the adapter
+sources added since are named. A second `adopt` widens the scope to the next area; its unit tests
+join the baseline, and from then on the area is held to the same rules.
 
 ## What you did not have to do
 
-Rewrite code. Stop the stories in flight. Migrate the backlog. Model everything. Delete tests.
-Each of those can happen later, one story at a time, and the owed list and the baselines show
-exactly how far along you are.
-
-Nor did you have to convert a design you already keep. Machines in a JSON dialect of your own,
-failure modes in Markdown tables and your own trace markers in comments are read as they are
-(a marker you also use for other text goes in `trace.markers.scenarios_exact`, which claims only
-when the text is a scenario name),
-through `import` and `trace.markers` in `machinery.yaml` (`docs/formats.md` sections 5.2.1, 5.4.1
-and 8.1); the fixture `e2e/testdata/fixtures/library` is a small example.
+Rewrite code, stop the stories in flight, migrate the backlog, model everything, delete tests or
+convert a design you keep. The owed list and the baselines show how far along you are.

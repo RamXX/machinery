@@ -181,3 +181,17 @@ no `machinery.yaml`: `machinery adopt` adds the files to the config. The action
 runs the cross-reference stage appends a waiver for rule `action-event`.
 
 Obligations once generated: 12 cases (`tc:SHIP-*`), 2 invariants, 2 scenarios (16), and 5 act ids.
+
+## `brownfield-tests`
+
+The end-to-end tests a team points at the design once it models the shipment. Copy it over
+`brownfield` and `brownfield-design` with `fixture brownfield-tests`. Both tests build the real
+`depot` binary and drive it over a store of their own.
+
+| File | Emits | Claims |
+|---|---|---|
+| `e2e/shipment_e2e.sh` | One receipt per id, with effects, after its assertions. | `tc:SHIP-422414` (Created on:pack), `tc:SHIP-ab88ab` and `tc:SHIP-e82c34` (pack refused when Packed or Dispatched). |
+| `e2e/shipment_test.go` (package `example.test/depot/e2e`) | Nothing: an ordinary Go test, for the run adapter. | Above `TestDelivery`: `sc:shipment-is-packed-dispatched-and-delivered`, `inv:dispatched-only-from-packed`. Above `TestFinal`: `sc:dispatched-shipment-refuses-cancellation`, `inv:terminal-is-final`, `tc:SHIP-58b48e`. |
+
+Counts the scripts rely on: 8 claimed ids (4 `tc`, 2 `sc`, 2 `inv`), 2 test functions; the
+adapter writes 4 passes and cannot prove `tc:SHIP-58b48e`, which needs effects.
