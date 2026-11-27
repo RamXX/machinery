@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/RamXX/machinery/internal/adopt"
 	"github.com/RamXX/machinery/internal/gen"
 	"github.com/RamXX/machinery/internal/modelith"
 	"github.com/RamXX/machinery/internal/report"
@@ -51,6 +52,14 @@ func runGen(e *Env, args []string) int {
 // stages, when the model, machines or failure-modes stage has an ERROR or the
 // model stage cannot run.
 func Generate(ctx *stages.Context) (written []string, blocked []*report.Stage, err error) {
+	written, _, blocked, err = GenerateFor(ctx, nil)
+	return written, blocked, err
+}
+
+// GenerateFor is Generate for machinery adopt (section 17.2): a rendering
+// beside a model that may does not allow is left as it is and returned in
+// left. A nil may allows every file.
+func GenerateFor(ctx *stages.Context, may func(string) bool) (written []string, left []adopt.Left, blocked []*report.Stage, err error) {
 	for _, name := range []string{"model", "machines", "failure-modes"} {
 		s := stages.RunOne(ctx, name)
 		errs, _, _ := s.Count3()
@@ -59,26 +68,32 @@ func Generate(ctx *stages.Context) (written []string, blocked []*report.Stage, e
 		}
 	}
 	if len(blocked) > 0 {
-		return nil, blocked, nil
+		return nil, nil, blocked, nil
 	}
 	p := ctx.P
 	for _, rel := range p.Cfg.Design.Models {
 		want, rerr := modelith.Render(p, rel)
 		if rerr != nil {
-			return written, nil, rerr
+			return written, left, nil, rerr
 		}
 		md := modelith.RenderedPath(rel)
-		if got, gerr := p.Read(md); gerr == nil && bytes.Equal(got, want) {
+		got, gerr := p.Read(md)
+		switch {
+		case gerr == nil && bytes.Equal(got, want):
+			continue
+		case may != nil && !may(md):
+			left = append(left, adopt.Left{Path: md, Missing: gerr != nil})
 			continue
 		}
 		if werr := p.WriteAtomic(md, want); werr != nil {
-			return written, nil, werr
+			return written, left, nil, werr
 		}
 		written = append(written, md)
 	}
 	w, werr := gen.Write(ctx.Design())
 	written = append(written, w...)
 	sort.Strings(written)
+	sort.Slice(left, func(i, j int) bool { return left[i].Path < left[j].Path })
 	ctx.Reload()
-	return written, nil, werr
+	return written, left, nil, werr
 }

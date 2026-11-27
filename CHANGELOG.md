@@ -44,6 +44,9 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - An answer on the owner's behalf comes from a `*-delegate` agent that did not ask the question.
 - `decisions import`: the records of an existing decision file become backlog decisions, once
   each.
+- `adopt --write` writes only `machinery.yaml`, files under `design/` and the gen directory, the
+  owed list and the baselines: the rendering beside a model kept elsewhere is the project's file,
+  and adopt says `<file> is stale; the project regenerates it` (or `is missing`) and leaves it.
 - `adopt --rehearse`: adoption on a snapshot outside the project, with what it writes and owes,
   the check, the plan, and what blocks it; `adopt` names exactly the findings that stop
   generation.

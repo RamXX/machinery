@@ -52,7 +52,7 @@ type Options struct {
 	Out         string
 	Paths, E2E  []string
 	Stdout      io.Writer
-	Gen         func(*stages.Context) (written []string, blocked []*report.Stage, err error)
+	Gen         adopt.GenFunc
 }
 
 type file struct {

@@ -1455,7 +1455,8 @@ machines and cases compared. Not applicable when `tools.xstate` is false or abse
   file here; the source file stays the one to change;
 - `vital/<area>.json` for each vital area of the risk file: the property record (section 23.4);
 
-and beside each model its `<name>.modelith.md`.
+and beside each model its `<name>.modelith.md`. `machinery adopt` runs this generation but
+writes a rendering beside a model only under `design/`, and names the others (section 17.2).
 
 All generated files are committed and never edited by hand. JSON is written with two-space
 indentation, keys in the order given in this document, and a trailing newline. Writes are atomic
@@ -4573,6 +4574,7 @@ design: <n> model(s), <n> machine(s), <n> contract(s)
 backlog: bd, <n> open, <n> ready, <n> closed, cycles: <none|n>
 would write:
   <path>  <what>
+<file> is stale; the project regenerates it
 next:
   <one line per suggested step>
 ```
@@ -4652,15 +4654,26 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    `unbound waivers: <n>`. A waived machine is still unbound: while no machine is the lifecycle
    machine of a model entity, stage `xref-model-machine` is not demonstrated (section 6.4).
 
-`adopt` never creates, changes or deletes a file outside `machinery.yaml` and the design
-directory. That includes `.gitignore`: when the receipts directory is not ignored it prints
+`adopt` writes only `machinery.yaml`, files under the design directory `design/`, files under
+the gen directory, and the owed list and the baselines where the configuration puts them. It
+never creates, changes or deletes any other file of the project. That includes the rendering
+`<name>.modelith.md` beside a model kept outside `design/` (section 5.1): it is the project's
+file, which the project may produce its own way, and `machinery gen`, which the project runs,
+writes it; `adopt`'s step 3 does not. When the rendering differs from the one generation would
+write, adopt leaves it and prints `<file> is stale; the project regenerates it`, and
+`<file> is missing; the project generates it` when there is none, one line per model, sorted:
+after the `would write:` list without `--write`, and after the files written with `--write`.
+Stage `model` reports such a rendering as a DRIFT (section 6.1) until it is regenerated. That
+includes `.gitignore`: when the receipts directory is not ignored it prints
 `note: add .machinery/ to .gitignore` and leaves the edit to the team. It prints `adopt: wrote <n> file(s)` and the paths. Running it twice with the same
 arguments writes nothing the second time.
 
 After `adopt --write`, `machinery check` passes: what exists is baselined, owed or waived, and
-anything new in scope is held to the rules. The one exception is a design in which no machine is
-the lifecycle machine of a model entity: nothing about the machines has been compared with the
-model yet, so `xref-model-machine` is not demonstrated until the first one is bound. From there:
+anything new in scope is held to the rules. There are two exceptions. In a design in which no
+machine is the lifecycle machine of a model entity nothing about the machines has been compared
+with the model yet, so `xref-model-machine` is not demonstrated until the first one is bound.
+And a rendering adopt left stale or missing (above) is a DRIFT of stage `model` until the
+project regenerates it. From there:
 
 - the area's design is written or extended a piece at a time (the riskiest stateful resource
   first), and each `machinery gen` plus `machinery adopt --write` owes the new obligations;

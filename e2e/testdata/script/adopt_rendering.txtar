@@ -1,0 +1,51 @@
+# adopt --write writes only machinery.yaml, files under design/ and the gen directory: the
+# rendering beside a model kept elsewhere is the project's file, which it may post-process, and
+# adopt leaves it (section 17.2)
+fixture brownfield
+fixture brownfield-design
+mkdir model
+exec mv design/model/depot.modelith.yaml model/depot.modelith.yaml
+rm design
+cp rendering.md model/depot.modelith.md
+gitinit
+
+# without --write the report says so, and does not list the file among those it would write
+exec machinery adopt --paths 'internal/shipping/**'
+stdout '^design: 1 model\(s\), 0 machine\(s\), 0 contract\(s\)$'
+stdout '^model/depot\.modelith\.md is stale; the project regenerates it$'
+! stdout '^  model/'
+stdout '^  design/owed\.yaml  new owed entries: '
+
+# with --write the committed rendering is left as it is: every file adopt wrote is new, under
+# design/ or machinery.yaml
+exec machinery adopt --paths 'internal/shipping/**' --write
+stdout '^model/depot\.modelith\.md is stale; the project regenerates it$'
+! stdout '^  model/'
+stdout '^  design/gen/obligations\.json$'
+cmp model/depot.modelith.md rendering.md
+exec git status --short
+! stdout '^ M'
+stdout '^\?\? design/$'
+stdout '^\?\? machinery\.yaml$'
+! stdout 'model/'
+# stage model reports the rendering until the project regenerates it, and machinery gen does
+exec mrun 1 check --stage model
+stdout '^  DRIFT  model/depot\.modelith\.md: stale; run machinery gen$'
+
+# a rendering that is missing is not created either
+gitcommit adopted
+rm model/depot.modelith.md
+exec machinery adopt --paths 'internal/shipping/**' --write
+stdout '^model/depot\.modelith\.md is missing; the project generates it$'
+! exists model/depot.modelith.md
+
+# machinery gen is the project's own command, and it writes the rendering
+exec machinery gen
+stdout '^  model/depot\.modelith\.md$'
+exists model/depot.modelith.md
+exec mrun 0 check --stage model
+
+-- rendering.md --
+# Depot
+
+The project renders its model with its own script, and adds this line after it.

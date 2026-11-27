@@ -36,7 +36,7 @@ func runAdopt(e *Env, args []string) int {
 		return e.Usage("--config and --out go with --rehearse")
 	case *rehearseIt:
 		err := rehearse.Run(rehearse.Options{ProjectFlag: e.ProjectFlag, Config: *config, Out: *out, Paths: paths, E2E: e2e,
-			Stdout: e.Stdout, Gen: Generate})
+			Stdout: e.Stdout, Gen: GenerateFor})
 		var ue *assess.UsageError
 		if errors.As(err, &ue) {
 			return e.Usage("%s", ue.Msg)
@@ -50,7 +50,7 @@ func runAdopt(e *Env, args []string) int {
 	if root == "" {
 		root = "."
 	}
-	res, err := adopt.Run(adopt.Options{Root: root, Paths: paths, E2E: e2e, Write: *write, Gen: Generate})
+	res, err := adopt.Run(adopt.Options{Root: root, Paths: paths, E2E: e2e, Write: *write, Gen: GenerateFor})
 	if err != nil {
 		return e.Fail(err)
 	}

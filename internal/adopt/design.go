@@ -46,8 +46,9 @@ func (w *worker) baselines() error {
 	return nil
 }
 
-// pendingGen lists the generated files machinery gen would write now.
-func pendingGen(d *design.Design) []string {
+// pendingGen lists the generated files machinery gen would write now, and
+// the renderings among them that adopt may not write, which it leaves.
+func pendingGen(d *design.Design, may func(string) bool) ([]string, []Left) {
 	set := map[string]bool{}
 	if diffs, _, err := gen.Compare(d); err == nil {
 		for _, df := range diffs {
@@ -56,13 +57,19 @@ func pendingGen(d *design.Design) []string {
 			}
 		}
 	}
+	var left []Left
 	for _, rel := range d.P.Cfg.Design.Models {
 		want, err := modelith.Render(d.P, rel)
 		if err != nil {
 			continue
 		}
 		md := modelith.RenderedPath(rel)
-		if got, rerr := d.P.Read(md); rerr != nil || !bytes.Equal(got, want) {
+		got, rerr := d.P.Read(md)
+		switch {
+		case rerr == nil && bytes.Equal(got, want):
+		case !may(md):
+			left = append(left, Left{Path: md, Missing: rerr != nil})
+		default:
 			set[md] = true
 		}
 	}
@@ -71,5 +78,6 @@ func pendingGen(d *design.Design) []string {
 		res = append(res, f)
 	}
 	sort.Strings(res)
-	return res
+	sort.Slice(left, func(i, j int) bool { return left[i].Path < left[j].Path })
+	return res, left
 }

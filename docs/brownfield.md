@@ -122,7 +122,9 @@ git commit -q -m "model the shipment lifecycle"
 The second `adopt --write` finds the new design sources, adds them to `machinery.yaml`, runs
 `machinery gen` and puts every obligation into `design/owed.yaml` with the reason `unproven at
 adoption`. That list is your baseline of what was never proven. Nothing fails; nothing is
-claimed.
+claimed. Adopt writes only `machinery.yaml` and files under `design/` and the gen directory:
+when you keep a model elsewhere with a Markdown rendering of your own beside it, adopt leaves
+that file alone and says when it is stale (`machinery gen` rewrites it when you run it).
 
 Here no test names an id yet. In a project whose tests already point at the design, an id a
 test claims is owed with the reason `claimed at adoption`, and an id your own sources mark as

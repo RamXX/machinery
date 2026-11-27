@@ -13,6 +13,7 @@ import (
 // Default file names adopt writes (section 17.2).
 const (
 	DefaultE2E       = "e2e/**"
+	DesignDir        = "design/" // what adopt writes lives here, or in the gen directory
 	TestsBaseline    = "design/tests-baseline.yaml"
 	ArchBaseline     = "design/arch-baseline.yaml"
 	defaultScopeGlob = "**"

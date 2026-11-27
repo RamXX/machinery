@@ -54,6 +54,9 @@ func (r *Result) Print(w io.Writer) {
 		for _, f := range r.Written {
 			fmt.Fprintf(w, "  %s\n", f)
 		}
+		for _, l := range r.Left {
+			fmt.Fprintln(w, l.Line())
+		}
 	} else {
 		fmt.Fprintf(w, "adopt: %s at %s\n", r.Name, r.Sha)
 		for _, l := range r.FactLines() {
@@ -66,6 +69,9 @@ func (r *Result) Print(w io.Writer) {
 		}
 		if len(r.Would) == 0 {
 			fmt.Fprintln(w, "  nothing")
+		}
+		for _, l := range r.Left {
+			fmt.Fprintln(w, l.Line())
 		}
 		fmt.Fprintln(w, "next:")
 		for _, n := range r.Next {
