@@ -262,14 +262,20 @@ version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod
 
 A marker directly above a test function claims for that function (`granularity: function`); a
 marker above no function claims for every test function of the file (`granularity: file`); one
-above a fuzz test, a benchmark or a helper counts nothing and is named in the summary. A pass
+above a fuzz test, a benchmark or a helper gives no receipt and is named in the summary (its
+file is then a claimant the adapter cannot judge, below). A pass
 through a parent test records how many subtests ran (`subtests: 2`).
 
 **Every claimant.** An id that several tests claim is proven by the adapter only when every one
 of them passed at the commit, in this run or another one. One that did not leaves the id
 `partly run: 1 of 2 claimants passed`: not proven, not failed, kept in the owed list. `verify`
-names the first ten claimants without a pass and `verify --partly` every one. A claiming file
-that does not parse is a claimant that never passes, and `verify` names it. A test that
+names the first ten claimants without a pass and `verify --partly` every one. The claimants are
+all the files under `trace.tests` that carry a marker for the id, not only the Go test files: a
+shell script, a test in another language, a Go file that is not named `_test.go`, a file that
+does not parse. The adapter cannot judge such a file, so it needs a receipt its own test emits
+at the commit (or, for a staged Go source, an entry in `evidence.adapter.sources`), and
+`verify` says so by name. An id with no counted adapter pass is not under this rule: a receipt
+a test emits proves it as before. A test that
 cannot run where you make the evidence goes into `evidence.adapter.excused` with a reason:
 
 ```yaml
@@ -381,7 +387,7 @@ named by no test, planned, and actions by whether code serves them.
 | An id of a critical or vital area | By default adapter evidence proves routine and consequential ids only (`warn   adapter: <id> not counted`). | A receipt the test emits after its own assertions. |
 | An id no test names | Nothing claims it. | Its `Prove` story. |
 | A claimed id with no verdict | Its test did not run, was cached, or has a twin (`claimed, not run`, `claimed, verdict not counted`). | Run it, or rename the twin. |
-| A partly run id | One of the tests that claim it has no pass at the commit (`partly run: 1 of 2 claimants passed`). | Run that test at the same commit, or excuse it with a reason. |
+| A partly run id | One of the files that claim it has no pass at the commit (`partly run: 1 of 2 claimants passed`): a test that did not run, or a file the adapter cannot judge. | Run that test at the same commit, have a file the adapter cannot judge emit its own receipt, or excuse it with a reason. |
 | An id planned at adoption | Your project said it is not delivered. | The story your mark names. |
 | An action | No `machinery:serves` in the code yet. | The `Serve <Entity> actions` story. |
 

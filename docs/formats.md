@@ -309,7 +309,7 @@ Rules:
 
   `claims` is `all`, the default, or `any`
   (`evidence.adapter.claims must be all or any, got "<value>"`): with `all` adapter evidence
-  proves an id only when every claimant of it has a pass at the commit, with `any` a pass of one
+  proves an id only when every claimant of it is satisfied at the commit, with `any` a pass of one
   claimant is enough (section 10.3, "Every claimant"); the ratchet reports `any` as a widening
   (section 11.3). Each entry of `excused`, numbered from 1, needs `tests`, a non-empty list of
   valid globs inside the project
@@ -1746,7 +1746,6 @@ Stage `trace` rules:
 | `proposed` | No tag or marker names a proposed id (section 4.1): `ERROR  proposed: <id> is claimed by <file>; commit it first`, once per id and file. |
 | `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
-| `claimant` | With `evidence.adapter.claims: all`, the default: a `_test.go` file under `trace.tests`, or a staged source an entry of `evidence.adapter.sources` names there, that claims an id of kind `inv`, `sc`, `fm` or `ck` and that the Go parser refuses is `ERROR  claimant: <file>: cannot be read as Go (<first parse error>): its claims count as not passed; fix the file or remove its markers`, once per file (section 10.3, "A claiming file that cannot be read as Go"): its claims stay claims for rule `unverified`, and no adapter evidence proves what it claims. |
 | `adapter` | Only in a project that configures `evidence.adapter`, and when a `_test.go` file under `trace.tests` claims an id of kind `inv`, `sc`, `fm` or `ck`: the layout of the Go modules is one the adapter can attribute by import path (section 10.3, "The layout of the modules", with the files it reads): `ERROR  adapter: module <path> is declared by <a> and <b>: give each module its own path, or move the copy under a testdata directory` for every module path two tracked `go.mod` files declare, and `ERROR  adapter: <workspace> does not use the module of <file> (<go.mod>): add the module to the workspace, or set GOWORK=off` for every module of a claiming file the workspace leaves out, naming its first claiming file. |
 
 A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
@@ -2401,7 +2400,8 @@ reads them (sections 8 and 8.1). Each is attributed:
   `adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level`.
   It never falls back to the file: a test function of the file that passed says nothing of a
   fuzz test whose seeds were skipped or not selected, or of a benchmark, which direct mode never
-  runs;
+  runs. For the rule of every claimant (below) such a claim makes its file a claimant of the
+  id, and this marker brings the file no verdict;
 - a tag or marker anywhere else in the file (above no function) belongs to every test function of the file. The
   receipt has `granularity: file`, and it needs a verdict of every one of them ("Which receipt",
   below): a function of the file that has none in the run, because it was not built, not
@@ -2528,8 +2528,8 @@ functions the claim belongs to, in this order:
 | Every one passed, and each package ended every run of it with a package-level `pass` event. | A `pass` receipt. |
 
 A claim of a whole file that has no test function, and a claim in a file that does not parse,
-give nothing, and the file is named in the summary. A file that does not parse still counts as a
-claimant that has not passed ("Every claimant", below). The policy of the project (below) is not applied here: the receipt records what
+give no receipt, and the file is named in the summary. Each is still a claimant of the ids it
+claims, as is the file of a claim above a function the adapter does not judge ("Every claimant", below). The policy of the project (below) is not applied here: the receipt records what
 happened, and `verify` decides what it proves.
 
 An adapter receipt is a receipt line with three more keys:
@@ -2773,10 +2773,11 @@ command that ran nothing), its count of ids leaves out every id that a receipt o
 used at the commit names (section 12): those ids have evidence at the commit, and the line
 counts the ones that have none. A run that wrote receipts counts every claimed id it did not
 run, as before. `partly run` counts, with `evidence.adapter.claims: all`, the ids that got a
-`pass` receipt and no `fail` receipt in this run and have a claimant, not excused, without a
-`pass` in this run ("Every claimant", below), with the sum of their claimants that passed here
-and of their claimants that are not excused; earlier runs at the commit are not read, and
-`verify` judges the id over all of them.
+`pass` receipt and no `fail` receipt from the adapter in this run and have a claimant, not
+excused, without an adapter `pass` in this run ("Every claimant", below), with the sum of their
+claimants that passed here and of their claimants that are not excused. A file the adapter
+cannot judge is such a claimant in every run: the receipts tests emitted are not read for this
+line, earlier runs at the commit are not read either, and `verify` judges the id over all of them.
 
 **What the evidence proves: `evidence.adapter`.** `verify`, and every command that judges
 evidence, reads an adapter receipt under sections 10.1 and 10.2 like any other. A `fail` fails
@@ -2801,52 +2802,95 @@ counted adapter passes has it and at file granularity otherwise, once the rule o
 claimant (below) holds for it.
 
 **Every claimant (`evidence.adapter.claims`).** An id claimed by several tests is not proven by
-one of them. A **claimant** of an id is a test function with a marker for the id directly above
-it, or a file under `trace.tests` with a file-level marker for the id and at least one test
-function ("Whose claim", above). The claimants are read from the files the adapter reads: the
-`_test.go` files under `trace.tests` and the staged sources the entries of
-`evidence.adapter.sources` name there, whichever mode a run used. A marker above a function the
-adapter does not judge and a file-level marker in a file with no test function make no
-claimant, since nothing could ever give them a verdict. A
-claimant has a pass at the commit when an adapter receipt of a run used at the commit is a
-`pass` for the id with the claimant as its `test` (`<file>::<function>`, or `<file>` at file
-granularity, which passes when every test function of the file passed, as above), whether or
-not the policy lets that pass count. The rule asks whether every claimant ran and passed; the
-policy asks whether the passes that ran are strong enough to prove the id. Only granularity can
-leave one pass of an id uncounted while another counts (kind and tier decide for every pass of
-the id at once, and an id no pass of which counts is not proven by adapter, so the rule never
-reaches it): with `min_granularity: function`, a file-level claimant that passed has passed, and
-the id is proven by the function-granularity passes of its other claimants.
+one of them once adapter evidence is used for it.
 
-**A claiming file that cannot be read as Go.** A `_test.go` file under `trace.tests`, or a
-staged source, that the Go parser refuses has no functions the adapter can see, but the line
-scan of section 8 still finds its markers. It is a claimant of every id of kind `inv`, `sc`,
-`fm` or `ck` they claim, as a whole file (`<file>`), that never has a pass and that no entry of
-`evidence.adapter.excused` covers: an id it claims is never proven by adapter evidence while the
-file is so, and is partly run when the passes of its other claimants would prove it. `verify`
-names the file once,
-`ERROR  claimant: <file>: cannot be read as Go (<first parse error>): its claims count as not passed; fix the file or remove its markers`,
-`<first parse error>` as in the run summary (above), and so does stage `trace` (section 8,
-rule `claimant`). It is the threat model's "a claiming file
-the run did not build", which the command could not have built either. A file under
-`trace.tests` that cannot be read at all (its permissions, say) is stricter still: its markers
-cannot be seen, so every command that reads them (`verify`, `status` and `proof` among them)
-fails with
+*Who the claimants are.* The claimants of an id are derived from the claims of section 8 and
+from nothing else: every file under `trace.tests` that carries a tag or a marker for the id,
+read and resolved exactly as stage `trace` reads them (sections 8 and 8.1), holds a claimant of
+the id, whatever the file is called and whatever language it is written in.
+
+- Where the marker stands directly above a test function ("Test functions" and "Whose claim",
+  above) of a file the adapter reads, the claimant is that function, `<file>::<function>`. The
+  adapter reads the `_test.go` files under `trace.tests` and the staged sources the entries of
+  `evidence.adapter.sources` with `files` name there, whichever mode a run used, when they
+  parse as Go.
+- Every other claim makes the file the claimant, `<file>`, once per id: a marker above no
+  function, a marker above a function the adapter does not judge, and every marker of a file
+  the adapter does not read (a shell script, a test in another language, a Go file whose name
+  does not end in `_test.go` and that no entry names) or cannot read as Go.
+
+So the files of the claimants of an id are exactly the files that claim it for stage `trace`.
+No claim is dropped for the name of its file, for its language, for a syntax error or for the
+lack of a test function. The claimants and the claims of stage `trace` are computed from one
+reading of the markers and compared for every id of kind `inv`, `sc`, `fm` or `ck`; if they
+ever differ, the command stops with
+`the claimants of <id> are in <files> and the files that claim it are <files>: a defect of machinery; nothing is judged`.
+
+*When a claimant is satisfied.* A claimant is satisfied at the commit by either of two things
+in a run used at the commit:
+
+- (a) **a verdict of the adapter**: an adapter receipt that is a `pass` for the id with the
+  claimant as its `test` (`<file>::<function>`, or `<file>` at file granularity, which passes
+  when every test function of the file passed, as above), whether or not the policy lets that
+  pass count;
+- (b) **a receipt its own test emitted**: a `pass` receipt for the id that no adapter wrote and
+  whose `test` names the claimant's file, by the rule of section 10.2 for the file of a receipt
+  (its path, or a base name that only it has). It satisfies every claimant of the id in that
+  file: the `<name>` of a `test` is free text.
+
+The rule asks whether every claimant ran and passed; the policy asks whether the passes that
+ran are strong enough to prove the id. Only granularity can leave one pass of an id uncounted
+while another counts (kind and tier decide for every pass of the id at once): with
+`min_granularity: function`, a file claimant that passed has passed, and the id is proven by
+the function-granularity passes of its other claimants.
+
+*A file the adapter cannot judge.* The adapter writes a receipt for a file only when it reads
+the file, the file parses, a marker for the id stands above no function of it, and it has a
+test function ("Which receipt", above). A file claimant that lacks one of these never has (a):
+it is satisfied by (b), or excused (below), and by nothing else. `verify` names it with why
+(section 12):
+
+| `<why>` | The file |
+|---|---|
+| `not a Go file` | Its name does not end in `.go`. |
+| `a Go file not named _test.go that no entry of evidence.adapter.sources names` | A Go file the adapter does not read, a test file whose name lacks `_test` included. It is not parsed, so it is the same claimant with a syntax error and without one. |
+| `cannot be read as Go: <first parse error>` | A file the adapter reads that the Go parser refuses, `<first parse error>` as in the run summary (above). The line scan of section 8 still finds its markers. It is the threat model's "a claiming file the run did not build", which the command could not have built either. |
+| `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above functions the adapter does not judge, and above no test function for the file claimant in question; the first such function in the file. |
+| `no test function` | A file the adapter reads, with a marker for the id above no function, and no test function. |
+
+A file under `trace.tests` that cannot be read at all (its permissions, say) is stricter
+still: its markers cannot be seen, so every command that reads them (`verify`, `status` and
+`proof` among them) fails with
 `<file>: cannot be read (<error>): its markers cannot be seen; make the file readable`, and no id
 is judged without it.
 
-With `claims: all`, the default, an id that counted adapter passes would prove, and that no
-receipt a test emitted proves on its own, is proven only when every claimant of it that is not
-excused (below) has a pass at the commit. Otherwise it is **partly run**: not proven and not
-failed. A claimant with a `fail` receipt fails the id as before. Receipts a test emits itself
-are not affected: an id that one of them proves is proven whatever its adapter claimants say.
-A partly run id is reported as `partly run: <n> of <m> claimants passed` (`<m>` the claimants
-that are not excused, followed by ` (<k> claimant(s) excused)` when some are) by `verify`,
-which also names the claimants without a pass and says what to do (section 12), by `status`
+*The rule.* With `claims: all`, the default, an id **has adapter evidence** when a run used at
+the commit holds an adapter `pass` for it that the policy lets count (above). Such an id, when
+it is not failed, is proven only when every claimant of it that is not excused (below) is
+satisfied. Otherwise it is **partly run**: not proven and not failed, and never proven by
+adapter evidence while a claimant of it is neither satisfied nor excused. A claimant with a
+`fail` receipt fails the id as before. The rule holds also when a receipt a test emitted
+would prove the id on its own: once an adapter pass is used for an id, each claimant answers
+for itself, and an emitted receipt satisfies the claimants of its own file and no other.
+
+An id that has no adapter evidence is not under the rule. It is judged as section 12 judges it
+without this section: one `pass` receipt a test emitted proves it, whatever its other claimants
+did. A project whose tests emit their own receipts and never run through the adapter therefore
+behaves exactly as it did before this rule, and so does, in a project that uses both, an id
+whose adapter passes the policy does not let count (by default an id of a critical or vital
+area). One consequence follows and is meant: for an id several tests claim, a receipt a test
+emitted proves it alone, and the same receipt beside a counted adapter pass leaves it partly
+run until the other claimants are satisfied. The adapter is the stricter regime, and an id
+enters it when its evidence is used.
+
+A partly run id is reported as `partly run: <n> of <m> claimants passed` (`<n>` the claimants
+that are satisfied and `<m>` the claimants that are not excused, followed by
+` (<k> claimant(s) excused)` when some are) by `verify`,
+which also names the claimants that are not satisfied and says what to do (section 12), by `status`
 (section 14), by `proof` (section 13), and for the run alone by the run summary (above).
 `owed sync` does not remove it (section 11.2) and the story gate fails it (section 15.6).
-`verify` reads the claimants, and prints the lines of this rule (the `claimant` lines and those
-of the excused entries included), whenever a run used at the commit wrote an adapter pass or the
+`verify` reads the claimants, and prints the lines of this rule (those of the excused entries
+included), whenever a run used at the commit wrote an adapter pass or the
 project has excused entries. With `claims: any` one counted pass proves the id, as before this
 rule, and the claimants are not read; the ratchet reports `any` as a widening (section 11.3).
 
@@ -2854,13 +2898,15 @@ rule, and the claimants are not read; the ratchet reports `any` as a widening (s
 evidence is made (a test that needs a cluster, a sandbox the CI cannot reach) is left out of the
 rule by an entry of `evidence.adapter.excused` with a reason. An entry covers a claimant when
 the claimant's file matches one of its `tests` globs and, when the entry has `functions`, the
-claimant is a test function whose name matches one of its patterns. A file-level claimant is
+claimant is a test function whose name matches one of its patterns. A file claimant is
 excused by its file, never by a function: only an entry without `functions` covers it, whatever
-its functions are called. A claimant that cannot be read as Go is never covered (above). An
-id all of whose claimants that are not excused passed is proven, and `verify` says
+its functions are called. A file the adapter cannot judge is a file claimant like any other,
+and an entry without `functions` covers it. An
+id all of whose claimants that are not excused are satisfied is proven, and `verify` says
 `warn   excused: <id>: proven (<k> claimant(s) excused)`. An id whose claimants are all
 excused is not proven by adapter evidence, whatever an excused claimant gave: no claimant can
-run here (sections 12 to 15.6). A fail of an excused claimant still fails its id. `verify`
+run here (sections 12 to 15.6); a receipt a test emitted proves such an id as it proves an id
+without adapter evidence. A fail of an excused claimant still fails its id. `verify`
 prints every entry once,
 `warn   adapter excused: entry <n> (tests <globs>[; functions <patterns>]): <k> claimant(s) of <j> id(s): <reason>`,
 `<k>` counting distinct claimants and `<j>` the ids they claim. A glob or a pattern through
@@ -2872,7 +2918,6 @@ matches. Each ERROR says why and what to do:
 |---|---|
 | `ERROR  adapter excused: entry <n>: tests "<glob>" covers no claimant: correct the glob or remove it` | The glob matches no file that holds a claimant. |
 | `ERROR  adapter excused: entry <n>: tests "<glob>" covers no claimant: its functions leave out every claimant of the files it matches: correct the functions or remove the glob` | The glob matches files that hold claimants, and the `functions` of the entry match none of them (a file-level claimant included). |
-| `ERROR  adapter excused: entry <n>: tests "<glob>" covers no claimant: <file> cannot be read as Go, and a claimant that cannot be read as Go is never excused: fix the file` | The glob matches only claiming files that cannot be read as Go; the first of them, sorted. |
 | `ERROR  adapter excused: entry <n>: functions "<pattern>" covers no claimant of its tests: it matches a function of <file>, whose claim is file-level; a file-level claimant is excused by its file, not by a function: excuse the file in an entry without functions, or move the marker above the function` | The pattern matches a test function of a file-level claimant in the entry's `tests` and no function-level claimant there; the first such file, sorted. |
 | `ERROR  adapter excused: entry <n>: functions "<pattern>" covers no claimant of its tests: correct the pattern or remove it` | The pattern matches no test function of a claimant in the entry's `tests`. |
 
@@ -2882,8 +2927,9 @@ does not check it, and a reviewer reads the reason.
 
 The rule defends against a claimant that the evidence left out by accident: a package the
 command did not name, a set the wrapper did not stage, a job that did not run at the commit, a
-test whose variables selected none of its cases elsewhere. It says nothing of what a claimant
-asserts (above).
+test whose variables selected none of its cases elsewhere, a test file under a name `go test`
+does not build as a test, a test in another language that did not run. It says nothing of what
+a claimant asserts (above).
 
 **What this does not defend against** is what section 10.2 lists and what the threat model at
 the top of this section leaves to review: code or modules planted in the project, a `go` or a
@@ -3043,15 +3089,17 @@ Per obligation:
 | `failed` | At least one `fail` receipt. For a `cx` id: a receipt whose `replay` differs from the trace's `expect`. |
 | `proven` | Not failed, at least one `pass` receipt, and for a `tc` id at least one `pass` receipt whose `effects` equal the case's effects as a set. For a `cx` id: a receipt whose `replay` equals the trace's `expect`. For an `fv` id: the formal stage finds nothing against the area (section 16.9); no receipt is involved. |
 | `partial` | A `tc` id that is not failed, has a `pass` receipt, but no `pass` receipt observed every effect. |
-| `partly run` | Not failed, proven by adapter passes alone but for a claimant of the id, not excused, that has no pass at the commit (section 10.3, "Every claimant"). |
+| `partly run` | Not failed, an adapter pass that counts is used for the id, and a claimant of the id, not excused, is not satisfied at the commit (section 10.3, "Every claimant"). |
 | `unproven` | Anything else, an id every claimant of which is excused included. `skip` receipts never count. |
 
 A `pass` a run adapter wrote (`source: adapter`, section 10.3) is a `pass` receipt of this table
 only when the policy `evidence.adapter` lets it count for its id; its `fail` always is a `fail`
 receipt. An id proven by such passes alone is proven by adapter, at function or at file
-granularity, and is counted apart; with `evidence.adapter.claims: all` it is so only when every
-claimant of it that is not excused has a pass at the commit, and is `partly run` otherwise
-(section 10.3).
+granularity, and is counted apart. With `evidence.adapter.claims: all`, an id for which such a
+pass is used is proven only when every claimant of it that is not excused is satisfied at the
+commit, by a verdict of the adapter or by a receipt its own test emitted, and is `partly run`
+otherwise, also when a receipt a test emitted would prove it on its own; an id for which none
+is used is judged by this table alone (section 10.3, "Every claimant").
 
 Findings:
 
@@ -3091,13 +3139,14 @@ Findings:
 - `ERROR  partly run: <id>: <n> of <m> claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence.adapter.excused`,
   with ` (<k> claimant(s) excused)` after `passed` when some are, for a partly run id that is
   not owed, in place of `unproven: <id>`, and the same line as a `warn` for one that is owed.
-  Then one
-  `warn   partly run: <id>: no verdict: <claimant>` per claimant without a pass
+  Then one line per claimant that is not satisfied (section 10.3):
+  `warn   partly run: <id>: no verdict: <claimant>` for one the adapter can judge
   (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
-  `<file>::<function>` or `<file>`: the first ten of these lines in the order they print, and then
+  `<file>::<function>` or `<file>`, and for a file the adapter cannot judge
+  `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
+  `<why>` as in section 10.3 ("A file the adapter cannot judge"). The first ten of these lines print, in the order they print, and then
   `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`;
-  with `--partly` every one of them. A claiming file that cannot be read as Go is one of them,
-  as `no verdict: <file>`.
+  with `--partly` every one of them.
 - `ERROR  no claimant can run here: <id>: <k> claimant(s) excused: run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits`
   for an id every claimant of which is excused and that is not proven otherwise, in place of
   `unproven: <id>`, and the same line as a `warn` for one that is owed (section 10.3).
@@ -3105,9 +3154,6 @@ Findings:
   the only line of the id about why it is not proven: `unproven: <id>` and
   `adapter: <id> not counted` do not print for it, whatever its adapter passes and the policy
   give. The claimants without a pass and the other findings of the id print as for any id.
-- `ERROR  claimant: <file>: cannot be read as Go (<first parse error>): its claims count as not passed; fix the file or remove its markers`
-  once per claiming file the Go parser refuses (section 10.3, "A claiming file that cannot be
-  read as Go"), whatever the ids it claims.
 - `warn   excused: <id>: proven (<k> claimant(s) excused)` for a proven id with claimants
   excused, `warn   adapter excused: entry <n> (...)` once per entry, and the ERRORs of a glob or
   a pattern through which an entry covers no claimant (section 10.3, with the texts).
@@ -3153,7 +3199,7 @@ ignored except for `failed` ones, which always print. A refused receipts file, a
 run and `receipt: <id>: <test> does not claim it` (section 10.2) always print too, whatever id
 they name. The `adapter: <id> not counted` warning, the `partly run`, `no claimant can run here`
 and `excused: <id>` lines and the claimants without a pass print for the ids of the story only;
-the `claimant` lines and the lines of the excused entries always print.
+the lines of the excused entries always print.
 
 ### 12.1 Targeted runs: `machinery affected`
 
@@ -3182,7 +3228,7 @@ With nothing touched it prints nothing and exits 0.
 `MACHINERY_ONLY`; when the list is empty it runs nothing and exits 0. `--affected` and `--base`
 go together. `machinery verify --affected --base <ref>` reports `unproven`, `partly run` and
 `no claimant can run here` as ERRORs only for those ids, and names the claimants without a pass
-of those ids only; the `claimant` lines and the lines of the excused entries always print. A targeted verify is a check for one change; only a full `verify` supports a landing.
+of those ids only; the lines of the excused entries always print. A targeted verify is a check for one change; only a full `verify` supports a landing.
 
 ### 12.2 The end gate: `machinery landing`
 
@@ -3816,8 +3862,8 @@ that is not proven and has an adapter pass which does not count is
 (with ` (<k> claimant(s) excused)` after `passed` when some are), and an id that
 is not proven because every claimant of it is excused is
 `ERROR  unproven: <id>; no claimant can run here: <k> claimant(s) excused: run a claimant of it here and narrow evidence.adapter.excused, or prove it with a receipt a test emits`
-(section 10.3). An id that a claiming file which cannot be read as Go leaves partly run is partly
-run here too; `machinery verify` names the file. A refused receipts file or an incomplete run fails the gate of every
+(section 10.3). An id that a file the adapter cannot judge leaves partly run is partly run here
+too; `machinery verify` names the file and says what it needs. A refused receipts file or an incomplete run fails the gate of every
 story with the finding `verify` has for it (`ERROR  receipts: <file>: ...`,
 `ERROR  incomplete run: <file>`; sections 10.2 and 12): the failure of the story may be in it.
 `checked:` counts ids, proofs, predictions and verdicts. A story without a `machinery:ids` line

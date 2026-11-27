@@ -80,16 +80,20 @@ command, output line and exit code.
   never proves an id of a critical or vital area. `status`, `verify` and `proof` count it
   apart, and the ratchet reports a policy that admits more (`adapter widened`, an ERROR for a
   critical or vital tier).
-- Every claimant must pass (`evidence.adapter.claims: all`, the default): an id several tests
-  claim is proven by adapter evidence only when each of them, a test function with its marker
-  or a file with a file-level marker and a test function, has a pass at the commit. Otherwise
-  it is `partly run: <n> of <m> claimants passed` in `verify`, `status`, `proof` and the run
+- Every claimant must pass (`evidence.adapter.claims: all`, the default). The claimants of an
+  id are every file under `trace.tests` that carries a marker for it, as stage `trace` reads
+  markers, whatever its name or language: the test function a marker stands above in a Go test
+  file the adapter reads, and otherwise the file. Once a counted adapter pass is used for an
+  id, it is proven only when each claimant is satisfied at the commit, by a verdict of the
+  adapter or by a pass receipt its own test emitted. Otherwise it is
+  `partly run: <n> of <m> claimants passed` in `verify`, `status`, `proof` and the run
   summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names the
-  first ten claimants without a pass, `verify --partly` every one, and says what to do. A
-  claiming file that does not parse is a claimant that never passes (`ERROR  claimant: <file>:
-  cannot be read as Go (...)`), and a file under `trace.tests` that cannot be read fails the
-  commands that read markers. A receipt a test emits is not affected. `claims: any` is the rule
-  of one claimant, and the ratchet reports it.
+  first ten claimants without a pass, `verify --partly` every one, and says what to do; a file
+  the adapter cannot judge (not Go, not named `_test.go`, not a mapped staged source, not
+  parsing, without a test function) is named with why and with what it needs. A file under
+  `trace.tests` that cannot be read fails the commands that read markers. An id with no
+  counted adapter pass is judged as before: a receipt a test emits proves it. `claims: any` is
+  the rule of one claimant, and the ratchet reports it.
 - `evidence.adapter.excused` leaves claimants that cannot run here out of that rule, each entry
   with globs of test files, optional function patterns and a one-line reason; a file-level
   claimant is excused by its file, never by a function. `verify` prints every entry with the
