@@ -62,7 +62,76 @@ exec machinery adopt --paths 'internal/shipping/**' --write
 exec mrun 1 check --stage xref-model-machine
 stdout '^  warn   waived: entity-machine: entity:Shipment: '
 stdout '^not demonstrated: no machine is bound to a model entity$'
+cd ..
 
+# an existing machinery.yaml, written by hand: adopt adds only what section 17.2 lists, each
+# addition at the end of its list or mapping, and every byte that was there stays as it was:
+# comments, blank lines, the spacing before a comment, the order of the keys, flow and block style
+fixture brownfield third
+cd third
+mkdir design/model design/machines
+cp ../depot-model.yaml design/model/depot.modelith.yaml
+cp ../shipment.json design/machines/Shipment.machine.json
+cp ../courier.json design/machines/CourierRun.machine.json
+gitinit
+exec machinery adopt --paths 'internal/billing/**'
+stdout '^  machinery\.yaml  edit: scope \+internal/billing/\*\*; design\.machines \+design/machines; trace\.code \+internal/shipping/\*\*, internal/billing/\*\*; trace\.tests \+e2e/\*\*; tests\.baseline; unbound waivers: 1$'
+exec machinery adopt --paths 'internal/billing/**' --write
+exec sh -c 'sed -E "s/adoption \([0-9a-f]{7}\)/adoption (SHA)/" machinery.yaml > got.yaml'
+cmp got.yaml ../want-edited.yaml
+exec machinery adopt --paths 'internal/billing/**' --write
+stdout '^adopt: wrote 0 file\(s\)$'
+
+-- third/machinery.yaml --
+# owned by the platform team: hand-edited
+
+version: 2   # the format
+
+# the riskiest area first
+scope:
+  - "internal/shipping/**"   # shipping only, for now
+
+tests: {e2e: ["e2e/**"]}   # end-to-end tests only
+
+tools:
+  bd: /nonexistent    # no backlog here
+
+design:
+  models: [design/model/depot.modelith.yaml]   # the one model
+
+waivers:
+  # a waiver the team wrote
+  - {rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}
+
+# the end of the file
+-- want-edited.yaml --
+# owned by the platform team: hand-edited
+
+version: 2   # the format
+
+# the riskiest area first
+scope:
+  - "internal/shipping/**"   # shipping only, for now
+  - "internal/billing/**"
+
+tests: {e2e: ["e2e/**"], baseline: design/tests-baseline.yaml}   # end-to-end tests only
+
+tools:
+  bd: /nonexistent    # no backlog here
+
+design:
+  models: [design/model/depot.modelith.yaml]   # the one model
+  machines: design/machines
+
+waivers:
+  # a waiver the team wrote
+  - {rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}
+  - {rule: machine-binding, id: "courierRun", reason: "unbound at adoption (SHA)"}
+
+# the end of the file
+trace:
+  code: ["internal/shipping/**", "internal/billing/**"]
+  tests: ["e2e/**"]
 -- depot-model.yaml --
 kind: DomainModel
 version: v1

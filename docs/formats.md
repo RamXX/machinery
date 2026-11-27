@@ -4635,10 +4635,29 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
 1. **Config.** Without a `machinery.yaml`, writes one: `scope` from `--paths`, `tests.e2e` from
    `--e2e` (default `e2e/**`), and, once design sources exist, `trace.code` equal to the scope
    and `trace.tests` equal to the e2e roots, with the model, machine and contract files found (`*.modelith.yaml`, `*.machine.json`, `openapi.{yaml,yml,json}`),
-   `tests.baseline`, and `backlog.tool: bd` when a backlog was found. With an existing file, adds
-   the new `--paths` to `scope`, adds design sources it finds that are not configured yet (so a
-   model written after the first adoption is picked up), and changes nothing else in it;
-   comments are kept.
+   `tests.baseline`, and `backlog.tool: bd` when a backlog was found. With an existing file it
+   only adds what is missing, each addition at the end of its mapping or list, and nothing
+   else:
+   - to `scope` and to `trace.code`, where the key is there, the `--paths` globs it does not
+     match yet; to `trace.tests` and `tests.e2e`, where the key is there, the `--e2e` globs it
+     does not match yet, and `tests.e2e` from `--e2e` when neither it nor `trace.tests` is
+     there;
+   - the design sources it finds that are not configured yet (so a model written after the
+     first adoption is picked up): a model to `design.models`, `design.machines` when neither
+     it nor `import.machines` is set, a contract to `contracts`;
+   - `trace`, with `code` (the scope) and `tests` (the e2e roots), when there is none and
+     design sources exist;
+   - `tests.baseline` when it is not set, with `tests.e2e` (the e2e roots) when there is
+     neither `tests` nor `trace`, and `constraints.baseline` when `constraints` has none;
+   - `backlog.tool: bd` when a backlog was found and there is no `backlog`;
+   - the waivers of steps 4 and 5.
+
+   What the file has stays byte for byte: comments, blank lines, the spacing before a comment,
+   the order of the keys and the flow or block style of each list and mapping; the additions
+   are spliced in. The one exception is an empty `waivers` (no value, `~` or `[]`), whose value
+   becomes a block list when step 4 or 5 adds to it. A file adopt cannot add to without changing what it
+   has is refused before anything is written, exit 2:
+   `config: machinery.yaml: adopt cannot add <additions> without changing what the file has (<reason>): add it by hand`.
 2. **Baselines.** Writes the tests baseline with every unit test and test double now in scope
    (section 9.4), and the architecture baseline when `constraints` are configured. Existing
    entries are kept; entries are added only for paths newly in scope.
@@ -4700,7 +4719,8 @@ it works with an existing `machinery.yaml` that has one: `design:` counts the fi
    `unbound waivers: <n>`. A waived machine is still unbound: while no machine is the lifecycle
    machine of a model entity, stage `xref-model-machine` is not demonstrated (section 6.4).
 
-`adopt` writes only `machinery.yaml`, files under the design directory `design/`, files under
+`adopt` writes only `machinery.yaml` (a new one, or an existing one with the additions of
+steps 1, 4 and 5 and nothing else), files under the design directory `design/`, files under
 the gen directory, and the owed list and the baselines where the configuration puts them. It
 never creates, changes or deletes any other file of the project. That includes the rendering
 `<name>.modelith.md` beside a model kept outside `design/` (section 5.1): it is the project's

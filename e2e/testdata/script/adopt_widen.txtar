@@ -49,10 +49,10 @@ constraints:
 -- want-first.yaml --
 # owned by the platform team
 version: 2
-scope: ["internal/shipping/**"] # the riskiest area first
+scope: ["internal/shipping/**"]  # the riskiest area first
 constraints:
   size:
-    max_func_lines: 8 # the team's own size rule
+    max_func_lines: 8  # the team's own size rule
   baseline: design/arch-baseline.yaml
 tests:
   e2e: ["e2e/**"]
@@ -62,10 +62,10 @@ backlog:
 -- want-widened.yaml --
 # owned by the platform team
 version: 2
-scope: ["internal/shipping/**", "internal/billing/**"] # the riskiest area first
+scope: ["internal/shipping/**", "internal/billing/**"]  # the riskiest area first
 constraints:
   size:
-    max_func_lines: 8 # the team's own size rule
+    max_func_lines: 8  # the team's own size rule
   baseline: design/arch-baseline.yaml
 tests:
   e2e: ["e2e/**"]
