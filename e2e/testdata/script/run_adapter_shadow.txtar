@@ -1,6 +1,7 @@
 # a verdict goes to a file only when no other Go file of the package's directory could have given
-# it: a same-named function under any build constraint makes the name ambiguous, and the build
-# tags, -race and the files a build compiled play no part (section 10.3)
+# it: a function of the same name that begins with Test and takes one parameter, under any build
+# constraint and whatever its parameter is written as, makes the name ambiguous; the build tags,
+# -race and the files a build compiled play no part (section 10.3)
 fixture shop
 fixture shop-gotests
 cp named.yaml machinery.yaml
@@ -114,12 +115,59 @@ stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestShipNeedsPayment: defined in e2e/suite/order_test\.go, e2e/suite/wip\.go \(does not parse\): ambiguous'
 stderr -count=6 'wip\.go \(does not parse\): ambiguous'
 
-# go test from another directory (-C): the package and its files are still found
+# the verifier's alias: a shadow whose parameter is *T, T an alias of testing.T, is a test
+# function go runs: the name is ambiguous
 rm .machinery/receipts
 rm e2e/suite/wip.go
-gitcommit 'no file that does not parse'
-exec machinery run --adapter go-test-json -- go test -C e2e -tags faults ./suite
-stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+cp shadow_alias_test.go e2e/suite/shadow_test.go
+gitcommit 'a shadow through a type alias'
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+! stdout 'fm:payment-provider-down is proven'
+
+# the verifier's dot import: import . "testing" and *T, the same
+rm .machinery/receipts
+cp shadow_dot_test.go e2e/suite/shadow_test.go
+gitcommit 'a shadow through a dot import'
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+
+# the verifier's -race case with the alias: the claiming file behind !race fails, the shadow
+# behind race takes *T. Without -race the fail is written; with -race nothing is credited
+rm .machinery/receipts
+cp outage_norace_test.go e2e/suite/outage_test.go
+cp shadow_race_alias_test.go e2e/suite/shadow_test.go
+gitcommit 'the claim behind !race, an aliased shadow behind race'
+env SHOP_OUTAGE=fail
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -race ./e2e/suite
+env SHOP_OUTAGE=
+stderr '^machinery run: adapter: example\.test/shop/e2e/suite\.TestProviderDown: defined in e2e/suite/outage_test\.go, e2e/suite/shadow_test\.go: ambiguous'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+! stdout 'fm:payment-provider-down is proven'
+
+# a function go does not run counts too: TestdataPath begins with Test and takes one parameter,
+# and a claim of its whole file waits for it, so the file's ids are claimed and not run
+rm .machinery/receipts
+rm e2e/suite/shadow_test.go
+cp outage_faults_test.go e2e/suite/outage_test.go
+cp scenario_testfoo_test.go e2e/suite/scenario_test.go
+gitcommit 'a function go does not run in a file with a file claim'
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 2 id\(s\)$'
+exec sh -c '! grep -q sc:customer-pays-and-the-order-ships .machinery/receipts/*.jsonl'
 
 -- shadow_test.go --
 //go:build !faults
@@ -178,6 +226,76 @@ func TestProviderDown(t *testing.T) {}
 package suite
 
 func half(
+-- shadow_alias_test.go --
+//go:build !faults
+
+package suite
+
+import "testing"
+
+type T = testing.T
+
+func TestProviderDown(t *T) {}
+-- shadow_dot_test.go --
+//go:build !faults
+
+package suite
+
+import . "testing"
+
+func TestProviderDown(t *T) {}
+-- shadow_race_alias_test.go --
+//go:build race
+
+package suite
+
+import "testing"
+
+type T = testing.T
+
+func TestProviderDown(t *T) {}
+-- scenario_testfoo_test.go --
+package suite
+
+// The markers of this file stand above no function: they belong to every test function in it.
+//
+// machinery:verifies sc:customer-pays-and-the-order-ships sc:cancelled-order-refuses-payment
+
+import (
+	"os"
+	"testing"
+
+	"example.test/shop/internal/api"
+)
+
+// TestdataPath is a helper: go test does not run it, its parameter is no *testing.T.
+func TestdataPath(name string) string { return "testdata/" + name }
+
+func TestPayThenShip(t *testing.T) {
+	for _, event := range []string{"pay", "ship"} {
+		if got := api.Handle(event); got != event {
+			t.Fatalf("Handle(%s) = %q", event, got)
+		}
+	}
+}
+
+// TestMain is not a test function: it has no verdict of its own, and the markers of the file
+// do not wait for one.
+func TestMain(m *testing.M) {
+	os.Exit(m.Run())
+}
+
+func TestCancelledRefusesPay(t *testing.T) {
+	if os.Getenv("SHOP_SCENARIO") == "fail" {
+		t.Fatal("pay accepted on a cancelled order")
+	}
+	if os.Getenv("SHOP_SCENARIO") == "skip" {
+		t.Skip("no cancelled order in this run")
+	}
+	if got := api.Handle("pay"); got != "pay" {
+		t.Fatalf("Handle(pay) = %q", got)
+	}
+}
 -- named.yaml --
 version: 2
 design:

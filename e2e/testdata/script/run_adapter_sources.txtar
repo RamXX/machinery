@@ -40,11 +40,15 @@ rm e2e/other
 # a mapped file that claims nothing and is not under trace.tests is a candidate all the same
 mkdir drafts
 cp dup_test.go drafts/dup_test.go
+cp extra_test.go drafts/extra_test.go
 cp mapped-drafts.yaml machinery.yaml
 gitcommit 'the map names a file outside trace.tests'
-exec machinery run --adapter go-test-json --streams -- sh staged.sh
+exec machinery run --adapter go-test-json --streams -- sh staged-extra.sh
 stderr '^machinery run: adapter: example\.test/shop/staged/suite\.TestShipNeedsPayment: defined in drafts/dup_test\.go, e2e/suite/order_test\.go: ambiguous: '
 stderr '^machinery run: adapter: receipts written: 4 pass, 0 fail, 0 skip$'
+# and a function only such a file defines has its verdict in no file under trace.tests
+stderr 'with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: 1 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; '
 rm drafts
 cp mapped.yaml machinery.yaml
 gitcommit 'back to the map'
@@ -102,6 +106,23 @@ go test -json -count=1 ./staged/suite > "$MACHINERY_GO_TEST_JSON/staged.json"
 status=$?
 rm -rf staged
 exit $status
+-- staged-extra.sh --
+#!/bin/sh
+# stages the three test files and drafts/extra_test.go in staged/suite
+set -u
+rm -rf staged
+mkdir -p staged/suite
+cp e2e/suite/order_test.go e2e/suite/email_test.go e2e/suite/scenario_test.go drafts/extra_test.go staged/suite/
+go test -json -count=1 ./staged/suite > "$MACHINERY_GO_TEST_JSON/staged.json"
+status=$?
+rm -rf staged
+exit $status
+-- extra_test.go --
+package suite
+
+import "testing"
+
+func TestDraftOnly(t *testing.T) {}
 -- dup_test.go --
 package other
 

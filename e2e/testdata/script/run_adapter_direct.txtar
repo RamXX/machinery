@@ -1,0 +1,110 @@
+# direct mode is deliberately narrow: the adapter reads the packages of the project's own module
+# as they are on disk, so neither the go command, GOFLAGS nor the go environment may move the
+# module, the files or the binary (section 10.3). The verifier's decoys are refused. The
+# project is proj; what is outside it stays in $WORK
+mkdir proj
+cd proj
+fixture shop
+fixture shop-gotests
+mkdir decoy/e2e/suite
+cp $WORK/decoy.mod decoy/go.mod
+cp $WORK/decoy_test.go decoy/e2e/suite/decoy_test.go
+cp $WORK/inside.work decoy.work
+exec machinery gen
+gitinit
+
+# the project's own module, its failing test: a fail receipt
+env SHOP_EMAIL=fail
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+rm .machinery/receipts
+
+# the verifier's decoy, a nested module of the same module path with empty tests: go test -C
+# into it is refused
+exec mrun 2 run --adapter go-test-json -- go test -C decoy ./e2e/suite
+stderr '^usage: --adapter go-test-json: -C: not accepted by the adapter in direct mode; run the command through --streams$'
+
+# a workspace that uses the decoy: a module path pattern is refused, and a relative pattern
+# names a directory of the project, which go does not build from the decoy: no verdict at all
+env GOWORK=$WORK/proj/decoy.work
+exec mrun 2 run --adapter go-test-json -- go test example.test/shop/e2e/suite
+stderr '^usage: --adapter go-test-json: example\.test/shop/e2e/suite: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr 'with a verdict: 0 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+rm .machinery/receipts
+# a workspace file outside the project is refused
+env GOWORK=$WORK/outside.work
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: go env GOWORK is ".*/outside\.work", a file outside the project root: run the command through --streams$'
+# a GOWORK go cannot read: go env fails
+env GOWORK=relative.work
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: go env failed \(.*GOWORK.*\): the adapter reads GOFLAGS, GOMOD and GOWORK from it; fix the environment of go, or run the command through --streams$'
+env GOWORK=
+
+# the verifier's -modfile in GOFLAGS, naming another module path: refused
+env GOFLAGS=-modfile=$WORK/alt.mod
+exec mrun 2 run --adapter go-test-json -- go test ./suite
+stderr '^usage: --adapter go-test-json: -modfile=.*/alt\.mod in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
+env GOFLAGS=
+
+# GOFLAGS written to the go environment file by go env -w is read the same way
+env GOENV=$WORK/goenv
+exec go env -w GOFLAGS=-mod=mod
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: -mod=mod in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
+env GOENV=
+
+# the verifier's -exec: refused
+exec mrun 2 run --adapter go-test-json -- go test -exec $WORK/fake.sh ./e2e/suite
+stderr '^usage: --adapter go-test-json: -exec: not accepted by the adapter in direct mode; run the command through --streams$'
+
+# a go inside the project is no go the adapter can trust, by path or found on PATH
+mkdir bin
+cp $WORK/fake.sh bin/go
+chmod 755 bin/go
+exec mrun 2 run --adapter go-test-json -- ./bin/go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: bin/go: a go inside the project is not accepted by the adapter in direct mode; run the command through --streams$'
+env SAVED=$PATH
+env PATH=$WORK/proj/bin:$PATH
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env PATH=$SAVED
+stderr '^usage: --adapter go-test-json: bin/go: a go inside the project is not accepted '
+rm bin
+
+# without modules go env GOMOD is empty, not the go.mod of the project root: refused
+env GO111MODULE=off
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+env GO111MODULE=
+stderr '^usage: --adapter go-test-json: go env GOMOD is "", not the go\.mod of the project root: run the command through --streams$'
+# nothing ran and nothing was recorded
+! exists .machinery/receipts
+
+-- decoy.mod --
+module example.test/shop
+
+go 1.27
+-- decoy_test.go --
+package suite
+
+import "testing"
+
+func TestEmailUnique(t *testing.T)      {}
+func TestShipNeedsPayment(t *testing.T) {}
+-- inside.work --
+go 1.27
+
+use ./decoy
+-- outside.work --
+go 1.27
+
+use ./proj/decoy
+-- alt.mod --
+module example.test/shop/e2e
+
+go 1.27
+-- fake.sh --
+#!/bin/sh
+echo '{"Action":"pass","Package":"example.test/shop/e2e/suite","Test":"TestEmailUnique"}'
+echo '{"Action":"pass","Package":"example.test/shop/e2e/suite"}'

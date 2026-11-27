@@ -1,5 +1,5 @@
-# what the adapter refuses before it runs anything, and the flags it adds to go test
-# (section 10.3)
+# what the adapter refuses before it runs anything, and the flags it adds to go test. Direct
+# mode is deliberately narrow: only a list of go test words is accepted (section 10.3)
 fixture shop
 fixture shop-gotests
 exec machinery gen
@@ -20,8 +20,13 @@ exec mrun 2 run --adapter go-test-json -- go test -test.count=2 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -test\.count=2 is refused: write -count=1$'
 exec mrun 2 run --adapter go-test-json -- go test --count=2 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -count=2 is refused: write -count=1$'
-exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite -args -test.count=2
+exec mrun 2 run --adapter go-test-json -- go test -test.count 2 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -test\.count=2 is refused: write -count=1$'
+# nothing may follow -args: there the words reach the test binary
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite -args -test.count=2
+stderr '^usage: --adapter go-test-json: -test\.count=2: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -count=1 ./e2e/suite -args -- -count=2
+stderr '^usage: --adapter go-test-json: --: not accepted by the adapter in direct mode; run the command through --streams$'
 env GOFLAGS=-count=2
 exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
 stderr '^usage: --adapter go-test-json: GOFLAGS has -count=2, which is refused: take it out of GOFLAGS$'
@@ -30,34 +35,58 @@ stderr '^usage: --adapter go-test-json: GOFLAGS has -count=2, which is refused: 
 env GOFLAGS=
 exec mrun 2 run --adapter go-test-json -- go test -json=false -count=1 ./e2e/suite
 stderr '^usage: --adapter go-test-json: -json=false is refused: the adapter reads the event stream; leave it out$'
-# -overlay builds files that are not on disk, and the adapter reads the files on disk
+# any other flag: what could move the module, the files or the binary is never read
 exec mrun 2 run --adapter go-test-json -- go test -overlay overlay.json ./e2e/suite
-stderr '^usage: --adapter go-test-json: -overlay is refused: the adapter reads the test files on disk; run without it$'
+stderr '^usage: --adapter go-test-json: -overlay: not accepted by the adapter in direct mode; run the command through --streams$'
 exec mrun 2 run --adapter go-test-json -- go test -overlay=overlay.json ./e2e/suite
-stderr '^usage: --adapter go-test-json: -overlay is refused: '
+stderr '^usage: --adapter go-test-json: -overlay=overlay\.json: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -C e2e/suite -count=1 .
+stderr '^usage: --adapter go-test-json: -C: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -exec ./fake.sh ./e2e/suite
+stderr '^usage: --adapter go-test-json: -exec: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -modfile=alt.mod ./e2e/suite
+stderr '^usage: --adapter go-test-json: -modfile=alt\.mod: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -mod=mod ./e2e/suite
+stderr '^usage: --adapter go-test-json: -mod=mod: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test -vet=off ./e2e/suite
+stderr '^usage: --adapter go-test-json: -vet=off: not accepted by the adapter in direct mode; run the command through --streams$'
+# and any pattern that is not relative to the project root
+exec mrun 2 run --adapter go-test-json -- go test example.test/shop/e2e/suite
+stderr '^usage: --adapter go-test-json: example\.test/shop/e2e/suite: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test all
+stderr '^usage: --adapter go-test-json: all: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test $WORK/e2e/suite
+stderr '^usage: --adapter go-test-json: .*/e2e/suite: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/../e2e/suite
+stderr '^usage: --adapter go-test-json: \./e2e/\.\./e2e/suite: not accepted by the adapter in direct mode; run the command through --streams$'
+exec mrun 2 run --adapter go-test-json -- go test e2e/suite/order_test.go
+stderr '^usage: --adapter go-test-json: e2e/suite/order_test\.go: not accepted by the adapter in direct mode; run the command through --streams$'
+# GOFLAGS is held to the same list, -overlay in it refused with --streams too
 env GOFLAGS=-overlay=overlay.json
 exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^usage: --adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS$'
+stderr '^usage: --adapter go-test-json: -overlay=overlay\.json in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
 exec mrun 2 run --adapter go-test-json --streams -- sh run-suite.sh
 stderr '^usage: --adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS$'
+env GOFLAGS=-mod=mod
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: -mod=mod in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams$'
 env GOFLAGS=
 # nothing ran and nothing was recorded
 ! exists .machinery/receipts
 ! exists .git/machinery/runs
 
-# -json written by the caller is not added again, and a leading -C stays first
+# -json written by the caller is not added again
 exec machinery run --adapter go-test-json -- go test -count=1 -json ./e2e/suite
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
 stdout '"command":\["go","test","-count=1","-json","./e2e/suite"\],'
 rm .machinery/receipts
-exec machinery run --adapter go-test-json -- go test -C e2e/suite -count=1 .
+# every word of the list is accepted, a value as one word or two, -args as the last word
+exec machinery run --adapter go-test-json -- go test -v -short -failfast -timeout 5m -p 2 -parallel 2 -shuffle on -cpu 1 -run Test -skip TestNothing -cover -covermode set -coverpkg=./internal/... -coverprofile .machinery/cover.out -test.short --test.v=true -tags= ./e2e/suite -args
 stderr 'adapter: receipts written: 5 pass, 0 fail, 0 skip$'
-exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
-stdout '"command":\["go","test","-C","e2e/suite","-json","-count=1","."\],'
-# a -count after -args belongs to the test binary and is not read
-rm .machinery/receipts
-exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite -args -- -count=2
-stderr 'adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+env GOFLAGS=-tags=faults
+exec machinery run --adapter go-test-json -- go test -race ./e2e/...
+env GOFLAGS=
+stderr 'adapter: receipts written: 6 pass, 0 fail, 0 skip$'
 
 # -count=1 is added when it is absent: go test never answers from its cache
 rm .machinery/receipts
@@ -67,10 +96,6 @@ exec machinery run --adapter go-test-json -- go test -short ./e2e/suite
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
 exec sh -c 'grep -h "\"type\":\"run\"" .machinery/receipts/*.jsonl'
 stdout -count=2 '"command":\["go","test","-json","-count=1","-short","./e2e/suite"\],'
-rm .machinery/receipts
-exec machinery run --adapter go-test-json -- go test -C e2e/suite -json .
-exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
-stdout '"command":\["go","test","-C","e2e/suite","-count=1","-json","."\],'
 
 # without trace.tests there is no claim to join the run to
 cp notrace.yaml machinery.yaml

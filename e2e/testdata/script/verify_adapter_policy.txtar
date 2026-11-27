@@ -99,6 +99,14 @@ stdout '^  warn   adapter: sc:cancelled-order-refuses-payment not counted: .*; e
 ! stdout 'sc:customer-pays-and-the-order-ships not counted'
 stdout '^checked: 17 obligations, 3 proven, 2 by adapter at function granularity, 1 by adapter at file granularity, 0 partial, 2 owed, 6 receipts$'
 
+# tiers without routine: an id in no area is routine, and its pass does not count
+cp routine.yaml machinery.yaml
+gitcommit 'adapter: consequential only'
+exec machinery run --adapter go-test-json -- go test -tags faults -count=1 ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   adapter: inv:terminal-is-final not counted: a test that names it passed \(function granularity\); evidence\.adapter\.tiers does not list routine$'
+! stdout 'sc:cancelled-order-refuses-payment not counted'
+
 # a list that is set and empty admits nothing
 cp nothing.yaml machinery.yaml
 gitcommit 'adapter: nothing'
@@ -329,6 +337,34 @@ trace:
 evidence:
   adapter:
     allow: []
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- routine.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+  risk: design/risk.yaml
+backlog:
+  tool: bd
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    tiers: [consequential]
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}
