@@ -2114,8 +2114,10 @@ commit is the current commit, or when its header commit is an ancestor of the cu
 every path that differs between the two is **exempt**. The paths are those of
 `git diff-tree -r --relative <receipt commit> HEAD -- .`, run in the project directory and read
 as "How machinery reads git" below says: only paths inside the project directory are compared,
-and a file renamed or copied since counts by both of its paths, so a file moved into an exempt
-directory from anywhere else voids the run. A path is exempt when it is:
+and a file renamed since counts by both of its paths, so a file moved into an exempt directory
+from anywhere else voids the run. A copy counts by its new path only: its source did not change,
+so it is no changed path, and a copy into an exempt directory keeps the run valid. A path is
+exempt when it is:
 
 - **a file of the tool**: the owed file, `design/adoption.yaml` (section 2.1),
   `design/excused.yaml` (section 2.2), a receipts file (a `.jsonl` file directly in the receipts
@@ -2147,20 +2149,36 @@ current one.
 with plumbing (`rev-parse`, `symbolic-ref`, `diff-tree`, `diff-index`, `ls-files`, `ls-tree`,
 `cat-file`, `rev-list`, `merge-base`, `for-each-ref`, `check-ignore`, `config`), with
 `git status` only as `--porcelain=v2`, and every list NUL-separated (`-z`), so no path is
-quoted and a name that is not ASCII reads as it is. What a configuration could change is fixed on
-the command line, whatever the user's, the system's or the repository's configuration says:
-optional locks are off (a read never rewrites the index); `-c core.quotepath=off`,
-`-c core.fsmonitor=false`, `-c diff.ignoreSubmodules=none`, `-c diff.renames=false`,
-`-c status.renames=false`, `-c color.ui=never` and `-c submodule.recurse=false` are set; git's
-messages are in the C locale; and every comparison passes `--ignore-submodules=none`,
-`--no-renames`, `--no-ext-diff`, `--no-textconv` and `--no-color`. So a submodule pointer is
-compared even when `submodule.<name>.ignore` (in `.gitmodules` or `.git/config`) or
-`diff.ignoreSubmodules` says to hide it, and a submodule checked out at another commit than its
-pointer, or with changed or untracked files, makes the tree dirty. No rename or copy is detected,
-on purpose: a renamed file is its old path deleted and its new path added, both read, and no
-threshold or setting can pair them or leave one out. The configuration itself is kept, so
-`safe.directory` (a repository another user owns), `user.name`, worktrees and the ignore rules
-work as they do for git. A git command that fails stops the command with git's message. Only the
+quoted and a name that is not ASCII reads as it is. These are fixed on the command line, whatever
+the user's, the system's or the repository's configuration says: optional locks are off (a read
+never rewrites the index); `-c core.quotepath=off`, `-c core.fsmonitor=false`,
+`-c diff.ignoreSubmodules=none`, `-c diff.renames=false`, `-c status.renames=false`,
+`-c color.ui=never` and `-c submodule.recurse=false` are set; git's messages are in the C
+locale; and every comparison passes `--ignore-submodules=none`, `--no-renames`, `--no-ext-diff`,
+`--no-textconv` and `--no-color`. So a submodule pointer is compared even when
+`submodule.<name>.ignore` (in `.gitmodules` or `.git/config`) or `diff.ignoreSubmodules` says to
+hide it, and a submodule checked out at another commit than its pointer, or with changed or
+untracked files, makes the tree dirty. No rename or copy is detected, on purpose: a renamed file
+is its old path deleted and its new path added, both read, and no threshold or setting can pair
+them or leave one out; a copy is its new path added, and its source, which did not change, is no
+changed path. Every other setting is kept, so `safe.directory` (a repository another user owns),
+`user.name`, worktrees, the ignore rules, and line-ending conversion and filters
+(`core.autocrlf`, `.gitattributes`) work as they do for git: the work tree is compared as
+`git status` compares it.
+
+One kept setting hides a change: **`core.fileMode`**. machinery honours it and does not fix it,
+because `true` would make every file dirty on a filesystem without executable bits, where git
+sets it to `false`. Where it is `false`, git compares no executable bit between the index and
+the work tree: a change of only a file's mode in the work tree is not seen as dirty, and a run
+there records the tree as clean (`"dirty":false`), although a checkout of its commit has the
+committed mode. A change of mode that is committed is compared as any other change. Where it is
+`true`, git's default where the filesystem has executable bits, a change of a file's mode in
+the work tree makes the tree dirty.
+
+A git command that fails stops the command with one line that names the command with its
+arguments, the directory it ran in, what git said, and what to do:
+`git <arguments> failed in <directory>: <what git said>; the repository may be shallow or damaged: run git fsck there, and git fetch --unshallow if it is a shallow clone`
+(`git <arguments> could not start in <directory>: <why>` when git cannot be started). Only the
 "no" a yes-or-no query documents (`merge-base --is-ancestor`, `merge-base` of histories with no
 common commit, `check-ignore`, `symbolic-ref` of a detached HEAD, `rev-parse --verify --quiet`,
 `config --get` of an unset key, `rev-parse` outside a work tree) is read as an answer: no
@@ -2633,9 +2651,10 @@ A file **carries a build constraint** when a line before its package clause is a
 a `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` suffix before `_test.go` or `.go`, by the lists of
 known systems of `go/build` (`helper_windows_test.go`, `wire_arm64.go`,
 `helper_linux_amd64_test.go`), or a name that begins with `_` or `.`, which go never builds, or
-when it imports `"C"` (cgo), which go leaves out of a build with cgo off. Such a file with no test
-function is judged by no set, in any run and whatever the run's system or tags: `go test` may
-not have built it, and the pass of its set says nothing of a file outside the build. It stays a
+when it imports `C` (cgo), however the path is written (`"C"` or `` `C` ``, alone or in a grouped
+import), which go leaves out of a build with cgo off. Such a file with no test function is
+judged by no set, in any run and whatever the run's system or tags: `go test` may not have built
+it, and the pass of its set says nothing of a file outside the build. It stays a
 claimant the adapter cannot judge ("A file the adapter cannot judge", below).
 
 **Which verdict.** The verdict of a function is its `pass`, `fail` or `skip` event, read with
@@ -3258,10 +3277,9 @@ The owed list records what the committed design, tests and configuration prove, 
 reads anything `owed sync` refuses, without `--allow-dirty`, while the working tree has an
 uncommitted change (`git status --porcelain=v2`, read as section 10.1 says: changed, added,
 deleted or untracked, a rename by both of its paths, so a test file moved out of `trace.tests`
-counts by its old path) in a
-file that can change a verdict: `machinery.yaml`, `design/adoption.yaml` (section 2.1),
-`design/excused.yaml` (section 2.2), the status file (section 4.1), a design source (section
-10.1) or a file under `trace.tests`. It prints
+counts by its old path) in a file that can change a verdict: `machinery.yaml`,
+`design/adoption.yaml` (section 2.1), `design/excused.yaml` (section 2.2), the status file
+(section 4.1), a design source (section 10.1) or a file under `trace.tests`. It prints
 `ERROR  owed sync: uncommitted changes in files that can change a verdict: <files>: commit them, or pass --allow-dirty to sync against the working tree`,
 `<files>` sorted and each once, the first five and then `and <n> more`, writes nothing and exits
 1. A change anywhere else, in the code say, does not stop it: the evidence of a run says what it
@@ -3510,7 +3528,7 @@ Testing shifts right: per change, run what the change can break; run everything 
 `machinery affected --base <ref>` prints, one per line and sorted, the obligation ids touched by
 the difference between `<ref>` and the working tree: what is committed or staged since `<ref>`
 (`git diff-index --cached <ref>`) and what `git status` reports, read as section 10.1 says
-(untracked files and both paths of a rename or a copy included):
+(untracked files and both paths of a rename included; a copy is its new path):
 
 1. ids whose entry in `obligations.json` is new or differs from the base (title, effects);
 2. ids named by a `machinery:verifies` tag, or claimed by a verifies or scenarios marker
@@ -4838,10 +4856,10 @@ machinery check --base <ref> --story <id>
 ```
 
 The changed files are those of `git diff-index --cached <merge base>` (read as section 10.1 says:
-both paths of a rename or a copy), the merge base being `git merge-base <ref> HEAD`: what is
-committed since the branch left the base, and what is staged to be committed. The owed list and the
-tests and architecture baselines are not judged: a builder prunes them
-(`machinery owed sync --prune-only`), and the ratchet holds them. For every other changed file, in
+both paths of a rename, the new path of a copy), the merge base being
+`git merge-base <ref> HEAD`: what is committed since the branch left the base, and what is staged
+to be committed. The owed list and the tests and architecture baselines are not judged: a builder
+prunes them (`machinery owed sync --prune-only`), and the ratchet holds them. For every other changed file, in
 path order:
 
 - a design source (a file of the contract hash, section 15.4), unless the story carries
