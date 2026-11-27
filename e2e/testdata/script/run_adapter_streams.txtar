@@ -270,11 +270,12 @@ exec sh -c 'sleep 1; rm -rf .tmp/go-build*'
 exec sh -c '! grep -q "\"type\":\"end\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify
 stdout '^  ERROR  incomplete run: \.machinery/receipts/'
-# two runs of the package at once, writing into one file: the same
+# two runs of the package at once, writing into one file: the same. The interleaving is typed by
+# hand, so no timing decides it: the second start comes before the end of the first run
 rm .machinery/receipts
 exec mrun 1 run --adapter go-test-json --streams -- sh together.sh
 stdout '^together: done$'
-stderr '^machinery: run: stream all\.jsonl: line [0-9]+: package example\.test/shop/stage/suite starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete \.machinery/receipts/[^ ]+\.jsonl and run again$'
+stderr '^machinery: run: stream all\.jsonl: line 3: package example\.test/shop/stage/suite starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete \.machinery/receipts/[^ ]+\.jsonl and run again$'
 ! stderr 'receipts written'
 exec mrun 1 verify
 stdout '^  ERROR  incomplete run: \.machinery/receipts/'
@@ -380,19 +381,19 @@ echo "retry: exit $status"
 exit $status
 -- together.sh --
 #!/bin/sh
-# two runs of the suite at once, both appending to one file: the first reruns TestEmailUnique,
-# which hangs past -timeout, and the second starts a second later, while the first still runs
-set -u
-rm -rf stage
-mkdir -p stage/suite
-cp e2e/suite/*_test.go stage/suite/
-SHOP_EMAIL=hang go test -json -count=1 -timeout 5s -run TestEmailUnique ./stage/suite >> "$MACHINERY_GO_TEST_JSON/all.jsonl" &
-sleep 1
-go test -json -count=1 ./stage/suite >> "$MACHINERY_GO_TEST_JSON/all.jsonl"
-wait
-rm -rf stage
+# two runs of one package writing into one file as they go: the second run starts (line 3) while
+# the first has not ended, and both then end
+set -eu
+p=example.test/shop/stage/suite
+{
+  printf '{"Action":"start","Package":"%s"}\n' "$p"
+  printf '{"Action":"run","Package":"%s","Test":"TestEmailUnique"}\n' "$p"
+  printf '{"Action":"start","Package":"%s"}\n' "$p"
+  printf '{"Action":"pass","Package":"%s","Test":"TestEmailUnique"}\n' "$p"
+  printf '{"Action":"pass","Package":"%s"}\n' "$p"
+  printf '{"Action":"pass","Package":"%s"}\n' "$p"
+} > "$MACHINERY_GO_TEST_JSON/all.jsonl"
 echo "together: done"
-exit 0
 -- cut.sh --
 #!/bin/sh
 # a complete run of the suite, then a second one of which only the first three lines are appended

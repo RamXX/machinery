@@ -506,9 +506,6 @@ func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
 			}
 		}
 		if err == io.EOF {
-			if st.restarted != "" {
-				return &Incomplete{What: "go test -json: package " + st.restarted + restartedText, Todo: "find what stopped go test"}
-			}
 			if what := st.unended(); what != "" {
 				return &Incomplete{What: "go test -json: " + what, Todo: "find what stopped go test"}
 			}

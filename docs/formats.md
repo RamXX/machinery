@@ -2231,10 +2231,9 @@ and with `--streams` `machinery: run: stream <file>: package <import path> has n
 where `<receipts>` is the receipts file of the run by its project-relative path; for events
 after the last end event the message says `has events after its last end event` instead of
 `has no end event`. A `start` event before the end of the run it would interrupt is read where
-it stands, before the lines after it:
-`machinery: run: stream <file>: line <n>: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete <receipts> and run again`,
-and in direct mode
-`machinery: run: go test -json: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test, delete <receipts> and run again`.
+it stands, before the lines after it, and only with `--streams` (one `go test -json` run gives
+each package one `start` event):
+`machinery: run: stream <file>: line <n>: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete <receipts> and run again`.
 `verify` reports the file as an incomplete run (section 12). So within
 the threat model no fail is lost: a failed function, a function a failure stopped and the
 claims of a package that failed all write fails, in whichever run of the package they happened,
