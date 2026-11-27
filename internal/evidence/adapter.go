@@ -1087,7 +1087,7 @@ func (a *GoTest) Receipts() [][]byte {
 			for _, fn := range f.Funcs {
 				funcs = append(funcs, fileFn{u.File, fn, ""})
 			}
-		case !f.Broken:
+		case !f.Broken && !f.Constrained: // a file a run may not have built is judged by no set
 			funcs, pkgs, broken = a.setOf(u.File, names)
 		}
 		if len(funcs) == 0 {
@@ -1270,6 +1270,8 @@ func (a *GoTest) Receipts() [][]byte {
 			a.emptyAll++
 			switch {
 			case !scope[rel]:
+			case f.Constrained:
+				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; it carries a build constraint, so no set judges it: its claims count nothing", rel))
 			case len(sets[rel]) > 0:
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims are judged by its set: every test function of %s", rel, packageWords(sets[rel])))
 			default:

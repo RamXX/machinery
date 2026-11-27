@@ -4,10 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
+	"go/build/constraint"
 	"go/parser"
 	"go/scanner"
 	"go/token"
+	"io"
 	"io/fs"
+	"path"
 	"sort"
 	"strings"
 	"unicode"
@@ -27,6 +31,10 @@ type goTestFile struct {
 	// Err is why a broken file cannot be read as Go: the first error of the
 	// parser, as <line>:<column>: <message>, or the error of the read
 	Err string
+	// Constrained: the file carries a build constraint, a //go:build or
+	// // +build line or a name go builds only for some systems, so a run
+	// may not have built it (section 10.3)
+	Constrained bool
 }
 
 // funcDoc is the doc comment of a test function, a fuzz test, a benchmark or
@@ -108,6 +116,7 @@ func parseGoTest(name string, data []byte) *goTestFile {
 		f.Broken, f.Err = true, parseError(err)
 		return f
 	}
+	f.Constrained = constrainedName(path.Base(name)) || constrainedHeader(tree)
 	for _, decl := range tree.Decls {
 		fn, ok := decl.(*ast.FuncDecl)
 		if !ok {
@@ -124,6 +133,36 @@ func parseGoTest(name string, data []byte) *goTestFile {
 	}
 	sort.Strings(f.Funcs)
 	return f
+}
+
+// constrainedHeader reports a //go:build or // +build line before the
+// package clause, where go reads them, whatever the expression says.
+func constrainedHeader(tree *ast.File) bool {
+	for _, group := range tree.Comments {
+		if group.Pos() >= tree.Package {
+			break
+		}
+		for _, c := range group.List {
+			if constraint.IsGoBuild(c.Text) || constraint.IsPlusBuild(c.Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// constrainedName reports a file name go builds only for some systems: a
+// _GOOS, _GOARCH or _GOOS_GOARCH suffix before _test.go or .go, by the lists
+// of known systems of go/build, or a name go never builds (one that begins
+// with _ or .). go/build keeps those lists to itself, so it is asked whether
+// it would build the name for a system that is none of them.
+func constrainedName(name string) bool {
+	nowhere := build.Context{GOOS: "machinery", GOARCH: "machinery", Compiler: "gc",
+		JoinPath: path.Join,
+		OpenFile: func(string) (io.ReadCloser, error) { return io.NopCloser(strings.NewReader("package p\n")), nil },
+	}
+	ok, err := nowhere.MatchFile(".", name)
+	return err == nil && !ok
 }
 
 // isRunnable reports a fuzz test, a benchmark or an example: a top-level

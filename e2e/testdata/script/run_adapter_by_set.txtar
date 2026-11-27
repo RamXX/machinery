@@ -82,6 +82,44 @@ stdout '^  warn   partly run: inv:paid-before-shipped: e2e/lone/lone_test\.go: c
 rm e2e/lone
 gitcommit 'the lone helper is gone'
 
+# a file with no test function that carries a build constraint is judged by no set, in any run
+# and whatever the run built: go test may not have built it. A //go:build line whatever it says
+# (here one the run satisfies, and one nothing satisfies), a // +build line, and a name with a
+# _GOOS, _GOARCH or _GOOS_GOARCH suffix each keep it a claimant the adapter cannot judge, beside a
+# set that passed in full and a helper without a constraint that it judges
+rm .machinery/receipts
+cp never_test.go.txt e2e/suite/never_test.go
+cp faults_helper_test.go.txt e2e/suite/faults_helper_test.go
+cp plusbuild_test.go.txt e2e/suite/plusbuild_test.go
+cp helper_test.go.txt e2e/suite/helper_windows_test.go
+cp helper_test.go.txt e2e/suite/helper_s390x_test.go
+cp helper_test.go.txt e2e/suite/helper_plan9_386_test.go
+gitcommit 'helpers that carry a build constraint'
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: e2e/suite/support_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/suite$'
+stderr '^machinery run: adapter: e2e/suite/never_test\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+stderr '^machinery run: adapter: e2e/suite/faults_helper_test\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+stderr '^machinery run: adapter: e2e/suite/plusbuild_test\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+stderr '^machinery run: adapter: e2e/suite/helper_windows_test\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+stderr '^machinery run: adapter: e2e/suite/helper_s390x_test\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+stderr '^machinery run: adapter: e2e/suite/helper_plan9_386_test\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+exec sh -c '! grep -E "\"test\":\"e2e/suite/(never|faults_helper|plusbuild|helper_[a-z0-9_]+)_test\.go\"" .machinery/receipts/*.jsonl'
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '"adapter_sets":\["e2e/suite/support_test.go"\]'
+exec mrun 1 verify --partly
+stdout '^  warn   by its set: inv:customer-email-unique: e2e/suite/support_test\.go: '
+! stdout 'by its set: inv:[a-z-]+: e2e/suite/(never|faults_helper|plusbuild|helper_)'
+stdout '^  ERROR  partly run: inv:customer-email-unique: 2 of 4 claimants passed: '
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/never_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); put the marker above a test function, emit a receipt from its own test, or give it an excused entry with a reason$'
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/faults_helper_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+stdout '^  warn   partly run: inv:terminal-is-final: e2e/suite/plusbuild_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/helper_windows_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/helper_s390x_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/helper_plan9_386_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+rm e2e/suite/never_test.go e2e/suite/faults_helper_test.go e2e/suite/plusbuild_test.go
+rm e2e/suite/helper_windows_test.go e2e/suite/helper_s390x_test.go e2e/suite/helper_plan9_386_test.go
+gitcommit 'the constrained helpers are gone'
+
 # with --streams a staged source with no test function that an entry maps to the package is a
 # helper of its set too
 rm .machinery/receipts
@@ -93,6 +131,30 @@ stderr '^machinery run: adapter: e2e/suite/staged_support\.go: no test function;
 exec mrun 1 verify
 stdout '^  warn   by its set: inv:terminal-is-final: e2e/suite/staged_support\.go: no test function of its own; every test function of its package passed in one run$'
 ! stdout 'partly run: inv:terminal-is-final'
+
+# a set is judged in each of its packages: one helper and two test files mapped to two packages,
+# each built from copies of them. When both run every test function, the helper passes by the
+# set of both; when the second runs only TestA, TestB has no verdict there, and the pass of TestB
+# in the first package does not stand in for it: the helper gets nothing
+rm .machinery/receipts
+mkdir e2e/set
+cp set_a_test.go.txt e2e/set/a_test.go
+cp set_b_test.go.txt e2e/set/b_test.go
+cp set_helper_test.go.txt e2e/set/helper_test.go
+cp two-packages.yaml machinery.yaml
+gitcommit 'one set in two packages'
+exec machinery run --adapter go-test-json --streams -- sh two.sh
+exec sh -c 'grep -c "\"test\":\"e2e/set/helper_test.go\",\"observed\":\"go test: all 4 test function(s) of its set passed (packages example.test/shop/stage/one, example.test/shop/stage/two)\"" .machinery/receipts/*.jsonl'
+stdout '^1$'
+rm .machinery/receipts
+env TWO_RUN=TestA
+exec machinery run --adapter go-test-json --streams -- sh two.sh
+env TWO_RUN=
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 3 test function\(s\) with a verdict: 3 passed, 0 failed, 0 skipped$'
+exec sh -c '! grep "\"test\":\"e2e/set/helper_test.go\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify --partly
+stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/set/helper_test\.go \(by its set\)$'
+! stdout 'by its set: inv:customer-email-unique: e2e/set/helper_test\.go'
 
 -- e2e/suite/support_test.go --
 package suite
@@ -122,6 +184,96 @@ func TestShippedHelper(t *testing.T) {
 		t.Fatal("ship is not shipped")
 	}
 }
+-- never_test.go.txt --
+//go:build never
+
+package suite
+
+// A helper go test never builds: nothing sets the tag never.
+//
+// machinery:verifies inv:customer-email-unique
+-- faults_helper_test.go.txt --
+//go:build faults
+
+package suite
+
+// A helper the run builds, with -tags faults; it carries a build constraint all the same.
+//
+// machinery:verifies inv:customer-email-unique
+-- plusbuild_test.go.txt --
+// +build ignore
+
+package suite
+
+// A helper behind a +build line.
+//
+// machinery:verifies inv:terminal-is-final
+-- helper_test.go.txt --
+package suite
+
+// A helper whose name builds it for one system, or one architecture, only.
+//
+// machinery:verifies inv:paid-before-shipped
+-- set_a_test.go.txt --
+package set
+
+import "testing"
+
+// machinery:verifies inv:customer-email-unique
+func TestA(t *testing.T) {}
+-- set_b_test.go.txt --
+package set
+
+import "testing"
+
+func TestB(t *testing.T) {}
+-- set_helper_test.go.txt --
+package set
+
+// A helper of the set, mapped with it to two packages.
+//
+// machinery:verifies inv:customer-email-unique
+-- two.sh --
+#!/bin/sh
+# copies the files of e2e/set into stage/one and stage/two and tests both; stage/two runs only
+# the test functions TWO_RUN names
+set -u
+status=0
+for p in one two; do
+  mkdir -p "stage/$p"
+  cp e2e/set/*_test.go "stage/$p/"
+done
+go test -json -count=1 ./stage/one > "$MACHINERY_GO_TEST_JSON/one.json" || status=1
+go test -json -count=1 -run "${TWO_RUN:-.}" ./stage/two > "$MACHINERY_GO_TEST_JSON/two.json" || status=1
+rm -rf stage
+exit $status
+-- two-packages.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  adapter:
+    sources:
+      - {package: example.test/shop/stage/one, files: ["e2e/set/*_test.go"]}
+      - {package: example.test/shop/stage/two, files: ["e2e/set/*_test.go"]}
 -- lone_test.go.txt --
 package lone
 

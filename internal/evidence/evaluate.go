@@ -197,7 +197,14 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 			Exit: *fd.End.Exit, Dirty: fd.Header.Dirty, Receipts: len(fd.Receipts), Adapter: fd.Header.Adapter == GoTestJSON,
 			Through: v.through(fd.Header.Commit)}
 		if run.Through > 0 { // a record of how the run reaches the current commit (section 10.1)
-			add(report.Warn, "%s", run.ValidLine())
+			valid := run.ValidLine()
+			add(report.Warn, "%s", valid)
+			// every glob of evidence.exempt, with the paths it exempted since:
+			// the project's statement, which machinery cannot check
+			for i, n := range v.Exempted(run.Commit) {
+				ev.Findings = append(ev.Findings, report.Finding{Sev: report.Warn, Key: fmt.Sprintf("%s\x00%04d", valid, i),
+					Msg: run.ExemptLine(p.Cfg.EvidenceExempt()[i], n)})
+			}
 		}
 		if run.Adapter {
 			run.Env, run.Sets = fd.Header.Environment, fd.End.AdapterSets

@@ -105,7 +105,9 @@ command, output line and exit code.
   golden file). A claiming file with no test function of its own that is a candidate of a
   package of the run (a helper) is judged by its set: it passes only when every test function
   of that package passed in one run, a fail of the set fails it, and `verify` says `by its
-  set`. A marker above a helper, a method or `TestMain` is a marker of its file. A file under
+  set`. A helper that carries a build constraint (a `//go:build` or `// +build` line, or a
+  `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` name, by the lists of `go/build`) is judged by no set:
+  go test may not have built it, and `verify` says so. A marker above a helper, a method or `TestMain` is a marker of its file. A file under
   `trace.tests` that cannot be read fails the commands that read markers. An id with no
   counted adapter pass is judged as before: a receipt a test emits proves it. `claims: any` is
   the rule of one claimant, and the ratchet reports it.
@@ -118,13 +120,18 @@ command, output line and exit code.
   ERROR when it covers a claimant of a critical or vital id. The entries may be kept in
   `design/excused.yaml`, read with `machinery.yaml`, where a change keeps earlier runs valid.
 - Evidence across commits: a run of an earlier commit is valid at HEAD when its commit is an
-  ancestor of HEAD and every path changed since (renames by both paths) is the tool's own (the
-  owed list, the adoption and excused files, receipts, property records) or matches a glob of
-  `evidence.exempt`; `verify` and `status` say through how many exempt commits. A glob that
-  would exempt a test, the code, a design source, `machinery.yaml` or a build manifest is a
-  config error, and the ratchet reports every exempt glob added or widened.
+  ancestor of HEAD and every path changed since inside the project directory (renames and
+  copies by both paths) is the tool's own (the owed list, the adoption and excused files,
+  receipts, property records) or matches a glob of `evidence.exempt`; `verify` and `status`
+  say through how many exempt commits, and `verify` prints every exempt glob with the paths it
+  exempted since each run. A glob that would exempt a test, the code, a design source,
+  `machinery.yaml`, a build manifest, a submodule pointer or a path below a submodule is a
+  config error, a submodule pointer is never exempt, and the ratchet reports every exempt glob
+  added or widened. The contract says what a glob cannot protect: the other files a test reads
+  (fixtures, golden files, scripts, data), which the tool cannot know.
 - `owed sync` writes nothing while `machinery.yaml`, the adoption or excused file, a design
-  source or a test file has uncommitted changes, and names them; `--allow-dirty` syncs as
+  source or a test file has uncommitted changes, and names them, both paths of a rename or a
+  copy (a test file moved out of `trace.tests` by its old path); `--allow-dirty` syncs as
   `verify --allow-dirty` judges.
 - A `--streams` run that reads no stream exits 1 (the wrapper ran no `go test`, or cleared the
   environment with `env -i`); `--allow-no-streams` accepts a wrapper that may run nothing.

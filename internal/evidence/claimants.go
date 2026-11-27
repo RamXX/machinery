@@ -160,18 +160,22 @@ func unreadableClaimant(file, why string) string {
 // Why the adapter cannot judge a file claimant, where what to do depends on
 // it (section 10.3, "A file the adapter cannot judge").
 const (
-	whyNotGo  = "not a Go file"
-	whyBroken = "cannot be read as Go: "
+	whyNotGo       = "not a Go file"
+	whyBroken      = "cannot be read as Go: "
+	whyConstrained = "it carries a build constraint: it may not have been built"
 )
 
 // cannotJudge is what verify says of a file claimant the adapter cannot
 // judge, with what to do (sections 10.3 and 12): a file that cannot be read
-// as Go is to be fixed; a file that is not Go may be no test at all.
+// as Go is to be fixed; a file that is not Go may be no test at all; a file
+// with a build constraint is judged by no set.
 func cannotJudge(file, why string) string {
 	todo := "it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason"
 	switch {
 	case strings.HasPrefix(why, whyBroken):
 		todo = "fix the file so that it can be read as Go, or give it an excused entry with a reason"
+	case why == whyConstrained:
+		todo = "put the marker above a test function, emit a receipt from its own test, or give it an excused entry with a reason"
 	case why == whyNotGo:
 		todo += "; if the file is not a test (a README, a golden file), remove its marker for the id"
 	}
@@ -240,6 +244,8 @@ func (c *claimants) derive(d *design.Design, found []tags.Tag) error {
 						}
 					case len(f.Funcs) > 0:
 						judged[u] = true // the adapter writes a receipt for the file
+					case f.Constrained:
+						// a run may not have built it: no set judges it (section 10.3)
 					default:
 						fileLevel[u] = true // its set may judge it
 					}
@@ -307,6 +313,8 @@ func (c *claimants) why(file, above string) string {
 		return whyBroken + f.Err
 	case above != "":
 		return "its marker for the id is above " + above + ", which is not a test function"
+	case len(f.Funcs) == 0 && f.Constrained:
+		return whyConstrained
 	}
 	return "no test function"
 }

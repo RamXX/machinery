@@ -65,9 +65,10 @@ func Branch(root string) string {
 }
 
 // StatusPaths returns the project-relative paths git status reports, relative
-// to root. Untracked files are listed one by one.
+// to root, both paths of a rename or a copy included. Untracked files are
+// listed one by one. Paths outside root are left out.
 func StatusPaths(root string) ([]string, error) {
-	out, err := run(root, "status", "--porcelain", "--untracked-files=all", "--", ".")
+	out, err := run(root, "status", "--porcelain=v2", "-z", "--untracked-files=all", "--", ".")
 	if err != nil {
 		return nil, err
 	}
@@ -77,19 +78,145 @@ func StatusPaths(root string) ([]string, error) {
 	}
 	prefix := strings.TrimSpace(top)
 	var paths []string
-	for _, line := range strings.Split(out, "\n") {
-		if len(line) < 4 {
+	keep := func(p string) { // porcelain paths are relative to the top of the work tree
+		if rel, ok := strings.CutPrefix(p, prefix); ok && rel != "" {
+			paths = append(paths, rel)
+		}
+	}
+	entries := strings.Split(out, "\x00")
+	for i := 0; i < len(entries); i++ {
+		e := entries[i]
+		fields := statusFields[firstByte(e)]
+		if fields == 0 {
+			continue // a header line, or the end
+		}
+		parts := strings.SplitN(e, " ", fields+1)
+		if len(parts) != fields+1 {
 			continue
 		}
-		p := line[3:]
-		if i := strings.Index(p, " -> "); i >= 0 {
-			p = p[i+4:]
+		keep(parts[fields])
+		if e[0] == '2' && i+1 < len(entries) {
+			i++
+			keep(entries[i])
 		}
-		p = strings.Trim(p, "\"")
-		p = strings.TrimPrefix(p, prefix)
-		paths = append(paths, p)
 	}
 	return paths, nil
+}
+
+// statusFields is how many fields come before the path in an entry of git
+// status --porcelain=v2, by its first character: 8 of an ordinary entry, 9 of
+// a rename or a copy (whose original path is the next entry), 10 of an
+// unmerged one, 1 of an untracked file.
+var statusFields = map[byte]int{'1': 8, '2': 9, 'u': 10, '?': 1}
+
+func firstByte(s string) byte {
+	if s == "" {
+		return 0
+	}
+	return s[0]
+}
+
+// Change is a project-relative path that differs between two trees, and
+// whether it is a submodule pointer (a gitlink) on either side.
+type Change struct {
+	Path    string
+	Gitlink bool
+}
+
+// GitlinkMode is the mode git records for a submodule pointer.
+const GitlinkMode = "160000"
+
+// diffChanges runs a git diff in raw form, renames and copies detected, and
+// returns every path it names: both paths of a rename or a copy.
+func diffChanges(root string, args ...string) ([]Change, error) {
+	full := append([]string{"diff", "--raw", "-z", "-M", "-C", "--relative"}, args...)
+	out, err := run(root, append(full, "--", ".")...)
+	if err != nil {
+		return nil, err
+	}
+	var res []Change
+	entries := strings.Split(out, "\x00")
+	for i := 0; i < len(entries); i++ {
+		meta := entries[i]
+		if !strings.HasPrefix(meta, ":") {
+			continue
+		}
+		// :<src mode> <dst mode> <src sha> <dst sha> <status>
+		f := strings.Fields(meta[1:])
+		if len(f) < 5 {
+			continue
+		}
+		link := f[0] == GitlinkMode || f[1] == GitlinkMode
+		n := 1
+		if s := f[4][0]; s == 'R' || s == 'C' {
+			n = 2
+		}
+		for ; n > 0 && i+1 < len(entries); n-- {
+			i++
+			res = append(res, Change{Path: entries[i], Gitlink: link})
+		}
+	}
+	return res, nil
+}
+
+// DiffChanges lists the project-relative paths that differ between two
+// commits: both paths of a rename or a copy, each with whether it is a
+// submodule pointer in either commit.
+func DiffChanges(root, a, b string) ([]Change, error) { return diffChanges(root, a, b) }
+
+// Gitlinks lists the project-relative paths the index records as submodule
+// pointers.
+func Gitlinks(root string) ([]string, error) {
+	out, err := run(root, "ls-files", "-s", "-z", "--", ".")
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, e := range strings.Split(out, "\x00") {
+		// <mode> <sha> <stage>\t<path>
+		if meta, p, ok := strings.Cut(e, "\t"); ok && strings.HasPrefix(meta, GitlinkMode+" ") {
+			res = append(res, p)
+		}
+	}
+	return res, nil
+}
+
+// Submodules lists the paths of the submodules .gitmodules records at the
+// top of the work tree, project-relative; those outside root are left out.
+func Submodules(root string) ([]string, error) {
+	top, err := TopLevel(root)
+	if err != nil {
+		return nil, err
+	}
+	file := filepath.Join(top, ".gitmodules")
+	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	cmd := exec.Command("git", "config", "--file", file, "--null", "--get-regexp", `^submodule\..*\.path$`)
+	cmd.Dir = root
+	out, err := cmd.Output()
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 {
+		return nil, nil // no submodule has a path
+	}
+	if err != nil {
+		return nil, fmt.Errorf("git config --file .gitmodules: %v", err)
+	}
+	prefix, err := run(root, "rev-parse", "--show-prefix")
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, e := range strings.Split(string(out), "\x00") {
+		// <key>\n<value>
+		if _, p, ok := strings.Cut(e, "\n"); ok {
+			if rel, in := strings.CutPrefix(path.Clean(p), strings.TrimSpace(prefix)); in && rel != "" {
+				res = append(res, rel)
+			}
+		}
+	}
+	sort.Strings(res)
+	return res, nil
 }
 
 // Dirty reports whether the tree has changes outside the ignored paths. An
@@ -138,16 +265,6 @@ func Show(root, ref, rel string) ([]byte, bool) {
 	return out, true
 }
 
-// DiffNames lists project-relative paths that differ between two commits. A
-// rename is a deletion and an addition: both paths are listed.
-func DiffNames(root, a, b string) ([]string, error) {
-	out, err := run(root, "diff", "--name-only", "--relative", "--no-renames", a, b, "--", ".")
-	if err != nil {
-		return nil, err
-	}
-	return lines(out), nil
-}
-
 // MergeBase returns the merge base of two refs.
 func MergeBase(root, a, b string) (string, error) {
 	out, err := run(root, "merge-base", a, b)
@@ -155,25 +272,40 @@ func MergeBase(root, a, b string) (string, error) {
 }
 
 // StagedSince lists the project-relative paths that differ between a commit
-// and the index: what is committed since it and what is staged. A rename is a
-// deletion and an addition.
+// and the index: what is committed since it and what is staged, both paths of
+// a rename or a copy.
 func StagedSince(root, commit string) ([]string, error) {
-	out, err := run(root, "diff", "--name-only", "--relative", "--no-renames", "--cached", commit, "--", ".")
+	changes, err := diffChanges(root, "--cached", commit)
 	if err != nil {
 		return nil, err
 	}
-	return lines(out), nil
+	return changePaths(changes), nil
+}
+
+// changePaths returns the paths of changes, sorted, each once.
+func changePaths(changes []Change) []string {
+	set := map[string]bool{}
+	for _, c := range changes {
+		set[c.Path] = true
+	}
+	res := make([]string, 0, len(set))
+	for p := range set {
+		res = append(res, p)
+	}
+	sort.Strings(res)
+	return res
 }
 
 // ChangedSince lists project-relative paths that differ between a ref and the
-// working tree, untracked files included.
+// working tree, untracked files and both paths of a rename or a copy
+// included.
 func ChangedSince(root, ref string) ([]string, error) {
-	out, err := run(root, "diff", "--name-only", "--relative", ref, "--", ".")
+	changes, err := diffChanges(root, ref)
 	if err != nil {
 		return nil, err
 	}
 	set := map[string]bool{}
-	for _, p := range lines(out) {
+	for _, p := range changePaths(changes) {
 		set[p] = true
 	}
 	st, err := StatusPaths(root)
@@ -254,9 +386,10 @@ func CommitsTouching(root, from string, paths []string) ([]string, error) {
 	return lines(out), nil
 }
 
-// FilesOfCommit lists project-relative paths a commit changed.
+// FilesOfCommit lists project-relative paths a commit changed, both paths of
+// a rename.
 func FilesOfCommit(root, sha string) ([]string, error) {
-	out, err := run(root, "show", "--name-only", "--relative", "--format=", sha, "--", ".")
+	out, err := run(root, "show", "--name-only", "--relative", "--no-renames", "--format=", sha, "--", ".")
 	if err != nil {
 		return nil, err
 	}

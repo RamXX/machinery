@@ -50,6 +50,12 @@ func (r RunInfo) ValidLine() string {
 	return fmt.Sprintf("run: %s: made at %s, valid at HEAD through %d exempt commit(s)", r.File, gitx.Short(r.Commit), r.Through)
 }
 
+// ExemptLine says of a run of an earlier commit how many of the paths changed
+// since it a glob of evidence.exempt exempted (sections 10.1 and 12).
+func (r RunInfo) ExemptLine(glob string, n int) string {
+	return fmt.Sprintf("run: %s: evidence.exempt %q exempted %d path(s) changed since %s", r.File, glob, n, gitx.Short(r.Commit))
+}
+
 // RunInfo describes one complete receipts file that was used as evidence.
 type RunInfo struct {
 	File     string // project-relative
@@ -335,6 +341,9 @@ type validity struct {
 	cache map[string]bool
 	// count: a valid commit -> the commits from it to the head, 0 for the head
 	count map[string]int
+	// exempted: a valid commit -> each glob of evidence.exempt -> the paths
+	// changed since that commit that it matches
+	exempted map[string]map[string]int
 }
 
 // through returns how many commits lead from a valid commit to the head.
@@ -350,14 +359,30 @@ func (v *validity) through(commit string) int {
 	return n
 }
 
-// exemptAcross reports whether a change to a path leaves a run of an earlier
-// commit valid (section 10.1): a file of the tool, or a path a glob of
-// evidence.exempt matches that can change no verdict.
-func exemptAcross(p *project.Project, rel string) bool {
-	if p.Cfg.ToolOwned(rel) {
+// exemptAcross reports whether a change leaves a run of an earlier commit
+// valid (section 10.1): a file of the tool, or a path a glob of
+// evidence.exempt matches that can change no verdict. A submodule pointer is
+// never exempt.
+func exemptAcross(p *project.Project, c gitx.Change) bool {
+	switch {
+	case c.Gitlink:
+		return false
+	case p.Cfg.ToolOwned(c.Path):
 		return true
 	}
-	return project.Match(p.Cfg.EvidenceExempt(), rel) && p.Cfg.Protected(rel) == ""
+	return project.Match(p.Cfg.EvidenceExempt(), c.Path) && p.Cfg.Protected(c.Path) == ""
+}
+
+// Exempted returns, for a valid commit, how many of the paths changed since
+// it each glob of evidence.exempt matches, in the order of the globs
+// (section 10.1).
+func (v *validity) Exempted(commit string) []int {
+	globs := v.p.Cfg.EvidenceExempt()
+	res := make([]int, len(globs))
+	for i, g := range globs {
+		res[i] = v.exempted[commit][g]
+	}
+	return res
 }
 
 // ValidFor reports whether evidence from commit is valid for head (section 10.1).
@@ -366,7 +391,7 @@ func ValidFor(p *project.Project, head, commit string) bool {
 }
 
 func newValidity(p *project.Project, head string) *validity {
-	return &validity{p: p, head: head, cache: map[string]bool{head: true}, count: map[string]int{}}
+	return &validity{p: p, head: head, cache: map[string]bool{head: true}, count: map[string]int{}, exempted: map[string]map[string]int{}}
 }
 
 func (v *validity) valid(commit string) bool {
@@ -377,14 +402,27 @@ func (v *validity) valid(commit string) bool {
 	// a run of a commit that is not an ancestor of the head is never valid,
 	// whatever its tree (section 10.1)
 	if commit != "" && gitx.Exists(v.p.Root, commit) && gitx.IsAncestor(v.p.Root, commit, v.head) {
-		names, err := gitx.DiffNames(v.p.Root, commit, v.head)
+		changes, err := gitx.DiffChanges(v.p.Root, commit, v.head)
 		if err == nil {
 			ok = true
-			for _, n := range names {
-				if !exemptAcross(v.p, n) {
+			seen, counts := map[string]bool{}, map[string]int{}
+			for _, c := range changes {
+				if !exemptAcross(v.p, c) {
 					ok = false
 					break
 				}
+				if seen[c.Path] || v.p.Cfg.ToolOwned(c.Path) {
+					continue
+				}
+				seen[c.Path] = true
+				for _, g := range v.p.Cfg.EvidenceExempt() {
+					if project.Match([]string{g}, c.Path) {
+						counts[g]++
+					}
+				}
+			}
+			if ok {
+				v.exempted[commit] = counts
 			}
 		}
 	}

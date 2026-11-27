@@ -45,6 +45,25 @@ exec mrun 1 owed sync
 stdout 'can change a verdict: e2e/orders\.sh: '
 exec git checkout -q e2e/orders.sh
 
+# a rename counts by both of its paths: git mv of a test file, staged, is named by its old path
+# and its new one; a test file or a design source moved out of where verdicts come from is named
+# by its old path
+exec git mv e2e/orders.sh e2e/orders-moved.sh
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/orders-moved\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+mkdir docs
+exec git mv e2e/orders-moved.sh docs/orders.sh
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+! stdout '^owed:'
+exec git mv docs/orders.sh e2e/orders.sh
+exec git mv design/failure-modes.yaml docs/failure-modes.yaml
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: design/failure-modes\.yaml: commit them, '
+exec git mv docs/failure-modes.yaml design/failure-modes.yaml
+exec machinery owed sync --prune-only
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+
 # --allow-dirty syncs against the working tree, and uses a run made on a dirty tree, as
 # verify --allow-dirty does; without it that run is not evidence
 exec sh -c 'echo "# touched" >> e2e/orders.sh'

@@ -1,8 +1,9 @@
 # a run made at an earlier commit is valid at HEAD when every path changed since is exempt: the
 # tool's own files (the owed list, the adoption file, the excused file, receipts files) and the
-# globs of evidence.exempt. A rename counts on both sides, a change of machinery.yaml voids the
-# run, and a run whose commit is not an ancestor of HEAD is never valid (sections 2, 10.1, 12
-# and 14)
+# globs of evidence.exempt. verify prints every glob in effect with the paths it exempted since
+# the run. A rename counts on both sides, a change of machinery.yaml voids the run, a run whose
+# commit is not an ancestor of HEAD is never valid, and a submodule pointer is never exempt
+# (sections 2, 10.1, 12 and 14)
 fixture shop
 cp exempt.yaml machinery.yaml
 mkdir docs/examples notes
@@ -22,8 +23,12 @@ gitcommit 'more notes'
 exec machinery verify
 stdout '^checked: 16 obligations, 14 proven, 1 partial, 2 owed, 15 receipts$'
 stdout '^  warn   run: \.machinery/receipts/[0-9TZ.]+-[0-9a-f]{7}\.jsonl: made at [0-9a-f]{7}, valid at HEAD through 1 exempt commit\(s\)$'
+# every glob in effect follows the run line, in the order written, with the paths it exempted
+# since the run, none included
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: \.machinery/receipts/[0-9TZ.]+-([0-9a-f]{7})\.jsonl: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}\n  warn   run: [^\n]*: evidence\.exempt "\*\.txt" exempted 0 path\(s\) changed since [0-9a-f]{7}$'
 stdout '^passed$'
 exec machinery status --no-backlog
+! stdout 'evidence\.exempt'
 stdout '^evidence: [0-9a-f]{7} clean, 1 run\(s\), 15 receipt\(s\)$'
 stdout '^run: \.machinery/receipts/[0-9TZ.]+-[0-9a-f]{7}\.jsonl: made at [0-9a-f]{7}, valid at HEAD through 1 exempt commit\(s\)$'
 
@@ -36,6 +41,8 @@ cp excused.yaml design/excused.yaml
 gitcommit 'an excused file'
 exec machinery verify
 stdout 'valid at HEAD through 4 exempt commit\(s\)$'
+# the tool's files are exempt by no glob, and counted by none
+stdout ': evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
 stdout '^passed$'
 
 # a new run at HEAD keeps the earlier one, which is still valid; it is not reported
@@ -85,6 +92,67 @@ gitcommit 'the examples are tests now, and the old one is gone'
 exec mrun 1 verify
 stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
 
+# a submodule, made here from a bare repository under .home (which git ignores) that holds a
+# go.mod and Go code: machinery sees its pointer and none of its files. A new pointer voids the
+# runs of earlier commits
+exec git init -q -b main .home/libsrc
+cp lib.mod .home/libsrc/go.mod
+cp lib.go.txt .home/libsrc/lib.go
+exec git -C .home/libsrc add -A
+exec git -C .home/libsrc commit -q -m 'a library'
+exec git clone -q --bare .home/libsrc .home/lib.git
+exec git -c protocol.file.allow=always submodule add -q $WORK/.home/lib.git third_party/lib
+gitcommit 'a submodule'
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+exec git -C third_party/lib commit -q --allow-empty -m 'a new commit of the library'
+gitcommit 'a new pointer'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+
+# a glob over the pointer, or one that can reach a path below the submodule, is a config error:
+# the files of a submodule cannot be compared, and its pointer voids earlier runs whatever a
+# glob says
+cp exempt-lib.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "third_party/\*\*" would exempt third_party/lib: third_party/lib is a submodule pointer: a change of it voids earlier runs; narrow the glob$'
+cp exempt-below.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "third_party/lib/\*\.go" matches paths below third_party/lib, a submodule whose files machinery never sees: third_party/lib is a submodule pointer: a change of it voids earlier runs; narrow the glob$'
+cp exempt-brace.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "\{docs,third_party/lib\}/\*\.md" matches paths below third_party/lib, a submodule whose files machinery never sees: '
+cp exempt-anywhere.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: evidence\.exempt: "\*\*/\*\.md" matches paths below third_party/lib, a submodule whose files machinery never sees: '
+# a glob beside the submodule is accepted
+cp exempt-beside.yaml machinery.yaml
+exec machinery config
+stdout '^    - third_party/\*\.md$'
+exec git checkout -q machinery.yaml
+
+# a pointer is never exempt, not even at the path of a file of the tool: a submodule forced into
+# the receipts directory, a new pointer of it, and the run of the commit before is void
+exec git -c protocol.file.allow=always submodule add -q -f $WORK/.home/lib.git .machinery/receipts/lib.jsonl
+gitcommit 'a submodule where receipts are kept'
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+exec git -C .machinery/receipts/lib.jsonl commit -q --allow-empty -m 'another commit of the library'
+gitcommit 'a new pointer in the receipts directory'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+
+-- lib.mod --
+module example.test/lib
+
+go 1.27
+-- lib.go.txt --
+package lib
+
+// Answer is what the library computes.
+func Answer() int { return 42 }
 -- check.sh --
 #!/bin/sh
 exit 0
@@ -138,7 +206,7 @@ constraints:
 waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
 evidence:
-  exempt: ["docs/**"]
+  exempt: ["docs/**", "*.txt"]
 -- exempt-more.yaml --
 version: 2
 design:
@@ -163,3 +231,123 @@ waivers:
   - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
 evidence:
   exempt: ["docs/**", "notes/**"]
+-- exempt-lib.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["third_party/**"]
+-- exempt-below.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**", "third_party/lib/*.go"]
+-- exempt-brace.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["{docs,third_party/lib}/*.md"]
+-- exempt-anywhere.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["**/*.md"]
+-- exempt-beside.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**", "third_party/*.md"]

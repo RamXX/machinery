@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/bmatcuk/doublestar/v4"
 	"gopkg.in/yaml.v3"
 )
 
@@ -168,10 +169,18 @@ func BuildManifest(rel string) bool {
 	return false
 }
 
+// SubmoduleVoids is what a change of a submodule pointer does to the runs of
+// earlier commits (section 10.1).
+func SubmoduleVoids(rel string) string {
+	return rel + " is a submodule pointer: a change of it voids earlier runs"
+}
+
 // checkExempt refuses a glob of evidence.exempt that matches a file of the
-// project that is protected: the first such file, sorted, is named. The
-// files are those git tracks and those it does not ignore, or every file
-// below the root outside git.
+// project that is protected, the first such file, sorted, named; one that
+// matches a submodule pointer; and one that can match a path below a
+// submodule, whose files machinery never sees. The files are those git
+// tracks and those it does not ignore, or every file below the root outside
+// git.
 func (p *Project) checkExempt() error {
 	globs := p.Cfg.EvidenceExempt()
 	if len(globs) == 0 {
@@ -181,17 +190,142 @@ func (p *Project) checkExempt() error {
 	if err != nil {
 		return err
 	}
+	links, subs, err := p.submodules()
+	if err != nil {
+		return err
+	}
 	for _, g := range globs {
 		for _, f := range files {
-			if p.Cfg.ToolOwned(f) || !Match([]string{g}, f) {
-				continue
+			switch {
+			case !Match([]string{g}, f):
+			case links[f]:
+				return Errf("evidence.exempt: %q would exempt %s: %s; narrow the glob", g, f, SubmoduleVoids(f))
+			case p.Cfg.ToolOwned(f):
+			case p.Cfg.Protected(f) != "":
+				return Errf("evidence.exempt: %q would exempt %s, %s; a run is never valid across a change to it: narrow the glob", g, f, p.Cfg.Protected(f))
 			}
-			if what := p.Cfg.Protected(f); what != "" {
-				return Errf("evidence.exempt: %q would exempt %s, %s; a run is never valid across a change to it: narrow the glob", g, f, what)
+		}
+		for _, s := range subs {
+			if globReachesBelow(g, s) {
+				return Errf("evidence.exempt: %q matches paths below %s, a submodule whose files machinery never sees: %s; narrow the glob", g, s, SubmoduleVoids(s))
 			}
 		}
 	}
 	return nil
+}
+
+// submodules returns the submodule pointers the index records and, sorted,
+// the paths of every submodule: those pointers and the paths .gitmodules
+// records. Nothing outside git.
+func (p *Project) submodules() (links map[string]bool, subs []string, err error) {
+	links = map[string]bool{}
+	if !gitx.IsRepo(p.Root) {
+		return links, nil, nil
+	}
+	gl, err := gitx.Gitlinks(p.Root)
+	if err != nil {
+		return nil, nil, err
+	}
+	recorded, err := gitx.Submodules(p.Root)
+	if err != nil {
+		return nil, nil, err
+	}
+	seen := map[string]bool{}
+	for _, s := range append(gl, recorded...) {
+		if !seen[s] {
+			seen[s] = true
+			subs = append(subs, s)
+		}
+	}
+	for _, l := range gl {
+		links[l] = true
+	}
+	sort.Strings(subs)
+	return links, subs, nil
+}
+
+// globReachesBelow reports whether a glob can match a path below a
+// directory. Read segment by segment, with its braces expanded, the glob
+// reaches below when each segment of the directory is matched by the segment
+// of the glob in its place and the glob goes on after them, or when a "**"
+// comes before their end. It may say yes of a glob that matches nothing
+// there.
+func globReachesBelow(g, dir string) bool {
+	ds := strings.Split(dir, "/")
+	for _, alt := range expandBraces(g) {
+		gs := strings.Split(alt, "/")
+		matched := true
+		for i, d := range ds {
+			if i >= len(gs) {
+				matched = false
+				break
+			}
+			if gs[i] == "**" {
+				return true
+			}
+			if ok, _ := doublestar.Match(gs[i], d); !ok {
+				matched = false
+				break
+			}
+		}
+		if matched && len(gs) > len(ds) {
+			return true
+		}
+	}
+	return false
+}
+
+// expandBraces returns the globs a pattern with braces stands for, one for
+// each alternative ({a,b} gives a and b), nested braces included; a pattern
+// without braces stands for itself.
+func expandBraces(g string) []string {
+	depth, start := 0, 0
+	for i := 0; i < len(g); i++ {
+		switch g[i] {
+		case '\\':
+			i++
+		case '{':
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		case '}':
+			if depth == 0 {
+				continue
+			}
+			if depth--; depth == 0 {
+				var res []string
+				for _, alt := range splitAlternatives(g[start+1 : i]) {
+					res = append(res, expandBraces(g[:start]+alt+g[i+1:])...)
+				}
+				return res
+			}
+		}
+	}
+	return []string{g}
+}
+
+// splitAlternatives splits the inside of a brace at its commas, those of
+// nested braces left alone.
+func splitAlternatives(s string) []string {
+	var res []string
+	depth, from := 0, 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '\\':
+			i++
+		case '{':
+			depth++
+		case '}':
+			depth--
+		case ',':
+			if depth == 0 {
+				res = append(res, s[from:i])
+				from = i + 1
+			}
+		}
+	}
+	return append(res, s[from:])
 }
 
 // listed returns the files of the project git knows of and does not ignore,
