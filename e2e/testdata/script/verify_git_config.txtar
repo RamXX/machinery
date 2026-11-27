@@ -1,0 +1,235 @@
+# machinery reads git the same whatever the configuration says (section 10.1). A submodule
+# pointer that submodule.<name>.ignore (in .gitmodules or .git/config) or diff.ignoreSubmodules
+# hides from git diff and git status still makes the tree dirty while the submodule is checked
+# out at another commit, and still voids the runs of earlier commits once committed.
+# status.renames, diff.renames, core.quotepath and color.ui change no finding: a rename is read
+# by both of its paths and a name that is not ASCII as it is, in the dirty check and in the
+# commit diff
+fixture shop
+cp exempt.yaml machinery.yaml
+mkdir docs notes
+cp notes.md docs/nötes.md
+cp plan.txt notes/plän.txt
+exec machinery gen
+gitinit
+
+# a submodule, made here from a bare repository under .home (which git ignores)
+exec git init -q -b main .home/libsrc
+cp lib.mod .home/libsrc/go.mod
+exec git -C .home/libsrc add -A
+exec git -C .home/libsrc commit -q -m 'a library'
+exec git clone -q --bare .home/libsrc .home/lib.git
+exec git -c protocol.file.allow=always submodule add -q $WORK/.home/lib.git third_party/lib
+gitcommit 'a submodule'
+
+# submodule.<name>.ignore = all in .gitmodules, committed
+exec git config -f .gitmodules submodule.third_party/lib.ignore all
+gitcommit 'git diff and git status are told to hide the submodule'
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+exec git -C third_party/lib commit -q --allow-empty -m 'commit 1 of the library'
+exec mrun 1 verify
+stdout '^  ERROR  working tree has uncommitted changes$'
+exec git add -f third_party/lib
+exec git commit -q -m 'pointer 1'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git config -f .gitmodules --unset submodule.third_party/lib.ignore
+gitcommit 'the submodule is no longer hidden by .gitmodules'
+
+# submodule.<name>.ignore = all in .git/config
+exec git config submodule.third_party/lib.ignore all
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+exec git -C third_party/lib commit -q --allow-empty -m 'commit 2 of the library'
+exec mrun 1 verify
+stdout '^  ERROR  working tree has uncommitted changes$'
+exec git add -f third_party/lib
+exec git commit -q -m 'pointer 2'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git config --unset submodule.third_party/lib.ignore
+
+# diff.ignoreSubmodules = all in the user's configuration
+exec git config --global diff.ignoreSubmodules all
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec machinery verify
+stdout '^passed$'
+exec git -C third_party/lib commit -q --allow-empty -m 'commit 3 of the library'
+exec mrun 1 verify
+stdout '^  ERROR  working tree has uncommitted changes$'
+exec git add -f third_party/lib
+exec git commit -q -m 'pointer 3'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git config --global --unset diff.ignoreSubmodules
+
+# as git is configured by default: a staged rename of a test file, beside a new test file whose
+# name is not ASCII, is named by both of its paths and the new name as it is; a change of an
+# exempt file whose name is not ASCII keeps the run valid and is counted by its glob; a file
+# moved from where nothing is exempt into an exempt directory voids the run
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec git mv e2e/orders.sh e2e/orders-moved.sh
+cp extra.sh e2e/naïve.sh
+exec git add e2e
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/naïve\.sh, e2e/orders-moved\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git reset -q
+rm e2e/naïve.sh e2e/orders-moved.sh
+exec git checkout -q e2e/orders.sh
+exec sh -c 'echo "more notes" >> docs/nötes.md'
+gitcommit 'more notes'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: [^\n]*: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
+stdout '^passed$'
+exec git mv notes/plän.txt docs/plän.txt
+gitcommit 'the plan moves into the docs'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git mv docs/plän.txt notes/plän.txt
+gitcommit 'the plan moves back'
+
+# status.renames = copies: the same findings
+exec git config status.renames copies
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec git mv e2e/orders.sh e2e/orders-moved.sh
+cp extra.sh e2e/naïve.sh
+exec git add e2e
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/naïve\.sh, e2e/orders-moved\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git reset -q
+rm e2e/naïve.sh e2e/orders-moved.sh
+exec git checkout -q e2e/orders.sh
+exec sh -c 'echo "more notes" >> docs/nötes.md'
+gitcommit 'more notes'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: [^\n]*: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
+stdout '^passed$'
+exec git mv notes/plän.txt docs/plän.txt
+gitcommit 'the plan moves into the docs'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git mv docs/plän.txt notes/plän.txt
+gitcommit 'the plan moves back'
+exec git config --unset status.renames
+
+# diff.renames = false: the same findings
+exec git config diff.renames false
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec git mv e2e/orders.sh e2e/orders-moved.sh
+cp extra.sh e2e/naïve.sh
+exec git add e2e
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/naïve\.sh, e2e/orders-moved\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git reset -q
+rm e2e/naïve.sh e2e/orders-moved.sh
+exec git checkout -q e2e/orders.sh
+exec sh -c 'echo "more notes" >> docs/nötes.md'
+gitcommit 'more notes'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: [^\n]*: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
+stdout '^passed$'
+exec git mv notes/plän.txt docs/plän.txt
+gitcommit 'the plan moves into the docs'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git mv docs/plän.txt notes/plän.txt
+gitcommit 'the plan moves back'
+exec git config --unset diff.renames
+
+# core.quotepath = true, which quotes names that are not ASCII: the same findings
+exec git config core.quotepath true
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec git mv e2e/orders.sh e2e/orders-moved.sh
+cp extra.sh e2e/naïve.sh
+exec git add e2e
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/naïve\.sh, e2e/orders-moved\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git reset -q
+rm e2e/naïve.sh e2e/orders-moved.sh
+exec git checkout -q e2e/orders.sh
+exec sh -c 'echo "more notes" >> docs/nötes.md'
+gitcommit 'more notes'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: [^\n]*: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
+stdout '^passed$'
+exec git mv notes/plän.txt docs/plän.txt
+gitcommit 'the plan moves into the docs'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git mv docs/plän.txt notes/plän.txt
+gitcommit 'the plan moves back'
+exec git config --unset core.quotepath
+
+# color.ui = always: the same findings
+exec git config color.ui always
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec git mv e2e/orders.sh e2e/orders-moved.sh
+cp extra.sh e2e/naïve.sh
+exec git add e2e
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/naïve\.sh, e2e/orders-moved\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git reset -q
+rm e2e/naïve.sh e2e/orders-moved.sh
+exec git checkout -q e2e/orders.sh
+exec sh -c 'echo "more notes" >> docs/nötes.md'
+gitcommit 'more notes'
+exec machinery verify
+stdout 'valid at HEAD through 1 exempt commit\(s\)\n  warn   run: [^\n]*: evidence\.exempt "docs/\*\*" exempted 1 path\(s\) changed since [0-9a-f]{7}$'
+stdout '^passed$'
+exec git mv notes/plän.txt docs/plän.txt
+gitcommit 'the plan moves into the docs'
+exec mrun 1 verify
+stdout '^not demonstrated: no evidence at [0-9a-f]{7}$'
+exec git mv docs/plän.txt notes/plän.txt
+gitcommit 'the plan moves back'
+exec git config --unset color.ui
+
+-- exempt.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  exempt: ["docs/**"]
+-- notes.md --
+# Notes
+
+Nothing here changes what the tests check.
+-- plan.txt --
+A plan kept outside the exempt directory.
+-- lib.mod --
+module example.test/lib
+
+go 1.27
+-- extra.sh --
+#!/bin/sh
+# machinery:verifies inv:paid-before-shipped
+exit 0

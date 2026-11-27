@@ -4,6 +4,7 @@
 fixture library proj
 cd proj
 exec mv machinery.yaml ../library.yaml
+cp $WORK/gitattributes .gitattributes
 gitinit
 exec sh -c 'echo "// changed in the work tree" >> internal/desk/desk.go'
 exec sh -c 'echo note > notes.txt && mkdir -p extra && echo more > extra/more.txt'
@@ -34,3 +35,13 @@ grep '^  "config": "--config library.yaml",$' out/report.json
 ! exists out/snapshot/notes.txt
 ! exists out/snapshot/extra
 cmp out/snapshot/machinery.yaml library.yaml
+# the snapshot is the committed tree, attributes aside: export-ignore leaves nothing out and
+# export-subst rewrites nothing (section 18.2)
+exists out/snapshot/e2e/loans.sh
+cmp out/snapshot/notes.md proj/notes.md
+
+-- gitattributes --
+e2e/** export-ignore
+notes.md export-subst
+-- proj/notes.md --
+Kept as committed: $Format:%H$

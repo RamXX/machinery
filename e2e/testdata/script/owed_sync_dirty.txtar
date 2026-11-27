@@ -64,6 +64,19 @@ exec git mv docs/failure-modes.yaml design/failure-modes.yaml
 exec machinery owed sync --prune-only
 stdout '^owed: 2 kept, 0 added, 0 removed$'
 
+# a copy git status pairs with its source (status.renames = copies), the source changed as well:
+# each file is named once
+exec git config status.renames copies
+cp e2e/orders.sh e2e/orders-copy.sh
+exec sh -c 'echo "# touched" >> e2e/orders.sh'
+exec git add e2e
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: e2e/orders-copy\.sh, e2e/orders\.sh: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git reset -q
+rm e2e/orders-copy.sh
+exec git checkout -q e2e/orders.sh
+exec git config --unset status.renames
+
 # --allow-dirty syncs against the working tree, and uses a run made on a dirty tree, as
 # verify --allow-dirty does; without it that run is not evidence
 exec sh -c 'echo "# touched" >> e2e/orders.sh'

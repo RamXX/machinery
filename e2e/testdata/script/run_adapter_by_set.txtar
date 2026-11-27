@@ -116,6 +116,19 @@ stdout '^  warn   partly run: inv:terminal-is-final: e2e/suite/plusbuild_test\.g
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/helper_windows_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/helper_s390x_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/helper_plan9_386_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+# verify judges a claimant as it is when it judges: a run made while a helper carried no
+# constraint (here on a dirty tree, its //go:build line taken out) gave its set a pass for it,
+# and once the line is back that pass credits nothing
+rm .machinery/receipts
+cp faults_helper_open.go.txt e2e/suite/faults_helper_test.go
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: e2e/suite/faults_helper_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/suite$'
+exec sh -c 'grep -c "\"test\":\"e2e/suite/faults_helper_test.go\",\"observed\":\"go test: all [0-9]* test function(s) of its set passed" .machinery/receipts/*.jsonl'
+stdout '^1$'
+exec git checkout -q e2e/suite/faults_helper_test.go
+exec mrun 1 verify --allow-dirty --partly
+stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/faults_helper_test\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+! stdout 'by its set: inv:customer-email-unique: e2e/suite/faults_helper_test\.go'
 rm e2e/suite/never_test.go e2e/suite/faults_helper_test.go e2e/suite/plusbuild_test.go
 rm e2e/suite/helper_windows_test.go e2e/suite/helper_s390x_test.go e2e/suite/helper_plan9_386_test.go
 gitcommit 'the constrained helpers are gone'
@@ -131,6 +144,22 @@ stderr '^machinery run: adapter: e2e/suite/staged_support\.go: no test function;
 exec mrun 1 verify
 stdout '^  warn   by its set: inv:terminal-is-final: e2e/suite/staged_support\.go: no test function of its own; every test function of its package passed in one run$'
 ! stdout 'partly run: inv:terminal-is-final'
+
+# a source that imports "C" carries a build constraint too: go leaves it out of a build with cgo
+# off, as here, and the pass of its set says nothing of it
+rm .machinery/receipts
+cp cgo_support.go.txt e2e/suite/cgo_support.go
+gitcommit 'a staged helper that uses cgo'
+env CGO_ENABLED=0
+exec machinery run --adapter go-test-json --streams -- sh suite.sh
+env CGO_ENABLED=
+stderr '^machinery run: adapter: e2e/suite/cgo_support\.go: no test function; it carries a build constraint, so no set judges it: its claims count nothing$'
+exec sh -c '! grep -q "\"test\":\"e2e/suite/cgo_support.go\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify --partly
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/suite/cgo_support\.go: cannot be judged by the adapter \(it carries a build constraint: it may not have been built\); '
+! stdout 'by its set: inv:paid-before-shipped: e2e/suite/cgo_support\.go'
+rm e2e/suite/cgo_support.go
+gitcommit 'the cgo helper is gone'
 
 # a set is judged in each of its packages: one helper and two test files mapped to two packages,
 # each built from copies of them. When both run every test function, the helper passes by the
@@ -200,6 +229,22 @@ package suite
 // A helper the run builds, with -tags faults; it carries a build constraint all the same.
 //
 // machinery:verifies inv:customer-email-unique
+-- faults_helper_open.go.txt --
+package suite
+
+// The same helper with its //go:build line taken out.
+//
+// machinery:verifies inv:customer-email-unique
+-- cgo_support.go.txt --
+package suite
+
+import "C"
+
+// A source the wrapper builds with the suite when cgo is on; it has no test function.
+//
+// machinery:verifies inv:paid-before-shipped
+
+func cgoSupport() bool { return true }
 -- plusbuild_test.go.txt --
 // +build ignore
 
