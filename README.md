@@ -1,4 +1,10 @@
-# machinery
+# Machinery v2
+
+[![CI](https://github.com/RamXX/machinery/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/ci.yml)
+[![Formal Verification](https://github.com/RamXX/machinery/actions/workflows/formal.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/formal.yml)
+[![Security](https://github.com/RamXX/machinery/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/security.yml)
+[![Nightly](https://github.com/RamXX/machinery/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/RamXX/machinery/actions/workflows/nightly.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/RamXX/machinery/v2.svg)](https://pkg.go.dev/github.com/RamXX/machinery/v2)
 
 machinery joins a project's design to evidence from its running system, plans what is unproven
 as a backlog graph, and adds formality where the risk calls for it.
