@@ -1,8 +1,8 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/xstate"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/xstate"
 )
 
 func init() { Bind("xstate", XState) }

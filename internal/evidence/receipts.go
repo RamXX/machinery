@@ -13,8 +13,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Outcomes and replay values of a receipt (section 10).

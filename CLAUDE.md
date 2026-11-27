@@ -1,7 +1,7 @@
 # Conventions for agents in this repository
 
-This branch, `experimental/v2`, is machinery v2. Nothing is released from it. v1 lives on `main`:
-read v1 files with `git show main:<path>`, never check `main` out here, never change it.
+This repository is machinery v2. v1 lives on branch `v1`: read v1 files with
+`git show v1:<path>`, never check `v1` out here, never change it.
 
 ## What this repository is
 

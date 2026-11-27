@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Core is the core of one vital area as stage arch holds it (section 9): the

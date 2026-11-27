@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // Input is the part of a harness's hook input machinery reads.

@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/modelith"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/modelith"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("model", Model) }

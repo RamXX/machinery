@@ -1,9 +1,10 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/sh
 JOBS ?= 4
-VERSION ?= dev
+# The release version, stamped by make build. Only a release commit changes it.
+VERSION ?= 2.0.0
 BUILD_DATE ?= $(shell date -u +%Y-%m-%d)
-VERSION_PKG := github.com/RamXX/machinery/internal/version
+VERSION_PKG := github.com/RamXX/machinery/v2/internal/version
 TOOLS := $(CURDIR)/.bin
 export MACHINERY_TOOLS := $(TOOLS)
 

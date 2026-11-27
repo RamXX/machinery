@@ -6,9 +6,9 @@ package vital
 import (
 	"strings"
 
-	"github.com/RamXX/machinery/internal/arch"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/arch"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/tags"
 )
 
 // Cores returns the core of every vital area for stage arch (section 9), with

@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/stages"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/stages"
 )
 
 // Env is what a command gets.

@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // ratchetVital is rule vital-weakened of stage ratchet (section 11.3): a

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/backlog"
 )
 
 // Decision is a backlog item that carries a machinery:decision line

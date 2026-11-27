@@ -1,4 +1,4 @@
-module github.com/RamXX/machinery
+module github.com/RamXX/machinery/v2
 
 go 1.27.4
 

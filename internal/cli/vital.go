@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/vital"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/vital"
 )
 
 func init() {

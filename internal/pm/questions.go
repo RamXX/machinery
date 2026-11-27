@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/delegate"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/delegate"
 )
 
 // IsQuestion reports whether an item is a question for the owner (section 15.9).

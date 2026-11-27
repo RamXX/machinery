@@ -3,7 +3,7 @@ package cli
 import (
 	"errors"
 
-	"github.com/RamXX/machinery/internal/assess"
+	"github.com/RamXX/machinery/v2/internal/assess"
 )
 
 func init() {

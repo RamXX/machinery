@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/version"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/version"
 )
 
 // Tool is a pinned formal tool (section 16.8).

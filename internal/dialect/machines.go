@@ -12,8 +12,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/RamXX/machinery/internal/ir"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Machine is one translated machine file.

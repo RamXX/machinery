@@ -8,8 +8,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Obligation is an entry of obligations.json (section 7.1).

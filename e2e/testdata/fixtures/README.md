@@ -63,8 +63,8 @@ self-target and an atomic self-target. No model; generated files are not part of
 
 A tiny Go program, its own module, that emits receipts with `pkg/receipt` from its arguments
 (`pass`, `fail`, `skip`, `replay`, `outcome`, `many`) and prints what `Enabled`, `Only` and
-`Wanted` return. Its `go.mod` requires `github.com/RamXX/machinery`; a script adds the `replace`
-directive pointing at `$REPO` and builds it.
+`Wanted` return. Its `go.mod` requires `github.com/RamXX/machinery/v2`; a script adds the
+`replace` directive pointing at `$REPO` and builds it.
 
 ## `checkerprog`
 

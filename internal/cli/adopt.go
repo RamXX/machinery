@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/adopt"
-	"github.com/RamXX/machinery/internal/assess"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/rehearse"
+	"github.com/RamXX/machinery/v2/internal/adopt"
+	"github.com/RamXX/machinery/v2/internal/assess"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/rehearse"
 )
 
 func init() {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/machine"
 )
 
 // maxSteps bounds the eventless steps followed after a case fires.

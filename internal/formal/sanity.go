@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // The sanity run of machinery assess (docs/formats.md section 18.5): the

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/checkers"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/checkers"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 func init() {

@@ -1,10 +1,10 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/arch"
-	"github.com/RamXX/machinery/internal/baseline"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/vital"
+	"github.com/RamXX/machinery/v2/internal/arch"
+	"github.com/RamXX/machinery/v2/internal/baseline"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/vital"
 )
 
 func init() { Bind("arch", Arch) }

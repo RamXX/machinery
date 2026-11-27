@@ -1,9 +1,9 @@
 package stages
 
 import (
-	"github.com/RamXX/machinery/internal/backlog"
-	"github.com/RamXX/machinery/internal/pm"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/backlog"
+	"github.com/RamXX/machinery/v2/internal/pm"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("intake", Intake) }

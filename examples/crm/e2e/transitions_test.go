@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RamXX/machinery/pkg/receipt"
+	"github.com/RamXX/machinery/v2/pkg/receipt"
 )
 
 // caseTable is the part of a runtime table (docs/formats.md section 7.3)

@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // The findings of every section grouped by the machines and the entities

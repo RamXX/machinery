@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Link is a symbolic link a trace list reaches (section 8): the scan does not

@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/contract"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/contract"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gen"
 )
 
 // ProjectionFile is the name of the projection inside the gen directory.

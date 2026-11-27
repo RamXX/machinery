@@ -3,10 +3,10 @@ package stages
 import (
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/dialect"
-	"github.com/RamXX/machinery/internal/machine"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/dialect"
+	"github.com/RamXX/machinery/v2/internal/machine"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // The rules of a register of observed transitions (section 5.2.1).

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/RamXX/machinery/internal/design"
+	"github.com/RamXX/machinery/v2/internal/design"
 )
 
 func lowerCamel(s string) string {

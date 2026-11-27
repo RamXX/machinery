@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/evidence"
-	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/gitx"
 )
 
 func init() {

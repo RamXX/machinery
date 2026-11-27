@@ -1,8 +1,8 @@
 package affected
 
 import (
-	"github.com/RamXX/machinery/internal/evidence"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // idFindings are the findings of stage verify that a targeted verify keeps

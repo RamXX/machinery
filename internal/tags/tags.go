@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Tag kinds.

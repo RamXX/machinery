@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/gitx"
 	"github.com/bmatcuk/doublestar/v4"
 	"gopkg.in/yaml.v3"
 )

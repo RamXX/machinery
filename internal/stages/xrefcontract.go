@@ -4,9 +4,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/contract"
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/contract"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func init() { Bind("xref-contract", XrefContract) }

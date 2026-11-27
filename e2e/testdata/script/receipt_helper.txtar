@@ -2,7 +2,7 @@
 fixture shop shop
 fixture receiptprog prog
 cd prog
-exec go mod edit -replace github.com/RamXX/machinery=$REPO
+exec go mod edit -replace github.com/RamXX/machinery/v2=$REPO
 exec go build -o $WORK/bin/receiptprog .
 cd $WORK/shop
 exec machinery gen

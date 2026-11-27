@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/gitx"
 )
 
 // exportFile is the tracker's export, read as a file (section 18.8).

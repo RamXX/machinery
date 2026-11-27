@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gitx"
 )
 
 // historyKinds are the kinds history compares, in order (section 18.6).

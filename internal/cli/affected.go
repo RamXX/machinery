@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/affected"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gitx"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/affected"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 func init() {

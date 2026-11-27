@@ -1,10 +1,67 @@
 # Changelog
 
-## Unreleased: 2.0.0 (experimental, branch `experimental/v2`)
+Notable changes to machinery, newest first. v1, the 0.x releases, keeps its history in
+`CHANGELOG.md` on branch `v1`.
 
-v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not listed under
-"Carried forward" remains in this tree. `docs/formats.md` is the contract for every format,
-command, output line and exit code.
+## [Unreleased]
+
+### Evidence
+
+- A claiming file with no test function of its own that is a candidate of a package of the run
+  (a helper) is judged by its set: it passes only when every test function of that package
+  passed in one run, a fail of the set fails it, and `verify` says `by its set`. A helper that
+  carries a build constraint (a `//go:build` or `// +build` line, a `_GOOS`, `_GOARCH` or
+  `_GOOS_GOARCH` name, by the lists of `go/build`, or an import of `C`, written `"C"` or
+  `` `C` ``) is judged by no set: go test may not have built it, and `verify` says so. A file
+  without a test function is one the adapter cannot judge only when no set judges it. A marker
+  above a helper, a method or `TestMain` is a marker of its file.
+- `verify` names up to three claimants without a pass for each of the first ten partly run ids,
+  then how many more there are, in place of the first ten claimants; `verify --partly` still
+  names every one.
+- `verify` prints how many globs each `evidence.adapter.excused` entry has (the globs under
+  `verify --partly`). The entries may be kept in `design/excused.yaml`, read with
+  `machinery.yaml`, where a change keeps earlier runs valid.
+- Evidence across commits: a run of an earlier commit is valid at HEAD when its commit is an
+  ancestor of HEAD and every path changed since inside the project directory (a rename by both
+  of its paths, a copy by its new path) is the tool's own (the owed list, the adoption and
+  excused files, receipts, property records) or matches a glob of `evidence.exempt`; `verify`
+  and `status` say through how many exempt commits, and `verify` prints every exempt glob with
+  the paths it exempted since each run. A glob that would exempt a test, the code, a design
+  source, `machinery.yaml`, a build manifest, a submodule pointer or a path below a submodule
+  is a config error, a submodule pointer is never exempt, and the ratchet reports every exempt
+  glob added or widened. The contract says what a glob cannot protect: the other files a test
+  reads (fixtures, golden files, scripts, data), which the tool cannot know.
+- `owed sync` writes nothing while `machinery.yaml`, the adoption or excused file, a design
+  source or a test file has uncommitted changes, and names them, each once, both paths of a
+  rename (a test file moved out of `trace.tests` by its old path); `--allow-dirty` syncs as
+  `verify --allow-dirty` judges.
+- Every git command goes through one place: plumbing (`diff-tree`, `diff-index`, `ls-tree`,
+  `cat-file`, `rev-list` and the like) and `git status --porcelain=v2 -z`, optional locks off,
+  `--ignore-submodules=none`, `--no-renames` and the settings section 10.1 lists fixed on the
+  command line. `core.fileMode` is honoured: where it is `false` (a filesystem without
+  executable bits), a change of only a file's mode in the work tree is not dirty. A submodule
+  pointer that `submodule.<name>.ignore` or `diff.ignoreSubmodules` hides still voids earlier
+  runs and still makes the tree dirty, and `assess` writes its snapshot from `ls-tree` and
+  `cat-file`, so `export-ignore` and filters change nothing. A git failure stops the command
+  with one line that names the git command with its arguments, the directory, what git said and
+  what to do; none reads as "nothing changed".
+
+## [2.0.0] - 2026-11-27
+
+### Upgrading from v1
+
+2.0.0 is a rewrite, not an in-place upgrade. The design is data: a Modelith model, XState
+machines, contracts, failure modes and a risk file. Evidence comes only from end-to-end runs on
+the real system, recorded as receipts. `design/owed.yaml` is the one list of what is not proven
+yet. The backlog is `bd`, planned by `machinery plan`, in place of v1's execution packets and
+slice maps. v2 reads no v1 artifact. v1 remains on branch `v1`, with its `install.sh`; its
+last release is 0.11.2. To move a project, install 2.0.0 (`README.md`, "Install"), then start
+with `docs/getting-started.md` for a new project or `docs/brownfield.md` for an existing one.
+The Go module path is now `github.com/RamXX/machinery/v2`, so a Go suite imports
+`github.com/RamXX/machinery/v2/pkg/receipt`.
+
+Nothing of v1 that is not listed under "Carried forward" remains in this tree. `docs/formats.md`
+is the contract for every format, command, output line and exit code.
 
 ### Design
 
@@ -96,53 +153,20 @@ command, output line and exit code.
   id, it is proven only when each claimant is satisfied at the commit, by a verdict of the
   adapter or by a pass receipt its own test emitted. Otherwise it is
   `partly run: <n> of <m> claimants passed` in `verify`, `status`, `proof` and the run
-  summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names up
-  to three claimants without a pass for each of the first ten such ids, then how many more
-  there are, `verify --partly` every one, and says what to do; a file the adapter cannot judge
-  (not Go, not named `_test.go`, not a mapped staged source, not parsing, without a test
-  function and judged by no set) is named with why and with what it needs: fixing the file
-  when it does not parse, and removing the marker when it is not Go and no test (a README, a
-  golden file). A claiming file with no test function of its own that is a candidate of a
-  package of the run (a helper) is judged by its set: it passes only when every test function
-  of that package passed in one run, a fail of the set fails it, and `verify` says `by its
-  set`. A helper that carries a build constraint (a `//go:build` or `// +build` line, a
-  `_GOOS`, `_GOARCH` or `_GOOS_GOARCH` name, by the lists of `go/build`, or an import of
-  `C`, written `"C"` or `` `C` ``) is judged by no set: go test may not have built it, and `verify` says so. A marker above a helper, a method or `TestMain` is a marker of its file. A file under
+  summary: not proven, not failed, not pruned, and the story gate fails it. `verify` names the
+  first ten claimants without a pass, `verify --partly` every one, and says what to do; a file
+  the adapter cannot judge (not Go, not named `_test.go`, not a mapped staged source, not
+  parsing, without a test function) is named with why and with what it needs: fixing the file when it does
+  not parse, and removing the marker when it is not Go and no test (a README, a golden file). A file under
   `trace.tests` that cannot be read fails the commands that read markers. An id with no
   counted adapter pass is judged as before: a receipt a test emits proves it. `claims: any` is
   the rule of one claimant, and the ratchet reports it.
 - `evidence.adapter.excused` leaves claimants that cannot run here out of that rule, each entry
   with globs of test files, optional function patterns and a one-line reason; a file-level
   claimant is excused by its file, never by a function. `verify` prints every entry with the
-  claimants it covers and how many globs it has (the globs under `verify --partly`), and an
-  ERROR, with why, for each glob or pattern through which it covers nothing; an id whose
-  claimants are all excused is not proven; the ratchet names an entry added or widened, an
-  ERROR when it covers a claimant of a critical or vital id. The entries may be kept in
-  `design/excused.yaml`, read with `machinery.yaml`, where a change keeps earlier runs valid.
-- Evidence across commits: a run of an earlier commit is valid at HEAD when its commit is an
-  ancestor of HEAD and every path changed since inside the project directory (a rename by both
-  of its paths, a copy by its new path) is the tool's own (the owed list, the adoption and
-  excused files, receipts, property records) or matches a glob of `evidence.exempt`; `verify` and `status`
-  say through how many exempt commits, and `verify` prints every exempt glob with the paths it
-  exempted since each run. A glob that would exempt a test, the code, a design source,
-  `machinery.yaml`, a build manifest, a submodule pointer or a path below a submodule is a
-  config error, a submodule pointer is never exempt, and the ratchet reports every exempt glob
-  added or widened. The contract says what a glob cannot protect: the other files a test reads
-  (fixtures, golden files, scripts, data), which the tool cannot know.
-- `owed sync` writes nothing while `machinery.yaml`, the adoption or excused file, a design
-  source or a test file has uncommitted changes, and names them, each once, both paths of a
-  rename (a test file moved out of `trace.tests` by its old path); `--allow-dirty`
-  syncs as `verify --allow-dirty` judges.
-- Every git command goes through one place: plumbing (`diff-tree`, `diff-index`, `ls-tree`,
-  `cat-file`, `rev-list` and the like) and `git status --porcelain=v2 -z`, optional locks off,
-  `--ignore-submodules=none`, `--no-renames` and the settings section 10.1 lists fixed on the
-  command line. `core.fileMode` is honoured: where it is `false` (a filesystem without
-  executable bits), a change of only a file's mode in the work tree is not dirty. A submodule
-  pointer that `submodule.<name>.ignore` or `diff.ignoreSubmodules` hides still voids earlier runs and still makes the tree dirty, and
-  `assess` writes its snapshot from `ls-tree` and `cat-file`, so `export-ignore` and filters
-  change nothing. A git failure stops the command with one line that names the git command
-  with its arguments, the directory, what git said and what to do; none reads as "nothing
-  changed".
+  claimants it covers and an ERROR, with why, for each glob or pattern through which it covers
+  nothing; an id whose claimants are all excused is not proven; the ratchet names an entry
+  added or widened, an ERROR when it covers a claimant of a critical or vital id.
 - A `--streams` run that reads no stream exits 1 (the wrapper ran no `go test`, or cleared the
   environment with `env -i`); `--allow-no-streams` accepts a wrapper that may run nothing.
   `--keep-streams <dir>` copies every stream read into `<dir>/<run id>/` and records it in the

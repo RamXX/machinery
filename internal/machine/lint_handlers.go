@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/ir"
+	"github.com/RamXX/machinery/v2/internal/ir"
 )
 
 // lintHandlers holds the per-state rules over trigger containers: event

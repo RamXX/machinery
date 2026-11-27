@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/gitx"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/gitx"
 )
 
 // SelectIDs returns the obligations named by --ids and --prefix (section 13),

@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/baseline"
-	"github.com/RamXX/machinery/internal/project"
+	"github.com/RamXX/machinery/v2/internal/baseline"
+	"github.com/RamXX/machinery/v2/internal/project"
 )
 
 // Violation is one finding of the arch stage.

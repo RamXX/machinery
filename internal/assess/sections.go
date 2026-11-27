@@ -6,15 +6,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/adopt"
-	"github.com/RamXX/machinery/internal/design"
-	"github.com/RamXX/machinery/internal/evidence"
-	"github.com/RamXX/machinery/internal/formal"
-	"github.com/RamXX/machinery/internal/gen"
-	"github.com/RamXX/machinery/internal/report"
-	"github.com/RamXX/machinery/internal/stages"
-	"github.com/RamXX/machinery/internal/tags"
-	"github.com/RamXX/machinery/internal/vital"
+	"github.com/RamXX/machinery/v2/internal/adopt"
+	"github.com/RamXX/machinery/v2/internal/design"
+	"github.com/RamXX/machinery/v2/internal/evidence"
+	"github.com/RamXX/machinery/v2/internal/formal"
+	"github.com/RamXX/machinery/v2/internal/gen"
+	"github.com/RamXX/machinery/v2/internal/report"
+	"github.com/RamXX/machinery/v2/internal/stages"
+	"github.com/RamXX/machinery/v2/internal/tags"
+	"github.com/RamXX/machinery/v2/internal/vital"
 )
 
 // inventory: the facts of the adopt report for the snapshot, and the links

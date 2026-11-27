@@ -3,8 +3,8 @@ package stages
 import (
 	"fmt"
 
-	"github.com/RamXX/machinery/internal/project"
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/project"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 // waivers applies the waivers of machinery.yaml (section 6.7) to the findings

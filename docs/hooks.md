@@ -13,7 +13,9 @@ is `docs/formats.md` section 21.1.
 
 ## Setup
 
-1. Put the `machinery` executable on `PATH`: from a checkout, `go install ./cmd/machinery`.
+1. Put the `machinery` executable on `PATH`:
+   `go install github.com/RamXX/machinery/v2/cmd/machinery@v2.0.0`, or from a checkout,
+   `go install ./cmd/machinery`.
 2. Install the plugin. Its hooks load from `hooks/hooks.json` at the plugin root.
 3. Optionally set the modes in `machinery.yaml`; these are the defaults:
 

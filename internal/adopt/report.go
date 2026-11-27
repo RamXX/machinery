@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/RamXX/machinery/internal/report"
+	"github.com/RamXX/machinery/v2/internal/report"
 )
 
 func list(vs []string, none string) string {
