@@ -57,6 +57,9 @@ type RunAdapter interface {
 	// Environment is what the header records of the environment of the
 	// run, nil for nothing.
 	Environment() any
+	// Sets are the claiming files with no test function of their own that
+	// the run judged by their set, for the end line, after Receipts.
+	Sets() []string
 }
 
 // ExitNotStarted is the exit code when the command could not be started.
@@ -94,6 +97,8 @@ type endLine struct {
 	// Adapter is the number of receipt lines the run adapter wrote right
 	// before the end line (section 10.3); absent without an adapter.
 	Adapter *int `json:"adapter_receipts,omitempty"`
+	// Sets are the helpers the adapter judged by their set (section 10.3).
+	Sets []string `json:"adapter_sets,omitempty"`
 }
 
 func jsonLine(v any) []byte {
@@ -250,7 +255,7 @@ func Run(p *project.Project, opts RunOptions, argv []string) (exit int, file str
 		// one append, after the command has exited
 		lines := opts.Adapter.Receipts()
 		n := len(lines)
-		end.Adapter = &n
+		end.Adapter, end.Sets = &n, opts.Adapter.Sets()
 		tail = bytes.Join(lines, nil)
 	}
 	_, err = f.Write(append(tail, jsonLine(end)...))

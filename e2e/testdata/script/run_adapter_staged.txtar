@@ -108,9 +108,10 @@ gitcommit 'a second package, and one entry for every package of e2e'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/... > "$MACHINERY_GO_TEST_JSON/e2e.json"'
 stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 2 package\(s\), 7 test function\(s\) with a verdict: 7 passed, 0 failed, 0 skipped$'
-stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 7 pass, 0 fail, 0 skip$'
 ! stderr 'ambiguous'
-stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims count nothing$'
+# the file without a test function is judged by its set: the test functions of e2e/more
+stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/more$'
 exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
 stdout '"test":"e2e/more/more_test\.go::TestEmailUnique"'
 stdout '"test":"e2e/suite/email_test\.go::TestEmailUnique"'
@@ -123,8 +124,11 @@ env MORE_FAILS_IN=x
 exec mrun 1 run --adapter go-test-json --streams -- sh more.sh
 env MORE_FAILS_IN=
 stderr '^machinery run: adapter: TestEmailUnique: failed in package\(s\) example\.test/shop/stage/x, so read as failed in e2e/more/more_test\.go, e2e/suite/email_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 3 fail, 0 skip$'
 ! stderr 'no file under trace\.tests belongs to'
+# the file without a test function of e2e/more fails with its set
+exec sh -c 'grep -h sc:customer-pays-and-the-order-ships .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/more/doc_test\.go","observed":"go test: TestEmailUnique of its set failed"'
 ! stderr 'defined in no candidate file'
 exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
 stdout '"outcome":"fail","test":"e2e/more/more_test\.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
@@ -143,7 +147,9 @@ exec sh -c 'cat base.yaml wide.part > machinery.yaml'
 gitcommit 'one glob over every directory of e2e'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/... > "$MACHINERY_GO_TEST_JSON/e2e.json"'
-stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+# the file of e2e/more without a test function is judged by the set of its own package
+stderr '^machinery run: adapter: receipts written: 7 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/more$'
 ! stderr 'ambiguous'
 
 # the verifier's case: a staged test kept under testdata is copied into e2e/suite, where it fails,
@@ -159,12 +165,15 @@ exec mrun 1 run --adapter go-test-json --streams -- sh extra.sh e2e/suite e2e/ru
 env EXTRA_FAILS_IN=
 stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 8 test function\(s\) with a verdict: 7 passed, 1 failed, 0 skipped$'
 stderr '^machinery run: adapter: TestExtra: failed in package\(s\) example\.test/shop/e2e/suite, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 ! stderr 'no file under trace\.tests belongs to'
 ! stderr 'defined in no candidate file'
 exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
-stdout -count=1 receipt
+stdout -count=2 receipt
 stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra failed"'
+# the wildcard entry gives the package built from copies every file, the file of e2e/more without
+# a test function included: its set holds TestExtra, and it fails with it
+stdout '"id":"sc:customer-pays-and-the-order-ships","outcome":"fail","test":"e2e/more/doc_test\.go","observed":"go test: TestExtra of its set failed"'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/testdata/staged/extra_test\.go::TestExtra\)$'
 
@@ -176,19 +185,20 @@ exec mrun 1 run --adapter go-test-json --streams -- sh extra.sh e2e/suite e2e/ru
 env EXTRA_EXITS_IN=
 stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestExtra$'
 stderr '^machinery run: adapter: TestExtra: failed in package\(s\) example\.test/shop/e2e/suite, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
 stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra: started, no verdict; the package failed"'
 
 # a fail needs no package: the copy in a directory of its own passes, and the same file built
 # into a test binary and run under go tool test2json without -p fails, by t.Fatal and by
 # os.Exit, in events that name no package. The fail goes by name, the name gets no pass, and
-# verify fails the id
+# verify fails the id. Each time the file of e2e/more without a test function, in the set of the
+# package built from copies, fails with it
 rm .machinery/receipts
 env EXTRA_FAILS_IN=x
 exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh
 env EXTRA_FAILS_IN=
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 stderr '^machinery run: adapter: 1 verdict\(s\) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>$'
 exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
@@ -199,13 +209,13 @@ rm .machinery/receipts
 env EXTRA_EXITS_IN=x
 exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh
 env EXTRA_EXITS_IN=
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 # a function those events started and gave no verdict, in a run of them that did not end with
 # pass, fails by name too
 rm .machinery/receipts
 exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh cut
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
 stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra: started, no verdict; the package failed"'
@@ -214,7 +224,7 @@ stdout '"outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra",
 # still a function with more run events than verdicts. It fails by name, and no pass of it counts
 rm .machinery/receipts
 exec mrun 1 run --adapter go-test-json --streams -- sh nameless.sh cutpass
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 stderr '^machinery run: adapter: TestExtra: failed in events that name no package, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
 stderr '^machinery run: adapter: 1 verdict\(s\) name no package: a pass or a skip of them counts nothing, a fail goes by name; run the test binary under go tool test2json -p <import path>$'
 exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
@@ -252,10 +262,10 @@ exec sh -c 'cat base.yaml > machinery.yaml'
 gitcommit 'no map'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/more
-stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 2 pass, 0 fail, 0 skip$'
 stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
-stderr '^machinery run: adapter: in the whole project: 5 claimed id\(s\) not run, 1 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
-stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims count nothing$'
+stderr '^machinery run: adapter: in the whole project: 4 claimed id\(s\) not run, 1 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
+stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/more$'
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/suite
 stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'

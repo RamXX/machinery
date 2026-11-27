@@ -112,6 +112,10 @@ type claimants struct {
 	// unjudged: a file claimant of an id that the adapter cannot give a
 	// verdict (Func "") -> why; only a receipt its own test emits satisfies it
 	unjudged map[claimUnit]string
+	// bySet: such a claimant with no test function of its own and a marker
+	// at file level: a run that judged its file by its set gives it a verdict
+	// after all (section 10.3)
+	bySet map[claimUnit]bool
 	// uses: what each entry in effect covers; problems: its patterns that
 	// cover nothing
 	uses     []excusedUse
@@ -168,7 +172,7 @@ func readClaimants(p *project.Project, d *design.Design) (*claimants, error) {
 // readClaimantsWith reads the claimants, and with excuse applies the entries
 // of evidence.adapter.excused to them.
 func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*claimants, error) {
-	c := &claimants{of: map[string][]Claimant{}, excused: map[Claimant]bool{}, files: map[string]*goTestFile{}, unjudged: map[claimUnit]string{}}
+	c := &claimants{of: map[string][]Claimant{}, excused: map[Claimant]bool{}, files: map[string]*goTestFile{}, unjudged: map[claimUnit]string{}, bySet: map[claimUnit]bool{}}
 	if p.Cfg.Trace == nil || len(p.Cfg.Trace.Tests) == 0 {
 		return c, nil
 	}
@@ -199,7 +203,7 @@ func readClaimantsWith(p *project.Project, d *design.Design, excuse bool) (*clai
 // file is called or holds (section 10.3).
 func (c *claimants) derive(d *design.Design, found []tags.Tag) error {
 	ids, scenarios := d.DeclaredIDs(), d.ScenarioIDs()
-	seen, judged := map[claimUnit]bool{}, map[claimUnit]bool{}
+	seen, judged, fileLevel := map[claimUnit]bool{}, map[claimUnit]bool{}, map[claimUnit]bool{}
 	above := map[claimUnit]string{} // the first function, not a test function, a marker of the id stands above
 	for _, t := range found {
 		if t.Kind != tags.Verifies {
@@ -221,6 +225,8 @@ func (c *claimants) derive(d *design.Design, found []tags.Tag) error {
 						}
 					case len(f.Funcs) > 0:
 						judged[u] = true // the adapter writes a receipt for the file
+					default:
+						fileLevel[u] = true // its set may judge it
 					}
 				}
 				if !seen[u] {
@@ -233,6 +239,9 @@ func (c *claimants) derive(d *design.Design, found []tags.Tag) error {
 	for u := range seen {
 		if u.Func == "" && !judged[u] {
 			c.unjudged[u] = c.why(u.File, above[u])
+			if fileLevel[u] {
+				c.bySet[u], c.unjudged[u] = true, c.why(u.File, "")
+			}
 		}
 	}
 	trace := tags.ClaimsOf(d, found).Tests
@@ -424,6 +433,8 @@ type Partly struct {
 	Missing  []Claimant
 	Skipped  map[Claimant]bool
 	Unjudged map[Claimant]string
+	// BySet: those of them a run judged by their set (section 10.3)
+	BySet map[Claimant]bool
 }
 
 // Text is "<n> of <m> claimants passed", with the excused ones when there are.
@@ -508,8 +519,12 @@ func (e *Evaluation) PartlyFindings(only map[string]bool, all bool) []report.Fin
 			switch why, cannot := pr.Unjudged[cl]; {
 			case cannot:
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: %s", id, cannotJudge(cl.File, why)))
+			case pr.Skipped[cl] && pr.BySet[cl]:
+				msgs = append(msgs, fmt.Sprintf("partly run: %s: skipped: %s (by its set)", id, cl))
 			case pr.Skipped[cl]:
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: skipped: %s", id, cl))
+			case pr.BySet[cl]:
+				msgs = append(msgs, fmt.Sprintf("partly run: %s: no verdict: %s (by its set)", id, cl))
 			default:
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: no verdict: %s", id, cl))
 			}

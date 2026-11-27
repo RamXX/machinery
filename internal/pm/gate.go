@@ -402,7 +402,7 @@ func StoryVerify(d *design.Design, ev *evidence.Evaluation, ids []string, partly
 }
 
 // per-id findings of stage verify; failed ones always print
-var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: ", "adapter: ", "partly run: ", "no claimant can run here: ", "excused: "}
+var idFindings = []string{"unproven: ", "stale owed entry: ", "unexpected effect: ", "adapter: ", "partly run: ", "no claimant can run here: ", "excused: ", "by its set: "}
 
 func keepFinding(msg string, sel map[string]bool) bool {
 	if id, ok := evidence.FindingID(msg, idFindings); ok {

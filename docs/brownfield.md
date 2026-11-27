@@ -261,9 +261,12 @@ version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod
 | The stream ended before its package did | none: the run is incomplete; delete its receipts file |
 
 A marker directly above a test function claims for that function (`granularity: function`); a
-marker above no function claims for every test function of the file (`granularity: file`); one
-above a fuzz test, a benchmark or a helper gives no receipt and is named in the summary (its
-file is then a claimant the adapter cannot judge, below). A pass
+marker above no function, or above a helper, claims for every test function of the file
+(`granularity: file`); one above a fuzz test, a benchmark or an example gives no receipt and is
+named in the summary (its file is then a claimant the adapter cannot judge, below). A file of
+helpers with no test function of its own is judged by its set: it passes when every test
+function of its package passed in the same run, and a `-run` filter or a build tag that leaves
+one out gives it nothing. A pass
 through a parent test records how many subtests ran (`subtests: 2`).
 
 **Every claimant.** An id that several tests claim is proven by the adapter only when every one

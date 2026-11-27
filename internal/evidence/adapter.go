@@ -78,6 +78,8 @@ type GoTest struct {
 	// names it)
 	kept   int
 	keptAt string
+	// sets are the helpers judged by their set (section 10.3), sorted
+	sets []string
 	// wrote counts the receipts written; whole is the index of the
 	// whole-project line in summary, idleAll the ids it counts as not run
 	wrote    int
@@ -767,6 +769,8 @@ func (a *GoTest) Receipts() [][]byte {
 			names[name] = true
 		}
 	}
+	pkgOK := map[string]bool{}               // package -> every run of it ended with pass
+	pkgState := map[string]map[string]int{}  // package -> function -> its state there
 	raw := map[string]map[string][2]string{} // file -> function -> its verdict and the package it came from
 	subCount := map[string]map[string]int{}  // file -> function -> how many subtests ran (section 10.3)
 	for _, name := range sortedKeys(names) {
@@ -831,6 +835,7 @@ func (a *GoTest) Receipts() [][]byte {
 		if notOK {
 			refused = append(refused, fmt.Sprintf("adapter: package %s: did not end with pass; no pass is written from it", name))
 		}
+		pkgOK[name] = !notOK
 		fns := sortedKeys(read)
 		for fn := range replayed {
 			if read[fn] == nil {
@@ -895,6 +900,10 @@ func (a *GoTest) Receipts() [][]byte {
 				}
 				passed++
 			}
+			if pkgState[name] == nil { // the verdict of the function in this package, for a set (section 10.3)
+				pkgState[name] = map[string]int{}
+			}
+			pkgState[name][fn] = st
 			markFail := func(file string) {
 				switch {
 				case isExplicit:
@@ -1063,37 +1072,73 @@ func (a *GoTest) Receipts() [][]byte {
 	has, idle, idleAll, held := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	passedBy, failedID := map[string]map[Claimant]bool{}, map[string]bool{}
 	var lines [][]byte
+	// a helper judged by its set (section 10.3): its file -> the packages of
+	// its set
+	sets := map[string][]string{}
 	for _, u := range a.units {
 		f := a.files[u.File]
-		funcs := f.Funcs
-		if u.Func != "" {
-			funcs = []string{u.Func}
+		var funcs []fileFn
+		var pkgs []string // the packages of the set of a helper
+		broken := false
+		switch {
+		case u.Func != "":
+			funcs = []fileFn{{u.File, u.Func, ""}}
+		case len(f.Funcs) > 0:
+			for _, fn := range f.Funcs {
+				funcs = append(funcs, fileFn{u.File, fn, ""})
+			}
+		case !f.Broken:
+			funcs, pkgs, broken = a.setOf(u.File, names)
 		}
 		if len(funcs) == 0 {
-			continue // no test function, or a file that does not parse: named in the summary
+			continue // no test function and no set, or a file that does not parse: named in the summary
+		}
+		bySet := len(pkgs) > 0
+		if bySet {
+			sets[u.File] = pkgs
 		}
 		st := stPass
+		if broken { // a candidate of the set does not parse: its test functions are not known
+			st = stAmbiguous
+		}
+		for _, pkg := range pkgs { // the set passes only when its package ended with pass
+			if !pkgOK[pkg] && st > stBlocked {
+				st = stBlocked
+			}
+		}
 		var failedFns, startedFns, unranFns, skippedFns []string
-		for _, fn := range funcs {
-			fst, ran := state[u.File][fn]
+		for _, ff := range funcs {
+			file, fn := ff.file, ff.fn
+			fst, ran := state[file][fn]
 			if !ran {
 				fst = stNotRun
+			}
+			if ff.pkg != "" { // in a set the function is judged in the package of the set as well
+				if pst, ok := pkgState[ff.pkg][fn]; !ok {
+					fst = min(fst, stNotRun)
+				} else {
+					fst = min(fst, pst)
+				}
 			}
 			if fst < st {
 				st = fst
 			}
 			switch {
-			case fst == stFail && explicit[u.File][fn]:
+			case fst == stFail && explicit[file][fn]:
 				failedFns = append(failedFns, fn)
-			case fst == stFail && silent[u.File][fn]:
+			case fst == stFail && silent[file][fn]:
 				startedFns = append(startedFns, fn)
-			case fst == stFail && unrun[u.File][fn]:
+			case fst == stFail && unrun[file][fn]:
 				unranFns = append(unranFns, fn)
 			case fst == stFail:
 				failedFns = append(failedFns, fn)
 			case fst == stSkip:
 				skippedFns = append(skippedFns, fn)
 			}
+		}
+		ofSet := "" // how the observed text says the functions are those of a set
+		if bySet {
+			ofSet = " of its set"
 		}
 		r := adapterReceipt{V: 1, Type: "receipt", ID: u.ID, Test: u.File, Source: SourceAdapter,
 			Granularity: project.GranularityFile, Tags: "unknown"}
@@ -1106,11 +1151,14 @@ func (a *GoTest) Receipts() [][]byte {
 		switch st {
 		case stPass:
 			r.Outcome, r.Observed = Pass, fmt.Sprintf("go test: all %d test function(s) of the file passed", len(funcs))
-			if u.Func != "" {
+			switch {
+			case u.Func != "":
 				r.Observed = "go test: " + u.Func + " passed"
+			case bySet:
+				r.Observed = fmt.Sprintf("go test: all %d test function(s) of its set passed (%s)", len(funcs), packageWords(pkgs))
 			}
-			for _, fn := range funcs { // a claim satisfied through a parent test says how many subtests ran
-				r.Subtests += subCount[u.File][fn]
+			for _, ff := range funcs { // a claim satisfied through a parent test says how many subtests ran
+				r.Subtests += subCount[ff.file][ff.fn]
 			}
 			if r.Subtests > 0 {
 				r.Observed += fmt.Sprintf(" (subtests: %d)", r.Subtests)
@@ -1119,14 +1167,14 @@ func (a *GoTest) Receipts() [][]byte {
 			r.Outcome = Fail
 			switch {
 			case len(failedFns) > 0:
-				r.Observed = "go test: " + nameList(failedFns) + " failed"
+				r.Observed = "go test: " + nameList(failedFns) + ofSet + " failed"
 			case len(startedFns) > 0:
-				r.Observed = "go test: " + nameList(startedFns) + ": started, no verdict; the package failed"
+				r.Observed = "go test: " + nameList(startedFns) + ofSet + ": started, no verdict; the package failed"
 			default:
-				r.Observed = "go test: " + nameList(unranFns) + ": the package did not run its tests"
+				r.Observed = "go test: " + nameList(unranFns) + ofSet + ": the package did not run its tests"
 			}
 		case stSkip:
-			r.Outcome, r.Observed = Skip, "go test: "+nameList(skippedFns)+" skipped"
+			r.Outcome, r.Observed = Skip, "go test: "+nameList(skippedFns)+ofSet+" skipped"
 		case stNotRun:
 			idleAll[u.ID] = true
 			if scope[u.File] {
@@ -1151,6 +1199,7 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 	}
 	a.wrote = len(lines)
+	a.sets = sortedKeys(sets)
 	// partly run in this run: an id with a pass and no fail here, and a
 	// claimant that is not excused without a pass here (section 10.3)
 	var partly, partlyPassed, partlyOf int
@@ -1219,7 +1268,11 @@ func (a *GoTest) Receipts() [][]byte {
 			broken = append(broken, "adapter: "+unreadableClaimant(rel, f.Err))
 		case len(f.Funcs) == 0:
 			a.emptyAll++
-			if scope[rel] {
+			switch {
+			case !scope[rel]:
+			case len(sets[rel]) > 0:
+				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims are judged by its set: every test function of %s", rel, packageWords(sets[rel])))
+			default:
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims count nothing", rel))
 			}
 		}
@@ -1292,6 +1345,52 @@ func (a *GoTest) wholeLine(evidenced func(string) bool) string {
 
 // Wrote is the number of receipts the adapter wrote, after Receipts.
 func (a *GoTest) Wrote() int { return a.wrote }
+
+// Sets are the helpers the run judged by their set, sorted (section 10.3):
+// the end line of the run records them, after Receipts.
+func (a *GoTest) Sets() []string { return a.sets }
+
+// fileFn is a test function of a file and, in a set, the package of the
+// set (section 10.3).
+type fileFn struct{ file, fn, pkg string }
+
+// setOf returns the functions a helper is judged by (section 10.3, "Whose
+// claim"): for every package of the run whose candidate it is, every test
+// function of that package's candidate files, and those packages, sorted.
+// broken reports a candidate that does not parse, whose test functions are
+// not known.
+func (a *GoTest) setOf(file string, names map[string]bool) (funcs []fileFn, pkgs []string, broken bool) {
+	seen := map[fileFn]bool{}
+	for _, name := range sortedKeys(names) {
+		cands := a.candidates(name)
+		if !contains(cands, file) {
+			continue
+		}
+		pkgs = append(pkgs, name)
+		for _, c := range cands {
+			f := a.parsed(c)
+			if f.Broken {
+				broken = true
+				continue
+			}
+			for _, fn := range f.Funcs {
+				if ff := (fileFn{c, fn, name}); !seen[ff] {
+					seen[ff] = true
+					funcs = append(funcs, ff)
+				}
+			}
+		}
+	}
+	return funcs, pkgs, broken
+}
+
+// packageWords names packages: "package <p>", or "packages <p>, <q>".
+func packageWords(pkgs []string) string {
+	if len(pkgs) == 1 {
+		return "package " + pkgs[0]
+	}
+	return "packages " + nameList(append([]string(nil), pkgs...))
+}
 
 // NoStream reports a run through --streams that read no stream at all.
 func (a *GoTest) NoStream() bool { return a.fromDir && len(a.streams) == 0 }

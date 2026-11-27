@@ -200,7 +200,7 @@ func Evaluate(p *project.Project, d *design.Design, allowDirty bool) (*Evaluatio
 			add(report.Warn, "%s", run.ValidLine())
 		}
 		if run.Adapter {
-			run.Env = fd.Header.Environment
+			run.Env, run.Sets = fd.Header.Environment, fd.End.AdapterSets
 			add(report.Warn, "%s", EnvLine(rel, run.Env)) // a record, not a judgment (section 10.3)
 		}
 		ev.Runs = append(ev.Runs, run)
@@ -368,6 +368,13 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 		}
 		passed[r.ID][claimantOf(r)] = true
 	}
+	// the helpers a run used at the commit judged by their set (section 10.3)
+	sets := map[string]bool{}
+	for _, run := range ev.Runs {
+		for _, f := range run.Sets {
+			sets[f] = true
+		}
+	}
 	for i := range d.Obligations {
 		o := &d.Obligations[i]
 		if !contains(project.AdapterKinds, o.Kind) || len(cs.of[o.ID]) == 0 {
@@ -387,19 +394,32 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 			}
 		case !used[o.ID]: // no adapter evidence: not under the rule
 		default:
-			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}, Unjudged: map[Claimant]string{}}
+			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}, Unjudged: map[Claimant]string{}, BySet: map[Claimant]bool{}}
+			var bySet []string // the helpers of the id its set satisfied
 			for _, c := range open {
-				why, cannot := cs.unjudged[claimUnit{ID: o.ID, File: c.File, Func: c.Func}]
+				unit := claimUnit{ID: o.ID, File: c.File, Func: c.Func}
+				why, cannot := cs.unjudged[unit]
+				set := cs.bySet[unit] && sets[c.File] // a helper a run judged by its set
+				if set {
+					cannot = false
+				}
 				switch {
 				case passed[o.ID][c] && !cannot, emitted[o.ID][c.File]:
 					pr.Passed++
+					if set && passed[o.ID][c] {
+						bySet = append(bySet, c.File)
+					}
 				default:
 					pr.Missing = append(pr.Missing, c)
 					pr.Skipped[c] = skipped[o.ID][c]
+					pr.BySet[c] = set
 					if cannot {
 						pr.Unjudged[c] = why
 					}
 				}
+			}
+			for _, file := range bySet {
+				add(report.Warn, "by its set: %s: %s: no test function of its own; every test function of its package passed in one run", o.ID, file)
 			}
 			switch {
 			case pr.Passed < pr.Of:

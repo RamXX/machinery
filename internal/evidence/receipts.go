@@ -63,6 +63,9 @@ type RunInfo struct {
 	// header recorded (nil for a run through --streams)
 	Adapter bool
 	Env     *GoEnv
+	// Sets are the helpers an adapter run judged by their set, as its end
+	// line records them (section 10.3)
+	Sets []string
 	// Through is how many commits lead from the commit of the run to the
 	// current one, every path they change exempt (section 10.1); 0 for a run
 	// of the current commit
@@ -91,9 +94,10 @@ type line struct {
 	Subtests    *int   `json:"subtests"`
 	// Adapter names the run adapter in a header; AdapterReceipts counts, on
 	// the end line, the lines that adapter wrote right before it (section 10.3)
-	Adapter         any    `json:"adapter"`
-	AdapterReceipts *int   `json:"adapter_receipts"`
-	Environment     *GoEnv `json:"environment"`
+	Adapter         any      `json:"adapter"`
+	AdapterReceipts *int     `json:"adapter_receipts"`
+	AdapterSets     []string `json:"adapter_sets"`
+	Environment     *GoEnv   `json:"environment"`
 }
 
 // fileData is a parsed receipts file.

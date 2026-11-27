@@ -2488,8 +2488,9 @@ reads them (sections 8 and 8.1). Each is attributed:
 - a tag or marker on a line of the comment directly above a test function (its doc comment: the
   comment group that ends on the line before `func`) belongs to that function. The receipt has
   `granularity: function`;
-- a tag or marker on a line of the comment directly above any other function declared at the
-  top level of the file (a fuzz test, a benchmark, an example, `TestMain`, a helper, a method)
+- a tag or marker on a line of the comment directly above a fuzz test, a benchmark or an example
+  (a top-level function without a receiver named `Fuzz`, `Benchmark` or `Example`, or one of
+  them followed by a character that is not a lower-case letter, as `go test` names them)
   belongs to that function, which the adapter does not judge. The claim gives no receipt and is
   counted neither as `claimed, not run` nor as `claimed, verdict not counted`; the summary
   names it once if its file is a candidate of a package seen in the run,
@@ -2498,11 +2499,37 @@ reads them (sections 8 and 8.1). Each is attributed:
   fuzz test whose seeds were skipped or not selected, or of a benchmark, which direct mode never
   runs. For the rule of every claimant (below) such a claim makes its file a claimant of the
   id, and this marker brings the file no verdict;
-- a tag or marker anywhere else in the file (above no function) belongs to every test function of the file. The
+- a tag or marker anywhere else in the file belongs to every test function of the file: above no
+  function, or in the comment directly above any other function (a helper, a method,
+  `TestMain`), which is read as text of its file and never as a claim of that function. The
   receipt has `granularity: file`, and it needs a verdict of every one of them ("Which receipt",
   below): a function of the file that has none in the run, because it was not built, not
   selected or not reached, leaves the id without a receipt, unless its package did not run its
-  tests or a failure stopped it after it started (above).
+  tests or a failure stopped it after it started (above). A file with such a claim and no test
+  function of its own is judged by its set (below).
+
+**A file with no test function: judged by its set.** A helper staged with a set of tests, or a
+`_test.go` file of helpers, claims ids for the tests it serves and has no test function of its
+own. When such a file (one the adapter reads, that parses, with a claim of the whole file) is a
+candidate of a package the run saw ("Whose verdict", below), the functions its claims belong to
+are **its set**: for every such package, every test function defined in that package's candidate
+files, each judged by its verdict in that package and by the state of its own file (a fail that
+went to the file by name or from another package included). The table of "Which receipt" applies
+to them as to the functions of a file: the file gets a `pass` only when, in this one run, every
+test function of the set passed and the package ended every run of it with `pass`; a `fail`
+when one of them failed, a function that claims nothing included (a false fail rather than a
+lost one); and nothing when one of them has no verdict in that package (a `-run` filter, a build
+constraint that left a file out, a binary stopped before it), so a set that did not run in full
+never credits the file. A candidate that does not parse leaves the set ambiguous, and a
+candidate outside `trace.tests`, whose verdicts count nothing, leaves it without a pass. A
+package whose candidate files have no test function gives the file no set. The receipt names
+the file at `granularity: file`, and its `observed` says so:
+`go test: all <n> test function(s) of its set passed (package <import path>)`
+(`packages <a>, <b>` for several), and `go test: <functions> of its set failed` (`skipped`,
+`: started, no verdict; the package failed`, `: the package did not run its tests`). The end line
+of the run names every file it judged by its set (below). A file with no test function that is
+a candidate of no package of a run, or only of packages with no test function, is judged by no
+set in that run.
 
 **Which verdict.** The verdict of a function is its `pass`, `fail` or `skip` event, read with
 those of its subtests (a `Test` that begins with the function's name and a `/`, at any depth)
@@ -2623,8 +2650,8 @@ functions the claim belongs to, in this order:
 | One of them passed only in runs that answered its package from the cache, or its package failed in a run. | Nothing. |
 | Every one passed, and each package ended every run of it with a package-level `pass` event. | A `pass` receipt. |
 
-A claim of a whole file that has no test function, and a claim in a file that does not parse,
-give no receipt, and the file is named in the summary. Each is still a claimant of the ids it
+A claim of a whole file that has no test function and no set in the run, and a claim in a file
+that does not parse, give no receipt, and the file is named in the summary. Each is still a claimant of the ids it
 claims, as is the file of a claim above a function the adapter does not judge ("Every claimant", below). The policy of the project (below) is not applied here: the receipt records what
 happened, and `verify` decides what it proves.
 
@@ -2665,10 +2692,10 @@ An adapter receipt is a receipt line with three more keys:
 Receipts are written sorted by id, then file, then function, the file-level one first. They and
 the end line are written in one append, after the command has exited, and the end line of an
 adapter run has one more key, `adapter_receipts`, the number of lines the adapter wrote right
-before it:
+before it, and, when it judged a file by its set, `adapter_sets`, those files, sorted:
 
 ```json
-{"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z","adapter_receipts":6}
+{"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z","adapter_receipts":6,"adapter_sets":["e2e/suite/helpers_test.go"]}
 ```
 
 Those lines are the only ones that may carry `source`, `granularity`, `tags` or `subtests`. A
@@ -2814,6 +2841,7 @@ adapter: <import path>.<function>: <verdict> in <file>, <verdict> in <file>: ver
 adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in package <import path>: verdicts differ, read as fail
 adapter: <function>: failed in <where>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
+adapter: <file>: no test function; its claims are judged by its set: every test function of package <import path>
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: cannot be read as Go (<first parse error>): its claims count as not passed; fix the file or remove its markers
 adapter: streams kept in <dir>/<run id>: <n> file(s)
@@ -2860,7 +2888,9 @@ name included. A claim in a file of no package of the run does not count there.
 `claimed, verdict not counted` counts the other ids without a receipt whose claims met a pass
 replayed from the cache, a package that did not end with pass, or an ambiguous name. A claim
 above a function the adapter does not judge counts in neither. The `no test function` lines
-name only the candidate files of the packages the run saw. `in the whole project` counts the
+name only the candidate files of the packages the run saw: `its claims are judged by its set`
+for one the run judged by its set, with the packages of its set (`packages <a>, <b>` for
+several), and `its claims count nothing` for the others. `in the whole project` counts the
 ids without a receipt with a claim whose function did not run, the claiming files with no
 test function, and the distinct file, id and function combinations of claims above functions
 the adapter does not judge, across every file the adapter reads. In a run that wrote no receipt
@@ -2927,8 +2957,8 @@ in a run used at the commit:
 
 - (a) **a verdict of the adapter**: an adapter receipt that is a `pass` for the id with the
   claimant as its `test` (`<file>::<function>`, or `<file>` at file granularity, which passes
-  when every test function of the file passed, as above), whether or not the policy lets that
-  pass count;
+  when every test function of the file passed, or for a file with no test function when its set
+  passed, as above), whether or not the policy lets that pass count;
 - (b) **a receipt its own test emitted**: a `pass` receipt for the id that no adapter wrote and
   whose `test` names the claimant's file, by the rule of section 10.2 for the file of a receipt
   (its path, or a base name that only it has). It satisfies every claimant of the id in that
@@ -2941,8 +2971,11 @@ while another counts (kind and tier decide for every pass of the id at once): wi
 the function-granularity passes of its other claimants.
 
 *A file the adapter cannot judge.* The adapter writes a receipt for a file only when it reads
-the file, the file parses, a marker for the id stands above no function of it, and it has a
-test function ("Which receipt", above). A file claimant that lacks one of these never has (a):
+the file, the file parses, a marker for the id claims the whole file, and it has a test function
+or a run judges it by its set ("Which receipt", above). A file with no test function is judged
+by its set at the commit when a run used at the commit names it in `adapter_sets`: it is then a
+claimant the adapter judges like any other, satisfied by that run's `pass` and otherwise
+without a verdict, and `verify` says `by its set` of it (section 12). A file claimant that lacks one of these never has (a):
 it is satisfied by (b), or excused (below), and by nothing else. `verify` names it with why
 (section 12):
 
@@ -2951,8 +2984,8 @@ it is satisfied by (b), or excused (below), and by nothing else. `verify` names 
 | `not a Go file` | Its name does not end in `.go`. |
 | `a Go file not named _test.go that no entry of evidence.adapter.sources names` | A Go file the adapter does not read, a test file whose name lacks `_test` included. It is not parsed, so it is the same claimant with a syntax error and without one. |
 | `cannot be read as Go: <first parse error>` | A file the adapter reads that the Go parser refuses, `<first parse error>` as in the run summary (above). The line scan of section 8 still finds its markers. It is the threat model's "a claiming file the run did not build", which the command could not have built either. |
-| `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above functions the adapter does not judge, and above no test function for the file claimant in question; the first such function in the file. |
-| `no test function` | A file the adapter reads, with a marker for the id above no function, and no test function. |
+| `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above a fuzz test, a benchmark or an example and none at file level; the first such function in the file. |
+| `no test function` | A file the adapter reads, with a claim of the whole file for the id and no test function, that no run used at the commit judged by its set. |
 
 A file under `trace.tests` that cannot be read at all (its permissions, say) is stricter
 still: its markers cannot be seen, so every command that reads them (`verify`, `status` and
@@ -3264,7 +3297,8 @@ Findings:
   Then one line per claimant that is not satisfied (section 10.3):
   `warn   partly run: <id>: no verdict: <claimant>` for one the adapter can judge
   (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
-  `<file>::<function>` or `<file>`, and for a file the adapter cannot judge
+  `<file>::<function>` or `<file>`, followed by ` (by its set)` for a file with no test function
+  that a run judged by its set, and for a file the adapter cannot judge
   `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
   `<why>` as in section 10.3 ("A file the adapter cannot judge"). Without `--partly` they
   print for the first ten partly run ids, sorted, up to three for each id, the first in the
@@ -3279,6 +3313,9 @@ Findings:
   the only line of the id about why it is not proven: `unproven: <id>` and
   `adapter: <id> not counted` do not print for it, whatever its adapter passes and the policy
   give. The claimants without a pass and the other findings of the id print as for any id.
+- `warn   by its set: <id>: <file>: no test function of its own; every test function of its package passed in one run`
+  for every claimant of an id under the rule of every claimant that its set satisfied (section
+  10.3), proven or partly run; with `--story` for the ids of the story only.
 - `warn   excused: <id>: proven (<k> claimant(s) excused)` for a proven id with claimants
   excused, `warn   adapter excused: entry <n>: ...` once per entry, with its globs and patterns
   under `--partly`, and the ERRORs of a glob or a pattern through which an entry covers no
@@ -3327,8 +3364,9 @@ makes the effect real and the test observes it, the case becomes `proven` and le
 `--story <id>` judges only the ids of that backlog story (section 15.1); every other obligation is
 ignored except for `failed` ones, which always print. A refused receipts file, an incomplete
 run and `receipt: <id>: <test> does not claim it` (section 10.2) always print too, whatever id
-they name. The `adapter: <id> not counted` warning, the `partly run`, `no claimant can run here`
-and `excused: <id>` lines and the claimants without a pass print for the ids of the story only;
+they name. The `adapter: <id> not counted` warning, the `partly run`, `no claimant can run here`,
+`excused: <id>` and `by its set: <id>` lines and the claimants without a pass print for the ids of
+the story only;
 the lines of the excused entries always print.
 
 ### 12.1 Targeted runs: `machinery affected`

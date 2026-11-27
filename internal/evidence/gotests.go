@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/RamXX/machinery/internal/project"
 )
@@ -27,7 +29,9 @@ type goTestFile struct {
 	Err string
 }
 
-// funcDoc is the doc comment of a top-level function: its first and last line.
+// funcDoc is the doc comment of a test function, a fuzz test, a benchmark or
+// an example: its first and last line. The comment of any other function is
+// read as text of its file (section 10.3, "Whose claim").
 type funcDoc struct {
 	fn          string
 	test        bool // a test function (isTestFunc)
@@ -40,9 +44,10 @@ func (f *goTestFile) defines(fn string) bool {
 	return i < len(f.Funcs) && f.Funcs[i] == fn
 }
 
-// owner returns the top-level function whose doc comment holds the line and
-// whether it is a test function, or "" when the line is anywhere else in the
-// file.
+// owner returns the function whose doc comment holds the line and whether it
+// is a test function, for a test function, a fuzz test, a benchmark or an
+// example; "" when the line is anywhere else in the file, the comment of
+// any other function (a helper, a method, TestMain) included.
 func (f *goTestFile) owner(line int) (fn string, test bool) {
 	for _, d := range f.docs {
 		if line >= d.first && line <= d.last {
@@ -112,13 +117,31 @@ func parseGoTest(name string, data []byte) *goTestFile {
 		if test {
 			f.Funcs = append(f.Funcs, fn.Name.Name)
 		}
-		if fn.Doc != nil {
+		if fn.Doc != nil && (test || isRunnable(fn)) {
 			f.docs = append(f.docs, funcDoc{fn: fn.Name.Name, test: test,
 				first: fset.Position(fn.Doc.Pos()).Line, last: fset.Position(fn.Doc.End()).Line})
 		}
 	}
 	sort.Strings(f.Funcs)
 	return f
+}
+
+// isRunnable reports a fuzz test, a benchmark or an example: a top-level
+// function without a receiver named Fuzz, Benchmark or Example, or one of
+// those followed by a character that is not a lower-case letter, as go test
+// names them. go test runs them as kinds of their own, and the adapter does
+// not judge them: a marker above one never falls back to its file.
+func isRunnable(fn *ast.FuncDecl) bool {
+	if fn.Recv != nil {
+		return false
+	}
+	for _, prefix := range []string{"Fuzz", "Benchmark", "Example"} {
+		if rest, ok := strings.CutPrefix(fn.Name.Name, prefix); ok {
+			r, _ := utf8.DecodeRuneInString(rest)
+			return rest == "" || !unicode.IsLower(r)
+		}
+	}
+	return false
 }
 
 // isTestFunc reports a test function for the adapter (section 10.3): a

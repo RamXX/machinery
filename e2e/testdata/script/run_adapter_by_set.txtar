@@ -1,0 +1,168 @@
+# a claiming file with no test function of its own that is a candidate file of a package of the
+# run (a helper) is judged by its set: it is satisfied when, in one run, that package ended with
+# pass and every test function of the package's candidate files passed. A set that did not run in
+# full (a -run filter, a build tag) gives it nothing, a fail of the set fails it, and a helper
+# that is a candidate of no package of any run cannot be judged. A marker directly above a
+# function that is not a test function is a marker of its file (sections 10.3 and 12)
+fixture shop
+fixture shop-gotests
+exec machinery gen
+gitinit
+
+# the whole set runs and passes: the helper is satisfied by its set, for its marker at file level
+# and for the one above its helper function; the marker above a helper in a file with a test
+# function is read at file level
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 9 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: e2e/suite/support_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/suite$'
+! stderr 'the adapter does not judge [A-Za-z]+;'
+stderr '^machinery run: adapter: in the whole project: 0 claimed id\(s\) not run, 1 claiming file\(s\) with no test function, 0 claim\(s\) above functions the adapter does not judge$'
+exec sh -c 'grep -c "\"test\":\"e2e/suite/support_test.go\",\"observed\":\"go test: all 8 test function(s) of its set passed (package example.test/shop/e2e/suite) (subtests: 2)\",\"source\":\"adapter\",\"granularity\":\"file\"" .machinery/receipts/*.jsonl'
+stdout '^2$'
+exec sh -c 'grep -c "\"test\":\"e2e/suite/ship_helper_test.go\",\"observed\":\"go test: all 1 test function(s) of the file passed\"" .machinery/receipts/*.jsonl'
+stdout '^1$'
+exec sh -c 'tail -n 1 .machinery/receipts/*.jsonl'
+stdout '"adapter_sets":\["e2e/suite/support_test.go"\]'
+exec mrun 1 verify
+! stdout 'partly run'
+! stdout 'cannot be judged'
+stdout '^  warn   by its set: inv:customer-email-unique: e2e/suite/support_test\.go: no test function of its own; every test function of its package passed in one run$'
+stdout '^  warn   by its set: inv:terminal-is-final: e2e/suite/support_test\.go: no test function of its own; every test function of its package passed in one run$'
+! stdout 'by its set: inv:paid-before-shipped'
+exec machinery proof --ids inv:paid-before-shipped
+stdout '^  inv:paid-before-shipped -> e2e/suite/order_test\.go::TestShipNeedsPayment -> pass: '
+
+# a -run filter leaves the set without a verdict for some of its functions: the helper has no
+# pass, and verify says it is judged by its set
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -tags faults -run 'TestEmailUnique|TestCancelIsFinal|TestShipNeedsPayment' ./e2e/suite
+exec sh -c '! grep -q "\"test\":\"e2e/suite/support_test.go\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^  ERROR  partly run: inv:customer-email-unique: 1 of 2 claimants passed: '
+stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/support_test\.go \(by its set\)$'
+stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/suite/ship_helper_test\.go$'
+! stdout 'by its set: inv:'
+# the rest of the set in another run at the same commit does not make it whole: a set is judged
+# in one run
+exec machinery run --adapter go-test-json -- go test -tags faults -skip 'TestEmailUnique|TestCancelIsFinal|TestShipNeedsPayment' ./e2e/suite
+exec sh -c '! grep -q "\"test\":\"e2e/suite/support_test.go\"" .machinery/receipts/*.jsonl'
+exec mrun 1 verify
+stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/support_test\.go \(by its set\)$'
+
+# so does a build tag that leaves a test function of the set out of the build
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   partly run: inv:customer-email-unique: no verdict: e2e/suite/support_test\.go \(by its set\)$'
+
+# a fail of the set fails the ids of the helper, also a fail of a test that claims nothing
+rm .machinery/receipts
+env SHOP_ROUTING=fail
+exec mrun 1 run --adapter go-test-json -- go test -tags faults ./e2e/suite
+env SHOP_ROUTING=
+exec sh -c 'grep -c "\"outcome\":\"fail\",\"test\":\"e2e/suite/support_test.go\",\"observed\":\"go test: TestRouting of its set failed\"" .machinery/receipts/*.jsonl'
+stdout '^2$'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/support_test\.go\)$'
+stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/suite/support_test\.go\)$'
+
+# a helper that is a candidate of no package of any run cannot be judged, and neither can one
+# whose package has no test function at all
+rm .machinery/receipts
+mkdir e2e/lone
+cp lone_test.go.txt e2e/lone/lone_test.go
+gitcommit 'a helper in a package of its own'
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/suite
+exec mrun 1 verify
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/lone/lone_test\.go: cannot be judged by the adapter \(no test function\); '
+exec machinery run --adapter go-test-json -- go test -tags faults ./e2e/lone
+stderr '^machinery run: adapter: e2e/lone/lone_test\.go: no test function; its claims count nothing$'
+exec mrun 1 verify
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/lone/lone_test\.go: cannot be judged by the adapter \(no test function\); '
+rm e2e/lone
+gitcommit 'the lone helper is gone'
+
+# with --streams a staged source with no test function that an entry maps to the package is a
+# helper of its set too
+rm .machinery/receipts
+cp staged_support.go.txt e2e/suite/staged_support.go
+cp sources.yaml machinery.yaml
+gitcommit 'a staged helper, and the suite through a wrapper'
+exec machinery run --adapter go-test-json --streams -- sh suite.sh
+stderr '^machinery run: adapter: e2e/suite/staged_support\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/suite$'
+exec mrun 1 verify
+stdout '^  warn   by its set: inv:terminal-is-final: e2e/suite/staged_support\.go: no test function of its own; every test function of its package passed in one run$'
+! stdout 'partly run: inv:terminal-is-final'
+
+-- e2e/suite/support_test.go --
+package suite
+
+// The helpers of the suite have no test function of their own. This marker stands above no
+// function: the file claims the invariant, and its set judges it.
+//
+// machinery:verifies inv:customer-email-unique
+
+// settleAll applies every event; the marker above it is a marker of its file.
+//
+// machinery:verifies inv:terminal-is-final
+func settleAll(events ...string) int { return len(events) }
+-- e2e/suite/ship_helper_test.go --
+package suite
+
+import "testing"
+
+// shipped is a helper; the marker above it is a marker of its file, whose one test function
+// must pass.
+//
+// machinery:verifies inv:paid-before-shipped
+func shipped(event string) bool { return event == "ship" && settleAll(event) == 1 }
+
+func TestShippedHelper(t *testing.T) {
+	if !shipped("ship") {
+		t.Fatal("ship is not shipped")
+	}
+}
+-- lone_test.go.txt --
+package lone
+
+// machinery:verifies inv:paid-before-shipped
+
+func lone() bool { return true }
+-- staged_support.go.txt --
+package suite
+
+// A source the wrapper builds with the suite; it has no test function.
+//
+// machinery:verifies inv:terminal-is-final
+
+func stagedSupport() bool { return true }
+-- suite.sh --
+#!/bin/sh
+set -eu
+go test -count=1 -json -tags faults ./e2e/suite > "${MACHINERY_GO_TEST_JSON:?}/suite.json"
+-- sources.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+evidence:
+  adapter:
+    sources:
+      - {package: example.test/shop/e2e/suite, files: ["e2e/suite/*.go"]}
