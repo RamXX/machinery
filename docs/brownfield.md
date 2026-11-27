@@ -264,9 +264,13 @@ to passed and the package ended ok: the function under the marker when the marke
 comment directly above it, every test function of the file otherwise. A failed function writes
 a fail, a skipped one a skip, and one that did not run writes nothing; a pass answered from
 the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
-verdict belongs to a file only when no other Go file of its directory defines a test function of
-the same name, whatever their build tags: rename such a twin, or neither counts. The summary of
-the run says how many ids were claimed and not run.
+verdict belongs to a file only when no other Go file of its directory defines a function of the
+same name that begins with `Test` and takes one parameter, whatever its build tags or the
+way its parameter is written: rename such a twin, or neither counts. The summary of the run
+says how many ids were claimed and not run. The command is held narrow on purpose: `go test`
+with relative package patterns and the usual test flags, the module of the project root, and
+nothing that moves the files or the binary (`-C`, `-modfile`, `-exec` and the like); anything
+else runs through `--streams` (below).
 
 This evidence is weaker than a receipt, and every report says so. It shows that a test which
 names the id passed, not that the test checked the id. `status`, `verify` and `proof` count it

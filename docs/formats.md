@@ -281,7 +281,11 @@ Rules:
   (`evidence.adapter.sources: entry <n>: package is required`,
   `evidence.adapter.sources: entry <n>: package "<value>" is not a valid glob`), and a non-empty
   list `files` of valid globs inside the project
-  (`evidence.adapter.sources: entry <n>: files is required`), entries numbered from 1. The
+  (`evidence.adapter.sources: entry <n>: files is required`,
+  `evidence.adapter.sources: entry <n>: files "<value>" is not a valid glob`, and for a glob
+  that leaves the project `evidence.adapter.sources.files: "<value>" must use forward slashes`,
+  `... must be relative to the project root` or `... must stay inside the project root`),
+  entries numbered from 1. The
   entries are read only by `machinery run --adapter go-test-json --streams`; without `--streams`
   an entry for a package tested in its own directory is refused (section 10.3).
 - `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
@@ -1999,17 +2003,41 @@ adapter evidence is counted as a class of its own wherever a result is given (se
 and 14), why its granularity is recorded, and why by default it never satisfies an id of a
 critical or vital area.
 
-**The command.** It must be `go test`: `go` (or a path whose base name is `go`), then
-`test`. The flags before a `-args` are read:
+**The command: direct mode is deliberately narrow.** The adapter attributes a verdict by the
+directories of the project's module as they are on disk ("Whose verdict", below), so it accepts
+only a command under which `go` builds exactly those and runs the test binary itself. Anything
+that could move the module, the files or the binary is refused before the run, and such a
+suite runs through `--streams` (below), which trusts the wrapper and its entries of
+`evidence.adapter.sources` instead.
 
-- `-json` is added when it is absent, right after `test`, or after a leading `-C <dir>`.
+The command must be `go test`: `go`, found on `PATH`, or a path whose base name is `go`, then
+`test`. A `go` that is, after links are followed, a file inside the project is refused. Then
+only these words, flags with one dash or two, a flag that takes a value as one word
+(`-run=X`) or two (`-run X`):
+
+- the flags `-run`, `-skip`, `-tags`, `-race`, `-count`, `-timeout`, `-v`, `-json`, `-p`,
+  `-parallel`, `-short`, `-failfast`, `-shuffle`, `-cpu`, `-cover`, `-coverprofile`,
+  `-covermode` and `-coverpkg`, and the spellings `-test.run`, `-test.skip`, `-test.count`,
+  `-test.timeout`, `-test.v`, `-test.parallel`, `-test.short`, `-test.failfast`,
+  `-test.shuffle`, `-test.cpu` and `-test.coverprofile`;
+- package patterns relative to the project root, where the command runs: `.`, or a word that
+  begins with `./` and has no `..` element (`./...`, `./e2e/suite`);
+- `-args`, as the last word: nothing may follow it.
+
+Every other word is refused: another flag (`-C`, `-exec`, `-mod`, `-modfile`, `-overlay`,
+`-vet` and the rest), an absolute pattern, a module or import path (`example.test/shop/...`,
+`all`), a file name that does not begin with `./`, a word after `-args`. The environment is
+held to the same rules, as `go env` reads it in the project root (the variables and the go
+environment file): every word of `GOFLAGS` must be on the list above, `GOMOD` must be the
+`go.mod` of the project root, and `GOWORK` must be empty, `off`, or a file inside the project
+root. Then:
+
+- `-json` is added when it is absent, right after `test`.
 - `-count=1` is added when no count is given, after `-json`, so that `go test` never answers
-  from its cache. Every spelling that sets another count is refused: `-count` and `-test.count`
-  before `-args`, `-test.count` after it (there it reaches the test binary), each as one word
-  or two, and the same words in `GOFLAGS`. `GOFLAGS` is read with `--streams` too, where it is
-  all machinery can see of the count.
-- `-overlay` is refused, on the command line and in `GOFLAGS`, with or without `--streams`: it
-  builds files that are not on disk, and the adapter reads the test files on disk.
+  from its cache. Every spelling that sets another count is refused: `-count` and `-test.count`,
+  each as one word or two, and the same words in `GOFLAGS`. With `--streams`, `GOFLAGS` is read
+  from the environment of machinery; it is all machinery can see of the count, and a count
+  other than 1 or an `-overlay` there is refused too.
 - `-tags` gives the tags recorded in the receipts, in the order written (separated by commas or
   spaces); without the flag they are read from a `-tags=` word of `GOFLAGS`. They are a record
   of the command and decide nothing: `-race`, `GOOS` and the like set tags of their own, which
@@ -2021,18 +2049,24 @@ The header records the command as it ran, `-json` and `-count=1` included, and
 machinery prints the `Output` text of every event on its standard output, and a line of the
 stream that is no event as it is.
 
-Refusals, each `usage: <message>` with exit 2, before anything runs and with no file written.
-Each says what to do:
+Refusals, each `usage: <message>` with exit 2, before anything runs and with no file written,
+checked in the order of the table and the words of the command in the order written. Each says
+what to do:
 
 | Message | When |
 |---|---|
 | `--adapter: unknown adapter "<name>": write --adapter go-test-json, the only adapter` | Another name. |
 | `--adapter go-test-json: the command must be go test, got <first two words>: run go test itself, or add --streams and have the command leave its go test -json output in MACHINERY_GO_TEST_JSON` | The command is not `go test`: a wrapper cannot be given `-json` and its output is not known to be the event stream. |
-| `--adapter go-test-json: -count=<value> is refused: write -count=1` | A count other than 1 on the command line; the flag is printed as it was written (`-test.count=<value>`). |
 | `--adapter go-test-json: GOFLAGS has -count=<value>, which is refused: take it out of GOFLAGS` | A count other than 1 in `GOFLAGS`, with or without `--streams`. |
-| `--adapter go-test-json: -overlay is refused: the adapter reads the test files on disk; run without it` | `-overlay` on the command line. |
-| `--adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS` | `-overlay` in `GOFLAGS`, with or without `--streams`. |
+| `--adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS` | With `--streams`, `-overlay` in `GOFLAGS`. |
+| `--adapter go-test-json: <path>: a go inside the project is not accepted by the adapter in direct mode; run the command through --streams` | The `go` of the command is a file inside the project. |
+| `--adapter go-test-json: -count=<value> is refused: write -count=1` | A count other than 1 on the command line; the flag is printed as it was written (`-test.count=<value>`). |
 | `--adapter go-test-json: -json=false is refused: the adapter reads the event stream; leave it out` | `-json` switched off. |
+| `--adapter go-test-json: <word>: not accepted by the adapter in direct mode; run the command through --streams` | A word of the command outside the list above, as written. |
+| `--adapter go-test-json: go env failed (<first line it printed>): the adapter reads GOFLAGS, GOMOD and GOWORK from it; fix the environment of go, or run the command through --streams` | `go env` cannot answer. |
+| `--adapter go-test-json: <word> in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams` | A word of `GOFLAGS` outside the list, a count other than 1 excepted (above). |
+| `--adapter go-test-json: go env GOMOD is "<value>", not the go.mod of the project root: run the command through --streams` | Another module, or none. |
+| `--adapter go-test-json: go env GOWORK is "<value>", a file outside the project root: run the command through --streams` | A workspace file outside the project. |
 | `--streams needs --adapter go-test-json: add it before --streams` | `--streams` alone. |
 | `--adapter go-test-json: trace.tests is not set: the adapter joins the run to the claims of the test files; list them in machinery.yaml` | No `trace.tests`. |
 | `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>) matches <import path>, the package of <directory>: entries are read only with --streams; remove the entry, or run the suite through --streams` | Without `--streams`, an entry whose `package` matches the import path of a directory that holds files under `trace.tests` ("Whose verdict", below). The first such entry, and for it the first such import path in sorted order. |
@@ -2051,12 +2085,16 @@ run in another has the verdicts of the stream that ran it, and no verdict of any
 dropped because the package was cached somewhere else. A fail of any stream and of any package
 writes a fail receipt for every id its function's claims name ("Which receipt", below).
 
-**Test functions.** A test function is a top-level function of a `_test.go` file, with no
-receiver and no type parameters, whose name is `Test` or `Test` followed by a character that
-is not a lower-case letter, and whose one parameter is a `*testing.T`. `TestMain`, benchmarks,
-fuzz tests and examples are not test functions. Files are parsed as Go source and never
-compiled, and their build constraints are not read: a file left out of the build is read like
-any other. machinery never decides which files a run built (below).
+**Test functions.** The adapter counts as a test function every top-level function without a
+receiver whose name begins with `Test` and that has exactly one parameter, whatever its type is
+written as: `*testing.T`, `*T` through an alias or a dot import of `testing`, or anything else.
+That is more than `go test` runs, on purpose: it also counts `Testfoo`, which `go` does not run,
+and signatures `go` refuses. It is what makes a name ambiguous ("Whose verdict", below) and what
+a claim of a whole file waits for ("Whose claim"). The one exception is a `TestMain` whose
+parameter is written as a pointer to a type named `M` (`*testing.M`, `*M`): it is the test
+main. Benchmarks, fuzz tests and examples are not test functions. Files are parsed as Go source
+and never compiled, and their build constraints are not read: a file left out of the build is
+read like any other. machinery never decides which files a run built (below).
 
 **Whose claim.** The claims of a file under `trace.tests` are read exactly as stage `trace`
 reads them (sections 8 and 8.1). Each is attributed:
@@ -2090,7 +2128,9 @@ it.
 1. **The candidates of a package.** Without `--streams` they are the `_test.go` files under
    `trace.tests` in the package's own directory. The import path of a directory is the module
    path of the nearest `go.mod` at or above it (its `module` line), followed by the path of the
-   directory below that `go.mod`, as `go` reads it. A package whose import path is not that of a
+   directory below that `go.mod`. That is how `go` reads it under the narrow command above: the
+   module of the project root, no workspace outside the project, no flag that moves the module,
+   the files or the binary. A package whose import path is not that of a
    directory holding files under `trace.tests` has no candidate. `evidence.adapter.sources` is
    not read in this mode, and an entry whose `package` matches the import path of such a
    directory is refused (above), so that no entry seems to narrow or widen what it cannot. With
@@ -2109,8 +2149,9 @@ it.
    file that is not a candidate under `trace.tests`, the verdict is in no file under
    `trace.tests`: it is counted in the summary, with its package, and used for nothing.
 
-So a same-named function in another file of the directory, under any build constraint, never
-lends its pass to the file that claims: a claiming file the run did not build has no verdict of
+So a test function of the same name in another file of the directory, under any build
+constraint and whatever its parameter is written as, never lends its pass to the file that
+claims: a claiming file the run did not build has no verdict of
 its own, and its claims either meet a function that did not run or an ambiguous name. Renaming
 one of the two functions is what makes the claim count. An entry of `evidence.adapter.sources`
 is the project's statement that the package is built from its files and from no Go file outside
@@ -2176,7 +2217,8 @@ machinery cannot add `-json` to that, so the wrapper hands over the streams:
 machinery run --adapter go-test-json --streams [--stack "<description>"] -- <command> [args...]
 ```
 
-The command is any command. machinery creates an empty directory outside the project, exports
+The command is any command. machinery creates a new empty directory where the system keeps
+temporary files (under `TMPDIR` when it is set, which may be inside the project), exports
 its absolute path as `MACHINERY_GO_TEST_JSON` (a variable never inherited from the caller, like
 those of section 10), runs the command with its standard output untouched, and when it has
 exited reads every regular file directly in that directory whose name ends in `.json` or
@@ -2282,12 +2324,13 @@ id without evidence. An id that a counted adapter pass proves, and that no recei
 test proves on its own, is **proven by adapter**, at function granularity when one of its
 counted adapter passes has it and at file granularity otherwise.
 
-**What this does not defend against** is what section 10.2 lists, and two things more. The
-adapter trusts the stream: a command that is `go test` runs code of the project, and a test
-binary that writes event lines for another package on its standard output, or whose `TestMain`
-runs a function of its own under the name of a test, is not told apart from `go test` itself.
-And with `--streams` it trusts the entries of `evidence.adapter.sources` ("Whose verdict",
-above).
+**What this does not defend against** is what section 10.2 lists, and more. Direct mode accepts
+only a narrow command, and still the adapter trusts what runs: `go test` runs code of the
+project and the tools of the machine (the toolchain, a C compiler, the build cache), and a test
+binary whose `TestMain` runs a function of its own under the name of a test is not told apart
+from `go test` itself. With `--streams` it trusts the wrapper and the entries of
+`evidence.adapter.sources` ("Whose verdict", above): that mode is the way for every suite the
+direct mode refuses, and its trust is stated, not checked.
 
 ## 11. The owed list
 

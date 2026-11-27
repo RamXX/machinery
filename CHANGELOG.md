@@ -103,8 +103,11 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   `evidence.adapter` (kinds, tiers, minimum granularity, a map for test packages built from
   copies) decides what it proves; by default never an id of a critical or vital area.
   A verdict goes to the file under `trace.tests` in its package's directory that defines the
-  function, and to none when another Go file of that directory defines the same name, whatever
-  the build constraints: a same-named function behind another tag never lends its pass. With
+  function, and to none when another Go file of that directory defines a function of the same
+  name that begins with `Test` and takes one parameter, whatever the build constraints or the
+  way the parameter is written: a twin behind another tag never lends its pass. The direct form
+  accepts only a narrow `go test` (relative patterns, a list of test flags, the project's own
+  module and no workspace outside it); everything else runs through `--streams`. With
   `--streams` (a wrapper that starts `go test` itself and leaves the streams in
   `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
   mode only. A pass replayed from the cache counts nothing, and a fail is never dropped. A
