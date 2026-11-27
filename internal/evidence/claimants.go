@@ -130,10 +130,25 @@ func unreadableClaimant(file, why string) string {
 	return fmt.Sprintf("%s: cannot be read as Go (%s): its claims count as not passed; fix the file or remove its markers", file, why)
 }
 
+// Why the adapter cannot judge a file claimant, where what to do depends on
+// it (section 10.3, "A file the adapter cannot judge").
+const (
+	whyNotGo  = "not a Go file"
+	whyBroken = "cannot be read as Go: "
+)
+
 // cannotJudge is what verify says of a file claimant the adapter cannot
-// judge (sections 10.3 and 12).
+// judge, with what to do (sections 10.3 and 12): a file that cannot be read
+// as Go is to be fixed; a file that is not Go may be no test at all.
 func cannotJudge(file, why string) string {
-	return fmt.Sprintf("%s: cannot be judged by the adapter (%s); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test (a README, a golden file), remove its marker for the id", file, why)
+	todo := "it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason"
+	switch {
+	case strings.HasPrefix(why, whyBroken):
+		todo = "fix the file so that it can be read as Go, or give it an excused entry with a reason"
+	case why == whyNotGo:
+		todo += "; if the file is not a test (a README, a golden file), remove its marker for the id"
+	}
+	return fmt.Sprintf("%s: cannot be judged by the adapter (%s); %s", file, why, todo)
 }
 
 // readClaimants reads the claimants of the project: every file under
@@ -253,11 +268,11 @@ func fileList(files []string) string {
 func (c *claimants) why(file, above string) string {
 	switch f := c.files[file]; {
 	case f == nil && !strings.HasSuffix(file, ".go"):
-		return "not a Go file"
+		return whyNotGo
 	case f == nil:
 		return "a Go file not named _test.go that no entry of evidence.adapter.sources names"
 	case f.Broken:
-		return "cannot be read as Go: " + f.Err
+		return whyBroken + f.Err
 	case above != "":
 		return "its marker for the id is above " + above + ", which is not a test function"
 	}

@@ -16,7 +16,7 @@ exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite
 stderr '^machinery run: adapter: partly run: 1 id\(s\): 1 of 2 claimants passed in this run$'
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/ship_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test \(a README, a golden file\), remove its marker for the id$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/ship_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 ! stdout 'unproven: inv:paid-before-shipped'
 exec machinery status --no-backlog
 stdout '^partly run: 1 \(inv 1\): 1 of 2 claimants passed$'
@@ -31,7 +31,7 @@ env SHOP_MISNAMED=fail
 exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/misnamed
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/ship_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test \(a README, a golden file\), remove its marker for the id$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/ship_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 exec mrun 1 proof --ids inv:paid-before-shipped
 stdout '^not proven:\n  inv:paid-before-shipped \(partly run: 1 of 2 claimants passed\)$'
 # under the name of a test file its test runs, and the fail is found
@@ -62,8 +62,8 @@ exec machinery run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/
 stderr '^machinery run: adapter: partly run: 1 id\(s\): 2 of 6 claimants passed in this run$'
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 6 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/late_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test \(a README, a golden file\), remove its marker for the id$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/support/shipping\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test \(a README, a golden file\), remove its marker for the id$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/late_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/support/shipping\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/ship\.sh: cannot be judged by the adapter \(not a Go file\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test \(a README, a golden file\), remove its marker for the id$'
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/staged/cases\.go::TestShipStaged$'
 stdout -count=4 '^  warn   partly run: inv:paid-before-shipped: '
