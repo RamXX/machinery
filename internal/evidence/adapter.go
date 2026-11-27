@@ -81,6 +81,9 @@ type goStream struct {
 	// package-level end event ends a run (section 10.3)
 	pkgs     map[string][]*goPackage
 	nameless int // verdicts of test functions that name no package
+	// restarted: the first package with a start event before the end of
+	// its current run; the run is left incomplete (section 10.3)
+	restarted string
 }
 
 // goPackage is what a stream said about one run of a package.
@@ -503,6 +506,9 @@ func (a *GoTest) Consume(stream io.Reader, out io.Writer) error {
 			}
 		}
 		if err == io.EOF {
+			if st.restarted != "" {
+				return &Incomplete{What: "go test -json: package " + st.restarted + restartedText, Todo: "find what stopped go test"}
+			}
 			if what := st.unended(); what != "" {
 				return &Incomplete{What: "go test -json: " + what, Todo: "find what stopped go test"}
 			}
@@ -541,7 +547,10 @@ func (e *Incomplete) Error() string {
 	return fmt.Sprintf("%s; the run is left incomplete: %s, delete %s and run again", e.What, e.Todo, e.File)
 }
 
-const fixStream = "fix what writes the stream"
+const (
+	fixStream     = "fix what writes the stream"
+	restartedText = " starts again before its run ended"
+)
 
 // StreamsEnv names the directory a wrapper leaves its streams in.
 const StreamsEnv = "MACHINERY_GO_TEST_JSON"
@@ -574,7 +583,10 @@ func (a *GoTest) ReadStreams(dir string) error {
 				return &Incomplete{What: fmt.Sprintf("stream %s: line %d: not a go test -json event", name, i+1), Todo: fixStream}
 			}
 			events++
-			st.read(ev)
+			if st.read(ev); st.restarted != "" {
+				return &Incomplete{What: fmt.Sprintf("stream %s: line %d: package %s%s", name, i+1, st.restarted, restartedText),
+					Todo: "find what stopped go test or give each go test run a file of its own"}
+			}
 		}
 		if events == 0 {
 			return &Incomplete{What: "stream " + name + ": no event", Todo: fixStream}
@@ -597,6 +609,10 @@ func (s *goStream) read(ev goEvent) {
 		return
 	}
 	runs := s.pkgs[ev.Package]
+	if ev.Action == "start" && ev.Test == "" && len(runs) > 0 && runs[len(runs)-1].end == "" && s.restarted == "" {
+		// a run killed and started again, or two runs writing at once
+		s.restarted = ev.Package
+	}
 	if len(runs) == 0 || runs[len(runs)-1].end != "" {
 		// the first event of the package, or one after its end event: a run
 		// of its own (section 10.3)
