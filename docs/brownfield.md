@@ -267,10 +267,16 @@ the test cache counts nothing, and machinery adds `-count=1` to keep that from h
 verdict belongs to a file only when no other Go file of its directory defines a function of the
 same name that begins with `Test` and takes one parameter, whatever its build tags or the
 way its parameter is written: rename such a twin, or neither counts. The summary of the run
-says how many ids were claimed and not run. The command is held narrow on purpose: `go test`
-with relative package patterns and the usual test flags, the module of the project root, and
-nothing that moves the files or the binary (`-C`, `-modfile`, `-exec` and the like); anything
-else runs through `--streams` (below).
+says how many ids were claimed and not run. The command is held narrow on purpose, against
+mistakes: `go test` with relative package patterns and the usual test flags, in the module of
+the project root, for the machine it runs on; `-C`, `-modfile`, `-exec` and the like run
+through `--streams` (below). A module path that two `go.mod` files declare, or a `go.work`
+that leaves out the module of the claiming test files, is refused, and `machinery check`
+reports both (stage `trace`). The run's header records the go version, the `go` binary,
+`GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH` and the digests of `go.mod` and `go.work`, and
+`verify` and `proof` print them. The adapter trusts your test code and the environment of the
+run exactly as much as a receipt a test emits: it catches a stale cache, a twin test, a file
+that was not built, a wrong directory or a lost fail, not code or modules planted on purpose.
 
 This evidence is weaker than a receipt, and every report says so. It shows that a test which
 names the id passed, not that the test checked the id. `status`, `verify` and `proof` count it

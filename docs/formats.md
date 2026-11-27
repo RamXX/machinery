@@ -1606,6 +1606,7 @@ Stage `trace` rules:
 | `proposed` | No tag or marker names a proposed id (section 4.1): `ERROR  proposed: <id> is claimed by <file>; commit it first`, once per id and file. |
 | `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
+| `adapter` | When a `_test.go` file under `trace.tests` claims an id of kind `inv`, `sc`, `fm` or `ck`, the layout of the Go modules is one the adapter can attribute by import path (section 10.3, "The layout of the modules"): `ERROR  adapter: module <path> is declared by <a> and <b>` for every module path two `go.mod` files of the project declare, and `ERROR  adapter: go.work does not use the module of <file> (<go.mod>)` for every module of a claiming file that the `go.work` of the project root leaves out, naming its first claiming file. |
 
 A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
 which is not an `act` id is no ERROR and no credit. The stage says so once per run, in one
@@ -1993,6 +1994,19 @@ standard output, and after the command has exited it writes receipts itself, bef
 line. A test that appends receipts of its own to `MACHINERY_RECEIPTS` during such a run keeps
 doing so, and both kinds are in the file.
 
+**What the adapter defends against, and what it does not.** Adapter evidence is exactly as
+trustworthy as the project's test code and the command that ran it, the same as a receipt a test
+emits itself: a test can emit a `pass` without checking anything (section 10.2), and a test the
+adapter credits can pass without checking anything. The adapter defends against mistakes and
+accidents: a pass replayed from a stale cache, a function of the same name in another file, a
+claiming file the run did not build, a run in the wrong directory or of the wrong module, a fail
+that would go unnoticed. It does not defend against a party who adds decoy code or decoy modules
+to the project, or who controls the environment of the run (the `go` it finds, the variables of
+`go`, the toolchain, the machine). What such a party plants is the business of review, of the
+ratchet (section 11.3), and of the rule that by default an id of a critical or vital area never
+accepts adapter evidence (below). Every rule of this section closes a mistake, none closes a
+deliberate decoy, and what a run used is recorded in its header so that a reader sees it.
+
 **What adapter evidence is, and what it is not.** An adapter receipt says that a test which
 names the id passed in this run. It does not say that the test checked the id. A receipt a test
 emits follows that test's own assertions about that id (section 10); an adapter receipt follows
@@ -2004,14 +2018,17 @@ and 14), why its granularity is recorded, and why by default it never satisfies 
 critical or vital area.
 
 **The command: direct mode is deliberately narrow.** The adapter attributes a verdict by the
-directories of the project's module as they are on disk ("Whose verdict", below), so it accepts
-only a command under which `go` builds exactly those and runs the test binary itself. Anything
-that could move the module, the files or the binary is refused before the run, and such a
-suite runs through `--streams` (below), which trusts the wrapper and its entries of
+directories of the project's module as they are on disk ("Whose verdict", below), so direct mode
+accepts only a short list of flags and relative patterns, in a layout of modules it can read
+("The layout of the modules", below), for a test binary built for the machine that runs it. The
+list keeps a habit or a slip (`-C`, `-modfile`, `-exec`, an import path) from crediting other
+files; it is no fence against a party who controls the environment (above). Every suite the list
+refuses runs through `--streams` (below), which trusts the wrapper and its entries of
 `evidence.adapter.sources` instead.
 
 The command must be `go test`: `go`, found on `PATH`, or a path whose base name is `go`, then
-`test`. A `go` that is, after links are followed, a file inside the project is refused. Then
+`test`. A `go` that is a file inside the project, by the path the command names or the one
+found on `PATH`, links not followed, is refused. Then
 only these words, flags with one dash or two, a flag that takes a value as one word
 (`-run=X`) or two (`-run X`):
 
@@ -2028,9 +2045,13 @@ Every other word is refused: another flag (`-C`, `-exec`, `-mod`, `-modfile`, `-
 `-vet` and the rest), an absolute pattern, a module or import path (`example.test/shop/...`,
 `all`), a file name that does not begin with `./`, a word after `-args`. The environment is
 held to the same rules, as `go env` reads it in the project root (the variables and the go
-environment file): every word of `GOFLAGS` must be on the list above, `GOMOD` must be the
-`go.mod` of the project root, and `GOWORK` must be empty, `off`, or a file inside the project
-root. Then:
+environment file): every word of `GOFLAGS` must be on the list above (`-json=false` there is
+harmless: the `-json` of the command overrides it), `GOMOD` must be the `go.mod` of the
+project root, and `GOOS` and `GOARCH` must be `GOHOSTOS` and `GOHOSTARCH`: `go` runs a test
+binary built for another system through a program `go_<GOOS>_<GOARCH>_exec` it finds on `PATH`,
+and what that program prints is not `go test`. A workspace in effect (`GOWORK`: a file the
+variable names, or the `go.work` of the project root or of a directory above it) must use the
+modules of the claiming files ("The layout of the modules", below). Then:
 
 - `-json` is added when it is absent, right after `test`.
 - `-count=1` is added when no count is given, after `-json`, so that `go test` never answers
@@ -2044,8 +2065,49 @@ root. Then:
   are not recorded, and no build constraint is ever evaluated ("Whose verdict", below). With
   `--streams` the tags are not known (below).
 
-The header records the command as it ran, `-json` and `-count=1` included, and
-`"adapter":"go-test-json"`.
+The header records the command as it ran, `-json` and `-count=1` included,
+`"adapter":"go-test-json"` and, in direct mode, what `go env` gave in the project root right
+before the run:
+
+```json
+"environment":{"go_version":"go1.27.4","go_binary":"/usr/local/go/bin/go","GOFLAGS":"","GOWORK":"","GOOS":"linux","GOARCH":"amd64","go_mod_sha256":"<64 hex>","go_work_sha256":""}
+```
+
+`go_version` is `GOVERSION`; `go_binary` is the `go` of the command, as found on `PATH` or as
+written (from the project root), links not followed; `GOFLAGS`, `GOWORK`, `GOOS` and `GOARCH`
+are what `go env` gave; `go_mod_sha256` is the SHA-256 of the file `GOMOD` names and
+`go_work_sha256` that of the file `GOWORK` names, `""` when there is none. It is a record and
+decides nothing: two runs at the same commit in different environments are both evidence, and
+the difference is no finding. `verify` and `proof` print it, one line per adapter run they use
+(sections 12 and 13):
+`adapter environment: <file>: <go_version> <go_binary>, GOOS/GOARCH <GOOS>/<GOARCH>, GOFLAGS "<GOFLAGS>", GOWORK "<GOWORK>", go.mod <hex>, go.work <hex>`,
+where `<hex>` is the first 12 characters of the digest and `go.work none` stands for a run
+without a workspace. A run through `--streams` records no environment, since machinery did not
+run `go`; its line is `adapter environment: <file>: not recorded: the command ran through --streams`.
+
+**The layout of the modules.** Direct mode attributes a verdict by import path, so before
+anything runs it reads the `go.mod` files of the project and the workspace in effect, as files,
+and refuses two layouts under which `go` builds a package of a project's import path from
+files the adapter does not attribute it to:
+
+- a module path declared by two `go.mod` files of the project (every file named `go.mod` in
+  it, outside the directories machinery never reads: `.git`, `.bin`, `.machinery`, `.beads`,
+  `.worktrees` and `node_modules`): `module <path> is declared by <a> and <b>`, the files
+  sorted (`<a>, <b> and <c>` for three);
+- a workspace that does not use the module of every claiming file:
+  `<workspace> does not use the module of <file> (<go.mod>)`, naming the module by its
+  `go.mod` and by the first claiming file it holds. A claiming file is a `_test.go` file under
+  `trace.tests` that claims an id of kind `inv`, `sc`, `fm` or `ck`; its module is the
+  directory of the nearest `go.mod` at or above it; a workspace uses it when one of its `use`
+  directives, read from the directory of the workspace file, names that directory. A workspace
+  file that cannot be read uses nothing.
+
+A run is refused for the first of them, module paths and files in sorted order (the table
+below). Stage `trace` reports every one, from the files alone, for every project whose Go test
+files claim such ids, with or without the adapter (section 8); there the workspace is the
+`go.work` of the project root, if any. With `--streams` the run does not read them: the
+entries of `evidence.adapter.sources` decide which files a package has.
+
 machinery prints the `Output` text of every event on its standard output, and a line of the
 stream that is no event as it is.
 
@@ -2068,10 +2130,12 @@ what to do:
 | `--adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS` | With `--streams`, `-overlay` in `GOFLAGS`. |
 | `--adapter go-test-json: <word> in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams` | A word of `GOFLAGS` outside the list, a count other than 1 excepted (above). |
 | `--adapter go-test-json: go env GOMOD is "<value>", not the go.mod of the project root: run the command through --streams` | Another module, or none. |
-| `--adapter go-test-json: go env GOWORK is "<value>", a file outside the project root: run the command through --streams` | A workspace file outside the project. |
+| `--adapter go-test-json: go env GOOS/GOARCH is <GOOS>/<GOARCH>, not the host's <GOHOSTOS>/<GOHOSTARCH>: go would run the test binary through go_<GOOS>_<GOARCH>_exec; unset GOOS and GOARCH, or run the command through --streams` | A test binary built for another system. |
 | `--streams needs --adapter go-test-json: add it before --streams` | `--streams` alone. |
 | `--adapter go-test-json: trace.tests is not set: the adapter joins the run to the claims of the test files; list them in machinery.yaml` | No `trace.tests`. |
 | `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>) matches <import path>, the package of <directory>: entries are read only with --streams; remove the entry, or run the suite through --streams` | Without `--streams`, an entry whose `package` matches the import path of a directory that holds files under `trace.tests` ("Whose verdict", below). The first such entry, and for it the first such import path in sorted order. |
+| `--adapter go-test-json: module <path> is declared by <a> and <b>: give each module its own path, or run the command through --streams` | Without `--streams`, a module path declared twice (above). |
+| `--adapter go-test-json: <workspace> does not use the module of <file> (<go.mod>): add the module to the workspace, or run the command with GOWORK=off` | Without `--streams`, a workspace that leaves out the module of a claiming file (above); `<workspace>` is the file `GOWORK` names, by its project-relative path when it is in the project. |
 | `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>): files <globs> match no file under trace.tests: correct the globs, or list the files in trace.tests` | With `--streams`, an entry that maps onto nothing; `<globs>` as written, separated by `, `. |
 
 **Cached results never count, and fails are never lost.** Without `-count=1`, `go test` may
@@ -2091,12 +2155,15 @@ writes a fail receipt for every id its function's claims name ("Which receipt", 
 receiver whose name begins with `Test` and that has exactly one parameter, whatever its type is
 written as: `*testing.T`, `*T` through an alias or a dot import of `testing`, or anything else.
 That is more than `go test` runs, on purpose: it also counts `Testfoo`, which `go` does not run,
-and signatures `go` refuses. It is what makes a name ambiguous ("Whose verdict", below) and what
-a claim of a whole file waits for ("Whose claim"). The one exception is a `TestMain` whose
-parameter is written as a pointer to a type named `M` (`*testing.M`, `*M`): it is the test
-main. Benchmarks, fuzz tests and examples are not test functions. Files are parsed as Go source
-and never compiled, and their build constraints are not read: a file left out of the build is
-read like any other. machinery never decides which files a run built (below).
+and signatures `go` refuses. A function with no parameter or with two (`TestdataDir()`,
+`TestdataJoin(dir, name string)`) is none. It is what makes a name ambiguous ("Whose
+verdict", below) and what a claim of a whole file waits for ("Whose claim"). The one exception
+is a `TestMain` whose parameter is written as a pointer to a type named `M` (`*testing.M`,
+`*M`): it is the test main. A `TestMain` with another parameter, `TestMain(t *testing.T)`
+for one, is a test function, and `go test` runs it as a test. Benchmarks, fuzz tests and
+examples are not test functions. Files are parsed as Go source and never compiled, and their build constraints are not
+read: a file left out of the build is read like any other. machinery never decides which files
+a run built (below).
 
 **Whose claim.** The claims of a file under `trace.tests` are read exactly as stage `trace`
 reads them (sections 8 and 8.1). Each is attributed:
@@ -2130,9 +2197,9 @@ it.
 1. **The candidates of a package.** Without `--streams` they are the `_test.go` files under
    `trace.tests` in the package's own directory. The import path of a directory is the module
    path of the nearest `go.mod` at or above it (its `module` line), followed by the path of the
-   directory below that `go.mod`. That is how `go` reads it under the narrow command above: the
-   module of the project root, no workspace outside the project, no flag that moves the module,
-   the files or the binary. A package whose import path is not that of a
+   directory below that `go.mod`. That is how `go` reads it for a command of direct mode in a
+   layout of modules the rules above accept; nothing more is checked (the threat model, above).
+   A package whose import path is not that of a
    directory holding files under `trace.tests` has no candidate. `evidence.adapter.sources` is
    not read in this mode, and an entry whose `package` matches the import path of such a
    directory is refused (above), so that no entry seems to narrow or widen what it cannot. With
@@ -2326,11 +2393,12 @@ id without evidence. An id that a counted adapter pass proves, and that no recei
 test proves on its own, is **proven by adapter**, at function granularity when one of its
 counted adapter passes has it and at file granularity otherwise.
 
-**What this does not defend against** is what section 10.2 lists, and more. Direct mode accepts
-only a narrow command, and still the adapter trusts what runs: `go test` runs code of the
-project and the tools of the machine (the toolchain, a C compiler, the build cache), and a test
-binary whose `TestMain` runs a function of its own under the name of a test is not told apart
-from `go test` itself. With `--streams` it trusts the wrapper and the entries of
+**What this does not defend against** is what section 10.2 lists and what the threat model at
+the top of this section leaves to review: code or modules planted in the project, a `go` or a
+toolchain that does not do what `go test` does, the variables of the run, the build cache, a C
+compiler, and a `TestMain` that runs a function of its own under the name of a test. The header
+records the go environment of a direct-mode run so that a reader sees what ran; nothing in it is
+checked against another run. With `--streams` the adapter trusts the wrapper and the entries of
 `evidence.adapter.sources` ("Whose verdict", above): that mode is the way for every suite the
 direct mode refuses, and its trust is stated, not checked.
 
@@ -2519,6 +2587,9 @@ Findings:
 - `warn   adapter: <id> not counted: a test that names it passed (<granularity> granularity); <reason>`
   for an id that is not proven and has an adapter pass the policy does not let count
   (section 10.3, with the reasons). Owed or not, the id is unproven.
+- `warn   adapter environment: <file>: <what the header recorded>`, once for every adapter run
+  that is used (section 10.3, with the text). It is a record: environments that differ between
+  runs at the same commit are no finding. With `--story` it prints for every such run.
 - `ERROR  stale owed entry: <id> is proven` for an owed id that is proven. Run
   `machinery owed sync --prune-only`.
 - `ERROR  unknown owed id: <id>`.
@@ -2644,6 +2715,7 @@ PROOF
 commit:   <full sha>
 tier:     <highest tier among the selected ids> (<areas>)
 command:  <command of the run, one line per run>
+adapter environment: <file>: <what the header of an adapter run recorded>
 result:   <p> passed / <f> failed / <s> skipped, against <stack>
 adapter:  <n> proven by adapter at function granularity, <n> proven by adapter at file granularity
 criteria:
@@ -2669,6 +2741,9 @@ left out when no run names a stack. An owed id prints under `not proven` as
 (section 12), no count stands: the line is
 `result:   <n> receipts file(s) refused: delete them and run the tests through machinery run`
 and the exit code is 1, whatever the other runs prove. `--post` posts that block as it is.
+
+An `adapter environment:` line follows the `command:` line of every adapter run, with the text
+of section 10.3, whatever ids are selected.
 
 The `adapter:` line prints only when a selected obligation is proven by adapter (section 10.3),
 with the parts that count something: the block never shows such an id as if its test had

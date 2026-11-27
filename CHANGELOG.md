@@ -107,7 +107,13 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   name that begins with `Test` and takes one parameter, whatever the build constraints or the
   way the parameter is written: a twin behind another tag never lends its pass. The direct form
   accepts only a narrow `go test` (relative patterns, a list of test flags, the project's own
-  module and no workspace outside it); everything else runs through `--streams`. With
+  module, `GOOS` and `GOARCH` of the host), and refuses a module path that two `go.mod` files
+  declare and a workspace that leaves out the module of a claiming file, which stage `trace`
+  reports as well; everything else runs through `--streams`. The header of a direct run
+  records its go environment (version, binary, `GOFLAGS`, `GOWORK`, `GOOS`/`GOARCH`, the
+  digests of `go.mod` and `go.work`), and `verify` and `proof` print it. Adapter evidence is
+  as trustworthy as the project's test code and the command: the rules catch mistakes, not
+  planted code or a controlled environment. With
   `--streams` (a wrapper that starts `go test` itself and leaves the streams in
   `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
   mode only. A pass replayed from the cache counts nothing, and a fail is never dropped. A
