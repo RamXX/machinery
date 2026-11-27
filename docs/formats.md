@@ -1173,8 +1173,8 @@ command: the machine handles `cancel` and, where it does not accept it, records
 has its own event, so the event is no alias. `_refusal_events` declares it, and a declaration
 holds when the event is no action, the action it names is one of the machine's entity (for an
 operational machine, of an entity behind what it serves), that action has an `on` event of its
-own name in the same machine, and no transition on the event brings the machine to a state
-tagged `failure`.
+own name in the same machine, and no transition on the event moves the machine into a state
+tagged `failure` that it was not in already.
 The findings of `event-action` about one that does not hold:
 
 - `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <event> is itself an action of <E>; an action is a caller's command, not the refusal of one: <where>`;
@@ -1182,14 +1182,22 @@ The findings of `event-action` about one that does not hold:
   `event-action: <id>.<event>: _refusal_events names action <action>, which is not an action of an entity behind what the machine serves (<serves>); name one, or <where>`;
 - `event-action: <id>.<event>: _refusal_events gives the event the action <action>, and <action> has no event of its own name in <machine id>; a refusal is of a command the machine handles: <where>`;
 - `event-action: <id>.<event>: _refusal_events declares the event, and on it the machine can come to <state>, a state tagged failure; an event that records a failure is a failure event and asks for a failure mode: list it in _failure_events instead, or <where>`:
-  `<state>` is the first state tagged `failure`, in document order, among the states the
-  machine enters on an `on` transition of the event until it comes to rest: the target and the
+  `<state>` is the first state tagged `failure`, in document order, that an `on` transition of
+  the event moves the machine into. The states it enters are followed until it comes to rest: the target and the
   states the target is inside; for a compound target, its initial child, and that child's, down
   to a leaf (a failure state beside the initial child is not entered and is no ground); and
   from the leaf reached, the target of every `always` branch of it or of a state it is inside,
   and of the `onDone` of its parent when the leaf is final, each followed the same way, guarded
   or not. A delay (`after`), an invoke's outcome and a later event are not followed: they are
-  another cause.
+  another cause. A state tagged `failure` among those is no ground when the state whose `on`
+  holds the transition is that state or a state inside it: the machine was in it already, and
+  the event leaves it there (`failed: {tags: [failure], on: {cancel_refused: failed}}`, or a
+  transition between two states inside it that are not tagged `failure` themselves). Every
+  other one is: a move from a state that is not tagged `failure`, and a move from one state
+  tagged `failure` into a different one, directly or by a branch followed after the event,
+  because the event then records a new failure. The rule is held per transition: a transition
+  that stays in its failure state does not excuse another one on the same event that moves into
+  it from elsewhere.
 
 `<where>` is `remove it from _refusal_events in <file>`, or
 `remove the refusal from import.machines.annotate <key> (for <file>)`. As for an alias, a
@@ -1208,9 +1216,9 @@ be checked and is otherwise put in front of a reviewer:
 - it carries a reason, non-blank, for every event (section 6.2);
 - the event is in neither `_failure_events` nor `_external_events` and has no alias, so a
   declared failure is never declared away (section 6.2);
-- the event brings the machine to no state tagged `failure`, directly or through eventless
-  transitions (the finding above), so an event the machine itself records as a failure stays
-  one, whatever it is called;
+- the event moves the machine into no state tagged `failure` that it was not in already,
+  directly or through eventless transitions (the finding above), so an event the machine itself
+  records as a failure stays one, whatever it is called;
 - the reason is one line, so the printed line is one declaration and nothing else;
 - every declaration that holds is printed with its reason and counted, on every run.
 

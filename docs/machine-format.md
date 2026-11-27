@@ -224,8 +224,11 @@ handles or ignores (a stale entry is an error), and none is also in `_external_e
 `_failure_events` or `_aliases`. A refusal is declared, not a failure: its name is never
 hinted, no failure mode is asked for it, and one may name it (`event:<machine id>.<event>`).
 That is sound only for a refusal (the command was refused, nothing failed), so an event that
-brings the machine to a state tagged `failure`, directly or through `always` and `onDone`,
-is not accepted as one, an action and a reason are each one line, and the stage prints
+moves the machine into a state tagged `failure` it was not in already, directly or through
+`always` and `onDone`, is not accepted as one: from a state that is not tagged `failure`, and
+from one failure state into another. In a failure state, a transition on it that stays there
+(it targets the state that handles it, or a state inside it) leaves the machine where it was
+and is accepted, an action and a reason are each one line, and the stage prints
 one line for every refusal event in effect, with its reason, and counts them: the lines are
 what a reviewer reads to see that no failure was renamed a refusal.
 

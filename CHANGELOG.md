@@ -73,7 +73,9 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
 - `import.planned` reads scenario descriptions (`in: scenario-description`).
 - `_refusal_events` (`refusal_events` in `import.machines.annotate`) declares the event by which
   a machine writes that it refused a caller's command, with the action and a reason; rule
-  `event-action` accepts it unless the event enters a failure state, the stage prints it with
+  `event-action` accepts it unless the event moves the machine into a failure state it was not in
+  already (a transition that stays in its failure state is accepted; one from a state that is
+  not tagged failure, or from one failure state into another, is not), the stage prints it with
   its reason and counts it, and it is neither hinted nor asked for a failure mode.
 - An aliased event may be listed in `_failure_events` when the action it stands for is itself
   the failing outcome.
