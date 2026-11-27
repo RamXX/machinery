@@ -80,7 +80,7 @@ stderr '^machinery run: adapter: partly run: 1 id\(s\): 2 of 3 claimants passed 
 exec mrun 1 verify
 stdout '^checked: 16 obligations, 4 proven, 2 by adapter at function granularity, 2 by adapter at file granularity, 0 partial, 1 partly run, 2 owed, 7 receipts$'
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/broken/broken_test\.go: cannot be judged by the adapter \(cannot be read as Go: 10:3: expected ''\}'', found ''EOF''\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/broken/broken_test\.go: cannot be judged by the adapter \(cannot be read as Go: 10:3: expected ''\}'', found ''EOF''\); fix the file so that it can be read as Go, or give it an excused entry with a reason$'
 ! stdout 'no verdict: e2e/broken'
 ! stdout 'unproven: inv:paid-before-shipped'
 exec machinery status --no-backlog

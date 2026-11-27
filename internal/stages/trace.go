@@ -27,18 +27,19 @@ type NonAction struct {
 
 // Trace is stage trace (section 8).
 func Trace(ctx *Context) *report.Stage {
-	s, _, _ := trace(ctx)
+	s, _, _, _ := trace(ctx)
 	return s
 }
 
 // NonActionServes returns what machinery trace --non-action-serves lists:
 // every id a serves tag names that is not an action, once per tag, by file,
-// line and id. unread says why the files could not all be listed or read;
-// the list is then not known, and is never given as if it were whole.
-func NonActionServes(ctx *Context) (list []NonAction, unread []string) {
-	_, list, unread = trace(ctx)
+// line and id, and the paths of the symbolic links the stage reports, whose
+// tags are not read. unread says why the files could not all be listed or
+// read; the list is then not known, and is never given as if it were whole.
+func NonActionServes(ctx *Context) (list []NonAction, links, unread []string) {
+	_, list, links, unread = trace(ctx)
 	if len(unread) > 0 {
-		return nil, unread
+		return nil, nil, unread
 	}
 	sort.Slice(list, func(i, j int) bool {
 		a, b := list[i], list[j]
@@ -50,17 +51,17 @@ func NonActionServes(ctx *Context) (list []NonAction, unread []string) {
 		}
 		return a.ID < b.ID
 	})
-	return list, nil
+	return list, links, nil
 }
 
 // trace runs the stage and returns, with its result, the serves tags that
-// name an id which is not an action, and what kept it from listing or
-// reading every file.
-func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
+// name an id which is not an action, the symbolic links it reports, and what
+// kept it from listing or reading every file.
+func trace(ctx *Context) (*report.Stage, []NonAction, []string, []string) {
 	s := report.New("trace")
 	p := ctx.P
 	if p.Cfg.Trace == nil {
-		return s.NotApplicable("no trace configured"), nil, nil
+		return s.NotApplicable("no trace configured"), nil, nil, nil
 	}
 	var unread []string
 	cannot := func(format string, err error) {
@@ -81,6 +82,15 @@ func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
 	}
 	if len(p.Cfg.Trace.Tests) > 0 && len(tests) == 0 {
 		s.Errorf("trace.tests matches no file")
+	}
+	links, err := tags.Links(p)
+	if err != nil {
+		cannot("cannot list symbolic links: %v", err)
+	}
+	var linkPaths []string
+	for _, l := range links {
+		linkPaths = append(linkPaths, l.Path)
+		s.Errorf("trace: %s is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of %s", l.Path, strings.Join(l.Lists, " and "))
 	}
 	found, err := tags.Scan(p, append(append([]string{}, code...), tests...))
 	if err != nil {
@@ -183,5 +193,5 @@ func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
 	if len(d.Served)+len(d.Obligations) == 0 && s.Blocking() == 0 {
 		s.NotDemonstrated("nothing to check")
 	}
-	return s, nonActions, unread
+	return s, nonActions, linkPaths, unread
 }

@@ -26,7 +26,7 @@ func init() {
 			if p.Cfg.Trace == nil {
 				return e.Fail(project.Errf("no trace configured: machinery trace --non-action-serves lists serves tags, and trace says where they are"))
 			}
-			list, unread := stages.NonActionServes(&stages.Context{P: p})
+			list, links, unread := stages.NonActionServes(&stages.Context{P: p})
 			if len(unread) > 0 {
 				// no list is better than a part of one that reads as whole
 				for _, why := range unread {
@@ -36,6 +36,10 @@ func init() {
 			}
 			for _, n := range list {
 				fmt.Fprintf(e.Stdout, "%s:%d: %s\n", n.File, n.Line, n.ID)
+			}
+			// what is behind a link is never read, so the list says so
+			for _, l := range links {
+				fmt.Fprintf(e.Stderr, "machinery: trace --non-action-serves: %s is a symbolic link; tags behind it are not listed\n", l)
 			}
 			return 0
 		}

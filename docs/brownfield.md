@@ -278,8 +278,10 @@ all the files under `trace.tests` that carry a marker for the id, not only the G
 shell script, a test in another language, a Go file that is not named `_test.go`, a file that
 does not parse. The adapter cannot judge such a file, so it needs a receipt its own test emits
 at the commit (or, for a staged Go source, an entry in `evidence.adapter.sources`), and
-`verify` says so by name. An id with no counted adapter pass is not under this rule: a receipt
-a test emits proves it as before. A test that
+`verify` says so by name. When it is not a Go file and not a test at all (a README or a golden
+file that quotes the marker), the fix is to remove its marker for the id; a Go test file that does
+not parse is to be fixed. An id with no counted adapter
+pass is not under this rule: a receipt a test emits proves it as before. A test that
 cannot run where you make the evidence goes into `evidence.adapter.excused` with a reason:
 
 ```yaml
@@ -339,6 +341,16 @@ its entry; a fail goes by function name to every file of the entries that define
 test binary run without `-p`, and that name gets no pass in the run. The summary identifies
 when one run of a package suppresses passes from another. It reports individual non-test
 function marker claims for the packages seen and counts those claims across the whole project.
+
+**Symbolic links.** Markers are read in regular files only. A symbolic link under `trace.tests`
+or `trace.code`, to a file or to a directory, is not followed, while `go test` may build what it
+points to, so a failing test behind a linked directory would belong to no file machinery reads.
+Stage `trace` makes every such link an ERROR (`trace: e2e/linked is a symbolic link; markers
+behind it are not read: replace it with the files, or leave it out of trace.tests`), and no
+waiver covers it: put the files where the link is, or narrow the globs so that they do not reach
+it. A link inside a linked directory is found too, under the path the runner sees
+(`e2e/linked/inner`). A link to a README that no glob reaches is no finding, and so is a link
+under `node_modules` or another directory the scan never walks, or one with such a name.
 
 **A test that emits receipts.** A transition case (`tc`) needs the effects the test observed,
 which a verdict of `go test` does not carry. `e2e/shipment_e2e.sh` drives the real binary,
@@ -404,7 +416,7 @@ named by no test, planned, and actions by whether code serves them.
 | An id of a critical or vital area | By default adapter evidence proves routine and consequential ids only (`warn   adapter: <id> not counted`). | A receipt the test emits after its own assertions. |
 | An id no test names | Nothing claims it. | Its `Prove` story. |
 | A claimed id with no verdict | Its test did not run, was cached, or has a twin (`claimed, not run`, `claimed, verdict not counted`). | Run it, or rename the twin. |
-| A partly run id | One of the files that claim it has no pass at the commit (`partly run: 1 of 2 claimants passed`): a test that did not run, or a file the adapter cannot judge. | Run that test at the same commit, have a file the adapter cannot judge emit its own receipt, or excuse it with a reason. |
+| A partly run id | One of the files that claim it has no pass at the commit (`partly run: 1 of 2 claimants passed`): a test that did not run, or a file the adapter cannot judge. | Run that test at the same commit, have a file the adapter cannot judge emit its own receipt, excuse it with a reason, fix a Go file that does not parse, or remove the marker of a file that is not Go and no test. |
 | An id planned at adoption | Your project said it is not delivered. | The story your mark names. |
 | An action | No `machinery:serves` in the code yet. | The `Serve <Entity> actions` story. |
 

@@ -68,7 +68,7 @@ exec mrun 1 verify --partly
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 2 of 6 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/misnamed/late_tests\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/support/shipping\.go: cannot be judged by the adapter \(a Go file not named _test\.go that no entry of evidence\.adapter\.sources names\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/ship\.sh: cannot be judged by the adapter \(not a Go file\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/ship\.sh: cannot be judged by the adapter \(not a Go file\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason; if the file is not a test \(a README, a golden file\), remove its marker for the id$'
 stdout '^  warn   partly run: inv:paid-before-shipped: no verdict: e2e/staged/cases\.go::TestShipStaged$'
 stdout -count=4 '^  warn   partly run: inv:paid-before-shipped: '
 ! stdout 'ship_test\.go'

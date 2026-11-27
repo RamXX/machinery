@@ -36,7 +36,7 @@ stdout '^checked: 17 obligations, 6 proven, 2 by adapter at function granularity
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 3 claimants passed: run the claimants without a pass at this commit, or excuse those that cannot run here in evidence\.adapter\.excused$'
 ! stdout 'partly run: inv:terminal-is-final'
 stdout '^  warn   by its set: inv:terminal-is-final: e2e/suite/helpers_test\.go: no test function of its own; every test function of its package passed in one run$'
-stdout '^  warn   partly run: inv:paid-before-shipped: e2e/drafts/broken_test\.go: cannot be judged by the adapter \(cannot be read as Go: 4:32: expected ''\}'', found ''EOF''\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/drafts/broken_test\.go: cannot be judged by the adapter \(cannot be read as Go: 4:32: expected ''\}'', found ''EOF''\); fix the file so that it can be read as Go, or give it an excused entry with a reason$'
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/other/bench_test\.go: cannot be judged by the adapter \(its marker for the id is above BenchmarkOther, which is not a test function\); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason$'
 stdout '^  ERROR  unproven: cx:order-payment:race$'
 ! stdout 'unproven: tc:ORDE-1ded14'

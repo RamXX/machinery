@@ -1574,7 +1574,7 @@ or `event:<machine id>.<event>` for the failure rules. A
 finding prints as `<rule>: <subject>: <what is wrong>`. `reason` is
 required. A waived finding prints as `warn   waived: <message> (<reason>)`. A waiver that matches
 no finding is an ERROR `stale waiver`, so the list only shrinks. Only cross-reference rules can be
-waived.
+waived; a waiver of rule `trace` is refused with what to do instead (section 8, "Symbolic links").
 
 ### 6.8 `xstate`
 
@@ -1791,6 +1791,9 @@ machinery:verifies tc:ORDE-*
 - `machinery:serves` is read from files matched by `trace.code`. `machinery:verifies` is read
   from files matched by `trace.tests`. A file both match is read once, so a finding in it is
   reported once.
+- Only regular files are read. A symbolic link, to a file or to a directory, is never followed to
+  read: the markers behind it are not read by stage `trace`, by the claimants of section 10.3 or
+  by any other command ("Symbolic links", below).
 
 Stage `trace` rules:
 
@@ -1802,7 +1805,38 @@ Stage `trace` rules:
 | `proposed` | No tag or marker names a proposed id (section 4.1): `ERROR  proposed: <id> is claimed by <file>; commit it first`, once per id and file. |
 | `retired` | No tag or marker names a retired id: `ERROR  retired: <id> is claimed by <file>; remove the claim, or un-retire it`. |
 | `proof` | No tag or marker names a proof obligation (section 23.2): `ERROR  proof: <id> is claimed by <file>; tests do not discharge a proof obligation: it awaits a machine-checked proof`, once per id and file. A `pf:` token that names no proof obligation is `unknown-id`. |
+| `trace` | No symbolic link is under `trace.tests` or `trace.code` ("Symbolic links", below): `ERROR  trace: <path> is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace.tests`, with `trace.code`, or `trace.code and trace.tests`, for the list or lists that reach the link. One finding per link path, sorted by path. No waiver covers it. |
 | `adapter` | Only in a project that configures `evidence.adapter`, and when a `_test.go` file under `trace.tests` claims an id of kind `inv`, `sc`, `fm` or `ck`: the layout of the Go modules is one the adapter can attribute by import path (section 10.3, "The layout of the modules", with the files it reads): `ERROR  adapter: module <path> is declared by <a> and <b>: give each module its own path, or move the copy under a testdata directory` for every module path two tracked `go.mod` files declare, and `ERROR  adapter: <workspace> does not use the module of <file> (<go.mod>): add the module to the workspace, or set GOWORK=off` for every module of a claiming file the workspace leaves out, naming its first claiming file. |
+
+**Symbolic links.** The scan does not follow a symbolic link, while a test runner may build what
+the link points to: a failing test in a linked directory is a verdict that no file under
+`trace.tests` owns (section 10.3, "Whose verdict"), and the project would still pass. So every link
+that a list reaches is a finding of stage `trace`, and the stage fails with `check`.
+
+- Links are found at any depth. The stage walks the tree as the scan does and, to find links and
+  for nothing else, also the directory a link leads to, naming what is there below the link, as
+  the runner sees it: a link `inner` in the directory that `e2e/linked` leads to is
+  `e2e/linked/inner`, found like any other. A link that leads to a directory the walk is already
+  inside (a cycle) is not walked again, so the walk ends. Each path is reported once.
+- Nothing under a directory named `.git`, `node_modules`, `.machinery`, `.beads`, `.worktrees`
+  or `.bin` is walked, in the tree or behind a link (the scan lists no file there), and a link
+  with one of these names is no finding.
+- A list reaches a link when one of its globs matches the path of the link, whatever the link
+  points to (a file, a directory, a path that is not there, a place outside the project). It also
+  reaches a link to a directory when a glob matches `<link>/<path>` for a file found below the
+  link, through the links inside it too; below a link that closes a cycle, the files are those
+  found below the directory it leads back to.
+- `trace.code` reaches only links inside `scope`.
+- A link that no glob reaches (a link to a README, when `trace.tests` names test files only) is no
+  finding. A project without `trace:` has none.
+- No waiver covers it (section 6.7: only cross-reference rules are waived). A waiver that names
+  rule `trace` is refused when the configuration loads, with
+  `config: waivers: trace: <id>: no waiver covers a symbolic link under trace.tests or trace.code: replace it with the files, or leave it out of the globs`.
+  The fix is the one the line says: put the files where the link is, or leave the link out of
+  the globs.
+- `machinery trace --non-action-serves` lists the tags that are read, so it lists none behind a
+  link, and says so: one line on stderr for each link the stage reports,
+  `machinery: trace --non-action-serves: <path> is a symbolic link; tags behind it are not listed`.
 
 A serves tag credits only actions. A `machinery:serves` tag or a serves marker that names an id
 which is not an `act` id is no ERROR and no credit. The stage says so once per run, in one
@@ -1812,9 +1846,10 @@ holds an invariant has hundreds):
 where `<n>` counts the tags (a file and a line) that name at least one such id and `<m>` the
 distinct ids. Each id still needs what its kind needs, a test that claims it.
 
-`machinery trace --non-action-serves` prints the list and nothing else, one line per tag and id,
-`<file>:<line>: <id>`, sorted by file, line and id. It runs no check and is a report, never a
-gate: exit 0, with no output when there is none. When the code or test files cannot be listed
+`machinery trace --non-action-serves` prints the list and nothing else on stdout, one line per tag
+and id, `<file>:<line>: <id>`, sorted by file, line and id. It runs no check and is a report,
+never a gate: exit 0, with no output when there is none; the stderr line of a symbolic link
+(above) changes neither. When the code or test files cannot be listed
 or read, the list is not known and none is printed: one line per cause on stderr,
 `machinery: trace --non-action-serves: <what stage trace reports>; the list is not known`, and
 exit 1. Without `trace:` it is
@@ -2931,9 +2966,12 @@ claimant (below) holds for it.
 one of them once adapter evidence is used for it.
 
 *Who the claimants are.* The claimants of an id are derived from the claims of section 8 and
-from nothing else: every file under `trace.tests` that carries a tag or a marker for the id,
+from nothing else: every regular file under `trace.tests` that carries a tag or a marker for the id,
 read and resolved exactly as stage `trace` reads them (sections 8 and 8.1), holds a claimant of
-the id, whatever the file is called and whatever language it is written in.
+the id, whatever the file is called and whatever language it is written in. A symbolic link is
+no file here: it is not read, holds no claimant and is a finding of stage `trace` (section 8,
+"Symbolic links"), so a verdict of a test that the runner built through a link is a verdict in no
+file under `trace.tests`.
 
 - Where the marker stands directly above a test function ("Test functions" and "Whose claim",
   above) of a file the adapter reads, the claimant is that function, `<file>::<function>`. The
@@ -2986,6 +3024,13 @@ it is satisfied by (b), or excused (below), and by nothing else. `verify` names 
 | `cannot be read as Go: <first parse error>` | A file the adapter reads that the Go parser refuses, `<first parse error>` as in the run summary (above). The line scan of section 8 still finds its markers. It is the threat model's "a claiming file the run did not build", which the command could not have built either. |
 | `its marker for the id is above <function>, which is not a test function` | A file the adapter reads whose markers for the id stand above a fuzz test, a benchmark or an example and none at file level; the first such function in the file. |
 | `no test function` | A file the adapter reads, with a claim of the whole file for the id and no test function, that no run used at the commit judged by its set. |
+
+The line `verify` prints for such a file (section 12) ends with what to do. For a file that cannot
+be read as Go: fix it so that it can be read as Go, or excuse it with a reason. For any other:
+emit a receipt from its own test, name a staged Go source in `evidence.adapter.sources`, or
+excuse it with a reason; and for a file that is not a Go file, when it is not a test at all (a
+README or a golden file that quotes the marker), remove its marker for the id: it then claims
+nothing and is no claimant.
 
 A file under `trace.tests` that cannot be read at all (its permissions, say) is stricter
 still: its markers cannot be seen, so every command that reads them (`verify`, `status` and
@@ -3299,10 +3344,14 @@ Findings:
   (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
   `<file>::<function>` or `<file>`, followed by ` (by its set)` for a file with no test function
   that a run judged by its set, and for a file the adapter cannot judge
-  `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
-  `<why>` as in section 10.3 ("A file the adapter cannot judge"). Without `--partly` they
-  print for the first ten partly run ids, sorted, up to three for each id, the first in the
-  order they print; when some are left out,
+  `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); <what to do>`,
+  `<why>` as in section 10.3 ("A file the adapter cannot judge"), `<what to do>` as
+  `fix the file so that it can be read as Go, or give it an excused entry with a reason` for
+  `cannot be read as Go: ...`, and otherwise as
+  `it needs a receipt its own test emits, a sources entry if it is a staged Go source, or an excused entry with a reason`,
+  followed for `not a Go file` by `; if the file is not a test (a README, a golden file), remove its marker for the id`.
+  Without `--partly` they print for the first ten partly run ids, sorted, up to three for each
+  id, the first in the order they print; when some are left out,
   `warn   partly run: <k> more claimant(s) without a pass: machinery verify --partly lists every one`
   follows them, `<k>` counting every line left out, and it prints after every other line that
   begins `partly run: `. With `--partly` every one of them prints.
