@@ -31,6 +31,17 @@ exec mrun 1 verify
 ! stdout 'does not claim it'
 stdout ', 3 proven, 3 by adapter at function granularity, '
 
+# a fail goes by name: TestBalance fails in the ledger set, and the TestBalance of the orders set,
+# which passed, is read as failed too. That is the false fail the contract names; renaming one
+# of the two functions removes it
+env LEDGER_FAIL=1
+exec mrun 1 run --adapter go-test-json --streams -- sh sets.sh
+env LEDGER_FAIL=
+stderr '^machinery run: adapter: TestBalance: failed in package\(s\) example\.test/shop/e2e/testdata/sets/ledger, so read as failed in e2e/testdata/sets/orders/orders\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+stderr '^machinery run: adapter: receipts written: 1 pass, 2 fail, 0 skip$'
+exec sh -c 'grep -h inv:paid-before-shipped "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+stdout '"outcome":"fail","test":"e2e/testdata/sets/orders/orders\.go::TestBalance","observed":"go test: TestBalance failed"'
+
 # a set that does not build: the wrapper writes a stream that says its package failed, and no
 # test of it ran. Every test function of its sources failed
 cp broken.go e2e/testdata/sets/ledger/broken.go
@@ -88,6 +99,13 @@ exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
 stdout '"test":"e2e/more/more_test\.go::TestEmailUnique"'
 stdout '"test":"e2e/suite/email_test\.go::TestEmailUnique"'
 
+# a pattern x/... matches the package x itself, as it does for go
+exec sh -c 'cat base.yaml suite-dir.part > machinery.yaml'
+gitcommit 'dir: true for e2e/suite/...'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/suite > "$MACHINERY_GO_TEST_JSON/suite.json"'
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+
 # an entry with a wildcard over several directories maps each package to the files of its own
 # directory: it does not make every file a candidate of every package
 exec sh -c 'cat base.yaml wide.part > machinery.yaml'
@@ -96,6 +114,39 @@ rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/... > "$MACHINERY_GO_TEST_JSON/e2e.json"'
 stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
 ! stderr 'ambiguous'
+
+# the verifier's case: a staged test kept under testdata is copied into e2e/suite, where it fails,
+# and into a directory of its own, where it passes. The mapping narrows e2e/suite to its own
+# files and gives the second package every file, but a fail goes by name: the staged file's
+# function failed, and its id fails
+mkdir e2e/testdata/staged
+cp extra_test.go e2e/testdata/staged/extra_test.go
+gitcommit 'a staged test kept under testdata'
+rm .machinery/receipts
+env EXTRA_FAILS_IN=suite
+exec mrun 1 run --adapter go-test-json --streams -- sh extra.sh e2e/suite e2e/run/extra
+env EXTRA_FAILS_IN=
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 8 test function\(s\) with a verdict: 7 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: TestExtra: failed in package\(s\) example\.test/shop/e2e/suite, so read as failed in e2e/testdata/staged/extra_test\.go: a fail goes by name to every file of evidence\.adapter\.sources that defines it; rename one of the functions if they are unrelated$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+! stderr 'in no file under'
+exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout -count=1 receipt
+stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/testdata/staged/extra_test\.go::TestExtra\)$'
+
+# an entry whose package has no wildcard names one package and maps every file to it: the
+# staged copy's pass in e2e/suite goes to the file under testdata
+exec sh -c 'cat base.yaml exact.part > machinery.yaml'
+gitcommit 'one package, every file'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh extra.sh e2e/suite
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+exec sh -c 'grep -h inv:terminal-is-final .machinery/receipts/*.jsonl'
+stdout '"outcome":"pass","test":"e2e/testdata/staged/extra_test\.go::TestExtra","observed":"go test: TestExtra passed"'
+stdout '"outcome":"pass","test":"e2e/suite/order_test\.go::TestCancelIsFinal"'
+rm e2e/testdata/staged
 
 # the run summary is scoped to the packages of the run: a run of e2e/suite alone does not count
 # the claims of e2e/more nor name its file without a test function, and the project-wide line
@@ -162,6 +213,41 @@ done
 rm -rf stage
 echo "sets: $n set(s), exit $status"
 exit $status
+-- extra.sh --
+#!/bin/sh
+# copies the staged test e2e/testdata/staged/extra_test.go into each directory named, runs go test
+# there with a stream of its own, and removes the copy, and the directory when it made it
+set -u
+status=0
+n=0
+for dir in "$@"; do
+  n=$((n + 1))
+  made=
+  [ -d "$dir" ] || { mkdir -p "$dir"; made=1; }
+  cp e2e/testdata/staged/extra_test.go "$dir/extra_test.go"
+  go test -json -count=1 "./$dir" > "$MACHINERY_GO_TEST_JSON/$n.json" || status=1
+  rm "$dir/extra_test.go"
+  [ -z "$made" ] || rm -r "$dir"
+done
+exit $status
+-- extra_test.go --
+package suite
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+// TestExtra is kept under testdata and copied into a package before go test runs. It fails in
+// the directory EXTRA_FAILS_IN names.
+//
+// machinery:verifies inv:terminal-is-final
+func TestExtra(t *testing.T) {
+	if wd, _ := os.Getwd(); filepath.Base(wd) == os.Getenv("EXTRA_FAILS_IN") {
+		t.Fatal("a cancelled order changed status")
+	}
+}
 -- loose.sh --
 #!/bin/sh
 # the same sets, each tested by go test on its loose files
@@ -191,12 +277,19 @@ func TestShipOnce(t *testing.T) {}
 -- e2e/testdata/sets/ledger/ledger.go --
 package sets
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
-// TestBalance has the name of a function of the orders set.
+// TestBalance has the name of a function of the orders set. LEDGER_FAIL fails it.
 //
 // machinery:verifies inv:customer-email-unique
-func TestBalance(t *testing.T) {}
+func TestBalance(t *testing.T) {
+	if os.Getenv("LEDGER_FAIL") != "" {
+		t.Fatal("the ledger does not balance")
+	}
+}
 -- e2e/testdata/notes/notes.go --
 package notes
 
@@ -258,6 +351,18 @@ evidence:
     sources:
       - package: "example.test/shop/e2e/**"
         files: ["e2e/**/*_test.go"]
+-- suite-dir.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/suite/..."
+        dir: true
+-- exact.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/suite"
+        files: ["e2e/suite/*_test.go", "e2e/testdata/staged/*_test.go"]
 -- dir-nothing.part --
 evidence:
   adapter:

@@ -2221,9 +2221,10 @@ whatever another run gave it. A package fails in a run when the run's end event 
 test failed, the test binary did not finish (a `-timeout`, `os.Exit` or `log.Fatal`, a panic
 in any goroutine, a crash), or the package did not build. What it fails:
 
-- in that run, a test function of the package that has a `run` event and no verdict failed,
-  started and given no verdict: whatever stopped the binary stopped it, also when another run
-  gave it a verdict (its verdicts differ, "Which verdict", below). Its receipt says
+- in that run, a test function of the package that has more `run` events than verdicts failed,
+  started and given no verdict: whatever stopped the binary stopped it, also when it has a
+  verdict from an earlier iteration of the same run (`-count=2`, `-cpu 1,2`) or from another
+  run (its verdicts differ, "Which verdict", below). Its receipt says
   `started, no verdict; the package failed`;
 - a test function with no `run` event in a run where a test function of the package has one
   was not selected (`-run`, `-skip`) or not reached (the binary stopped before it started
@@ -2257,13 +2258,14 @@ it stands, before the lines after it, and only with `--streams` (one `go test -j
 each package one `start` event):
 `machinery: run: stream <file>: line <n>: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete <receipts> and run again`.
 `verify` reports the file as an incomplete run (section 12). So within
-the threat model no fail is lost: a failed function, a function a failure stopped and the
-claims of a package that did not run its tests all write fails, in whichever run of the package
-they happened; a function a filter left out or a failure never reached writes nothing and
+the threat model no fail is lost: a failed function, a function a failure stopped after it
+started (in any iteration of the run) and the claims of a package that did not run its tests
+all write fails, in whichever run of the package they happened; a function a filter left out or a failure never reached writes nothing and
 keeps its id without evidence from that run, while no pass of the package counts; and a stream
 that does not say how its packages ended, or that mixes two runs of one, counts for nothing. A fail of any run,
 of any stream and of any package writes a fail receipt for every id its function's claims name
-("Which receipt", below).
+("Which receipt", below), and with `--streams` in every file of `evidence.adapter.sources`
+that defines a test function of its name ("A fail goes by name", below).
 
 **Test functions.** The adapter counts as a test function every top-level function without a
 receiver whose name begins with `Test` and that has exactly one parameter, whatever its type is
@@ -2308,8 +2310,9 @@ skipped. `go test` passes a parent whose subtests all skipped; for the adapter t
 skip, as one whose own body calls `t.Skip` is. A filter that leaves subtests out is refused in
 direct mode (above); with `--streams` the command is not read, and a parent whose subtests the
 wrapper's filter left out reads as a pass. A function with no verdict did not run, whatever
-other events name it, except one with a `run` event in a run where its package failed and
-every function of a package that did not run its tests (above). A pass of a package answered
+other events name it, except one that started and gave no verdict in a run where its package
+failed (more `run` events than verdicts there) and every function of a package that did not
+run its tests (above). A pass of a package answered
 from the cache is not read (above). A
 function with several verdicts that are not all the same failed, whichever they are: in one
 run, across the runs of one stream or of several ("A package that failed", above, and
@@ -2343,7 +2346,8 @@ it.
      the package only those: one entry over many directories does not make every file a
      candidate of every package. A package whose own directory holds none of them, a package
      built from copies staged elsewhere, gets every one. An entry whose `package` has no
-     wildcard names one package and maps every file to it;
+     wildcard names one package and maps every file to it. This mapping is what a pass
+     needs; a fail goes further ("A fail goes by name", below);
    - an entry with `dir: true` whose pattern matches the package (`...` matches any string,
      slashes included, and `x/...` matches `x` too) maps to it the `_test.go` files under
      `trace.tests` in the package's own directory, the candidates direct mode gives it; the
@@ -2365,7 +2369,9 @@ it.
    skip counts for none of them, a fail fails each of them that is under `trace.tests`, and the
    summary names the function, the files and what to do. When no file defines it, or only a
    file that is not a candidate under `trace.tests`, the verdict is in no file under
-   `trace.tests`: it is counted in the summary, with its package, and used for nothing.
+   `trace.tests`: it is counted in the summary, with its package, and used for nothing. With
+   `--streams` a fail then still goes by name (below), and is counted there only when that
+   finds no file either.
 
 So a test function of the same name in another file of the directory, under any build
 constraint and whatever its parameter is written as, never lends its pass to the file that
@@ -2376,13 +2382,29 @@ is the project's statement that the package is built from its files and from no 
 their directories; machinery cannot check that, and a same-named function copied into the
 package from another directory is not seen.
 
+**A fail goes by name (`--streams`).** A pass counts only through the exact mapping above. A
+fail is matched loosely, so that it never falls through the mapping: a copy staged into a
+directory that holds files of a wildcard entry, or into a package that no entry matches, would
+otherwise lose it. A function that failed in a package of the run, whether or not an entry maps
+that package (a `fail` event, its own or a subtest's, verdicts that differ, or a `run` event
+with no verdict where its package failed), fails in every file under `trace.tests` that an
+entry names and that defines a test function of that name: a Go file the `files` of an entry
+match, or a `_test.go` file of a directory whose import path the pattern of an entry with
+`dir: true` matches. In that run the name gets no pass from any package, and every id that a
+function of that name claims in those files gets a `fail` receipt ("Which receipt", below). A
+package that did not run its tests fails the candidates of that package only (above). When the
+fail reaches a file the mapping did not give it to, the summary names the function:
+`adapter: <function>: failed in package(s) <import paths>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated`.
+This can give a false fail: two unrelated staged sets that share the name of a test fail
+together when one of them fails. Renaming one of the two functions is the remedy.
+
 **Which receipt.** For every obligation id of kind `inv`, `sc`, `fm` or `ck` that a test file
 claims, and for each attribution of it (a function, or a file), the adapter looks at the
 functions the claim belongs to, in this order:
 
 | The functions | The adapter writes |
 |---|---|
-| One of them failed, an ambiguous name and a function a package failure read as failed included. | A `fail` receipt. |
+| One of them failed, an ambiguous name, a function a package failure read as failed and, with `--streams`, one whose name failed in another package of the run included. | A `fail` receipt. |
 | One of them has an ambiguous name. | Nothing. |
 | One of them was skipped. | A `skip` receipt. |
 | One of them did not run. | Nothing: the id stays without evidence. |
@@ -2469,7 +2491,7 @@ the directory is read. The directory is removed after reading, whatever was foun
   failed", above). A run that answered the package from the cache gives none of its passes; the
   other runs give theirs, and a fail of any run is a fail ("Cached results never count",
   above). A function whose verdicts differ between runs failed ("Which verdict", above), a
-  function with a `run` event and no verdict in a run where the package failed included; each
+  function that started and gave no verdict in a run where the package failed included; each
   verdict of the summary line is followed by the file of its run, the same file for two runs of
   one stream. A pass counts only when the package ended with pass in every run of it.
 - **What a stream is trusted for.** machinery did not start what wrote the files. Lines typed
@@ -2535,6 +2557,7 @@ adapter: package <import path>: did not run its tests: <n> test function(s) read
 adapter: <import path>.<function>: defined in <file>, <file>: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions
 adapter: <import path>.<function>: <verdict> in <file>, <verdict> in <file>: verdicts differ, read as fail
 adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in package <import path>: verdicts differ, read as fail
+adapter: <function>: failed in package(s) <import paths>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
 adapter: <file>: no test function; its claims count nothing
 adapter: <file>: not Go source that parses; its claims count nothing
@@ -2551,8 +2574,8 @@ package names the functions a failure stopped after they started, and then one l
 package that did not run its tests names the functions that failed with it, each list sorted,
 the first five and then `and <n> more`; a function a failure stopped is also counted as failed in the first
 line, and a function of a package that did not run its tests is not. The packages of the
-`in no file` line are sorted, the first five and then
-`and <n> more`. Packages and functions are counted over the whole stream.
+`in no file` line, and the packages and files of the `failed in package(s)` line, are sorted,
+the first five and then `and <n> more`. Packages and functions are counted over the whole stream.
 `claimed, not run` counts the ids for which no receipt was written and a function of one of
 their claims did not run, among the claims of the files of the packages the run saw: their
 candidates ("Whose verdict", above) and every file a verdict of the run went to, an ambiguous
@@ -3053,8 +3076,9 @@ directory and reading its JSON output. The backlog is never committed and machin
 its files directly. When `bd` cannot be run, a command that needs it exits 2 with
 `config: bd not runnable: <reason>`.
 
-**Commands that read only design and evidence.** `adopt`, `status`, `verify`, `check`,
-`trace` and `owed` never need the backlog tool. `verify`, `trace` and `owed` never run it.
+**Commands that read only design and evidence.** `adopt`, `status`, `trace` and `owed`,
+and `verify` and `check` without `--story`, never need the backlog tool. `trace`, `owed`
+and `verify` without `--story` never run it.
 `adopt` (its `backlog:` line, section 17.2), `status` (its intake, review and question lines,
 section 14) and `check` (stage `intake`, section 15.7) run it only for the lines they derive from
 the backlog, and with the flag `--no-backlog`, or with the environment variable

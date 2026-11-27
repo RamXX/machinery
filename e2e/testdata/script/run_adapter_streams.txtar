@@ -110,6 +110,32 @@ stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/again/again_test.go::TestSettlesOnce"'
 
+# a function that passed in the first iteration of a -count=2 run and ended the test binary in
+# the second has more run events than verdicts: it started and gave no verdict, and it failed.
+# An earlier pass at the same commit does not keep its id proven
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/again > "$MACHINERY_GO_TEST_JSON/again.json"'
+stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
+env AGAIN_EXIT=1
+exec mrun 1 run --adapter go-test-json --streams -- sh again.sh
+env AGAIN_EXIT=
+stderr '^machinery run: adapter: example\.test/shop/e2e/again\.TestSettlesOnce: pass in again\.json, no verdict in again\.json: verdicts differ, read as fail$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/again: 1 test function\(s\) started and gave no verdict, read as failed: TestSettlesOnce$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/again/again_test.go::TestSettlesOnce","observed":"go test: TestSettlesOnce: started, no verdict; the package failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/again/again_test\.go::TestSettlesOnce\)$'
+
+# a package that did not run its tests in one run fails every function of its files, whatever
+# another run gave it: the suite passes in the first stream, and its second run does not build
+rm .machinery/receipts
+exec mrun 1 run --adapter go-test-json --streams -- sh unbuilt.sh
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: did not run its tests: 7 test function\(s\) read as failed: TestCancelIsFinal, TestCancelledRefusesPay, TestEmailUnique, TestPayThenShip, TestProviderDown and 2 more$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 6 fail, 0 skip$'
+exec sh -c 'grep -h inv:paid-before-shipped .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/order_test.go::TestShipNeedsPayment","observed":"go test: TestShipNeedsPayment: the package did not run its tests"'
+
 # one file staged into two packages: a function whose verdicts differ between them failed
 rm .machinery/receipts
 env TWO_ENV=SHOP_EMAIL=skip
@@ -451,6 +477,29 @@ p=example.test/shop/e2e/suite
 #!/bin/sh
 set -eu
 go test -json -count=2 ./e2e/again > "$MACHINERY_GO_TEST_JSON/again.json"
+-- unbuilt.sh --
+#!/bin/sh
+# stages the suite and runs it, then stages a file that does not build beside it and runs it again
+set -u
+rm -rf stage
+mkdir -p stage/suite
+cp e2e/suite/*_test.go stage/suite/
+status=0
+go test -json -count=1 ./stage/suite > "$MACHINERY_GO_TEST_JSON/1-plain.json" || status=$?
+cp broken.go.txt stage/suite/broken_test.go
+go test -json -count=1 ./stage/suite > "$MACHINERY_GO_TEST_JSON/2-broken.json" || status=$?
+rm -rf stage
+exit $status
+-- broken.go.txt --
+package suite
+
+import "testing"
+
+// TestBroken does not build, and with it the whole package
+func TestBroken(t *testing.T) {
+	var n int = "one"
+	_ = n
+}
 -- two.sh --
 #!/bin/sh
 # stages the suite into two packages and tests each; TWO_ENV is set for the second
@@ -466,15 +515,22 @@ exit 0
 -- e2e/again/again_test.go --
 package again
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 var settled int
 
-// TestSettlesOnce passes the first time it runs in a process and is skipped after that.
+// TestSettlesOnce passes the first time it runs in a process and is skipped after that; with
+// AGAIN_EXIT it ends the test binary instead.
 //
 // machinery:verifies inv:terminal-is-final
 func TestSettlesOnce(t *testing.T) {
 	settled++
+	if settled > 1 && os.Getenv("AGAIN_EXIT") != "" {
+		os.Exit(3)
+	}
 	if settled > 1 {
 		t.Skip("already settled")
 	}

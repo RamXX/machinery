@@ -94,7 +94,7 @@ type goPackage struct {
 	end      string              // the package-level pass, fail or skip
 	cached   bool                // answered from the test cache
 	verdicts map[string][]string // test function -> its pass, fail and skip events
-	started  map[string]bool     // test functions with a run event
+	started  map[string]int      // test function -> its run events, one per iteration
 	subs     map[string]string   // test function -> the worst verdict of its subtests, fail or skip
 }
 
@@ -641,7 +641,7 @@ func (s *goStream) read(ev goEvent) {
 	if len(runs) == 0 || runs[len(runs)-1].end != "" {
 		// the first event of the package, or one after its end event: a run
 		// of its own (section 10.3)
-		runs = append(runs, &goPackage{verdicts: map[string][]string{}, started: map[string]bool{}, subs: map[string]string{}})
+		runs = append(runs, &goPackage{verdicts: map[string][]string{}, started: map[string]int{}, subs: map[string]string{}})
 		s.pkgs[ev.Package] = runs
 	}
 	pkg := runs[len(runs)-1]
@@ -657,7 +657,7 @@ func (s *goStream) read(ev goEvent) {
 		}
 	case ev.Test == "":
 	case ev.Action == "run" && !sub:
-		pkg.started[ev.Test] = true
+		pkg.started[ev.Test]++
 	case verdict && sub: // read with its parent: a fail fails it, a skip skips it
 		if ev.Action == Fail || (ev.Action == Skip && pkg.subs[parent] != Fail) {
 			pkg.subs[parent] = ev.Action
@@ -721,6 +721,12 @@ func (a *GoTest) Receipts() [][]byte {
 	var passed, failed, skipped, homeless, nameless int
 	var ambiguous, refused, differ []string
 	lost := map[string]bool{} // packages with a verdict that found no file
+	// with streams a fail goes by name (section 10.3): the packages each
+	// function failed in, whether it had a fail event, and the fails the
+	// mapping found no file for
+	failedIn, failEvent := map[string]map[string]bool{}, map[string]bool{}
+	type pkgFn struct{ pkg, fn string }
+	var unplaced []pkgFn
 	names := map[string]bool{}
 	for _, s := range a.streams {
 		nameless += s.nameless
@@ -762,8 +768,8 @@ func (a *GoTest) Receipts() [][]byte {
 					if len(pkg.started) == 0 {
 						unran[name] = true
 					}
-					for fn := range pkg.started {
-						if len(pkg.verdicts[fn]) == 0 {
+					for fn, n := range pkg.started {
+						if len(pkg.verdicts[fn]) < n { // an iteration that started and gave no verdict
 							read[fn] = append(read[fn], seen{verdict: Fail, stream: s.name, silent: true})
 						}
 					}
@@ -818,6 +824,13 @@ func (a *GoTest) Receipts() [][]byte {
 			case Fail:
 				st = stFail
 				failed++
+				if a.fromDir {
+					if failedIn[fn] == nil {
+						failedIn[fn] = map[string]bool{}
+					}
+					failedIn[fn][name] = true
+					failEvent[fn] = failEvent[fn] || isExplicit
+				}
 			case Skip:
 				st = stSkip
 				skipped++
@@ -875,6 +888,8 @@ func (a *GoTest) Receipts() [][]byte {
 				if st == stFail {
 					markFail(file)
 				}
+			case st == stFail && a.fromDir:
+				unplaced = append(unplaced, pkgFn{name, fn}) // it may still go by name, below
 			default:
 				homeless++
 				lost[name] = true
@@ -901,6 +916,41 @@ func (a *GoTest) Receipts() [][]byte {
 				}
 				unranBy[name][fn] = true
 			}
+		}
+	}
+	// with streams a fail goes by name to every file of the entries that
+	// defines the function, whatever package it failed in (section 10.3)
+	var byName []string
+	placed := map[string]bool{}
+	if a.fromDir {
+		named := a.sourceFiles()
+		for _, fn := range sortedKeys(failedIn) {
+			var reached []string
+			for _, file := range named {
+				if f := a.files[file]; f.Broken || !f.defines(fn) {
+					continue
+				}
+				placed[fn] = true
+				if cur, ok := state[file][fn]; ok && cur == stFail {
+					continue
+				}
+				set(file, fn, stFail)
+				if failEvent[fn] {
+					mark(explicit, file, fn)
+				} else {
+					mark(silent, file, fn)
+				}
+				reached = append(reached, file)
+			}
+			if len(reached) > 0 {
+				byName = append(byName, fmt.Sprintf("adapter: %s: failed in package(s) %s, so read as failed in %s: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated", fn, nameList(sortedKeys(failedIn[fn])), nameList(reached)))
+			}
+		}
+	}
+	for _, u := range unplaced {
+		if !placed[u.fn] {
+			homeless++
+			lost[u.pkg] = true
 		}
 	}
 	for _, name := range sortedKeys(silentBy) {
@@ -1071,7 +1121,7 @@ func (a *GoTest) Receipts() [][]byte {
 	}
 	add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
 	sort.Strings(differ)
-	a.summary = append(append(append(append(a.summary, refused...), ambiguous...), differ...), sortedKeys(a.unjudged)...)
+	a.summary = append(append(append(append(append(a.summary, refused...), ambiguous...), differ...), byName...), sortedKeys(a.unjudged)...)
 	a.summary = append(append(a.summary, empty...), broken...)
 	return lines
 }
@@ -1141,6 +1191,32 @@ func (a *GoTest) candidates(pkg string) []string {
 	res := sortedKeys(set)
 	a.cands[pkg] = res
 	return res
+}
+
+// sourceFiles returns the files under trace.tests that the entries of
+// evidence.adapter.sources name, sorted: the Go files an entry with files
+// matches, and the test files of every directory whose import path the
+// pattern of an entry with dir: true matches.
+func (a *GoTest) sourceFiles() []string {
+	set := map[string]bool{}
+	for _, s := range a.sources {
+		if s.Dir {
+			for ip, files := range a.pkgFiles {
+				if s.Matches(ip) {
+					for _, file := range files {
+						set[file] = true
+					}
+				}
+			}
+			continue
+		}
+		for file := range a.files {
+			if strings.HasSuffix(file, ".go") && project.Match(s.Files, file) {
+				set[file] = true
+			}
+		}
+	}
+	return sortedKeys(set)
 }
 
 // projectFiles returns every file of the project, read once.
