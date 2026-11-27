@@ -511,7 +511,7 @@ excused:                        # the entries, exactly as in evidence.adapter.ex
 | `machinery affected --base <ref>` | Prints the obligation ids a change touches (section 12.1). |
 | `machinery landing --base <ref>` | The end gate: `check`, the full suite through `run`, `verify` (section 12.2). A failed landing marks the integration branch red. `--repair`; `--clear-red --reason <text>`. |
 | `machinery owed list` | Prints the owed list. |
-| `machinery owed sync` | Rewrites `owed.yaml` from the current evidence (section 11.2). `--prune-only` never adds. |
+| `machinery owed sync` | Rewrites `owed.yaml` from the current evidence (section 11.2). `--prune-only` never adds; `--allow-dirty` syncs against uncommitted changes in files that can change a verdict. |
 | `machinery proof` | Prints a proof block (section 13). `--limit`, `--learning`, `--observation`; `--story <id> --post` writes it to the story. |
 | `machinery status` | Prints a summary (section 14). A report, never a gate. `--no-backlog` (section 15.1). |
 | `machinery probe -- <command...>` | Stage `probe`: mutates the generated tables and expects the tests to notice (section 20). Never part of `check`. |
@@ -3094,6 +3094,24 @@ right after the skeleton; each story proves some ids and removes them. In an exi
 owed list is the baseline of what was never proven.
 
 ### 11.2 `machinery owed sync`
+
+```
+machinery owed sync [--prune-only] [--allow-dirty]
+```
+
+The owed list records what the committed design, tests and configuration prove, so before it
+reads anything `owed sync` refuses, without `--allow-dirty`, while the working tree has an
+uncommitted change (`git status --porcelain`: changed, added, deleted or untracked) in a file that
+can change a verdict: `machinery.yaml`, `design/adoption.yaml` (section 2.1),
+`design/excused.yaml` (section 2.2), the status file (section 4.1), a design source (section
+10.1) or a file under `trace.tests`. It prints
+`ERROR  owed sync: uncommitted changes in files that can change a verdict: <files>: commit them, or pass --allow-dirty to sync against the working tree`,
+`<files>` sorted, the first five and then `and <n> more`, writes nothing and exits 1. A change
+anywhere else, in the code say, does not stop it: the evidence of a run says what it says
+whatever the code is now, and the commit that carries the pruned list is held to section 10.1
+like any other. With `--allow-dirty` it does not refuse, and it reads the evidence as
+`verify --allow-dirty` does: a run whose header says `"dirty":true` is used. Without it such a
+run is not evidence, as for `verify` (section 12).
 
 Reads the evidence exactly as `verify` does (section 12). While a receipts file is refused
 (section 10.2) or a run is incomplete, it writes nothing, whatever the other runs prove: it

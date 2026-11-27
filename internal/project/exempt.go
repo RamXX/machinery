@@ -90,7 +90,7 @@ func (c *Config) Protected(rel string) string {
 		return "a file under trace.tests"
 	case c.Trace != nil && Match(c.Trace.Code, rel):
 		return "a file under trace.code"
-	case Match(c.designSourceGlobs(), rel):
+	case c.DesignSource(rel):
 		return "a design source"
 	case rel == ConfigName:
 		return "the configuration"
@@ -98,6 +98,25 @@ func (c *Config) Protected(rel string) string {
 		return "a build manifest"
 	}
 	return ""
+}
+
+// DesignSource reports a path of a design source (section 15.4): a file the
+// configuration names as one, a file of the machines directory, or a file
+// the globs of the imported machines match.
+func (c *Config) DesignSource(rel string) bool { return Match(c.designSourceGlobs(), rel) }
+
+// VerdictFile reports a file whose change can change a verdict that owed
+// sync writes (section 11.2): machinery.yaml, the adoption file, the excused
+// file, a design source (the status file among them) and a file under
+// trace.tests.
+func (c *Config) VerdictFile(rel string) bool {
+	switch {
+	case rel == ConfigName, rel == AdoptionName, rel == ExcusedName, rel == c.Design.Status:
+		return true
+	case c.DesignSource(rel):
+		return true
+	}
+	return c.Trace != nil && Match(c.Trace.Tests, rel)
 }
 
 // designSourceGlobs are the paths of the design sources: the files the

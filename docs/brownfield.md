@@ -357,7 +357,10 @@ machinery verify
 
 `owed sync --prune-only` removes exactly the ids the runs proved and adds nothing. Prune before
 you verify: `verify` fails on an owed id that is proven (`stale owed entry`). Pruning changes
-only the owed file, so the runs stay valid at the new commit.
+only the owed file, so the runs stay valid at the new commit. `owed sync` writes nothing while
+`machinery.yaml`, the adoption or excused file, a design source or a test file has uncommitted
+changes, and names them: commit them first, or pass `--allow-dirty`, which also uses a run made
+on a dirty tree, as `verify --allow-dirty` does.
 
 A run stays valid at a later commit when every path changed since is the tool's own (the owed
 list, the adoption and excused files, receipts) or matches a glob of `evidence.exempt` (say

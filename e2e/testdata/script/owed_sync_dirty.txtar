@@ -1,0 +1,80 @@
+# owed sync writes nothing while the working tree has uncommitted changes in a file that can
+# change a verdict (machinery.yaml, the adoption file, the excused file, the status file, a design
+# source, a file under trace.tests), and names them; with --allow-dirty it syncs as
+# verify --allow-dirty judges (section 11.2)
+fixture shop
+exec machinery gen
+gitinit
+exec machinery run -- sh e2e/orders.sh
+
+# a change elsewhere, here in the code, does not stop it
+exec sh -c 'echo "// touched" >> internal/domain/order.go'
+exec machinery owed sync --prune-only
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+exec git checkout -q internal/domain/order.go
+
+# the files that can change a verdict, changed, added or deleted, are named, the first five and
+# then how many more; nothing is written
+exec sh -c 'echo "# touched" >> e2e/orders.sh'
+exec sh -c 'echo "# touched" >> design/failure-modes.yaml'
+cp status.yaml design/status.yaml
+cp adoption.yaml design/adoption.yaml
+cp excused.yaml design/excused.yaml
+cp owed-empty.yaml design/owed.yaml
+exec sh -c 'echo "# touched" >> machinery.yaml'
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: design/adoption\.yaml, design/excused\.yaml, design/failure-modes\.yaml, design/status\.yaml, e2e/orders\.sh and 1 more: commit them, or pass --allow-dirty to sync against the working tree$'
+! stdout '^owed:'
+cmp design/owed.yaml owed-empty.yaml
+exec mrun 1 owed sync --prune-only
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: '
+exec git checkout -q design/owed.yaml
+
+# machinery.yaml alone, and a test file that is new or deleted
+exec git checkout -q e2e/orders.sh design/failure-modes.yaml
+rm design/status.yaml design/adoption.yaml design/excused.yaml
+exec mrun 1 owed sync
+stdout '^ERROR  owed sync: uncommitted changes in files that can change a verdict: machinery\.yaml: commit them, or pass --allow-dirty to sync against the working tree$'
+exec git checkout -q machinery.yaml
+cp extra.sh e2e/extra.sh
+exec mrun 1 owed sync
+stdout 'can change a verdict: e2e/extra\.sh: '
+rm e2e/extra.sh
+rm e2e/orders.sh
+exec mrun 1 owed sync
+stdout 'can change a verdict: e2e/orders\.sh: '
+exec git checkout -q e2e/orders.sh
+
+# --allow-dirty syncs against the working tree, and uses a run made on a dirty tree, as
+# verify --allow-dirty does; without it that run is not evidence
+exec sh -c 'echo "# touched" >> e2e/orders.sh'
+rm .machinery/receipts
+exec machinery run -- sh e2e/orders.sh
+exec mrun 1 owed sync
+stdout 'can change a verdict: e2e/orders\.sh: '
+exec machinery owed sync --allow-dirty
+stdout '^owed: 2 kept, 0 added, 0 removed$'
+exec machinery verify --allow-dirty
+stdout '^  warn   dirty evidence: not valid for acceptance$'
+stdout '^passed$'
+exec git checkout -q e2e/orders.sh
+exec mrun 1 owed sync
+stdout '^ERROR  no complete run valid for [0-9a-f]{7}: run the tests through machinery run first$'
+
+-- status.yaml --
+version: 1
+proposed: []
+-- adoption.yaml --
+version: 1
+scope:
+  - "internal/**"
+-- excused.yaml --
+version: 1
+excused: []
+-- owed-empty.yaml --
+version: 1
+owed: []
+-- extra.sh --
+#!/bin/sh
+# machinery:verifies inv:paid-before-shipped
+exit 0

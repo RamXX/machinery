@@ -267,6 +267,27 @@ func receiptFiles(p *project.Project) ([]string, error) {
 	return res, nil
 }
 
+// VerdictChanges lists, sorted, the paths with uncommitted changes (changed,
+// added, deleted or untracked) in files that can change a verdict (section
+// 11.2).
+func VerdictChanges(p *project.Project) ([]string, error) {
+	paths, err := gitx.StatusPaths(p.Root)
+	if err != nil {
+		return nil, err
+	}
+	var res []string
+	for _, rel := range paths {
+		if p.Cfg.VerdictFile(rel) {
+			res = append(res, rel)
+		}
+	}
+	sort.Strings(res)
+	return res, nil
+}
+
+// NameList joins names sorted: the first five, then how many more.
+func NameList(names []string) string { return nameList(append([]string(nil), names...)) }
+
 // TreeDirty reports whether the working tree has changes outside the receipts
 // directory and the owed file (section 10).
 func TreeDirty(p *project.Project) (bool, error) {

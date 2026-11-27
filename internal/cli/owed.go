@@ -11,7 +11,7 @@ import (
 
 func init() {
 	Register(&Command{Name: "owed list", Summary: "Print the owed list.", Run: runOwedList})
-	Register(&Command{Name: "owed sync", Summary: "Rewrite owed.yaml from the evidence; --prune-only never adds.", Run: runOwedSync})
+	Register(&Command{Name: "owed sync", Summary: "Rewrite owed.yaml from the evidence; --prune-only never adds; --allow-dirty syncs against uncommitted changes.", Run: runOwedSync})
 }
 
 func runOwedList(e *Env, args []string) int {
@@ -62,6 +62,7 @@ func sortOwed(es []design.OwedEntry) {
 func runOwedSync(e *Env, args []string) int {
 	fs := e.Flags("owed sync")
 	pruneOnly := fs.Bool("prune-only", false, "only remove proven entries")
+	allowDirty := fs.Bool("allow-dirty", false, "sync with uncommitted changes in files that can change a verdict, and use evidence from a dirty tree, as verify --allow-dirty does")
 	if !e.Parse(fs, args) {
 		return 2
 	}
@@ -73,7 +74,17 @@ func runOwedSync(e *Env, args []string) int {
 		return 2
 	}
 	d := design.Load(p)
-	ev, err := evidence.Evaluate(p, d, false)
+	if !*allowDirty { // section 11.2: the owed list follows committed verdicts
+		changed, err := evidence.VerdictChanges(p)
+		if err != nil {
+			return e.Fail(err)
+		}
+		if len(changed) > 0 {
+			fmt.Fprintf(e.Stdout, "ERROR  owed sync: uncommitted changes in files that can change a verdict: %s: commit them, or pass --allow-dirty to sync against the working tree\n", evidence.NameList(changed))
+			return 1
+		}
+	}
+	ev, err := evidence.Evaluate(p, d, *allowDirty)
 	if err != nil {
 		return e.Fail(err)
 	}
