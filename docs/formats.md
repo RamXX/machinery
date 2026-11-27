@@ -2446,7 +2446,8 @@ order, the named ones sorted. `<what to do>` is
 and with `--streams`
 `with --streams a package's verdicts go only to the files of its entry in evidence.adapter.sources: add one`.
 In the ambiguous line a file that does not parse is followed by ` (does not parse)`. A package that did not end with pass is named when it failed in a
-stream, and with it the functions it made fail for want of a verdict, sorted, the first five
+stream or did not end with pass in one that gives it verdicts, and with it the functions it made
+fail for want of a verdict, sorted, the first five
 and then `and <n> more`; a function with a `run` event and no verdict is also counted as
 failed in the first line. The packages of the `in no file` line are sorted, the first five and then
 `and <n> more`. Packages and functions are counted over the whole stream.
