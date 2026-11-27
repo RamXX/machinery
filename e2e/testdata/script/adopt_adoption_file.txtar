@@ -42,10 +42,10 @@ gitcommit adopted
 # status reads the merged configuration, and so does assess, on its snapshot
 exec machinery status --no-backlog
 stdout .
-exec machinery assess --out $WORK/../assessed
-grep '^scope: internal/shipping/\*\*, internal/billing/\*\*$' $WORK/../assessed/report.md
-grep '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$' $WORK/../assessed/report.md
-exists $WORK/../assessed/snapshot/design/adoption.yaml
+exec machinery assess --out $WORK/../adoption-file-assess
+grep '^scope: internal/shipping/\*\*, internal/billing/\*\*$' $WORK/../adoption-file-assess/report.md
+grep '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$' $WORK/../adoption-file-assess/report.md
+exists $WORK/../adoption-file-assess/snapshot/design/adoption.yaml
 
 # widening the scope later writes design/adoption.yaml again, whole, and nothing of machinery.yaml
 exec machinery adopt --paths 'cmd/**' --write
@@ -58,14 +58,14 @@ exec mrun 0 check --base HEAD --stage ratchet
 gitcommit widened
 
 # a rehearsal lists design/adoption.yaml among the files adopt writes, and never machinery.yaml
-exec machinery adopt --rehearse --paths 'e2e/**' --out $WORK/../rehearsed
+exec machinery adopt --rehearse --paths 'e2e/**' --out $WORK/../adoption-file-rehearse
 stdout '^adopt: wrote 1 file\(s\), 0 waiver\(s\), [0-9]+ owed$'
 # the snapshot starts from the project's design/adoption.yaml: what it held is kept
-grep '^  - "cmd/\*\*"$' $WORK/../rehearsed/snapshot/design/adoption.yaml
-grep '^\| `design/adoption\.yaml` \| [0-9]+ \|$' $WORK/../rehearsed/rehearsal.md
-! grep '^\| `machinery\.yaml` ' $WORK/../rehearsed/rehearsal.md
-grep '^  - "e2e/\*\*"$' $WORK/../rehearsed/snapshot/design/adoption.yaml
-cmp $WORK/../rehearsed/snapshot/machinery.yaml team.yaml
+grep '^  - "cmd/\*\*"$' $WORK/../adoption-file-rehearse/snapshot/design/adoption.yaml
+grep '^\| `design/adoption\.yaml` \| [0-9]+ \|$' $WORK/../adoption-file-rehearse/rehearsal.md
+! grep '^\| `machinery\.yaml` ' $WORK/../adoption-file-rehearse/rehearsal.md
+grep '^  - "e2e/\*\*"$' $WORK/../adoption-file-rehearse/snapshot/design/adoption.yaml
+cmp $WORK/../adoption-file-rehearse/snapshot/machinery.yaml team.yaml
 ! grep '^  - "e2e/\*\*"$' design/adoption.yaml
 exec git status --porcelain
 ! stdout .
@@ -89,9 +89,9 @@ exec mrun 1 check --base HEAD --stage ratchet
 stdout '^  ERROR  ratchet: scope narrowed: internal/billing/\*\*$'
 stdout '^  ERROR  ratchet: stage disabled: machines applied at HEAD and design\.machines is gone now$'
 # assess reads design/adoption.yaml from the work tree, as it reads machinery.yaml, never from HEAD
-exec machinery assess --out $WORK/../assessed-without
-grep '^scope: internal/shipping/\*\*$' $WORK/../assessed-without/report.md
-! exists $WORK/../assessed-without/snapshot/design/adoption.yaml
+exec machinery assess --out $WORK/../adoption-file-assess-without
+grep '^scope: internal/shipping/\*\*$' $WORK/../adoption-file-assess-without/report.md
+! exists $WORK/../adoption-file-assess-without/snapshot/design/adoption.yaml
 exec git checkout -q design/adoption.yaml
 
 # a scalar that both files set with two values is a config error that names both files, for
@@ -106,11 +106,11 @@ exec mrun 2 adopt --write
 stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
 cmp machinery.yaml conflict.yaml
 cmp design/adoption.yaml adoption-before.yaml
-exec mrun 2 assess --out $WORK/../refused
+exec mrun 2 assess --out $WORK/../adoption-file-refused
 stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
-exec mrun 2 adopt --rehearse --out $WORK/../refused
+exec mrun 2 adopt --rehearse --out $WORK/../adoption-file-refused
 stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
-! exists $WORK/../refused
+! exists $WORK/../adoption-file-refused
 cp conflict-baseline.yaml machinery.yaml
 exec mrun 2 config
 stderr '^config: tests\.baseline: machinery\.yaml has "design/unit-tests\.yaml" and design/adoption\.yaml has "design/tests-baseline\.yaml": keep one$'
