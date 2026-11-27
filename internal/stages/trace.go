@@ -82,6 +82,13 @@ func trace(ctx *Context) (*report.Stage, []NonAction, []string) {
 	if len(p.Cfg.Trace.Tests) > 0 && len(tests) == 0 {
 		s.Errorf("trace.tests matches no file")
 	}
+	links, err := tags.Links(p)
+	if err != nil {
+		cannot("cannot list symbolic links: %v", err)
+	}
+	for _, l := range links {
+		s.Errorf("trace: %s is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of %s", l.Path, strings.Join(l.Lists, " and "))
+	}
 	found, err := tags.Scan(p, append(append([]string{}, code...), tests...))
 	if err != nil {
 		cannot("cannot read tags: %v", err)

@@ -13,6 +13,9 @@ import (
 // skipDirs are never walked: they hold tools, tracker data and other checkouts.
 var skipDirs = map[string]bool{".git": true, "node_modules": true, ".machinery": true, ".beads": true, ".worktrees": true, ".bin": true}
 
+// SkipDir reports whether a directory of this name is never walked.
+func SkipDir(name string) bool { return skipDirs[name] }
+
 // Match reports whether a project-relative path matches any of the globs.
 func Match(globs []string, rel string) bool {
 	for _, g := range globs {

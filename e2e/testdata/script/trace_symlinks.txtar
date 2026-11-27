@@ -1,0 +1,301 @@
+# a symbolic link under trace.tests or trace.code is not followed by stage trace nor by the claimant
+# rule, while the test runner may build what it points to: every such link is a finding of stage
+# trace, with no waiver (section 8). A failing test behind a linked directory never leaves the
+# project passing check
+fixture shop
+fixture shop-gotests
+cp base.yaml machinery.yaml
+mkdir suites/failing suites/docs
+cp fail_test.go.txt suites/failing/fail_test.go
+cp README.txt suites/docs/README.md
+exec machinery gen
+gitinit
+exec machinery check
+stdout '^passed$'
+
+# the verifier's case: a failing test in a linked directory. The runner builds it and it fails,
+# the verdict belongs to no file the tool reads, and the id stays proven by the real suite: only
+# the link says that something is not read
+symlink e2e/linked -> ../suites/failing
+gitcommit 'a directory of tests behind a link'
+env SHOP_LINKED=fail
+exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite ./e2e/linked
+env SHOP_LINKED=
+stderr 'package\(s\) no file under trace\.tests belongs to: example\.test/shop/e2e/linked \(1\)'
+# the claimant rule does not read the linked file either: it is no claimant, and its fail is no fail of a file
+exec mrun 1 verify
+! stdout 'partly run'
+! stdout 'e2e/linked'
+! stdout 'failed: inv:paid-before-shipped'
+exec mrun 1 check
+stdout '^  ERROR  trace: e2e/linked is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout -count=1 'ERROR  trace:'
+exec mrun 1 check --stage trace
+stdout -count=1 'ERROR  trace:'
+# a waiver cannot cover it: trace is no rule that can be waived
+cp waived.yaml machinery.yaml
+! exec machinery check --stage trace
+stderr 'waivers: "trace" is not a rule that can be waived'
+cp base.yaml machinery.yaml
+# replaced with the files, the failing test is under trace.tests and the run fails the id
+rm e2e/linked
+mkdir e2e/linked
+cp suites/failing/fail_test.go e2e/linked/fail_test.go
+gitcommit 'the files instead of the link'
+exec machinery check --stage trace
+stdout '^passed$'
+! stdout 'symbolic link'
+
+# a linked file, a dangling link, a link that leaves the project, a link to a directory without
+# a file of tests: every one under trace.tests is a finding, in path order
+rm e2e/linked
+symlink e2e/ship_link_test.go -> ../suites/failing/fail_test.go
+symlink e2e/gone.sh -> ../suites/gone.sh
+symlink e2e/outside -> $WORK/outside
+symlink e2e/notes -> ../suites/docs
+mkdir outside
+gitcommit 'four kinds of links under trace.tests'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  trace: e2e/gone\.sh is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout '^  ERROR  trace: e2e/notes is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout '^  ERROR  trace: e2e/outside is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout '^  ERROR  trace: e2e/ship_link_test\.go is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+stdout -count=4 'ERROR  trace:'
+
+# the globs decide what is under trace.tests: with only test files named, a link to a directory
+# is a finding when a test file is behind it, and none when only a README is
+cp narrow.yaml machinery.yaml
+rm e2e/ship_link_test.go
+rm e2e/gone.sh
+rm e2e/outside
+symlink e2e/linked -> ../suites/failing
+gitcommit 'the globs name test files'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  trace: e2e/linked is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.tests$'
+! stdout 'e2e/notes'
+stdout -count=1 'ERROR  trace:'
+
+# a link outside every glob is no finding
+rm e2e/linked
+rm e2e/notes
+mkdir tools
+symlink docs-link -> suites/docs
+symlink internal/domain/notes.md -> ../../suites/docs/README.md
+symlink tools/alias.go -> ../internal/domain/order.go
+gitcommit 'links outside the globs'
+exec machinery check --stage trace
+stdout '^passed$'
+! stdout 'symbolic link'
+
+# a link under trace.code is the same finding, naming trace.code; one outside scope is not read
+cp code.yaml machinery.yaml
+gitcommit 'trace.code reaches tools'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  trace: tools/alias\.go is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.code$'
+stdout -count=1 'ERROR  trace:'
+cp scoped.yaml machinery.yaml
+gitcommit 'tools is outside the scope'
+exec machinery check --stage trace
+stdout '^passed$'
+
+# a link both lists reach names both
+symlink internal/domain/alias.go -> order.go
+cp both.yaml machinery.yaml
+gitcommit 'both lists reach internal/domain'
+exec mrun 1 check --stage trace
+stdout '^  ERROR  trace: internal/domain/alias\.go is a symbolic link; markers behind it are not read: replace it with the files, or leave it out of trace\.code and trace\.tests$'
+stdout -count=1 'ERROR  trace:'
+
+# a project that names no trace has no finding
+cp notrace.yaml machinery.yaml
+gitcommit 'no trace'
+exec machinery check --stage trace
+stdout 'not applicable'
+! stdout 'symbolic link'
+
+-- base.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- waived.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+  - {rule: trace, id: "e2e/linked", reason: "the tests behind the link are ours"}
+-- narrow.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**/*_test.go", "e2e/*.sh"]
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- both.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**/*_test.go", "e2e/*.sh", "internal/domain/*.go"]
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- fail_test.go.txt --
+package failing
+
+import (
+	"os"
+	"testing"
+)
+
+// TestLinkedShip is built by the runner when its directory is named, and fails when asked to.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestLinkedShip(t *testing.T) {
+	if os.Getenv("SHOP_LINKED") == "fail" {
+		t.Fatal("shipped without payment")
+	}
+}
+-- README.txt --
+Notes on the shipping rules. No test lives here.
+-- code.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["**/*.go"]
+  tests: ["e2e/**/*_test.go", "e2e/*.sh"]
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- scoped.yaml --
+version: 2
+scope: ["internal/**"]
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["**/*.go"]
+  tests: ["e2e/**/*_test.go", "e2e/*.sh"]
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- notrace.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+tests:
+  e2e: ["e2e/**", "suites/**"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+
