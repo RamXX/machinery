@@ -1,0 +1,284 @@
+# test sources a project keeps outside *_test.go files and stages before go test, sets of them
+# named with go tool test2json -p, and the forms of evidence.adapter.sources (section 10.3): an
+# entry with a wildcard maps each package to the files of its own directory when it names some,
+# and dir: true maps every package of a pattern to the test files of its own directory
+fixture shop
+fixture shop-gotests
+cp machinery.yaml base.yaml
+exec sh -c 'cat base.yaml staged.part > machinery.yaml'
+exec machinery gen
+gitinit
+
+# two sets of staged sources under e2e/testdata/sets, named by the import path of the directory
+# their sources are kept in: one entry maps each set to its own sources. Both sets define
+# TestBalance, and each verdict goes to the file of its own set: the name is not ambiguous
+exec machinery run --adapter go-test-json --streams -- sh sets.sh
+stdout '^sets: 2 set\(s\), exit 0$'
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 2 package\(s\), 3 test function\(s\) with a verdict: 3 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 3 pass, 0 fail, 0 skip$'
+! stderr 'ambiguous'
+! stderr 'in no file under'
+# the claims of the suite and of the notes file are of no package of the run: they count only in
+# the project-wide line, the notes file among the claiming files with no test function
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+stderr '^machinery run: adapter: in the whole project: 3 claimed id\(s\) not run, 1 claiming file\(s\) with no test function$'
+! stderr 'no test function; its claims count nothing'
+exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout '"id":"inv:customer-email-unique","outcome":"pass","test":"e2e/testdata/sets/ledger/ledger\.go::TestBalance","observed":"go test: TestBalance passed"'
+stdout '"id":"inv:paid-before-shipped","outcome":"pass","test":"e2e/testdata/sets/orders/orders\.go::TestBalance"'
+stdout '"id":"inv:terminal-is-final","outcome":"pass","test":"e2e/testdata/sets/orders/orders\.go::TestShipOnce"'
+exec mrun 1 verify
+! stdout 'does not claim it'
+stdout ', 3 proven, 3 by adapter at function granularity, '
+
+# a set that does not build: the wrapper writes a stream that says its package failed, and no
+# test of it ran. Every test function of its sources failed
+cp broken.go e2e/testdata/sets/ledger/broken.go
+exec mrun 1 run --adapter go-test-json --streams -- sh sets.sh
+stdout '^sets: 2 set\(s\), exit 1$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/testdata/sets/ledger: did not run its tests: 2 test function\(s\) read as failed: TestBalance, TestBroken$'
+stderr '^machinery run: adapter: receipts written: 2 pass, 1 fail, 0 skip$'
+exec sh -c 'grep -h inv:customer-email-unique "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+stdout '"outcome":"fail","test":"e2e/testdata/sets/ledger/ledger\.go::TestBalance","observed":"go test: TestBalance: the package did not run its tests"'
+rm e2e/testdata/sets/ledger/broken.go
+
+# go test on loose files names every set command-line-arguments: the sets cannot be told apart,
+# the entry for that name maps every file to it, and TestBalance is ambiguous
+exec sh -c 'cat base.yaml loose.part > machinery.yaml'
+gitcommit 'the sets as command-line-arguments'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh loose.sh
+stderr '^machinery run: adapter go-test-json: 2 stream\(s\), 1 package\(s\), '
+stderr '^machinery run: adapter: command-line-arguments\.TestBalance: defined in e2e/testdata/sets/ledger/ledger\.go, e2e/testdata/sets/orders/orders\.go: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions$'
+stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
+
+# an entry whose files match no Go file under trace.tests is refused, and the refusal says what
+# was looked for
+exec sh -c 'cat base.yaml nothing.part > machinery.yaml'
+exec mrun 2 run --adapter go-test-json --streams -- sh sets.sh
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/e2e/testdata/sets/\*\): files e2e/testdata/sets/\*/\*\.go\.txt match no Go file under trace\.tests \(a file whose name ends in \.go\): correct the globs, or list the files in trace\.tests$'
+exec git checkout -q machinery.yaml
+
+# in direct mode nothing changes: only _test.go files are read, and the staged sources, the notes
+# file among them, are not
+exec sh -c 'cat base.yaml staged.part > machinery.yaml'
+gitcommit 'the staged map again'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
+
+# a second package tested in its own directory, with a function of the same name as one of the
+# suite, and a file whose claim stands above no test function
+mkdir e2e/more
+cp more_test.go e2e/more/more_test.go
+cp doc_test.go e2e/more/doc_test.go
+exec sh -c 'cat base.yaml dir.part > machinery.yaml'
+gitcommit 'a second package, and one entry for every package of e2e'
+
+# dir: true: every package the pattern matches is built from the test files of its own
+# directory, so one entry serves both, and TestEmailUnique is not ambiguous
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/... > "$MACHINERY_GO_TEST_JSON/e2e.json"'
+stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 2 package\(s\), 7 test function\(s\) with a verdict: 7 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+! stderr 'ambiguous'
+stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims count nothing$'
+exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
+stdout '"test":"e2e/more/more_test\.go::TestEmailUnique"'
+stdout '"test":"e2e/suite/email_test\.go::TestEmailUnique"'
+
+# an entry with a wildcard over several directories maps each package to the files of its own
+# directory: it does not make every file a candidate of every package
+exec sh -c 'cat base.yaml wide.part > machinery.yaml'
+gitcommit 'one glob over every directory of e2e'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json --streams -- sh -c 'go test -json -count=1 ./e2e/... > "$MACHINERY_GO_TEST_JSON/e2e.json"'
+stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
+! stderr 'ambiguous'
+
+# the run summary is scoped to the packages of the run: a run of e2e/suite alone does not count
+# the claims of e2e/more nor name its file without a test function, and the project-wide line
+# counts them once
+exec sh -c 'cat base.yaml > machinery.yaml'
+gitcommit 'no map'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test ./e2e/more
+stderr '^machinery run: adapter: receipts written: 1 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+stderr '^machinery run: adapter: in the whole project: 5 claimed id\(s\) not run, 1 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: e2e/more/doc_test\.go: no test function; its claims count nothing$'
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
+stderr '^machinery run: adapter: in the whole project: 1 claimed id\(s\) not run, 1 claiming file\(s\) with no test function$'
+! stderr 'doc_test\.go'
+
+# refusals of dir: true: without --streams an entry that matches a package tested in its own
+# directory, and with --streams a pattern that matches no such package
+exec sh -c 'cat base.yaml dir.part > machinery.yaml'
+exec mrun 2 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/e2e/\.\.\., dir: true\) matches example\.test/shop/e2e/more, the package of e2e/more: entries are read only with --streams; remove the entry, or run the suite through --streams$'
+exec sh -c 'cat base.yaml dir-nothing.part > machinery.yaml'
+exec mrun 2 run --adapter go-test-json --streams -- sh sets.sh
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/nothing/\.\.\., dir: true\): the pattern matches the import path of no directory that holds a _test\.go file under trace\.tests: correct the pattern, or list the files in trace\.tests$'
+! exists .machinery/receipts/nothing
+
+# config errors of the two forms
+exec sh -c 'cat base.yaml both.part > machinery.yaml'
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources: entry 1: files and dir: true do not combine; write one entry for each$'
+exec sh -c 'cat base.yaml pattern.part > machinery.yaml'
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources: entry 1: package "example\.test/shop/e2e/\*" with dir: true is an import path pattern: \.\.\. is its only wildcard$'
+exec sh -c 'cat base.yaml neither.part > machinery.yaml'
+exec mrun 2 config
+stderr '^config: evidence\.adapter\.sources: entry 1: files is required, or dir: true$'
+exec git checkout -q machinery.yaml
+
+-- sets.sh --
+#!/bin/sh
+# stages each set of sources kept under e2e/testdata/sets as test files, builds its test binary
+# and runs it under go tool test2json, named by the import path of the directory the sources are
+# kept in. A set that does not build gets a stream that says its package failed
+set -u
+status=0
+n=0
+for dir in e2e/testdata/sets/*/; do
+  set=$(basename "$dir")
+  n=$((n + 1))
+  name="example.test/shop/e2e/testdata/sets/$set"
+  out="$MACHINERY_GO_TEST_JSON/$set.json"
+  rm -rf "stage/$set"
+  mkdir -p "stage/$set"
+  for f in "$dir"*.go; do cp "$f" "stage/$set/$(basename "$f" .go)_test.go"; done
+  if go test -c -o "stage/$set.test" "./stage/$set" > /dev/null 2>&1; then
+    go tool test2json -t -p "$name" "stage/$set.test" -test.v=test2json > "$out" || status=1
+  else
+    printf '{"Action":"start","Package":"%s"}\n{"Action":"fail","Package":"%s"}\n' "$name" "$name" > "$out"
+    status=1
+  fi
+done
+rm -rf stage
+echo "sets: $n set(s), exit $status"
+exit $status
+-- loose.sh --
+#!/bin/sh
+# the same sets, each tested by go test on its loose files
+set -u
+status=0
+for dir in e2e/testdata/sets/*/; do
+  set=$(basename "$dir")
+  rm -rf "stage/$set"
+  mkdir -p "stage/$set"
+  for f in "$dir"*.go; do cp "$f" "stage/$set/$(basename "$f" .go)_test.go"; done
+  go test -json -count=1 stage/$set/*_test.go > "$MACHINERY_GO_TEST_JSON/$set.json" || status=1
+done
+rm -rf stage
+exit $status
+-- e2e/testdata/sets/orders/orders.go --
+package sets
+
+import "testing"
+
+// TestBalance is staged as a test file before go test runs.
+//
+// machinery:verifies inv:paid-before-shipped
+func TestBalance(t *testing.T) {}
+
+// machinery:verifies inv:terminal-is-final
+func TestShipOnce(t *testing.T) {}
+-- e2e/testdata/sets/ledger/ledger.go --
+package sets
+
+import "testing"
+
+// TestBalance has the name of a function of the orders set.
+//
+// machinery:verifies inv:customer-email-unique
+func TestBalance(t *testing.T) {}
+-- e2e/testdata/notes/notes.go --
+package notes
+
+// The claim of this staged source stands above no function, and it has no test function.
+//
+// machinery:verifies sc:cancelled-order-refuses-payment
+-- broken.go --
+package sets
+
+import "testing"
+
+// TestBroken does not build, and with it the whole set.
+func TestBroken(t *testing.T) {
+	var n int = "one"
+	_ = n
+}
+-- more_test.go --
+package more
+
+import "testing"
+
+// TestEmailUnique has the name of a function of the suite.
+//
+// machinery:verifies inv:customer-email-unique
+func TestEmailUnique(t *testing.T) {}
+-- doc_test.go --
+package more
+
+// machinery:verifies sc:customer-pays-and-the-order-ships
+-- staged.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/testdata/sets/*"
+        files: ["e2e/testdata/sets/*/*.go"]
+      - package: "example.test/shop/e2e/testdata/notes"
+        files: ["e2e/testdata/notes/*.go"]
+-- loose.part --
+evidence:
+  adapter:
+    sources:
+      - package: "command-line-arguments"
+        files: ["e2e/testdata/sets/*/*.go"]
+-- nothing.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/testdata/sets/*"
+        files: ["e2e/testdata/sets/*/*.go.txt"]
+-- dir.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/..."
+        dir: true
+-- wide.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/**"
+        files: ["e2e/**/*_test.go"]
+-- dir-nothing.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/nothing/..."
+        dir: true
+-- both.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/..."
+        files: ["e2e/suite/*_test.go"]
+        dir: true
+-- pattern.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/*"
+        dir: true
+-- neither.part --
+evidence:
+  adapter:
+    sources:
+      - package: "example.test/shop/e2e/..."

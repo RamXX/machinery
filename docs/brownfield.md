@@ -272,14 +272,18 @@ comment directly above it, every test function of the file when it stands above 
 marker directly above a fuzz test, a benchmark or any other function that is no test counts
 nothing, and the summary of the run names it. A failed function writes
 a fail, a skipped one a skip (a parent with a skipped subtest too), and one that did not run
-writes nothing. A package that failed (a test that hangs past `-timeout`, calls `os.Exit` or
-panics, a build that fails) writes a fail for every claimed function without a verdict, and a
+writes nothing. In a package that failed, a test that hangs past `-timeout`, calls `os.Exit`
+or panics writes a fail ("started, no verdict"), a function a `-run` filter left out or the
+crash never reached writes nothing, and no pass of the package counts; a package that ran none
+of its tests (a build that fails, a `TestMain` that exits first) writes a fail for every
+claimed function. A
 stream cut short leaves the run incomplete, naming the receipts file to delete; a pass answered from
 the test cache counts nothing, and machinery adds `-count=1` to keep that from happening. A
 verdict belongs to a file only when no other Go file of its directory defines a function of the
 same name that begins with `Test` and takes one parameter, whatever its build tags or the
 way its parameter is written: rename such a twin, or neither counts. The summary of the run
-says how many ids were claimed and not run. The command is held narrow on purpose, against
+says how many ids of the packages it ran were claimed and not run, and the number for the
+whole project once. The command is held narrow on purpose, against
 mistakes: `go test` with relative package patterns and the usual test flags, in the module of
 the project root, for the machine it runs on; `-C`, `-modfile`, `-exec`, a `-run` that
 selects subtests and the like run through `--streams` (below). A module path that two tracked
@@ -305,9 +309,15 @@ and have it write each `go test -json` output to a file in the directory machine
 judged on its own, and a fail in any of them is a fail; a run that starts before the one before
 it ended, a killed run and its retry or two runs writing at once, leaves the run incomplete); there the wrapper must pass `-count=1` itself, and because machinery
 cannot see what such a run built, every package it tests needs an entry in
-`evidence.adapter.sources` naming the files it is built from. If you build your tests from
-copies staged in another directory, `evidence.adapter.sources` maps the staged package back to
-the files that carry the markers; it is read only with `--streams`.
+`evidence.adapter.sources` naming the files it is built from. One entry
+`{package: "<module path>/e2e/...", dir: true}` gives every package it matches the test files of
+its own directory. If you build your tests from copies staged in another directory, an entry with
+`files` maps the staged package back to the files that carry the markers, and those may be
+sources you keep under `trace.tests` without the `_test.go` name (under a `testdata`
+directory, say). When the wrapper tests several such sets, name each one: `go test -c` the set,
+then run the binary under `go tool test2json -t -p <name>`; named by the import path of the
+directory its sources are kept in, one entry with a wildcard maps each set to its own sources
+(`docs/formats.md` section 10.3). The entries are read only with `--streams`.
 
 `owed sync --prune-only` removes exactly the ids the run proved. `verify` passes: everything is
 proven or still owed. `story` is the gate for that one story; a consequential or critical story

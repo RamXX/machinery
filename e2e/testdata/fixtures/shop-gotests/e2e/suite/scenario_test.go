@@ -20,8 +20,11 @@ func TestPayThenShip(t *testing.T) {
 }
 
 // TestMain is not a test function: it has no verdict of its own, and the markers of the file
-// do not wait for one.
+// do not wait for one. SHOP_MAIN=exit stops it before m.Run, so that no test starts.
 func TestMain(m *testing.M) {
+	if os.Getenv("SHOP_MAIN") == "exit" {
+		os.Exit(4)
+	}
 	os.Exit(m.Run())
 }
 

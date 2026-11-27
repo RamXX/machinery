@@ -10,7 +10,9 @@ gitinit
 exec machinery run --adapter go-test-json --streams -- sh staged.sh
 stderr 'adapter go-test-json: 1 stream\(s\), 1 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, not run: 6 id\(s\)$'
+# the staged package has no candidate: no claim is of a package of the run
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
 stderr '^machinery run: adapter: 6 test function\(s\) with a verdict are in no file under trace\.tests: package\(s\) example\.test/shop/staged/suite; with --streams a package.s verdicts go only to the files of its entry in evidence\.adapter\.sources: add one$'
 
 # with the map the verdict of a staged function goes to the file that defines it
@@ -56,7 +58,7 @@ gitcommit 'back to the map'
 # an entry that maps onto nothing is refused before anything runs
 cp mapped-nothing.yaml machinery.yaml
 exec mrun 2 run --adapter go-test-json --streams -- sh staged.sh
-stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/staged/\*\*\): files suites/\*_test\.go, suites/\*/\*_test\.go match no file under trace\.tests: correct the globs, or list the files in trace\.tests$'
+stderr '^usage: --adapter go-test-json: evidence\.adapter\.sources: entry 1 \(package example\.test/shop/staged/\*\*\): files suites/\*_test\.go, suites/\*/\*_test\.go match no Go file under trace\.tests \(a file whose name ends in \.go\): correct the globs, or list the files in trace\.tests$'
 
 # without --streams the entries are not read: a staged package that go test runs itself is the
 # directory of no file under trace.tests, map or not
@@ -87,7 +89,7 @@ exec mrun 2 config
 stderr '^config: evidence\.adapter\.sources: entry 1: package is required$'
 cp no-files.yaml machinery.yaml
 exec mrun 2 config
-stderr '^config: evidence\.adapter\.sources: entry 2: files is required$'
+stderr '^config: evidence\.adapter\.sources: entry 2: files is required, or dir: true$'
 cp bad-glob.yaml machinery.yaml
 exec mrun 2 config
 stderr '^config: evidence\.adapter\.sources: entry 1: package "example\.test/\[" is not a valid glob$'

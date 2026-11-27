@@ -6,24 +6,41 @@ exec machinery gen
 gitinit
 
 # a failed function: a fail receipt for the id above it. The package did not end with pass, so
-# no pass is written from it, and the passes of its other functions count for nothing. A
-# function of the package with no verdict fails with it: the file behind the tag faults was not
-# built, and its claim fails, a false fail rather than a lost one
+# no pass is written from it, and the passes of its other functions count for nothing. The
+# function of the file behind the tag faults has no run event in a run where the others have
+# one: it was not built, it did not run, and its claim stays without evidence
 env SHOP_EMAIL=fail
 exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
 stderr 'with a verdict: 5 passed, 1 failed, 0 skipped$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
 stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
 stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
-stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: 1 test function\(s\) without a verdict, read as failed: TestProviderDown$'
+! stderr 'read as failed'
 exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 cmp stdout want-fail.jsonl
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
-stdout '^  ERROR  failed: fm:payment-provider-down \(e2e/suite/outage_test\.go\)$'
+! stdout 'failed: fm:payment-provider-down'
 exec machinery status
-stdout '^proven: 0  partial: 0  failed: 2  owed: 2  unproven and not owed: 13$'
+stdout '^proven: 0  partial: 0  failed: 1  owed: 2  unproven and not owed: 13$'
+
+# one failing test under a -run filter fails that test and no function the filter left out: they
+# have no run event in a run where a function of the package has one, so they did not run
+rm .machinery/receipts
+env SHOP_EMAIL=fail
+exec mrun 1 run --adapter go-test-json -- go test -run TestEmailUnique ./e2e/suite
+env SHOP_EMAIL=
+stderr 'with a verdict: 0 passed, 1 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 5 id\(s\)$'
+! stderr 'read as failed'
+exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
+stdout -count=1 receipt
+stdout '"id":"inv:customer-email-unique","outcome":"fail","test":"e2e/suite/email_test\.go::TestEmailUnique","observed":"go test: TestEmailUnique failed"'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique '
+stdout -count=1 'ERROR  failed: '
 
 # a skipped function: a skip receipt, which never counts
 rm .machinery/receipts
@@ -43,7 +60,7 @@ env SHOP_EMAIL=
 rm .machinery/receipts
 env SHOP_SCENARIO=fail
 exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 3 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
 exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 cmp stdout want-file-fail.jsonl
 rm .machinery/receipts
@@ -60,7 +77,7 @@ env SHOP_FAIL_SUBTEST=cancelled
 exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
 stderr 'with a verdict: 5 passed, 1 failed, 0 skipped$'
 exec sh -c 'grep "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
-stdout -count=2 receipt
+stdout -count=1 receipt
 stdout '"id":"inv:terminal-is-final","outcome":"fail","test":"e2e/suite/order_test.go::TestCancelIsFinal","observed":"go test: TestCancelIsFinal failed"'
 env SHOP_FAIL_SUBTEST=
 
@@ -76,57 +93,84 @@ exec mrun 1 verify
 stdout '^  ERROR  unproven: inv:terminal-is-final$'
 env SHOP_SKIP_SUBTEST=
 
-# a function that claims nothing fails: the package did not end ok, no pass of it counts, and
-# the claim of the function without a verdict fails
+# a function that claims nothing fails: the package did not end ok and no pass of it counts. The
+# claiming functions passed and the file behind faults did not run: no receipt at all
 rm .machinery/receipts
 env SHOP_ROUTING=fail
 exec mrun 1 run --adapter go-test-json -- go test -count=1 ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
 stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
 stderr 'package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
-exec sh -c 'grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
-stdout -count=1 receipt
-stdout '"id":"fm:payment-provider-down","outcome":"fail"'
+exec sh -c '! grep -h "\"type\":\"receipt\"" .machinery/receipts/*.jsonl'
 exec mrun 1 verify
-stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 1 receipts$'
+stdout '^checked: 16 obligations, 0 proven, 0 partial, 2 owed, 0 receipts$'
 stdout '^  warn   run exited 1: '
 env SHOP_ROUTING=
 
 # a test that hangs past -timeout, calls os.Exit or panics in a goroutine has a run event and no
-# verdict, and its package fails: the test failed ("no verdict; the package failed"), and so did
-# every test function of the package without a verdict, here every other one, since the binary
-# stopped before they started
+# verdict, and its package fails: the test failed ("started, no verdict; the package failed").
+# The functions the binary stopped before they started did not run, and get nothing from the run
 rm .machinery/receipts
 env SHOP_EMAIL=hang
 exec mrun 1 run --adapter go-test-json -- go test -timeout 3s ./e2e/suite
 env SHOP_EMAIL=
 stderr 'with a verdict: 0 passed, 1 failed, 0 skipped$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 6 fail, 0 skip$'
-stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: 7 test function\(s\) without a verdict, read as failed: TestCancelIsFinal, TestCancelledRefusesPay, TestEmailUnique, TestPayThenShip, TestProviderDown and 2 more$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestEmailUnique$'
+stderr '^machinery run: adapter: claimed, not run: 5 id\(s\)$'
 exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
-stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: no verdict; the package failed"'
-exec sh -c 'grep -h sc:customer-pays-and-the-order-ships .machinery/receipts/*.jsonl'
-stdout '"outcome":"fail","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay, TestPayThenShip: no verdict; the package failed"'
+stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: started, no verdict; the package failed"'
+exec sh -c '! grep -q sc:customer-pays-and-the-order-ships .machinery/receipts/*.jsonl'
 rm .machinery/receipts
 env SHOP_EMAIL=panic
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
 env SHOP_EMAIL=
-stderr '^machinery run: adapter: receipts written: 0 pass, 6 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestEmailUnique$'
 
 # an earlier pass at the same commit does not stand against a later run that failed this way:
-# the later fail receipt fails the id
+# the later fail receipt fails the id of the function the crash stopped. The functions it never
+# reached did not run in the later run, and their earlier passes stand
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test ./e2e/suite
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
 env SHOP_EMAIL=exit
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
 env SHOP_EMAIL=
-stderr '^machinery run: adapter: receipts written: 0 pass, 6 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
-stdout '^  ERROR  failed: inv:paid-before-shipped \(e2e/suite/order_test\.go::TestShipNeedsPayment\)$'
+! stdout 'failed: inv:paid-before-shipped'
 exec machinery status
-stdout '^proven: 0  partial: 0  failed: 6  '
+stdout '^proven: 4 \(2 by adapter at function granularity, 2 by adapter at file granularity\)  partial: 0  failed: 1  '
+
+# a package that did not run its tests: TestMain stops before m.Run and no function has a run
+# event. Every test function of its files failed, the one of the file the build left out
+# included: a false fail rather than a lost one
+rm .machinery/receipts
+env SHOP_MAIN=exit
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+env SHOP_MAIN=
+stderr 'with a verdict: 0 passed, 0 failed, 0 skipped$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 6 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: did not run its tests: 7 test function\(s\) read as failed: TestCancelIsFinal, TestCancelledRefusesPay, TestEmailUnique, TestPayThenShip, TestProviderDown and 2 more$'
+! stderr 'started and gave no verdict'
+exec sh -c 'grep -h fm:payment-provider-down .machinery/receipts/*.jsonl'
+stdout '"outcome":"fail","test":"e2e/suite/outage_test.go","observed":"go test: TestProviderDown: the package did not run its tests"'
+exec mrun 1 verify
+stdout -count=6 'ERROR  failed: '
+# nor does a package that does not build, after an earlier pass at the same commit
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
+cp broken_test.go e2e/suite/broken_test.go
+exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
+stderr '^machinery run: adapter: package example\.test/shop/e2e/suite: did not run its tests: 8 test function\(s\) read as failed: TestBroken, TestCancelIsFinal, TestCancelledRefusesPay, TestEmailUnique, TestPayThenShip and 3 more$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 6 fail, 0 skip$'
+exec sh -c 'grep -h sc:customer-pays-and-the-order-ships "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
+stdout '"outcome":"fail","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay, TestPayThenShip: the package did not run its tests"'
+rm e2e/suite/broken_test.go
 
 # a stream in which a package has no end event, here because the test killed the go command, is
 # no complete run: no receipt, no end line, and verify reports it
@@ -156,10 +200,18 @@ stderr '^machinery run: adapter: claimed, not run: 6 id\(s\)$'
 exec mrun 1 verify
 stdout '^  ERROR  unproven: sc:customer-pays-and-the-order-ships$'
 
+-- broken_test.go --
+package suite
+
+import "testing"
+
+// TestBroken does not build, and with it the whole package
+func TestBroken(t *testing.T) {
+	var n int = "one"
+	_ = n
+}
 -- want-fail.jsonl --
-{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"fail","test":"e2e/suite/outage_test.go","observed":"go test: TestProviderDown: no verdict; the package failed","source":"adapter","granularity":"file","tags":[]}
 {"v":1,"type":"receipt","id":"inv:customer-email-unique","outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique failed","source":"adapter","granularity":"function","tags":[]}
 -- want-file-fail.jsonl --
-{"v":1,"type":"receipt","id":"fm:payment-provider-down","outcome":"fail","test":"e2e/suite/outage_test.go","observed":"go test: TestProviderDown: no verdict; the package failed","source":"adapter","granularity":"file","tags":[]}
 {"v":1,"type":"receipt","id":"sc:cancelled-order-refuses-payment","outcome":"fail","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay failed","source":"adapter","granularity":"file","tags":[]}
 {"v":1,"type":"receipt","id":"sc:customer-pays-and-the-order-ships","outcome":"fail","test":"e2e/suite/scenario_test.go","observed":"go test: TestCancelledRefusesPay failed","source":"adapter","granularity":"file","tags":[]}

@@ -407,10 +407,55 @@ type Adapter struct {
 }
 
 // AdapterSource maps test packages built from copies to the test files
-// under trace.tests they are built from (section 10.3).
+// under trace.tests they are built from (section 10.3). With Dir, Package is
+// an import path pattern of go and each package it matches is built from the
+// test files of its own directory.
 type AdapterSource struct {
 	Package string   `yaml:"package"`
-	Files   []string `yaml:"files"`
+	Files   []string `yaml:"files,omitempty"`
+	Dir     bool     `yaml:"dir,omitempty"`
+}
+
+// Matches reports whether the entry is for the package: by its glob, or with
+// Dir by its import path pattern.
+func (s AdapterSource) Matches(pkg string) bool {
+	if s.Dir {
+		return MatchImportPattern(s.Package, pkg)
+	}
+	return Match([]string{s.Package}, pkg)
+}
+
+// Wildcard reports a package glob that may match several packages: one with
+// *, ?, [ or {. An import path has none of them.
+func (s AdapterSource) Wildcard() bool { return strings.ContainsAny(s.Package, "*?[{") }
+
+// Maps returns what the entry maps its packages to, as the ratchet compares
+// it: the file globs, or "dir: true".
+func (s AdapterSource) Maps() []string {
+	if s.Dir {
+		return []string{"dir: true"}
+	}
+	return s.Files
+}
+
+// Name is how a message names the entry's package.
+func (s AdapterSource) Name() string {
+	if s.Dir {
+		return s.Package + ", dir: true"
+	}
+	return s.Package
+}
+
+// MatchImportPattern matches an import path against a pattern as go does:
+// "..." matches any string, slashes included, and "x/..." matches x too.
+func MatchImportPattern(pattern, path string) bool {
+	re := regexp.QuoteMeta(pattern)
+	re = strings.ReplaceAll(re, `\.\.\.`, `.*`)
+	if strings.HasSuffix(re, `/.*`) {
+		re = strings.TrimSuffix(re, `/.*`) + `(/.*)?`
+	}
+	ok, _ := regexp.MatchString("^"+re+"$", path)
+	return ok
 }
 
 // Granularities of an adapter receipt, the weaker first.
@@ -546,10 +591,16 @@ func (c *Config) validateEvidence() error {
 		switch {
 		case strings.TrimSpace(s.Package) == "":
 			return Errf("evidence.adapter.sources: entry %d: package is required", i+1)
+		case s.Dir && len(s.Files) > 0:
+			return Errf("evidence.adapter.sources: entry %d: files and dir: true do not combine; write one entry for each", i+1)
+		case s.Dir && strings.ContainsAny(s.Package, "*?[]{}\\"):
+			return Errf("evidence.adapter.sources: entry %d: package %q with dir: true is an import path pattern: ... is its only wildcard", i+1, s.Package)
+		case s.Dir:
+			continue
 		case !ValidGlob(s.Package):
 			return Errf("evidence.adapter.sources: entry %d: package %q is not a valid glob", i+1, s.Package)
 		case len(s.Files) == 0:
-			return Errf("evidence.adapter.sources: entry %d: files is required", i+1)
+			return Errf("evidence.adapter.sources: entry %d: files is required, or dir: true", i+1)
 		}
 		for _, f := range s.Files {
 			if err := CheckPath("evidence.adapter.sources.files", f); err != nil {

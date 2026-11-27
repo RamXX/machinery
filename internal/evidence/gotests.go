@@ -10,8 +10,9 @@ import (
 	"github.com/RamXX/machinery/internal/project"
 )
 
-// goTestFile is one _test.go file under trace.tests, read statically
-// (section 10.3). It is parsed, never compiled.
+// goTestFile is one _test.go file under trace.tests, or a staged source an
+// entry of evidence.adapter.sources names there, read statically (section
+// 10.3). It is parsed, never compiled.
 type goTestFile struct {
 	Path   string    // project-relative
 	Funcs  []string  // the test functions, sorted
@@ -44,11 +45,12 @@ func (f *goTestFile) owner(line int) (fn string, test bool) {
 	return "", false
 }
 
-// readGoTests parses the Go test files among files.
-func readGoTests(p *project.Project, files []string) (map[string]*goTestFile, error) {
+// readGoTests parses the Go test files among files, and those staged says
+// are test sources whatever their name.
+func readGoTests(p *project.Project, files []string, staged func(string) bool) (map[string]*goTestFile, error) {
 	res := map[string]*goTestFile{}
 	for _, rel := range files {
-		if !strings.HasSuffix(rel, "_test.go") {
+		if !strings.HasSuffix(rel, "_test.go") && !staged(rel) {
 			continue
 		}
 		data, err := p.Read(rel)

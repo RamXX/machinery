@@ -38,7 +38,9 @@ env MACHINERY_GO_TEST_JSON=
 stdout '^ *0$'
 stderr '^machinery run: adapter go-test-json: no stream in MACHINERY_GO_TEST_JSON: the command ran nothing the adapter can read, and nothing is proven$'
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, not run: 6 id\(s\)$'
+# no package was seen: no claim is of a package of the run, and the project-wide line counts them
+stderr '^machinery run: adapter: claimed, not run: 0 id\(s\)$'
+stderr '^machinery run: adapter: in the whole project: 6 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
 ! grep nonexistent .machinery/dir.txt
 exec sh -c 'test ! -e "$(cat .machinery/dir.txt)"'
 exec mrun 1 verify
@@ -52,7 +54,7 @@ exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
 exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
 env SUITE_FLAGS=
 stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
-stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 6 id\(s\)$'
 stderr '^machinery run: adapter: package example\.test/shop/stage/suite: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1$'
 exec sh -c '! grep -q "\"type\":\"receipt\"" "$(ls .machinery/receipts/*.jsonl | tail -n 1)"'
 
@@ -115,15 +117,19 @@ exec machinery run --adapter go-test-json --streams -- sh two.sh
 stderr '^machinery run: adapter: e2e/suite/email_test\.go::TestEmailUnique: pass in package example\.test/shop/stage/a, skip in package example\.test/shop/stage/b: verdicts differ, read as fail$'
 stderr '^machinery run: adapter: receipts written: 4 pass, 1 fail, 0 skip$'
 # and with equal verdicts the worst of what each package gives stands: one of the two did not
-# end with pass, so the passes of the other do not count, and the function of its entry's files
-# that no stream gave a verdict (two.sh does not stage the file behind faults) failed
+# end with pass, so the passes of the other do not count. The function of the entry's files that
+# no stream ran (two.sh does not stage the file behind faults) did not run: it gets nothing. The
+# claim of inv:terminal-is-final in e2e/again is of no package of the run, and counts only in
+# the project-wide line
 rm .machinery/receipts
 env TWO_ENV=SHOP_ROUTING=fail
 exec machinery run --adapter go-test-json --streams -- sh two.sh
 env TWO_ENV=
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
-stderr '^machinery run: adapter: package example\.test/shop/stage/b: 1 test function\(s\) without a verdict, read as failed: TestProviderDown$'
-stderr '^machinery run: adapter: claimed, verdict not counted: 4 id\(s\)$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+! stderr 'read as failed'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
+stderr '^machinery run: adapter: in the whole project: 2 claimed id\(s\) not run, 0 claiming file\(s\) with no test function$'
+stderr '^machinery run: adapter: claimed, verdict not counted: 5 id\(s\)$'
 stderr 'package example\.test/shop/stage/b: did not end with pass; no pass is written from it$'
 
 # a test binary run directly under go tool test2json -p: read under the same rules
@@ -131,13 +137,14 @@ rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh direct.sh -p example.test/shop/e2e/suite
 stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 1 package\(s\), 6 test function\(s\) with a verdict: 6 passed, 0 failed, 0 skipped$'
 stderr '^machinery run: adapter: receipts written: 5 pass, 0 fail, 0 skip$'
-# its package did not end with pass: no pass from it, and the function of the package without
-# a verdict (the file behind faults) failed
+# its package did not end with pass: no pass from it, and the function the binary never ran (the
+# file behind faults) gets nothing
 rm .machinery/receipts
 env SHOP_ROUTING=fail
 exec machinery run --adapter go-test-json --streams -- sh direct.sh -p example.test/shop/e2e/suite
 env SHOP_ROUTING=
-stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
 stderr 'package example\.test/shop/e2e/suite: did not end with pass; no pass is written from it$'
 # without -p its events name no package: the verdicts are used for nothing
 rm .machinery/receipts
@@ -165,15 +172,15 @@ stderr '^machinery: run: stream empty\.json: no event; the run is left incomplet
 # the verifier's rerun: the wrapper runs the suite, then reruns TestEmailUnique, which hangs past
 # -timeout: in the second stream it has a run event and no verdict and its package failed, so
 # its verdicts differ and it failed. No pass of the package counts, and the function no stream
-# gave a verdict (the file behind faults) fails with it
+# ran (the file behind faults) gets nothing
 rm .machinery/receipts
 exec mrun 1 run --adapter go-test-json --streams -- sh rerun.sh
 stderr '^machinery run: adapter: example\.test/shop/stage/suite\.TestEmailUnique: pass in 1-plain\.json, no verdict in 2-rerun\.json: verdicts differ, read as fail$'
 stderr '^machinery run: adapter: package example\.test/shop/stage/suite: did not end with pass; no pass is written from it$'
-stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 2 test function\(s\) without a verdict, read as failed: TestEmailUnique, TestProviderDown$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestEmailUnique$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
-stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: no verdict; the package failed"'
+stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: started, no verdict; the package failed"'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
 ! stdout ' [1-9][0-9]* proven'
@@ -186,26 +193,25 @@ env RERUN_APPEND=
 stderr '^machinery run: adapter go-test-json: 1 stream\(s\), 1 package\(s\), '
 stderr '^machinery run: adapter: example\.test/shop/stage/suite\.TestEmailUnique: pass in all\.jsonl, no verdict in all\.jsonl: verdicts differ, read as fail$'
 stderr '^machinery run: adapter: package example\.test/shop/stage/suite: did not end with pass; no pass is written from it$'
-stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 2 test function\(s\) without a verdict, read as failed: TestEmailUnique, TestProviderDown$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestEmailUnique$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec sh -c 'grep -h inv:customer-email-unique .machinery/receipts/*.jsonl'
-stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: no verdict; the package failed"'
+stdout '"outcome":"fail","test":"e2e/suite/email_test.go::TestEmailUnique","observed":"go test: TestEmailUnique: started, no verdict; the package failed"'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
 ! stdout ' [1-9][0-9]* proven'
 
-# os.Exit in the suite's first stream: the test failed, and so did every function of the package
-# no stream gave a verdict; TestProviderDown passed in the second stream, which counts nothing
+# os.Exit in the suite's first stream: the test failed; the functions the crash never reached did
+# not run in that stream; TestProviderDown passed in the second stream, which counts nothing
 rm .machinery/receipts
 env SHOP_EMAIL=exit
 exec mrun 1 run --adapter go-test-json --streams -- sh run-suite.sh
 env SHOP_EMAIL=
-stderr '^machinery run: adapter: receipts written: 0 pass, 5 fail, 0 skip$'
-stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 6 test function\(s\) without a verdict, read as failed: '
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: package example\.test/shop/stage/suite: 1 test function\(s\) started and gave no verdict, read as failed: TestEmailUnique$'
 exec sh -c '! grep -q fm:payment-provider-down .machinery/receipts/*.jsonl'
 # the same crash, then a passing retry that appends its stream to the file of the first run: the
-# crashed run fails the function it stopped and every function no run gave a verdict, and the
-# passes of the retry count nothing
+# crashed run fails the function it stopped, and the passes of the retry count nothing
 rm .machinery/receipts
 env SHOP_EMAIL=exit
 exec machinery run --adapter go-test-json --streams -- sh retry.sh
@@ -213,24 +219,25 @@ env SHOP_EMAIL=
 stdout '^retry: exit 0$'
 stderr '^machinery run: adapter: example\.test/shop/stage/suite\.TestEmailUnique: no verdict in all\.jsonl, pass in all\.jsonl: verdicts differ, read as fail$'
 stderr '^machinery run: adapter: package example\.test/shop/stage/suite: did not end with pass; no pass is written from it$'
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
 ! stdout ' [1-9][0-9]* proven'
 
 # an earlier pass at the same commit does not stand against a later run whose test panicked in a
-# goroutine: the later fail receipts fail the ids
+# goroutine: the later fail receipt fails the id of the function the panic stopped, and the
+# functions it never reached keep their earlier passes
 rm .machinery/receipts
 exec machinery run --adapter go-test-json --streams -- sh run-suite.sh
 stderr '^machinery run: adapter: receipts written: 6 pass, 0 fail, 0 skip$'
 env SHOP_EMAIL=panic
 exec mrun 1 run --adapter go-test-json --streams -- sh run-suite.sh
 env SHOP_EMAIL=
-stderr '^machinery run: adapter: receipts written: 0 pass, 5 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/email_test\.go::TestEmailUnique\)$'
-stdout '^  ERROR  failed: sc:customer-pays-and-the-order-ships \(e2e/suite/scenario_test\.go\)$'
-stdout '^checked: 16 obligations, 1 proven, 1 by adapter at file granularity, '
+! stdout 'failed: sc:customer-pays-and-the-order-ships'
+stdout '^checked: 16 obligations, 5 proven, 2 by adapter at function granularity, 3 by adapter at file granularity, '
 
 # a stream cut short, here because the test killed the go command that wrote it, names a package
 # with no end event: the run is left incomplete

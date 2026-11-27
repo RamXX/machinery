@@ -125,10 +125,18 @@ v2 is a new tool. v1 and its history are on `main`. Nothing of v1 that is not li
   planted code or a controlled environment. With
   `--streams` (a wrapper that starts `go test` itself and leaves the streams in
   `MACHINERY_GO_TEST_JSON`) the files come from `evidence.adapter.sources`, which is read in that
-  mode only. A pass replayed from the cache counts nothing. A package that failed (a timeout,
-  `os.Exit`, a panic, a build failure) writes a fail for every claimed function without a
-  verdict and no pass; a stream without a package end leaves the run incomplete, and the error
-  names the receipts file. A stream file that holds several runs of one package is judged run by
+  mode only: an entry with `files` (which may name staged test sources under `trace.tests` that
+  are not `*_test.go` files; a wildcard entry gives each package only the files of its own
+  directory when it names some) or with `dir: true` (each package of an import path pattern
+  gets the test files of its own directory). A wrapper names each staged set with
+  `go test -c` and `go tool test2json -t -p <name>`. A pass replayed from the cache counts
+  nothing. In a package that failed, a function with a run event and no verdict (a timeout,
+  `os.Exit`, a panic) fails, a function a filter left out or a crash never reached gets
+  nothing, and no pass counts; a package that ran none of its tests (a build failure, a
+  `TestMain` that exits first) fails every claimed function. The summary counts "claimed, not
+  run" and names files without a test function for the packages of the run, and gives the
+  numbers for the whole project once. A stream without a package end leaves the run
+  incomplete, and the error names the receipts file. A stream file that holds several runs of one package is judged run by
   run, so a fail, a crash or a missing verdict in any of them is a fail; a run that starts again
   before the one before it ended (a killed run and its retry, two runs writing at once) leaves
   the run incomplete. A marker directly above a

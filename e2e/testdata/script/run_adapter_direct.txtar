@@ -10,11 +10,12 @@ exec sh -c 'printf "evidence:\n  adapter: {}\n" >> machinery.yaml'
 exec machinery gen
 gitinit
 
-# the project's own module, its failing test: a fail receipt, and one for the file behind the
-# tag faults, which has no verdict in a package that failed
+# the project's own module, its failing test: a fail receipt. The file behind the tag faults was
+# not built and did not run: nothing for it
 env SHOP_EMAIL=fail
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
+stderr '^machinery run: adapter: claimed, not run: 1 id\(s\)$'
 rm .machinery/receipts
 
 # go test -C into another directory is refused
@@ -71,7 +72,7 @@ rm .machinery/receipts
 # leaves the go.work of the root out, in the run and in stage trace
 env GOWORK=$WORK/proj/both.work
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
 stdout '"GOWORK":"[^"]*/both\.work",'
 stdout '"go_work_sha256":"[0-9a-f]{64}"\}\}$'
@@ -79,11 +80,11 @@ rm .machinery/receipts
 # one use directive on its line, quoted, with comments
 env GOWORK=$WORK/proj/one.work
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 rm .machinery/receipts
 env GOWORK=off
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec sh -c 'head -n 1 .machinery/receipts/*.jsonl'
 stdout '"GOWORK":"off",.*"go_work_sha256":""\}\}$'
 exec machinery check --stage trace
@@ -108,7 +109,7 @@ stdout '^  ERROR  adapter: go\.work does not use the module of e2e/extra/extra_t
 cp $WORK/extra_test.go e2e/extra/extra_test.go
 gitcommit 'a nested module with a tc claim only'
 exec mrun 1 run --adapter go-test-json -- go test ./e2e/suite
-stderr '^machinery run: adapter: receipts written: 0 pass, 2 fail, 0 skip$'
+stderr '^machinery run: adapter: receipts written: 0 pass, 1 fail, 0 skip$'
 exec machinery check --stage trace
 ! stdout 'ERROR  adapter'
 rm .machinery/receipts

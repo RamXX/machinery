@@ -47,6 +47,11 @@ gitcommit 'a wide policy'
 cp wide-split.yaml machinery.yaml
 exec machinery check --stage ratchet --base HEAD
 ! stdout 'adapter widened'
+# an entry with dir: true is the pair of its pattern and dir: true
+cp wide-dir.yaml machinery.yaml
+exec machinery check --stage ratchet --base HEAD
+stdout '^  warn   ratchet: adapter widened: evidence\.adapter\.sources: example\.test/shop/e2e/\.\.\. <- dir: true added$'
+stdout -count=1 'adapter widened'
 
 # critical or vital ids admitted is an error, one per tier
 cp critical.yaml machinery.yaml
@@ -188,6 +193,37 @@ evidence:
         files: ["e2e/suite/*_test.go"]
       - package: "example.test/shop/staged/**"
         files: ["e2e/suite/*_test.go"]
+constraints:
+  layers:
+    - {name: domain, paths: ["internal/domain/**"]}
+    - {name: api, paths: ["internal/api/**"]}
+  size:
+    max_file_lines: 200
+    max_func_lines: 40
+waivers:
+  - {rule: action-event, id: "act:Order.place", reason: "creation enters the initial state Pending"}
+-- wide-dir.yaml --
+version: 2
+design:
+  models:
+    - design/model/shop.modelith.yaml
+  machines: design/machines
+  failure_modes: design/failure-modes.yaml
+contracts:
+  - kind: openapi
+    path: contracts/openapi.yaml
+trace:
+  code: ["internal/**/*.go"]
+  tests: ["e2e/**"]
+evidence:
+  adapter:
+    allow: [inv, sc]
+    tiers: [routine, consequential]
+    sources:
+      - package: "example.test/shop/staged/**"
+        files: ["e2e/suite/*_test.go"]
+      - package: "example.test/shop/e2e/..."
+        dir: true
 constraints:
   layers:
     - {name: domain, paths: ["internal/domain/**"]}

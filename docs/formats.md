@@ -148,7 +148,9 @@ evidence:                       # optional
     min_granularity: file       # optional, this is the default: function | file, or a mapping (below)
     sources:                    # optional, read only with --streams: the files each test package of the run is built from
       - package: "example.test/shop/staged/**"   # required: a glob of package import paths
-        files: ["e2e/suite/*_test.go"]           # required: globs of the test files the package is built from
+        files: ["e2e/suite/*_test.go"]           # the Go files the package is built from: *_test.go files, or staged sources under trace.tests
+      - package: "example.test/shop/e2e/..."     # with dir: true, an import path pattern of go: ... matches any string
+        dir: true                                 # each package it matches is built from the test files of its own directory
 commands:
   e2e: ["go", "test", "./e2e/...", "-count=1"]   # optional: the project's end-to-end command
 backlog:                        # optional: the backlog bridge (section 15)
@@ -277,15 +279,26 @@ Rules:
   `evidence.adapter.min_granularity must be function or file, got "<value>"`,
   `evidence.adapter.min_granularity.<key> must be function or file, got "<value>"` and
   `evidence.adapter.min_granularity: "<key>" is not default, a kind (inv, sc, fm, ck) or a tier`.
-  Each entry of `sources` needs `package`, a valid glob
-  (`evidence.adapter.sources: entry <n>: package is required`,
-  `evidence.adapter.sources: entry <n>: package "<value>" is not a valid glob`), and a non-empty
-  list `files` of valid globs inside the project
-  (`evidence.adapter.sources: entry <n>: files is required`,
-  `evidence.adapter.sources: entry <n>: files "<value>" is not a valid glob`, and for a glob
-  that leaves the project `evidence.adapter.sources.files: "<value>" must use forward slashes`,
-  `... must be relative to the project root` or `... must stay inside the project root`),
-  entries numbered from 1. The
+  Each entry of `sources` needs `package`
+  (`evidence.adapter.sources: entry <n>: package is required`) and exactly one of two forms,
+  entries numbered from 1:
+  - `files`, a non-empty list of valid globs inside the project, with `package` a valid glob
+    (`evidence.adapter.sources: entry <n>: package "<value>" is not a valid glob`,
+    `evidence.adapter.sources: entry <n>: files "<value>" is not a valid glob`, and for a glob
+    that leaves the project `evidence.adapter.sources.files: "<value>" must use forward slashes`,
+    `... must be relative to the project root` or `... must stay inside the project root`): the
+    packages the glob matches are built from the Go files the globs match;
+  - `dir: true`, with `package` an import path pattern as `go` writes one, where `...` is the
+    only wildcard
+    (`evidence.adapter.sources: entry <n>: package "<value>" with dir: true is an import path pattern: ... is its only wildcard`
+    for a value with `*`, `?`, `[`, `]`, `{`, `}` or `\`): each package the pattern matches is
+    built from the test files of its own directory, as in direct mode, so that N packages tested
+    in their own directories need one entry and not N.
+
+  An entry with neither is `evidence.adapter.sources: entry <n>: files is required, or dir: true`,
+  and one with both is
+  `evidence.adapter.sources: entry <n>: files and dir: true do not combine; write one entry for each`.
+  Section 10.3 ("Whose verdict") says which files each form gives a package. The
   entries are read only by `machinery run --adapter go-test-json --streams`; without `--streams`
   an entry for a package tested in its own directory is refused (section 10.3).
 - `plan.wire_max_files` is a count; `0` or unset is the default, 20, and a negative one is a
@@ -2172,10 +2185,11 @@ what to do:
 | `--adapter go-test-json: go env GOOS/GOARCH is <GOOS>/<GOARCH>, not the host's <GOHOSTOS>/<GOHOSTARCH>: go would run the test binary through go_<GOOS>_<GOARCH>_exec; unset GOOS and GOARCH, or run the command through --streams` | A test binary built for another system. |
 | `--streams needs --adapter go-test-json: add it before --streams` | `--streams` alone. |
 | `--adapter go-test-json: trace.tests is not set: the adapter joins the run to the claims of the test files; list them in machinery.yaml` | No `trace.tests`. |
-| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>) matches <import path>, the package of <directory>: entries are read only with --streams; remove the entry, or run the suite through --streams` | Without `--streams`, an entry whose `package` matches the import path of a directory that holds files under `trace.tests` ("Whose verdict", below). The first such entry, and for it the first such import path in sorted order. |
+| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>) matches <import path>, the package of <directory>: entries are read only with --streams; remove the entry, or run the suite through --streams` | Without `--streams`, an entry whose `package` matches the import path of a directory that holds files under `trace.tests` ("Whose verdict", below). The first such entry, and for it the first such import path in sorted order. An entry with `dir: true` is named `entry <n> (package <pattern>, dir: true)` here and below, and its pattern is matched as `go` matches one. |
 | `--adapter go-test-json: module <path> is declared by <a> and <b>: give each module its own path, or move the copy under a testdata directory` | Without `--streams`, a module path declared twice (above). |
 | `--adapter go-test-json: <workspace> does not use the module of <file> (<go.mod>): add the module to the workspace, or set GOWORK=off` | Without `--streams`, a workspace that leaves out the module of a claiming file (above). |
-| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>): files <globs> match no file under trace.tests: correct the globs, or list the files in trace.tests` | With `--streams`, an entry that maps onto nothing; `<globs>` as written, separated by `, `. |
+| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <glob>): files <globs> match no Go file under trace.tests (a file whose name ends in .go): correct the globs, or list the files in trace.tests` | With `--streams`, an entry with `files` that maps onto nothing; `<globs>` as written, separated by `, `. |
+| `--adapter go-test-json: evidence.adapter.sources: entry <n> (package <pattern>, dir: true): the pattern matches the import path of no directory that holds a _test.go file under trace.tests: correct the pattern, or list the files in trace.tests` | With `--streams`, an entry with `dir: true` that maps onto nothing. |
 
 **Cached results never count.** Without `-count=1`, `go test` may
 answer for a package from its cache and replay the events of an earlier run. machinery adds the
@@ -2206,14 +2220,21 @@ whatever another run gave it. A package fails in a run when the run's end event 
 test failed, the test binary did not finish (a `-timeout`, `os.Exit` or `log.Fatal`, a panic
 in any goroutine, a crash), or the package did not build. What it fails:
 
-- in that run, a test function of the package that has a `run` event and no verdict failed:
-  whatever stopped the binary stopped it, also when another run gave it a verdict (its
-  verdicts differ, "Which verdict", below);
-- every test function of a candidate file under `trace.tests` of the package ("Whose
-  verdict", below) that has no verdict in any run of the package, in any stream, failed too. That includes a
-  function that never started, because the binary stopped before it or `-run` did not select
-  it, and one of a file the build left out (machinery never decides which files were built):
-  a false fail rather than a lost one. Its receipt says `no verdict; the package failed`;
+- in that run, a test function of the package that has a `run` event and no verdict failed,
+  started and given no verdict: whatever stopped the binary stopped it, also when another run
+  gave it a verdict (its verdicts differ, "Which verdict", below). Its receipt says
+  `started, no verdict; the package failed`;
+- a test function with no `run` event in a run where a test function of the package has one
+  was not selected (`-run`, `-skip`) or not reached (the binary stopped before it started
+  it): it did not run in that run, and that run gives it nothing, as it gives nothing to a
+  function of a file the build left out. One failing test under a `-run` filter fails that
+  test and no function the filter left out;
+- when no test function of the package has a `run` event in that run, the package did not run
+  its tests: it did not build, or `TestMain` stopped before `m.Run`. Then every test function
+  of a candidate file under `trace.tests` of the package ("Whose verdict", below) failed,
+  whatever another run gave it, a function of a file the build left out included (machinery
+  never decides which files were built): a false fail rather than a lost one. Its receipt
+  says `the package did not run its tests`;
 - no pass of the package counts, in any run of it: the failure may be that of a function that
   passed (a goroutine it left running, a check of `TestMain` after `m.Run`), so in a package
   that did not end with pass a `pass` event counts for nothing, while a `fail` or a `skip`
@@ -2236,9 +2257,10 @@ each package one `start` event):
 `machinery: run: stream <file>: line <n>: package <import path> starts again before its run ended; the run is left incomplete: find what stopped go test or give each go test run a file of its own, delete <receipts> and run again`.
 `verify` reports the file as an incomplete run (section 12). So within
 the threat model no fail is lost: a failed function, a function a failure stopped and the
-claims of a package that failed all write fails, in whichever run of the package they happened,
-and a stream that does not say how its packages ended, or that mixes two runs of one, counts
-for nothing. A fail of any run,
+claims of a package that did not run its tests all write fails, in whichever run of the package
+they happened; a function a filter left out or a failure never reached writes nothing and
+keeps its id without evidence from that run, while no pass of the package counts; and a stream
+that does not say how its packages ended, or that mixes two runs of one, counts for nothing. A fail of any run,
 of any stream and of any package writes a fail receipt for every id its function's claims name
 ("Which receipt", below).
 
@@ -2273,8 +2295,9 @@ reads them (sections 8 and 8.1). Each is attributed:
   runs;
 - a tag or marker anywhere else in the file (above no function) belongs to every test function of the file. The
   receipt has `granularity: file`, and it needs a verdict of every one of them ("Which receipt",
-  below): a function of the file that has none in the run, because it was not built or not
-  selected, leaves the id without a receipt, unless its package failed (above).
+  below): a function of the file that has none in the run, because it was not built, not
+  selected or not reached, leaves the id without a receipt, unless its package did not run its
+  tests or a failure stopped it after it started (above).
 
 **Which verdict.** The verdict of a function is its `pass`, `fail` or `skip` event, read with
 those of its subtests (a `Test` that begins with the function's name and a `/`, at any depth)
@@ -2284,7 +2307,8 @@ skipped. `go test` passes a parent whose subtests all skipped; for the adapter t
 skip, as one whose own body calls `t.Skip` is. A filter that leaves subtests out is refused in
 direct mode (above); with `--streams` the command is not read, and a parent whose subtests the
 wrapper's filter left out reads as a pass. A function with no verdict did not run, whatever
-other events name it, except in a package that failed (above). A pass of a package answered
+other events name it, except one with a `run` event in a run where its package failed and
+every function of a package that did not run its tests (above). A pass of a package answered
 from the cache is not read (above). A
 function with several verdicts that are not all the same failed, whichever they are: in one
 run, across the runs of one stream or of several ("A package that failed", above, and
@@ -2309,10 +2333,26 @@ it.
    directory holding files under `trace.tests` has no candidate. `evidence.adapter.sources` is
    not read in this mode, and an entry whose `package` matches the import path of such a
    directory is refused (above), so that no entry seems to narrow or widen what it cannot. With
-   `--streams` the candidates are the files of the entries of `evidence.adapter.sources` whose
-   `package` glob matches the package (section 2): every `_test.go` file their `files` globs
-   match in the project, under `trace.tests` or not. A package that no entry matches has no
-   candidate, also one tested in its own directory.
+   `--streams` the candidates of a package are only the files the entries of
+   `evidence.adapter.sources` map to that package (section 2), under `trace.tests` or not:
+   - an entry with `files` whose `package` glob matches the package maps to it the files its
+     `files` globs match in the project whose name ends in `.go`. When the `package` glob has a
+     wildcard (`*`, `?`, `[` or `{`) and some of those files are in the package's own
+     directory (the directory whose import path, by the rule above, is the package), it maps to
+     the package only those: one entry over many directories does not make every file a
+     candidate of every package. A package whose own directory holds none of them, a package
+     built from copies staged elsewhere, gets every one. An entry whose `package` has no
+     wildcard names one package and maps every file to it;
+   - an entry with `dir: true` whose pattern matches the package (`...` matches any string,
+     slashes included, and `x/...` matches `x` too) maps to it the `_test.go` files of the
+     package's own directory, the candidates direct mode gives it.
+
+   A package that no entry matches has no candidate, also one tested in its own directory. A
+   file an entry with `files` names under `trace.tests` is a Go test source whatever its name:
+   a project may keep test sources that are not named `*_test.go` (under a `testdata`
+   directory, say) and copy them into place before `go test`. Its claims, its test functions
+   and the names it defines are read exactly as those of a `_test.go` file, for every rule of
+   this section. Without `--streams` only `_test.go` files are read.
 2. **The files that could have given the verdict** are the candidates and every other Go file of
    a directory that holds a candidate, test file or not, whatever its build constraints. All of
    them are parsed; a file that does not parse may define any name.
@@ -2364,8 +2404,10 @@ An adapter receipt is a receipt line with three more keys:
   file granularity it is `go test: all <n> test function(s) of the file passed`, or
   `go test: <functions> failed` (`skipped`) with the names of those functions, sorted, the
   first five and then `and <n> more`. A fail that is no `fail` event, only a package that
-  failed ("A package that failed", above), reads `go test: <functions>: no verdict; the package failed`,
-  at file granularity when no function of the file has a `fail` event.
+  failed ("A package that failed", above), reads `go test: <functions>: started, no verdict; the package failed`
+  for the functions a failure stopped, and
+  `go test: <functions>: the package did not run its tests` when there are none, at file
+  granularity when no function of the file has a `fail` event.
 - `source` is `adapter`. A receipt without `source` is one a test emitted.
 - `granularity` is `function` or `file`, required with `source: adapter` and refused without.
 - `tags` are the tags of `-tags` (above), always present: a list, `[]` when the command gave
@@ -2439,6 +2481,25 @@ the directory is read. The directory is removed after reading, whatever was foun
   it: the package is the one the wrapper named, not one `go test` resolved and built. Without
   `-p` the events name no package: their verdicts belong to no file, are used for nothing, and
   are counted in the summary.
+- **Naming a staged set.** `go test` run on files rather than on a package names every such set
+  of tests `command-line-arguments`, so several sets of one run cannot be told apart and an
+  entry for that name maps every set to every file it names. A wrapper names each set by
+  building its test binary and running it under `test2json` with a name of its own:
+
+  ```
+  go test -c -o <binary> <the staged files>
+  go tool test2json -t -p <name> <binary> -test.v=test2json > "$MACHINERY_GO_TEST_JSON/<name>.json"
+  ```
+
+  `<name>` is the package of every event of that stream, and what the `package` of an entry
+  matches. A set named by the import path of the directory its sources are kept in
+  (`example.test/shop/e2e/testdata/sets/orders` for sources kept in
+  `e2e/testdata/sets/orders`) lets one entry with a wildcard,
+  `{package: "example.test/shop/e2e/testdata/sets/*", files: ["e2e/testdata/sets/*/*.go"]}`, map
+  every set to the sources of its own directory and to no other ("Whose verdict", above). When
+  `go test -c` fails there is no binary and no stream: the wrapper writes the two lines
+  `{"Action":"start","Package":"<name>"}` and `{"Action":"fail","Package":"<name>"}` to the
+  set's stream instead, which the adapter reads as a package that did not run its tests.
 
 The first line of the summary then counts the streams as well:
 `adapter go-test-json: <n> stream(s), <n> package(s), <n> test function(s) with a verdict: ...`,
@@ -2458,6 +2519,7 @@ section 10, each line after `machinery run: `:
 adapter go-test-json: <n> package(s), <n> test function(s) with a verdict: <n> passed, <n> failed, <n> skipped
 adapter: receipts written: <n> pass, <n> fail, <n> skip
 adapter: claimed, not run: <n> id(s)
+adapter: in the whole project: <n> claimed id(s) not run, <n> claiming file(s) with no test function
 adapter: claimed, verdict not counted: <n> id(s)
 adapter: needs a receipt with effects: <n> tc id(s)
 adapter: needs a receipt with a replay: <n> cx id(s)
@@ -2465,7 +2527,8 @@ adapter: <n> test function(s) with a verdict are in no file under trace.tests: p
 adapter: <n> verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>
 adapter: package <import path>: answered from the cache; a pass replayed from the cache counts nothing: run go test with -count=1
 adapter: package <import path>: did not end with pass; no pass is written from it
-adapter: package <import path>: <n> test function(s) without a verdict, read as failed: <functions>
+adapter: package <import path>: <n> test function(s) started and gave no verdict, read as failed: <functions>
+adapter: package <import path>: did not run its tests: <n> test function(s) read as failed: <functions>
 adapter: <import path>.<function>: defined in <file>, <file>: ambiguous: a pass or a skip counts for none of them, a fail fails each; rename one of the functions
 adapter: <import path>.<function>: <verdict> in <file>, <verdict> in <file>: verdicts differ, read as fail
 adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in package <import path>: verdicts differ, read as fail
@@ -2474,21 +2537,29 @@ adapter: <file>: no test function; its claims count nothing
 adapter: <file>: not Go source that parses; its claims count nothing
 ```
 
-The first three lines always print; the others only when they count or name something, in this
+The first four lines always print; the others only when they count or name something, in this
 order, the named ones sorted. `<what to do>` is
 `a package's verdicts go to the files under trace.tests in its own directory, and a package built from copies is run through --streams with an entry in evidence.adapter.sources`,
 and with `--streams`
 `with --streams a package's verdicts go only to the files of its entry in evidence.adapter.sources: add one`.
 In the ambiguous line a file that does not parse is followed by ` (does not parse)`. A package that did not end with pass is named when it failed in a
-run or did not end with pass in one that gives it verdicts, and with it the functions it made
-fail for want of a verdict, sorted, the first five
-and then `and <n> more`; a function with a `run` event and no verdict is also counted as
-failed in the first line. The packages of the `in no file` line are sorted, the first five and then
+run or did not end with pass in one that gives it verdicts. After those lines, one line per
+package names the functions a failure stopped after they started, and then one line per
+package that did not run its tests names the functions that failed with it, each list sorted,
+the first five and then `and <n> more`; a function a failure stopped is also counted as failed in the first
+line, and a function of a package that did not run its tests is not. The packages of the
+`in no file` line are sorted, the first five and then
 `and <n> more`. Packages and functions are counted over the whole stream.
 `claimed, not run` counts the ids for which no receipt was written and a function of one of
-their claims did not run; `claimed, verdict not counted` the other ids without a receipt whose
-claims met a pass replayed from the cache, a package that did not end with pass, or an
-ambiguous name. A claim above a function the adapter does not judge counts in neither.
+their claims did not run, among the claims of the files of the packages the run saw: their
+candidates ("Whose verdict", above) and every file a verdict of the run went to, an ambiguous
+name included. A claim in a file of no package of the run does not count there.
+`claimed, verdict not counted` counts the other ids without a receipt whose claims met a pass
+replayed from the cache, a package that did not end with pass, or an ambiguous name. A claim
+above a function the adapter does not judge counts in neither. The `no test function` lines
+name only the candidate files of the packages the run saw. `in the whole project` gives, once,
+the same two numbers over every claim of the project: the ids without a receipt with a claim
+whose function did not run, and the claiming files with no test function.
 
 **What the evidence proves: `evidence.adapter`.** `verify`, and every command that judges
 evidence, reads an adapter receipt under sections 10.1 and 10.2 like any other. A `fail` fails
@@ -2608,7 +2679,7 @@ that was established at the base may quietly stop being established:
 | `baseline-grew` | An architecture or tests baseline has an entry the base did not have: `ERROR  ratchet: baseline grew: <rule> <subject>`, unless the entry's file is newly in scope (it matches a scope glob the base did not have and was outside the base's scope). |
 | `spec-weakened` | A formal baseline acceptance (section 16.6) that the base did not have prints as `warn   ratchet: weakened since <ref>: <spec>: <change> (<reason>)`. |
 | `review-off` | A review gate (section 15.10) that was required at the base is off now: `warn   ratchet: review switched off: review.<kind> was required at <ref> and is off now`. A project being adopted switches a gate off on purpose; the ratchet makes the change seen. |
-| `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
+| `adapter-widened` | The policy `evidence.adapter` (section 10.3) lets adapter evidence prove an id it could not prove at the base, or at a weaker granularity. Policies are compared by what they admit, not by how they are written: for each tier and each kind among `inv`, `sc`, `fm` and `ck`, the least granularity an adapter pass needs to prove such an id, `function`, `file`, or `never` (the kind is not in `allow` or the tier not in `tiers`). One finding per tier and change, `<kinds>` in the order `inv`, `sc`, `fm`, `ck`, separated by `, `: `ERROR  ratchet: adapter widened: <tier> <kinds> ids: never -> <granularity>; an id of a critical or vital area needs a receipt its test emits after its own assertions` for a critical or vital tier, and `warn   ratchet: adapter widened: <tier> <kinds> ids: <old> -> <new>` for every other change that admits more (`never -> function`, `never -> file`, `function -> file`, in this order within a tier, the tiers from routine to vital). For `evidence.adapter.sources`, compared as pairs of a `package` glob and a `files` glob: `warn   ratchet: adapter widened: evidence.adapter.sources: <package> <- <files> added`, one per package glob in the order written, with the file globs the base did not map from it; an entry with `dir: true` is the pair of its pattern and `dir: true`, which prints in the place of the file globs. A base without the block had the defaults. Narrowing raises nothing, and neither does a policy written another way that admits the same. |
 | `vital-weakened` | A vital area of the base (section 23.1) states less now: `ERROR  ratchet: vital weakened: <area>: <what>; record it under lowered: in the risk file with a reason`, unless the risk file records that area and that `<what>` under `lowered:` (section 23), which prints as `warn   ratchet: vital weakened: <area>: <what> (<reason>)`. Adding or strengthening raises nothing. |
 
 The `<what>` of `vital-weakened`, one finding per change, in the order the base's area lists its

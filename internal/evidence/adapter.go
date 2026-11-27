@@ -54,6 +54,9 @@ type GoTest struct {
 	pkgFiles map[string][]string
 	pkgDir   map[string]string   // that import path -> its directory
 	dirGo    map[string][]string // directory -> its Go files, read once
+	dirIP    map[string]string   // directory -> its import path, "" for none; read once
+	cands    map[string][]string // package -> its candidates with streams, read once
+	all      []string            // every file of the project, read once
 	units    []claimUnit
 	effects  map[string]bool // claimed tc ids
 	replay   map[string]bool // claimed cx ids
@@ -102,7 +105,7 @@ type goPackage struct {
 // are the files it leaves in MACHINERY_GO_TEST_JSON.
 func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool) (*GoTest, error) {
 	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, unjudged: map[string]bool{}, fromDir: streams,
-		pkgFiles: map[string][]string{}, pkgDir: map[string]string{}, dirGo: map[string][]string{}}
+		pkgFiles: map[string][]string{}, pkgDir: map[string]string{}, dirGo: map[string][]string{}, dirIP: map[string]string{}, cands: map[string][]string{}}
 	if streams {
 		// the command is not read and its build tags are not known; GOFLAGS of
 		// the environment is all machinery sees of what the wrapper's go test gets
@@ -125,7 +128,21 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 	if err != nil {
 		return nil, err
 	}
-	if a.files, err = readGoTests(p, files); err != nil {
+	entries := p.Cfg.AdapterSources()
+	// with streams a Go file an entry names under trace.tests is a test
+	// source whatever its name: one the project stages before go test
+	staged := func(rel string) bool {
+		if !streams || !strings.HasSuffix(rel, ".go") {
+			return false
+		}
+		for _, s := range entries {
+			if !s.Dir && project.Match(s.Files, rel) {
+				return true
+			}
+		}
+		return false
+	}
+	if a.files, err = readGoTests(p, files, staged); err != nil {
 		return nil, err
 	}
 	var goFiles []string
@@ -134,25 +151,36 @@ func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool
 	}
 	sort.Strings(goFiles)
 	for _, rel := range goFiles {
+		if !strings.HasSuffix(rel, "_test.go") {
+			continue // a staged source is no test file of its own directory
+		}
 		dir := path.Dir(rel)
-		if ip, ok := importPath(p.Abs(dir)); ok {
+		if ip, ok := a.importPathOf(dir); ok {
 			a.pkgFiles[ip] = append(a.pkgFiles[ip], rel)
 			if _, seen := a.pkgDir[ip]; !seen {
 				a.pkgDir[ip] = dir
 			}
 		}
 	}
-	entries := p.Cfg.AdapterSources()
 	for i, s := range entries {
-		if streams && len(matching(goFiles, s.Files)) == 0 {
-			return nil, refuse("evidence.adapter.sources: entry %d (package %s): files %s match no file under trace.tests: correct the globs, or list the files in trace.tests", i+1, s.Package, strings.Join(s.Files, ", "))
-		}
-		if streams {
-			continue
-		}
-		for _, ip := range sortedKeys(a.pkgDir) { // not read without streams: an entry may not seem to narrow a package
-			if project.Match([]string{s.Package}, ip) {
-				return nil, refuse("evidence.adapter.sources: entry %d (package %s) matches %s, the package of %s: entries are read only with --streams; remove the entry, or run the suite through --streams", i+1, s.Package, ip, a.pkgDir[ip])
+		switch {
+		case streams && s.Dir:
+			found := false
+			for ip := range a.pkgDir {
+				found = found || s.Matches(ip)
+			}
+			if !found {
+				return nil, refuse("evidence.adapter.sources: entry %d (package %s): the pattern matches the import path of no directory that holds a _test.go file under trace.tests: correct the pattern, or list the files in trace.tests", i+1, s.Name())
+			}
+		case streams:
+			if len(matching(goFiles, s.Files)) == 0 {
+				return nil, refuse("evidence.adapter.sources: entry %d (package %s): files %s match no Go file under trace.tests (a file whose name ends in .go): correct the globs, or list the files in trace.tests", i+1, s.Name(), strings.Join(s.Files, ", "))
+			}
+		default:
+			for _, ip := range sortedKeys(a.pkgDir) { // not read without streams: an entry may not seem to narrow a package
+				if s.Matches(ip) {
+					return nil, refuse("evidence.adapter.sources: entry %d (package %s) matches %s, the package of %s: entries are read only with --streams; remove the entry, or run the suite through --streams", i+1, s.Name(), ip, a.pkgDir[ip])
+				}
 			}
 		}
 	}
@@ -685,7 +713,10 @@ func (a *GoTest) Receipts() [][]byte {
 		m[file][fn] = true
 	}
 	silentBy := map[string]map[string]bool{}
-	failedPkgs := map[string]bool{}
+	// a package that did not run its tests in a run: it failed and no test
+	// function of it has a run event there (section 10.3)
+	unran := map[string]bool{}
+	unrun := map[string]map[string]bool{}
 	var passed, failed, skipped, homeless, nameless int
 	var ambiguous, refused, differ []string
 	lost := map[string]bool{} // packages with a verdict that found no file
@@ -727,7 +758,9 @@ func (a *GoTest) Receipts() [][]byte {
 					}
 				}
 				if pkg.end == Fail { // whatever stopped the binary stopped these
-					failedPkgs[name] = true
+					if len(pkg.started) == 0 {
+						unran[name] = true
+					}
 					for fn := range pkg.started {
 						if len(pkg.verdicts[fn]) == 0 {
 							read[fn] = append(read[fn], seen{verdict: Fail, stream: s.name, silent: true})
@@ -848,35 +881,52 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 	}
 
-	// a package that failed: every test function of its candidate files
-	// under trace.tests without a verdict in any stream failed (section 10.3)
-	for _, name := range sortedKeys(failedPkgs) {
+	// a package that did not run its tests: every test function of its
+	// candidate files under trace.tests failed, whatever another run gave it.
+	// A function without a run event in a run where another has one was not
+	// selected or not reached, and gets nothing (section 10.3)
+	unranBy := map[string]map[string]bool{}
+	for _, name := range sortedKeys(unran) {
 		for _, file := range a.candidates(name) {
 			f := a.files[file]
 			if f == nil {
 				continue
 			}
 			for _, fn := range f.Funcs {
-				if _, has := state[file][fn]; !has {
-					set(file, fn, stFail)
-					mark(silent, file, fn)
-					if silentBy[name] == nil {
-						silentBy[name] = map[string]bool{}
-					}
-					silentBy[name][fn] = true
+				set(file, fn, stFail)
+				mark(unrun, file, fn)
+				if unranBy[name] == nil {
+					unranBy[name] = map[string]bool{}
 				}
+				unranBy[name][fn] = true
 			}
 		}
 	}
 	for _, name := range sortedKeys(silentBy) {
-		refused = append(refused, fmt.Sprintf("adapter: package %s: %d test function(s) without a verdict, read as failed: %s", name, len(silentBy[name]), nameList(sortedKeys(silentBy[name]))))
+		refused = append(refused, fmt.Sprintf("adapter: package %s: %d test function(s) started and gave no verdict, read as failed: %s", name, len(silentBy[name]), nameList(sortedKeys(silentBy[name]))))
+	}
+	for _, name := range sortedKeys(unranBy) {
+		refused = append(refused, fmt.Sprintf("adapter: package %s: did not run its tests: %d test function(s) read as failed: %s", name, len(unranBy[name]), nameList(sortedKeys(unranBy[name]))))
+	}
+
+	// the claims the summary counts are those of the files of the packages
+	// of the run: their candidates, and every file a verdict reached
+	scope := map[string]bool{}
+	for name := range names {
+		for _, file := range a.candidates(name) {
+			scope[file] = true
+		}
+	}
+	for file := range state {
+		scope[file] = true
 	}
 
 	// one receipt per attribution of a claimed id
 	wrote := map[string]int{}
-	// per id: a receipt was written, a claim met a function that did not
-	// run, a claim met a verdict that does not count
-	has, idle, held := map[string]bool{}, map[string]bool{}, map[string]bool{}
+	// per id: a receipt was written, a claim of the run's packages met a
+	// function that did not run (any claim, for idleAll), a claim met a
+	// verdict that does not count
+	has, idle, idleAll, held := map[string]bool{}, map[string]bool{}, map[string]bool{}, map[string]bool{}
 	var lines [][]byte
 	for _, u := range a.units {
 		f := a.files[u.File]
@@ -888,7 +938,7 @@ func (a *GoTest) Receipts() [][]byte {
 			continue // no test function, or a file that does not parse: named in the summary
 		}
 		st := stPass
-		var failedFns, silentFns, skippedFns []string
+		var failedFns, startedFns, unranFns, skippedFns []string
 		for _, fn := range funcs {
 			fst, ran := state[u.File][fn]
 			if !ran {
@@ -898,8 +948,12 @@ func (a *GoTest) Receipts() [][]byte {
 				st = fst
 			}
 			switch {
-			case fst == stFail && silent[u.File][fn] && !explicit[u.File][fn]:
-				silentFns = append(silentFns, fn)
+			case fst == stFail && explicit[u.File][fn]:
+				failedFns = append(failedFns, fn)
+			case fst == stFail && silent[u.File][fn]:
+				startedFns = append(startedFns, fn)
+			case fst == stFail && unrun[u.File][fn]:
+				unranFns = append(unranFns, fn)
 			case fst == stFail:
 				failedFns = append(failedFns, fn)
 			case fst == stSkip:
@@ -921,14 +975,22 @@ func (a *GoTest) Receipts() [][]byte {
 				r.Observed = "go test: " + u.Func + " passed"
 			}
 		case stFail:
-			r.Outcome, r.Observed = Fail, "go test: "+nameList(failedFns)+" failed"
-			if len(failedFns) == 0 {
-				r.Observed = "go test: " + nameList(silentFns) + ": no verdict; the package failed"
+			r.Outcome = Fail
+			switch {
+			case len(failedFns) > 0:
+				r.Observed = "go test: " + nameList(failedFns) + " failed"
+			case len(startedFns) > 0:
+				r.Observed = "go test: " + nameList(startedFns) + ": started, no verdict; the package failed"
+			default:
+				r.Observed = "go test: " + nameList(unranFns) + ": the package did not run its tests"
 			}
 		case stSkip:
 			r.Outcome, r.Observed = Skip, "go test: "+nameList(skippedFns)+" skipped"
 		case stNotRun:
-			idle[u.ID] = true
+			idleAll[u.ID] = true
+			if scope[u.File] {
+				idle[u.ID] = true
+			}
 			continue
 		default:
 			held[u.ID] = true
@@ -938,10 +1000,15 @@ func (a *GoTest) Receipts() [][]byte {
 		has[u.ID] = true
 		lines = append(lines, jsonLine(r))
 	}
-	var notRun, notCounted int
+	var notRun, notCounted, notRunAll int
 	for id := range idle {
 		if !has[id] {
 			notRun++
+		}
+	}
+	for id := range idleAll {
+		if !has[id] {
+			notRunAll++
 		}
 	}
 	for id := range held {
@@ -962,9 +1029,29 @@ func (a *GoTest) Receipts() [][]byte {
 	if !a.fromDir || len(a.streams) > 0 {
 		a.summary = append(a.summary, fmt.Sprintf("adapter %s: %s%d package(s), %d test function(s) with a verdict: %d passed, %d failed, %d skipped", GoTestJSON, counted, len(names), nFuncs, passed, failed, skipped))
 	}
+	// the claiming files: those of the run's packages without a test function
+	// are named, every one is counted
+	claiming := map[string]bool{}
+	for _, u := range a.units {
+		claiming[u.File] = true
+	}
+	var empty, broken []string
+	emptyAll := 0
+	for _, rel := range sortedKeys(claiming) {
+		switch f := a.files[rel]; {
+		case f.Broken:
+			broken = append(broken, fmt.Sprintf("adapter: %s: not Go source that parses; its claims count nothing", rel))
+		case len(f.Funcs) == 0:
+			emptyAll++
+			if scope[rel] {
+				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims count nothing", rel))
+			}
+		}
+	}
 	a.summary = append(a.summary,
 		fmt.Sprintf("adapter: receipts written: %d pass, %d fail, %d skip", wrote[Pass], wrote[Fail], wrote[Skip]),
 		fmt.Sprintf("adapter: claimed, not run: %d id(s)", notRun),
+		fmt.Sprintf("adapter: in the whole project: %d claimed id(s) not run, %d claiming file(s) with no test function", notRunAll, emptyAll),
 	)
 	add := func(n int, format string) {
 		if n > 0 {
@@ -984,19 +1071,6 @@ func (a *GoTest) Receipts() [][]byte {
 	add(nameless, "adapter: %d verdict(s) name no package and are used for nothing: run the test binary under go tool test2json -p <import path>")
 	sort.Strings(differ)
 	a.summary = append(append(append(append(a.summary, refused...), ambiguous...), differ...), sortedKeys(a.unjudged)...)
-	claiming := map[string]bool{}
-	for _, u := range a.units {
-		claiming[u.File] = true
-	}
-	var empty, broken []string
-	for _, rel := range sortedKeys(claiming) {
-		switch f := a.files[rel]; {
-		case f.Broken:
-			broken = append(broken, fmt.Sprintf("adapter: %s: not Go source that parses; its claims count nothing", rel))
-		case len(f.Funcs) == 0:
-			empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims count nothing", rel))
-		}
-	}
 	a.summary = append(append(a.summary, empty...), broken...)
 	return lines
 }
@@ -1020,28 +1094,73 @@ func (a *GoTest) parsed(file string) *goTestFile {
 
 // candidates returns the files a verdict of the package may belong to
 // (section 10.3, "Whose verdict"): without streams the test files under
-// trace.tests in the package's own directory, with streams the test files
-// the source map entries of the package name.
+// trace.tests in the package's own directory, with streams the files the
+// entries of evidence.adapter.sources map to the package.
 func (a *GoTest) candidates(pkg string) []string {
 	if !a.fromDir {
 		return a.pkgFiles[pkg]
 	}
-	var res []string
+	if res, ok := a.cands[pkg]; ok {
+		return res
+	}
+	set := map[string]bool{}
 	for _, s := range a.sources {
-		if !project.Match([]string{s.Package}, pkg) {
+		if !s.Matches(pkg) {
 			continue
 		}
-		all, err := a.p.Glob(s.Files)
-		if err != nil {
+		if s.Dir { // the test files of the package's own directory
+			for _, file := range a.pkgFiles[pkg] {
+				set[file] = true
+			}
 			continue
 		}
-		for _, file := range all {
-			if strings.HasSuffix(file, "_test.go") {
-				res = append(res, file)
+		var named []string
+		for _, file := range a.projectFiles() {
+			if strings.HasSuffix(file, ".go") && project.Match(s.Files, file) {
+				named = append(named, file)
 			}
 		}
+		// a glob of packages maps to each the files of its own directory when it
+		// names some, and every file to a package built from copies elsewhere
+		var own []string
+		if s.Wildcard() {
+			for _, file := range named {
+				if ip, ok := a.importPathOf(path.Dir(file)); ok && ip == pkg {
+					own = append(own, file)
+				}
+			}
+		}
+		if len(own) == 0 {
+			own = named
+		}
+		for _, file := range own {
+			set[file] = true
+		}
 	}
+	res := sortedKeys(set)
+	a.cands[pkg] = res
 	return res
+}
+
+// projectFiles returns every file of the project, read once.
+func (a *GoTest) projectFiles() []string {
+	if a.all == nil {
+		a.all, _ = a.p.Files()
+		if a.all == nil {
+			a.all = []string{}
+		}
+	}
+	return a.all
+}
+
+// importPathOf returns the import path of a project directory, read once.
+func (a *GoTest) importPathOf(dir string) (string, bool) {
+	if ip, ok := a.dirIP[dir]; ok {
+		return ip, ip != ""
+	}
+	ip, _ := importPath(a.p.Abs(dir))
+	a.dirIP[dir] = ip
+	return ip, ip != ""
 }
 
 // definers returns the files that could have given the verdict of a

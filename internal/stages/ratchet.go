@@ -420,14 +420,14 @@ func ratchetAdapter(s *report.Stage, base, now *project.Config) {
 	// sources, as pairs of a package glob and a files glob
 	had := map[[2]string]bool{}
 	for _, e := range base.AdapterSources() {
-		for _, f := range e.Files {
+		for _, f := range e.Maps() {
 			had[[2]string{e.Package, f}] = true
 		}
 	}
 	var pkgs []string
 	added := map[string][]string{}
 	for _, e := range now.AdapterSources() {
-		for _, f := range e.Files {
+		for _, f := range e.Maps() {
 			key := [2]string{e.Package, f}
 			if had[key] {
 				continue
