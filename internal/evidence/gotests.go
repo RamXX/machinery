@@ -6,8 +6,6 @@ import (
 	"go/token"
 	"sort"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/RamXX/machinery/internal/project"
 )
@@ -77,29 +75,28 @@ func parseGoTest(name string, data []byte) *goTestFile {
 	return f
 }
 
-// isTestFunc reports a top-level test function: no receiver, no type
-// parameters, a name go test runs, one parameter of type *testing.T.
+// isTestFunc reports a test function for the adapter (section 10.3): a
+// top-level function without a receiver whose name begins with Test and that
+// has exactly one parameter, whatever its type is written as. That is more
+// than go test runs, on purpose. A TestMain whose parameter is written as a
+// pointer to a type named M is the test main.
 func isTestFunc(fn *ast.FuncDecl) bool {
-	if fn.Recv != nil || fn.Type.TypeParams != nil || !isTestName(fn.Name.Name) {
+	if fn.Recv != nil || !strings.HasPrefix(fn.Name.Name, "Test") {
 		return false
 	}
 	params := fn.Type.Params.List
 	if len(params) != 1 || len(params[0].Names) > 1 {
 		return false
 	}
-	star, ok := params[0].Type.(*ast.StarExpr)
-	if !ok {
-		return false
+	if fn.Name.Name == "TestMain" {
+		if star, ok := params[0].Type.(*ast.StarExpr); ok {
+			switch t := star.X.(type) {
+			case *ast.Ident:
+				return t.Name != "M"
+			case *ast.SelectorExpr:
+				return t.Sel.Name != "M"
+			}
+		}
 	}
-	sel, ok := star.X.(*ast.SelectorExpr)
-	return ok && sel.Sel.Name == "T"
-}
-
-func isTestName(name string) bool {
-	rest, ok := strings.CutPrefix(name, "Test")
-	if !ok {
-		return false
-	}
-	r, _ := utf8.DecodeRuneInString(rest)
-	return rest == "" || !unicode.IsLower(r)
+	return true
 }

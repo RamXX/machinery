@@ -3,9 +3,11 @@ package evidence
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -86,16 +88,18 @@ type goPackage struct {
 func NewGoTest(p *project.Project, d *design.Design, argv []string, streams bool) (*GoTest, error) {
 	a := &GoTest{p: p, other: map[string]*goTestFile{}, effects: map[string]bool{}, replay: map[string]bool{}, fromDir: streams,
 		pkgFiles: map[string][]string{}, pkgDir: map[string]string{}, dirGo: map[string][]string{}}
-	for _, w := range strings.Fields(os.Getenv("GOFLAGS")) { // GOFLAGS reaches every go test of the run
-		switch name, val, _ := flagOf(w); {
-		case (name == "count" || name == "test.count") && val != "1":
-			return nil, refuse("GOFLAGS has -%s=%s, which is refused: take it out of GOFLAGS", name, val)
-		case name == "overlay":
-			return nil, refuse("GOFLAGS has -overlay, which is refused: take it out of GOFLAGS")
-		}
-	}
 	if streams {
-		a.Argv = argv // the command is not read, and its build tags are not known
+		// the command is not read and its build tags are not known; GOFLAGS of
+		// the environment is all machinery sees of what the wrapper's go test gets
+		for _, w := range strings.Fields(os.Getenv("GOFLAGS")) {
+			switch name, val, _ := flagOf(w); {
+			case (name == "count" || name == "test.count") && val != "1":
+				return nil, refuse("GOFLAGS has -%s=%s, which is refused: take it out of GOFLAGS", name, val)
+			case name == "overlay":
+				return nil, refuse("GOFLAGS has -overlay, which is refused: take it out of GOFLAGS")
+			}
+		}
+		a.Argv = argv
 	} else if err := a.readCommand(argv); err != nil {
 		return nil, err
 	}
@@ -200,8 +204,51 @@ func matching(files, globs []string) []string {
 	return res
 }
 
-// readCommand holds the command to go test, adds -json and -count=1, refuses
-// what it cannot read, and reads -tags among the flags before -args.
+// The words direct mode accepts after go test (section 10.3): the flags that
+// take a value, and the flags that are switches.
+var (
+	valueFlags = wordSet("run", "skip", "tags", "count", "timeout", "p", "parallel", "shuffle", "cpu",
+		"coverprofile", "covermode", "coverpkg", "test.run", "test.skip", "test.count", "test.timeout",
+		"test.parallel", "test.shuffle", "test.cpu", "test.coverprofile")
+	switchFlags = wordSet("race", "v", "json", "short", "failfast", "cover", "test.v", "test.short", "test.failfast")
+)
+
+func wordSet(words ...string) map[string]bool {
+	m := map[string]bool{}
+	for _, w := range words {
+		m[w] = true
+	}
+	return m
+}
+
+func notAccepted(word string) error {
+	return refuse("%s: not accepted by the adapter in direct mode; run the command through --streams", word)
+}
+
+func isFalse(v string) bool {
+	return v == "false" || v == "0" || v == "f" || v == "F" || v == "FALSE" || v == "False"
+}
+
+// relativePattern reports a package pattern relative to the project root
+// that does not leave it: ".", or "./..." with no ".." element.
+func relativePattern(word string) bool {
+	if word == "." {
+		return true
+	}
+	rest, ok := strings.CutPrefix(word, "./")
+	if !ok {
+		return false
+	}
+	for _, seg := range strings.Split(rest, "/") {
+		if seg == ".." {
+			return false
+		}
+	}
+	return true
+}
+
+// readCommand holds the command to the narrow go test of direct mode (section
+// 10.3), adds -json and -count=1, and reads the go environment of the run.
 func (a *GoTest) readCommand(argv []string) error {
 	if len(argv) < 2 || filepath.Base(argv[0]) != "go" || argv[1] != "test" {
 		n := len(argv)
@@ -210,69 +257,152 @@ func (a *GoTest) readCommand(argv []string) error {
 		}
 		return refuse("the command must be go test, got %s: run go test itself, or add --streams and have the command leave its go test -json output in %s", strings.Join(argv[:n], " "), StreamsEnv)
 	}
+	goBin := a.goBinary(argv[0])
+	if rel, inside := a.inProject(goBin); inside {
+		return refuse("%s: a go inside the project is not accepted by the adapter in direct mode; run the command through --streams", rel)
+	}
 	rest := argv[2:]
-	insert, hasJSON, hasCount, afterArgs := 0, false, false, false
+	hasJSON, hasCount := false, false
 	var tagList string
 	for i := 0; i < len(rest); i++ {
-		name, val, hasVal := flagOf(rest[i])
-		next := func() string { // the value of a flag written as two words
-			if !hasVal && i+1 < len(rest) {
+		word := rest[i]
+		name, val, hasVal := flagOf(word)
+		switch {
+		case name == "args" && i == len(rest)-1:
+		case name == "args":
+			return notAccepted(rest[i+1]) // nothing may follow -args
+		case name == "":
+			if !relativePattern(word) {
+				return notAccepted(word)
+			}
+		case valueFlags[name]:
+			if !hasVal && i+1 < len(rest) { // the value written as a second word
 				i++
-				return rest[i]
+				val = rest[i]
 			}
-			return val
-		}
-		if afterArgs { // the words after -args reach the test binary
-			if name == "test.count" {
-				if v := next(); v != "1" {
-					return refuse("-%s=%s is refused: write -count=1", name, v)
+			switch name {
+			case "count", "test.count":
+				if val != "1" {
+					return refuse("-%s=%s is refused: write -count=1", name, val)
 				}
+				hasCount = true
+			case "tags":
+				tagList = val
 			}
-			continue
-		}
-		switch name {
-		case "args":
-			afterArgs = true
-		case "C":
-			first := i == 0
-			next()
-			if first {
-				insert = i + 1
-			}
-		case "json":
-			if hasVal && (val == "false" || val == "0" || val == "f" || val == "F" || val == "FALSE" || val == "False") {
+		case switchFlags[name]:
+			if name == "json" && hasVal && isFalse(val) {
 				return refuse("-json=false is refused: the adapter reads the event stream; leave it out")
 			}
-			hasJSON = true
-		case "count", "test.count":
-			if v := next(); v != "1" {
-				return refuse("-%s=%s is refused: write -count=1", name, v)
-			}
-			hasCount = true
-		case "tags":
-			tagList = next()
-		case "overlay":
-			return refuse("-overlay is refused: the adapter reads the test files on disk; run without it")
-		case "mod", "modfile":
-			next()
+			hasJSON = hasJSON || name == "json"
+		default:
+			return notAccepted(word)
 		}
 	}
-	a.tags = tagsOf(tagList)
-	a.Argv = append([]string{}, argv[:2+insert]...)
+	goflags, err := a.checkGoEnv(goBin)
+	if err != nil {
+		return err
+	}
+	a.tags = tagsOf(tagList, goflags)
+	a.Argv = append([]string{}, argv[:2]...)
 	if !hasJSON {
 		a.Argv = append(a.Argv, "-json")
 	}
 	if !hasCount {
 		a.Argv = append(a.Argv, "-count=1") // go test never answers from its cache
 	}
-	a.Argv = append(a.Argv, rest[insert:]...)
+	a.Argv = append(a.Argv, rest...)
 	return nil
 }
 
+// goBinary returns the go of the command as a path, links followed: found
+// on PATH for a bare name, from the project root for a relative path.
+func (a *GoTest) goBinary(argv0 string) string {
+	bin := argv0
+	if !strings.Contains(argv0, "/") {
+		found, err := exec.LookPath(argv0)
+		switch {
+		case err == nil:
+			bin = found
+		case errors.Is(err, exec.ErrDot):
+			bin, _ = filepath.Abs(found)
+		default:
+			return argv0 // not found: go env says so
+		}
+	} else if !filepath.IsAbs(bin) {
+		bin = filepath.Join(a.p.Root, bin)
+	}
+	if r, err := filepath.EvalSymlinks(bin); err == nil {
+		bin = r
+	}
+	return bin
+}
+
+// inProject reports whether an absolute path is inside the project, links
+// followed, and its project-relative form.
+func (a *GoTest) inProject(abs string) (string, bool) {
+	if !filepath.IsAbs(abs) {
+		return "", false
+	}
+	root := a.p.Root
+	if r, err := filepath.EvalSymlinks(root); err == nil {
+		root = r
+	}
+	if r, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = r
+	}
+	rel, err := filepath.Rel(root, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") {
+		return "", false
+	}
+	return filepath.ToSlash(rel), true
+}
+
+// checkGoEnv asks go env, in the project root and with the environment of
+// the run, for GOFLAGS, GOMOD and GOWORK, and holds them to direct mode
+// (section 10.3). It returns GOFLAGS.
+func (a *GoTest) checkGoEnv(goBin string) (string, error) {
+	cmd := exec.Command(goBin, "env", "-json", "GOFLAGS", "GOMOD", "GOWORK")
+	cmd.Dir = a.p.Root
+	var out, errOut strings.Builder
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	var env struct{ GOFLAGS, GOMOD, GOWORK string }
+	runErr := cmd.Run()
+	if runErr == nil {
+		runErr = json.Unmarshal([]byte(out.String()), &env)
+	}
+	if runErr != nil {
+		line, _, _ := strings.Cut(strings.TrimSpace(errOut.String()), "\n")
+		if line == "" {
+			line = runErr.Error()
+		}
+		return "", refuse("go env failed (%s): the adapter reads GOFLAGS, GOMOD and GOWORK from it; fix the environment of go, or run the command through --streams", line)
+	}
+	for _, w := range strings.Fields(env.GOFLAGS) {
+		name, val, _ := flagOf(w)
+		switch {
+		case (name == "count" || name == "test.count") && val != "1":
+			return "", refuse("GOFLAGS has -%s=%s, which is refused: take it out of GOFLAGS", name, val)
+		case name == "json" && isFalse(val), !valueFlags[name] && !switchFlags[name]:
+			return "", refuse("%s in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams", w)
+		}
+	}
+	want := filepath.Join(a.p.Root, "go.mod")
+	_, wantOK := os.Stat(want)
+	if rel, inside := a.inProject(env.GOMOD); wantOK != nil || !inside || rel != "go.mod" {
+		return "", refuse("go env GOMOD is %q, not the go.mod of the project root: run the command through --streams", env.GOMOD)
+	}
+	if env.GOWORK != "" && env.GOWORK != "off" {
+		if _, inside := a.inProject(env.GOWORK); !inside {
+			return "", refuse("go env GOWORK is %q, a file outside the project root: run the command through --streams", env.GOWORK)
+		}
+	}
+	return env.GOFLAGS, nil
+}
+
 // tagsOf splits the value of -tags; without one it reads GOFLAGS. Never nil.
-func tagsOf(tagList string) []string {
+func tagsOf(tagList, goflags string) []string {
 	if tagList == "" {
-		for _, w := range strings.Fields(os.Getenv("GOFLAGS")) {
+		for _, w := range strings.Fields(goflags) {
 			if name, val, _ := flagOf(w); name == "tags" {
 				tagList = val
 			}

@@ -2050,20 +2050,22 @@ machinery prints the `Output` text of every event on its standard output, and a 
 stream that is no event as it is.
 
 Refusals, each `usage: <message>` with exit 2, before anything runs and with no file written,
-checked in the order of the table and the words of the command in the order written. Each says
+checked in the order of the table and the words of the command in the order written. With
+`--streams` the command and `go env` are not read: there only the rows on `GOFLAGS` that say so,
+`--streams` alone, `trace.tests` and the entries of `evidence.adapter.sources` apply. Each says
 what to do:
 
 | Message | When |
 |---|---|
 | `--adapter: unknown adapter "<name>": write --adapter go-test-json, the only adapter` | Another name. |
 | `--adapter go-test-json: the command must be go test, got <first two words>: run go test itself, or add --streams and have the command leave its go test -json output in MACHINERY_GO_TEST_JSON` | The command is not `go test`: a wrapper cannot be given `-json` and its output is not known to be the event stream. |
-| `--adapter go-test-json: GOFLAGS has -count=<value>, which is refused: take it out of GOFLAGS` | A count other than 1 in `GOFLAGS`, with or without `--streams`. |
-| `--adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS` | With `--streams`, `-overlay` in `GOFLAGS`. |
 | `--adapter go-test-json: <path>: a go inside the project is not accepted by the adapter in direct mode; run the command through --streams` | The `go` of the command is a file inside the project. |
 | `--adapter go-test-json: -count=<value> is refused: write -count=1` | A count other than 1 on the command line; the flag is printed as it was written (`-test.count=<value>`). |
 | `--adapter go-test-json: -json=false is refused: the adapter reads the event stream; leave it out` | `-json` switched off. |
 | `--adapter go-test-json: <word>: not accepted by the adapter in direct mode; run the command through --streams` | A word of the command outside the list above, as written. |
 | `--adapter go-test-json: go env failed (<first line it printed>): the adapter reads GOFLAGS, GOMOD and GOWORK from it; fix the environment of go, or run the command through --streams` | `go env` cannot answer. |
+| `--adapter go-test-json: GOFLAGS has -count=<value>, which is refused: take it out of GOFLAGS` | A count other than 1 in `GOFLAGS`, with or without `--streams`. |
+| `--adapter go-test-json: GOFLAGS has -overlay, which is refused: take it out of GOFLAGS` | With `--streams`, `-overlay` in `GOFLAGS`. |
 | `--adapter go-test-json: <word> in GOFLAGS: not accepted by the adapter in direct mode; run the command through --streams` | A word of `GOFLAGS` outside the list, a count other than 1 excepted (above). |
 | `--adapter go-test-json: go env GOMOD is "<value>", not the go.mod of the project root: run the command through --streams` | Another module, or none. |
 | `--adapter go-test-json: go env GOWORK is "<value>", a file outside the project root: run the command through --streams` | A workspace file outside the project. |
