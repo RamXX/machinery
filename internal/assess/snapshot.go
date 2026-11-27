@@ -99,9 +99,10 @@ func PrepareOut(root, out, verb string) (string, error) {
 }
 
 // TakeSnapshot extracts HEAD into <out>/snapshot, writes cfg there as
-// machinery.yaml (removes it when cfg is nil) and makes it a repository with
-// one commit. It returns the snapshot and the symbolic links left out.
-func TakeSnapshot(root, out, head string, cfg []byte) (string, []string, error) {
+// machinery.yaml and adoption as design/adoption.yaml (removes each when it
+// is nil) and makes it a repository with one commit. It returns the snapshot
+// and the symbolic links left out.
+func TakeSnapshot(root, out, head string, cfg, adoption []byte) (string, []string, error) {
 	snap := filepath.Join(out, "snapshot")
 	if err := os.MkdirAll(snap, 0o755); err != nil {
 		return "", nil, err
@@ -110,12 +111,21 @@ func TakeSnapshot(root, out, head string, cfg []byte) (string, []string, error) 
 	if err != nil {
 		return "", nil, err
 	}
-	path := filepath.Join(snap, project.ConfigName)
-	if err := os.RemoveAll(path); err != nil {
-		return "", nil, err
-	}
-	if cfg != nil {
-		if err := os.WriteFile(path, cfg, 0o644); err != nil {
+	for _, f := range []struct {
+		rel  string
+		data []byte
+	}{{project.ConfigName, cfg}, {project.AdoptionName, adoption}} {
+		path := filepath.Join(snap, filepath.FromSlash(f.rel))
+		if err := os.RemoveAll(path); err != nil {
+			return "", nil, err
+		}
+		if f.data == nil {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return "", nil, err
+		}
+		if err := os.WriteFile(path, f.data, 0o644); err != nil {
 			return "", nil, err
 		}
 	}

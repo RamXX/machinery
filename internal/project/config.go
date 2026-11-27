@@ -1,4 +1,5 @@
-// Package project finds, loads and validates machinery.yaml (docs/formats.md section 2).
+// Package project finds, loads and validates machinery.yaml, with
+// design/adoption.yaml merged into it (docs/formats.md sections 2 and 2.1).
 package project
 
 import (
@@ -765,27 +766,19 @@ func Load(explicit string) (*Project, error) {
 	if err != nil {
 		return nil, Errf("%v", err)
 	}
-	cfg, err := Parse(data)
+	adoption, err := ReadAdoption(root)
+	if err != nil {
+		return nil, err
+	}
+	cfg, err := ParseWith(data, adoption)
 	if err != nil {
 		return nil, err
 	}
 	return &Project{Root: root, Cfg: *cfg}, nil
 }
 
-// Parse decodes and validates a config document and applies defaults.
-func Parse(data []byte) (*Config, error) {
-	var cfg Config
-	dec := yaml.NewDecoder(bytes.NewReader(data))
-	dec.KnownFields(true)
-	if err := dec.Decode(&cfg); err != nil {
-		return nil, Errf("%s: %s", ConfigName, cleanYAMLError(err))
-	}
-	if err := cfg.validate(); err != nil {
-		return nil, err
-	}
-	cfg.applyDefaults()
-	return &cfg, nil
-}
+// Parse decodes and validates a machinery.yaml alone and applies defaults.
+func Parse(data []byte) (*Config, error) { return ParseWith(data, nil) }
 
 func cleanYAMLError(err error) string {
 	msg := err.Error()

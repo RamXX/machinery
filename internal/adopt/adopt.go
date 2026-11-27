@@ -97,18 +97,45 @@ func Run(o Options) (*Result, error) {
 			return nil, project.Errf("%q is not a valid glob", g)
 		}
 	}
-	cfgBytes, rerr := os.ReadFile(filepath.Join(root, project.ConfigName))
-	existing := rerr == nil
+	// machinery.yaml is read through the YAML decoder, as every command reads
+	// it, and never written when it exists (section 17.2)
+	cfgPath := filepath.Join(root, project.ConfigName)
+	_, serr := os.Lstat(cfgPath)
+	existing := serr == nil
+	adoption, err := project.ReadAdoption(root)
+	if err != nil {
+		return nil, err
+	}
+	pl := &plan{}
+	var cfgBytes []byte
+	var old project.Adoption
 	var oldP *project.Project
-	if existing {
+	switch {
+	case existing:
 		if oldP, err = project.Load(root); err != nil {
 			return nil, err
 		}
 		if lines := design.OwedRefusal(oldP); len(lines) > 0 {
 			return nil, fmt.Errorf("%s", strings.Join(lines, "\n"))
 		}
-	} else {
-		cfgBytes = nil
+		if cfgBytes, err = os.ReadFile(cfgPath); err != nil {
+			return nil, project.Errf("%v", err)
+		}
+		raw, rerr := project.Raw(cfgBytes, adoption)
+		if rerr != nil {
+			return nil, rerr
+		}
+		pl.view = *raw
+		if adoption != nil {
+			a, perr := project.ParseAdoption(adoption)
+			if perr != nil {
+				return nil, perr
+			}
+			old = *a
+		}
+	case adoption != nil:
+		return nil, project.Errf("%s exists and %s does not: it holds what adopt added to a %s; restore that file or remove this one",
+			project.AdoptionName, project.ConfigName, project.ConfigName)
 	}
 	base := &project.Project{Root: root}
 	files, err := base.Files()
@@ -132,20 +159,8 @@ func Run(o Options) (*Result, error) {
 		res.Sha = head
 	}
 
-	ed, err := newEditor(cfgBytes)
-	if err != nil {
-		return nil, err
-	}
-	applyEdits(ed, existing, o, discover(files, genDir), res.Backlog.Found)
-	newBytes, err := ed.bytes()
-	if err != nil {
-		return nil, err
-	}
-	final := cfgBytes
-	if newBytes != nil {
-		final = newBytes
-	}
-	cfg, err := project.Parse(final)
+	pl.step1(existing, o, discover(files, genDir), res.Backlog.Found)
+	cfg, data, err := pl.config(existing, cfgBytes, adoption, &old)
 	if err != nil {
 		return nil, err
 	}
@@ -172,12 +187,9 @@ func Run(o Options) (*Result, error) {
 		if len(gaps) == 0 {
 			continue
 		}
-		ed.addWaivers(gaps, step.reason+" ("+sha+")", step.note)
+		pl.waive(gaps, step.reason+" ("+sha+")", step.note)
 		waiverNotes = append(waiverNotes, fmt.Sprintf(step.note, len(gaps)))
-		if newBytes, err = ed.bytes(); err != nil {
-			return nil, err
-		}
-		if cfg, err = project.Parse(newBytes); err != nil {
+		if cfg, data, err = pl.config(existing, cfgBytes, adoption, &old); err != nil {
 			return nil, err
 		}
 		p = &project.Project{Root: root, Cfg: *cfg}
@@ -195,14 +207,18 @@ func Run(o Options) (*Result, error) {
 		return nil, err
 	}
 	w := &worker{planned: planned, o: o, res: res, oldP: oldP, p: p, head: head, written: map[string]bool{}}
-	if newBytes != nil {
+	switch {
+	case data == nil:
+	case existing:
+		if err := w.adoption(data, "adds: "+strings.Join(pl.notes, "; ")); err != nil {
+			return nil, err
+		}
+	default:
 		what := "new config"
-		if existing {
-			what = "edit: " + strings.Join(ed.changes, "; ")
-		} else if len(waiverNotes) > 0 {
+		if len(waiverNotes) > 0 {
 			what += "; " + strings.Join(waiverNotes, "; ")
 		}
-		if err := w.config(newBytes, what); err != nil {
+		if err := w.newConfig(data, what); err != nil {
 			return nil, err
 		}
 	}
@@ -263,102 +279,6 @@ func describe(res *Result, p *project.Project, files []string) error {
 	return nil
 }
 
-// applyEdits is step 1 of section 17.2: it adds what adoption needs to the
-// configuration and changes nothing else.
-func applyEdits(ed *editor, existing bool, o Options, src Sources, backlogFound bool) {
-	root := ed.root
-	switch {
-	case !existing:
-		paths := o.Paths
-		if len(paths) == 0 {
-			paths = []string{defaultScopeGlob}
-		}
-		ed.addSeq(root, "scope", paths, true, "scope")
-	case get(root, "scope") != nil:
-		ed.addSeq(root, "scope", covered(seqValues(get(root, "scope")), o.Paths), true, "scope")
-	}
-	effScope := seqValues(get(root, "scope"))
-	if len(effScope) == 0 {
-		effScope = []string{defaultScopeGlob}
-	}
-
-	// design sources found now, including ones written after the first adoption
-	var newModels []string
-	have := map[string]bool{}
-	for _, m := range seqValues(get(get(root, "design"), "models")) {
-		have[m] = true
-	}
-	for _, m := range src.Models {
-		if !have[m] {
-			newModels = append(newModels, m)
-		}
-	}
-	if len(newModels) > 0 {
-		ed.addSeq(ed.mapping(root, "design"), "models", newModels, false, "design.models")
-	}
-	imported := get(get(root, "import"), "machines") != nil
-	if len(src.Machines) > 0 && get(get(root, "design"), "machines") == nil && !imported {
-		dir := src.machinesDir()
-		ed.set(ed.mapping(root, "design"), "machines", dir, "design.machines +"+dir)
-	}
-	haveContract := ed.contractPaths()
-	for _, c := range src.Contracts {
-		if !haveContract[c] {
-			ed.addContract(c)
-		}
-	}
-	design := get(root, "design")
-	hasDesign := len(seqValues(get(design, "models"))) > 0 || get(design, "machines") != nil || imported
-
-	traceExisted := get(root, "trace") != nil
-	tests := get(root, "tests")
-	e2e := o.E2E
-	if len(e2e) == 0 {
-		e2e = seqValues(get(tests, "e2e"))
-	}
-	if len(e2e) == 0 {
-		e2e = seqValues(get(get(root, "trace"), "tests"))
-	}
-	if len(e2e) == 0 {
-		e2e = []string{DefaultE2E}
-	}
-	switch trace := get(root, "trace"); {
-	case trace == nil && hasDesign:
-		t := ed.mapping(root, "trace")
-		ed.addSeq(t, "code", effScope, true, "trace.code")
-		ed.addSeq(t, "tests", e2e, true, "trace.tests")
-	case trace != nil:
-		if get(trace, "code") != nil {
-			ed.addSeq(trace, "code", covered(seqValues(get(trace, "code")), o.Paths), true, "trace.code")
-		}
-		if get(trace, "tests") != nil {
-			ed.addSeq(trace, "tests", covered(seqValues(get(trace, "tests")), o.E2E), true, "trace.tests")
-		}
-	}
-
-	if tests == nil {
-		tests = ed.mapping(root, "tests")
-		if !traceExisted {
-			ed.addSeq(tests, "e2e", e2e, true, "tests.e2e")
-		}
-	} else if len(o.E2E) > 0 {
-		switch {
-		case get(tests, "e2e") != nil:
-			ed.addSeq(tests, "e2e", covered(seqValues(get(tests, "e2e")), o.E2E), true, "tests.e2e")
-		case get(get(root, "trace"), "tests") == nil:
-			ed.addSeq(tests, "e2e", o.E2E, true, "tests.e2e")
-		}
-	}
-	ed.set(tests, "baseline", TestsBaseline, "tests.baseline")
-
-	if cons := get(root, "constraints"); cons != nil {
-		ed.set(cons, "baseline", ArchBaseline, "constraints.baseline")
-	}
-	if backlogFound && get(root, "backlog") == nil {
-		ed.set(ed.mapping(root, "backlog"), "tool", "bd", "backlog.tool: bd")
-	}
-}
-
 // worker applies steps 1 to 3 of section 17.2 or, without Write, records
 // what they would do.
 type worker struct {
@@ -378,13 +298,34 @@ func (w *worker) record(rel, what string) {
 	w.res.Would = append(w.res.Would, Change{rel, what})
 }
 
-func (w *worker) config(data []byte, what string) error {
+// newConfig creates machinery.yaml. It never replaces one: the file is
+// opened to be created, and a file that is there is an error.
+func (w *worker) newConfig(data []byte, what string) error {
 	if w.o.Write {
-		if err := project.WriteFileAtomic(filepath.Join(w.p.Root, project.ConfigName), data); err != nil {
+		f, err := os.OpenFile(filepath.Join(w.p.Root, project.ConfigName), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if err != nil {
+			return project.Errf("%s: adopt never replaces it: %v", project.ConfigName, err)
+		}
+		if _, err := f.Write(data); err != nil {
+			f.Close()
+			return err
+		}
+		if err := f.Close(); err != nil {
 			return err
 		}
 	}
 	w.record(project.ConfigName, what)
+	return nil
+}
+
+// adoption writes design/adoption.yaml whole (section 2.1).
+func (w *worker) adoption(data []byte, what string) error {
+	if w.o.Write {
+		if err := w.p.WriteAtomic(project.AdoptionName, data); err != nil {
+			return err
+		}
+	}
+	w.record(project.AdoptionName, what)
 	return nil
 }
 
@@ -483,13 +424,13 @@ func (w *worker) owed() error {
 	return w.addOwed(d)
 }
 
-// may reports a file adopt may write (section 17.2): machinery.yaml, a file
-// under design/ or the gen directory, the owed list and the baselines.
+// may reports a file adopt may write (section 17.2): a file under design/
+// or the gen directory, the owed list and the baselines.
 func (w *worker) may(rel string) bool {
 	c := w.p.Cfg
 	gen := strings.TrimSuffix(c.Design.Gen, "/") + "/"
 	switch {
-	case rel == project.ConfigName, strings.HasPrefix(rel, DesignDir), strings.HasPrefix(rel, gen), rel == c.Design.Owed:
+	case strings.HasPrefix(rel, DesignDir), strings.HasPrefix(rel, gen), rel == c.Design.Owed:
 		return true
 	}
 	if c.Tests != nil && rel == c.Tests.Baseline {

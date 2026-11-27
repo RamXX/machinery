@@ -69,5 +69,8 @@ stdout 'Dispatch rules'
 stdout 'Wire evidence e2e/shipment_test.go'
 exec git log --oneline -- internal/shipping/shipment.go internal/billing cmd
 stdout -count=1 '^[0-9a-f]+ '
-grep 'internal/billing/\*\*' machinery.yaml
+# what the later adoptions added is in design/adoption.yaml: the machinery.yaml the first one
+# wrote, and the team then edited, was never written again
+grep 'internal/billing/\*\*' design/adoption.yaml
+! grep 'internal/billing' machinery.yaml
 grep 'unit-test, subject: "?internal/billing/invoice_test.go' design/tests-baseline.yaml

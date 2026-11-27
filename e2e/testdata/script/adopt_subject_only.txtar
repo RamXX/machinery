@@ -13,10 +13,10 @@ stdout '^adopt: wrote [0-9]+ file\(s\), 1 waiver\(s\), [0-9]+ owed$'
 ! stdout 'fix in the project first'
 grep -count=2 '^checked: .*, 1 name a subject and no required value' ../reh/stages/check.txt
 grep '^  - id: fm:risk-3$' ../reh/snapshot/design/owed.yaml
-grep '^  - \{rule: failure-state-mode, id: "state:loan\.Lost", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}$' ../reh/snapshot/machinery.yaml
+grep '^  - \{rule: failure-state-mode, id: "state:loan\.Lost", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}$' ../reh/snapshot/design/adoption.yaml
 
 # what the rehearsal writes names the commit of the project's HEAD, never one of the snapshot's own
-exec sh -c 'h=$(git rev-parse HEAD | cut -c1-7); grep -c "unmodeled at adoption ($h)" ../reh/snapshot/machinery.yaml; grep -c "at adoption ($h)" ../reh/snapshot/design/owed.yaml; grep -c "at adoption" ../reh/snapshot/design/owed.yaml'
+exec sh -c 'h=$(git rev-parse HEAD | cut -c1-7); grep -c "unmodeled at adoption ($h)" ../reh/snapshot/design/adoption.yaml; grep -c "at adoption ($h)" ../reh/snapshot/design/owed.yaml; grep -c "at adoption" ../reh/snapshot/design/owed.yaml'
 stdout '^1\n18\n18$'
 exec sh -c 'for s in $(git -C ../reh/snapshot log --format=%H | cut -c1-7); do grep -rl --exclude-dir=.git "$s" ../reh; done; echo searched'
 stdout '^searched$'
@@ -26,7 +26,9 @@ stdout '^searched$'
 exec machinery adopt --write
 ! stdout 'blocked'
 grep '^  - id: fm:risk-3$' design/owed.yaml
-grep 'reason: "unmodeled at adoption \([0-9a-f]{7}\)"' machinery.yaml
+grep 'reason: "unmodeled at adoption \([0-9a-f]{7}\)"' design/adoption.yaml
+exec git status --short machinery.yaml
+! stdout .
 exists design/gen/obligations.json
 grep '"id": "fm:risk-3"' design/gen/obligations.json
 gitcommit 'adopted'

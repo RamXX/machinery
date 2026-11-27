@@ -27,14 +27,16 @@ exec machinery adopt --paths 'internal/shipping/**' --write
 cmp stdout want-wrote-nothing.txt
 gitcommit adopted
 
-# a failure event added later is waived too; the waivers already there are kept as they are
+# a failure event added later is waived too, in design/adoption.yaml: this machinery.yaml exists
+# now, so adopt never writes it again, and the waivers there are kept as they are
 exec sh -c 'sed "s/unmodeled at adoption/kept by hand/" machinery.yaml > m.tmp && mv m.tmp machinery.yaml'
 cp job-lease.json design/machines/Job.machine.json
 exec machinery adopt --paths 'internal/shipping/**'
-stdout '^  machinery.yaml  edit: new waivers: 1$'
+stdout '^  design/adoption\.yaml  adds: new waivers: 1$'
 exec machinery adopt --paths 'internal/shipping/**' --write
 grep -count=2 'reason: "kept by hand \([0-9a-f]{7}\)"' machinery.yaml
-grep '\{rule: failure-event-mode, id: "event:job\.leaseLost", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}' machinery.yaml
+grep '^  - \{rule: failure-event-mode, id: "event:job\.leaseLost", reason: "unmodeled at adoption \([0-9a-f]{7}\)"\}$' design/adoption.yaml
+! grep leaseLost machinery.yaml
 exec mrun 0 check --stage machines --stage xref-failure --stage gen-drift
 
 # a failure mode written for a waived state makes its waiver stale, and adopt never removes one
@@ -57,6 +59,7 @@ exec mrun 1 adopt --paths 'internal/shipping/**'
 stdout '^  failure-modes: design/failure-modes.yaml: line 1: '
 exec mrun 1 adopt --paths 'internal/shipping/**' --write
 ! grep 'crashDetected' machinery.yaml
+! grep 'crashDetected' design/adoption.yaml
 
 -- job.json --
 {

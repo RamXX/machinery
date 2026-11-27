@@ -44,9 +44,10 @@ exec mrun 1 adopt --paths 'internal/shipping/**'
 ! stdout 'unbound waivers'
 exec mrun 1 adopt --paths 'internal/shipping/**' --write
 ! grep 'dispatch' machinery.yaml
+! exists design/adoption.yaml
 rm design/machines/Broken.machine.json
 exec machinery adopt --paths 'internal/shipping/**'
-stdout '^  machinery.yaml  edit: unbound waivers: 1$'
+stdout '^  design/adoption\.yaml  adds: unbound waivers: 1$'
 
 # a design whose machines all bind to nothing: adopt waives them, and xref-model-machine is not
 # demonstrated until the first one is bound

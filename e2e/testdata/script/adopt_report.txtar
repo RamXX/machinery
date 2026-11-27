@@ -45,11 +45,13 @@ exec machinery adopt --paths 'internal/billing/**'
 stdout '^test files: 1 under e2e roots, 1 elsewhere \(unit tests\), 0 with test doubles$'
 rm e2e/flow_test.go
 
-# an existing machinery.yaml is read, not replaced, in a dry run
+# an existing machinery.yaml is read and never written: what adoption adds would go to
+# design/adoption.yaml
 cp machinery-existing.yaml machinery.yaml
 exec machinery adopt --paths 'internal/billing/**'
 stdout '^scope: internal/shipping/\*\*, internal/billing/\*\*$'
-stdout '^  machinery.yaml  edit: scope \+internal/billing/\*\*; tests.baseline; backlog.tool: bd$'
+stdout '^  design/adoption\.yaml  adds: scope \+internal/billing/\*\*; tests\.baseline; backlog\.tool: bd$'
+! stdout '^  machinery\.yaml'
 cmp machinery.yaml machinery-existing.yaml
 
 # the languages come from marker files in scope and in its parents, and from extensions

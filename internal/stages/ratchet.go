@@ -42,7 +42,8 @@ func Ratchet(ctx *Context) *report.Stage {
 		// the project did not exist at the base: nothing was established there
 		return s.NotApplicable("no " + project.ConfigName + " at " + ref + ": nothing was established there")
 	}
-	bcfg, err := project.Parse(raw)
+	// the configuration at the base is its two files merged (section 2.1)
+	bcfg, err := project.ParseWith(raw, project.Present(gitx.Show(p.Root, ref, project.AdoptionName)))
 	if err != nil {
 		s.Errorf("cannot read %s at %s: %v", project.ConfigName, ref, err)
 		return s

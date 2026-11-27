@@ -20,13 +20,13 @@ stdout 'fix the findings below'
 ! stdout 'design/owed.yaml'
 ! stdout 'new owed entries'
 
-# --write still edits the config and baselines, but gen does not run and nothing is owed
+# --write still adds to the configuration and the baselines, but gen does not run and nothing is owed
 exec mrun 1 adopt --paths 'internal/shipping/**' --write
 stdout '^adopt: wrote 1 file\(s\)$'
-stdout '^  machinery.yaml$'
+stdout '^  design/adoption\.yaml$'
 stdout '^blocked: machinery gen refuses while [0-9]+ finding\(s\) stand'
 stdout '^  machines: design/machines/Shipment.machine.json: '
-grep 'design/model/depot.modelith.yaml' machinery.yaml
+grep 'design/model/depot.modelith.yaml' design/adoption.yaml
 ! exists design/owed.yaml
 ! exists design/gen/tables
 ! exists design/model/depot.modelith.md

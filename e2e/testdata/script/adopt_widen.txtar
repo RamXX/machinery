@@ -1,4 +1,5 @@
-# widening the scope: the config keeps its comments, and the baseline grows only for the new paths
+# widening the scope: machinery.yaml is never written, design/adoption.yaml holds what each
+# adoption added, and the baseline grows only for the new paths
 fixture brownfield
 gitinit
 exec sh backlog.sh
@@ -6,7 +7,8 @@ cp machinery-existing.yaml machinery.yaml
 gitcommit config
 
 exec machinery adopt --write
-cmp machinery.yaml want-first.yaml
+cmp machinery.yaml machinery-existing.yaml
+cmp design/adoption.yaml want-first.yaml
 cmp design/tests-baseline.yaml want-tests-first.yaml
 cmp design/arch-baseline.yaml want-arch-first.yaml
 exec mrun 0 check --stage model --stage machines --stage failure-modes --stage risk --stage xref-model-machine --stage xref-contract --stage xref-failure --stage xstate --stage gen-drift --stage formal --stage checkers --stage arch --stage tests --stage trace
@@ -16,7 +18,8 @@ gitcommit adopted
 exec sh -c 'printf "package shipping\n" > internal/shipping/later_test.go'
 exec machinery adopt --paths 'internal/billing/**' --write
 cmp stdout want-wrote.txt
-cmp machinery.yaml want-widened.yaml
+cmp machinery.yaml machinery-existing.yaml
+cmp design/adoption.yaml want-widened.yaml
 cmp design/tests-baseline.yaml want-tests-widened.yaml
 cmp design/arch-baseline.yaml want-arch-widened.yaml
 exec mrun 1 check --stage tests
@@ -37,7 +40,8 @@ exec machinery adopt --paths 'internal/billing/**' --write
 cmp stdout want-wrote-nothing.txt
 exec machinery adopt --paths 'internal/shipping/**' --paths 'internal/billing/**' --write
 cmp stdout want-wrote-nothing.txt
-cmp machinery.yaml want-widened.yaml
+cmp machinery.yaml machinery-existing.yaml
+cmp design/adoption.yaml want-widened.yaml
 
 -- machinery-existing.yaml --
 # owned by the platform team
@@ -48,34 +52,27 @@ constraints:
   size:
     max_func_lines: 8  # the team's own size rule
 -- want-first.yaml --
-# owned by the platform team
-version: 2
-scope:  # the riskiest area first
-  - "internal/shipping/**"
-constraints:
-  size:
-    max_func_lines: 8  # the team's own size rule
-  baseline: design/arch-baseline.yaml
+# machinery adopt writes this file whole: what adoption added to the configuration. machinery.yaml is yours; adopt never edits it.
+version: 1
 tests:
   e2e:
     - "e2e/**"
   baseline: design/tests-baseline.yaml
+constraints:
+  baseline: design/arch-baseline.yaml
 backlog:
   tool: bd
 -- want-widened.yaml --
-# owned by the platform team
-version: 2
-scope:  # the riskiest area first
-  - "internal/shipping/**"
+# machinery adopt writes this file whole: what adoption added to the configuration. machinery.yaml is yours; adopt never edits it.
+version: 1
+scope:
   - "internal/billing/**"
-constraints:
-  size:
-    max_func_lines: 8  # the team's own size rule
-  baseline: design/arch-baseline.yaml
 tests:
   e2e:
     - "e2e/**"
   baseline: design/tests-baseline.yaml
+constraints:
+  baseline: design/arch-baseline.yaml
 backlog:
   tool: bd
 -- want-tests-first.yaml --
@@ -106,8 +103,8 @@ baseline:
   - {rule: func-size, subject: "internal/shipping/store.go:Store.load"}
 -- want-wrote.txt --
 adopt: wrote 3 file(s)
+  design/adoption.yaml
   design/arch-baseline.yaml
   design/tests-baseline.yaml
-  machinery.yaml
 -- want-wrote-nothing.txt --
 adopt: wrote 0 file(s)

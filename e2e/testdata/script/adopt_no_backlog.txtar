@@ -16,8 +16,8 @@ cp machinery-nobd.yaml machinery.yaml
 exec machinery adopt
 stdout '^backlog: bd not runnable$'
 exec machinery adopt --write
-grep 'tool: bd' machinery.yaml
-grep 'bd: ./no-such-bd' machinery.yaml
+grep '^backlog:\n  tool: bd$' design/adoption.yaml
+cmp machinery.yaml machinery-nobd.yaml
 
 -- machinery-nobd.yaml --
 version: 2

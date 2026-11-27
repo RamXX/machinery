@@ -1,0 +1,381 @@
+# adopt and an existing machinery.yaml (docs/formats.md sections 2.1 and 17.2): adopt never
+# writes that file, whatever it holds. What it adds goes to design/adoption.yaml, which it owns
+# and writes whole, and every command reads the two files merged
+fixture brownfield
+mkdir design/model design/machines
+cp depot-model.yaml design/model/depot.modelith.yaml
+cp shipment.json design/machines/Shipment.machine.json
+cp courier.json design/machines/CourierRun.machine.json
+cp team.yaml machinery.yaml
+gitinit
+
+# a file written by hand, with a waiver of the team's own. The dry run names the file adopt
+# would write, and it is not machinery.yaml
+exec machinery adopt --paths 'internal/billing/**'
+stdout '^  design/adoption\.yaml  adds: scope \+internal/billing/\*\*; design\.machines \+design/machines; trace\.code \+internal/shipping/\*\*, internal/billing/\*\*; trace\.tests \+e2e/\*\*; tests\.baseline; unbound waivers: 1$'
+! stdout 'machinery\.yaml  '
+! exists design/adoption.yaml
+exec machinery adopt --paths 'internal/billing/**' --write
+stdout '^  design/adoption\.yaml$'
+! stdout '^  machinery\.yaml$'
+cmp machinery.yaml team.yaml
+exec sed -E 's/adoption \([0-9a-f]{7}\)/adoption (SHA)/' design/adoption.yaml
+cmp stdout want-adoption.yaml
+
+# the configuration is the two files merged: the team's scope, tests and waiver, and what adopt
+# added. The project keeps the waiver it had and gets the new one from design/adoption.yaml
+exec machinery config
+stdout '^scope:\n  - internal/shipping/\*\*\n  - internal/billing/\*\*$'
+stdout '^  machines: design/machines$'
+stdout '^  baseline: design/tests-baseline\.yaml$'
+stdout '^  - rule: entity-machine\n    id: entity:Carrier\n    reason: carriers come later\n  - rule: machine-binding\n    id: courierRun\n    reason: unbound at adoption \([0-9a-f]{7}\)$'
+exec mrun 0 check --stage xref-model-machine --stage tests --stage trace
+stdout '^  warn   waived: entity-machine: entity:Carrier: .* \(carriers come later\)$'
+stdout '^  warn   waived: machine-binding: courierRun: .* \(unbound at adoption \([0-9a-f]{7}\)\)$'
+stdout '^  warn   baselined: unit-test: internal/billing/invoice_test\.go$'
+
+# the same arguments again write nothing
+exec machinery adopt --paths 'internal/billing/**' --write
+cmp stdout want-wrote-nothing.txt
+gitcommit adopted
+
+# status reads the merged configuration, and so does assess, on its snapshot
+exec machinery status --no-backlog
+stdout .
+exec machinery assess --out $WORK/../assessed
+grep '^scope: internal/shipping/\*\*, internal/billing/\*\*$' $WORK/../assessed/report.md
+grep '^design: 1 model\(s\), 2 machine\(s\), 0 contract\(s\)$' $WORK/../assessed/report.md
+exists $WORK/../assessed/snapshot/design/adoption.yaml
+
+# widening the scope later writes design/adoption.yaml again, whole, and nothing of machinery.yaml
+exec machinery adopt --paths 'cmd/**' --write
+stdout '^  design/adoption\.yaml$'
+! stdout '^  machinery\.yaml$'
+cmp machinery.yaml team.yaml
+exec sed -E 's/adoption \([0-9a-f]{7}\)/adoption (SHA)/' design/adoption.yaml
+cmp stdout want-widened.yaml
+exec mrun 0 check --base HEAD --stage ratchet
+gitcommit widened
+
+# a rehearsal lists design/adoption.yaml among the files adopt writes, and never machinery.yaml
+exec machinery adopt --rehearse --paths 'e2e/**' --out $WORK/../rehearsed
+stdout '^adopt: wrote 1 file\(s\), 0 waiver\(s\), [0-9]+ owed$'
+# the snapshot starts from the project's design/adoption.yaml: what it held is kept
+grep '^  - "cmd/\*\*"$' $WORK/../rehearsed/snapshot/design/adoption.yaml
+grep '^\| `design/adoption\.yaml` \| [0-9]+ \|$' $WORK/../rehearsed/rehearsal.md
+! grep '^\| `machinery\.yaml` ' $WORK/../rehearsed/rehearsal.md
+grep '^  - "e2e/\*\*"$' $WORK/../rehearsed/snapshot/design/adoption.yaml
+cmp $WORK/../rehearsed/snapshot/machinery.yaml team.yaml
+! grep '^  - "e2e/\*\*"$' design/adoption.yaml
+exec git status --porcelain
+! stdout .
+
+# the content of design/adoption.yaml may be edited by hand. Removing a waiver there does what
+# removing it from machinery.yaml does: its finding stands again, and a later adopt waives it again
+exec grep -v courierRun design/adoption.yaml
+cp stdout design/adoption.yaml
+exec mrun 1 check --stage xref-model-machine
+stdout '^  ERROR  machine-binding: courierRun: '
+exec machinery adopt --write
+stdout '^  design/adoption\.yaml$'
+grep 'id: "courierRun"' design/adoption.yaml
+cmp machinery.yaml team.yaml
+gitcommit 'waived again'
+
+# the ratchet reads both files at the base: removing design/adoption.yaml narrows the scope and
+# switches stages off, as deleting the same keys from machinery.yaml would
+rm design/adoption.yaml
+exec mrun 1 check --base HEAD --stage ratchet
+stdout '^  ERROR  ratchet: scope narrowed: internal/billing/\*\*$'
+stdout '^  ERROR  ratchet: stage disabled: machines applied at HEAD and design\.machines is gone now$'
+# assess reads design/adoption.yaml from the work tree, as it reads machinery.yaml, never from HEAD
+exec machinery assess --out $WORK/../assessed-without
+grep '^scope: internal/shipping/\*\*$' $WORK/../assessed-without/report.md
+! exists $WORK/../assessed-without/snapshot/design/adoption.yaml
+exec git checkout -q design/adoption.yaml
+
+# a scalar that both files set with two values is a config error that names both files, for
+# every command, and adopt writes nothing; with the same value it is that value
+cp design/adoption.yaml adoption-before.yaml
+cp conflict.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
+exec mrun 2 status --no-backlog
+stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
+exec mrun 2 adopt --write
+stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
+cmp machinery.yaml conflict.yaml
+cmp design/adoption.yaml adoption-before.yaml
+exec mrun 2 assess --out $WORK/../refused
+stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
+exec mrun 2 adopt --rehearse --out $WORK/../refused
+stderr '^config: design\.machines: machinery\.yaml has "design/other-machines" and design/adoption\.yaml has "design/machines": keep one$'
+! exists $WORK/../refused
+cp conflict-baseline.yaml machinery.yaml
+exec mrun 2 config
+stderr '^config: tests\.baseline: machinery\.yaml has "design/unit-tests\.yaml" and design/adoption\.yaml has "design/tests-baseline\.yaml": keep one$'
+cp same.yaml machinery.yaml
+exec machinery config
+stdout '^  machines: design/machines$'
+cp team.yaml machinery.yaml
+
+# design/adoption.yaml holds only the keys adopt adds, at version 1, in one document
+exec cat adoption-before.yaml hooks.part
+cp stdout design/adoption.yaml
+exec mrun 2 config
+stderr '^config: design/adoption\.yaml: line [0-9]+: field hooks not found in type project\.Adoption$'
+exec sed 's/^version: 1$/version: 2/' adoption-before.yaml
+cp stdout design/adoption.yaml
+exec mrun 2 config
+stderr '^config: design/adoption\.yaml: version must be 1$'
+exec mrun 2 adopt --write
+stderr '^config: design/adoption\.yaml: version must be 1$'
+exec cat adoption-before.yaml second.part
+cp stdout design/adoption.yaml
+exec mrun 2 config
+stderr '^config: design/adoption\.yaml: the file holds more than one YAML document$'
+cp empty.txt design/adoption.yaml
+exec mrun 2 config
+stderr '^config: design/adoption\.yaml: version must be 1$'
+cp adoption-before.yaml design/adoption.yaml
+
+# a design/adoption.yaml without a machinery.yaml is refused: adopt starts no project beside it
+rm machinery.yaml
+exec mrun 2 adopt --write
+stderr '^config: design/adoption\.yaml exists and machinery\.yaml does not: it holds what adopt added to a machinery\.yaml; restore that file or remove this one$'
+! exists machinery.yaml
+cmp design/adoption.yaml adoption-before.yaml
+
+# whatever machinery.yaml holds, adopt leaves every byte of it, the dry run and --write alike,
+# and never fails on its text: \r\n without a line break at the end
+rm design/adoption.yaml
+exec printf 'version: 2\r\nscope:\r\n  - "internal/shipping/**"\r\ntools:\r\n  bd: /nonexistent'
+cp stdout crlf.yaml
+cp crlf.yaml machinery.yaml
+exec machinery adopt --paths 'internal/billing/**'
+exec machinery adopt --paths 'internal/billing/**' --write
+! stderr 'panic|goroutine'
+cmp machinery.yaml crlf.yaml
+grep '^  - "internal/billing/\*\*"$' design/adoption.yaml
+exec machinery config
+stdout '^  - internal/billing/\*\*$'
+
+# a lone \r as the line break (it crashed adopt once)
+rm design/adoption.yaml
+exec printf 'version: 2\rscope:\r  - "internal/shipping/**"\rtools:\r  bd: /nonexistent\r'
+cp stdout cr.yaml
+cp cr.yaml machinery.yaml
+exec machinery adopt --paths 'internal/billing/**'
+exec machinery adopt --paths 'internal/billing/**' --write
+! stderr 'panic|goroutine'
+cmp machinery.yaml cr.yaml
+grep '^  - "internal/billing/\*\*"$' design/adoption.yaml
+exec machinery config
+stdout '^scope:\n  - internal/shipping/\*\*\n  - internal/billing/\*\*$'
+
+# \r\r\n, a file converted twice (it crashed adopt too)
+rm design/adoption.yaml
+exec printf 'version: 2\r\r\nscope:\r\r\n  - "internal/shipping/**"\r\r\ntools:\r\r\n  bd: /nonexistent\r\r\n'
+cp stdout crcrlf.yaml
+cp crcrlf.yaml machinery.yaml
+exec machinery adopt --paths 'internal/billing/**' --write
+! stderr 'panic|goroutine'
+cmp machinery.yaml crcrlf.yaml
+grep '^  - "internal/billing/\*\*"$' design/adoption.yaml
+
+# a byte order mark, then comment lines that end in U+2028 and U+0085
+rm design/adoption.yaml
+exec printf '\357\273\277# the depot\342\200\250# shipping first\302\205version: 2\nscope:\n  - "internal/shipping/**"\ntools:\n  bd: /nonexistent\n'
+cp stdout unicode.yaml
+cp unicode.yaml machinery.yaml
+exec machinery adopt --paths 'internal/billing/**' --write
+! stderr 'panic|goroutine'
+cmp machinery.yaml unicode.yaml
+grep '^  - "internal/billing/\*\*"$' design/adoption.yaml
+
+# tabs, an anchor and its alias, flow lists and mappings on one line and over several, an empty
+# flow list over two lines, and a merge key at the top level that supplies the waivers
+rm design/adoption.yaml
+cp exotic.yaml machinery.yaml
+mkdir api
+cp depot-api.yaml api/openapi.yaml
+exec machinery adopt --paths 'internal/billing/**'
+stdout '^  design/adoption\.yaml  adds: scope \+internal/billing/\*\*; design\.models \+design/model/depot\.modelith\.yaml; design\.machines \+design/machines; contracts \+api/openapi\.yaml; trace\.code \+internal/billing/\*\*; tests\.baseline; unbound waivers: 1$'
+exec machinery adopt --paths 'internal/billing/**' --write
+! stderr 'panic|goroutine'
+cmp machinery.yaml exotic.yaml
+exec machinery config
+stdout '^  - rule: entity-machine\n    id: entity:Carrier\n    reason: carriers come later\n  - rule: machine-binding\n    id: courierRun\n'
+stdout '^contracts:\n  - kind: openapi\n    path: api/openapi\.yaml$'
+grep '^contracts:\n  - kind: openapi\n    path: api/openapi\.yaml$' design/adoption.yaml
+exec machinery adopt --paths 'internal/billing/**' --write
+cmp stdout want-wrote-nothing.txt
+
+-- depot-api.yaml --
+openapi: 3.0.3
+info: {title: depot, version: "1"}
+paths: {}
+-- want-wrote-nothing.txt --
+adopt: wrote 0 file(s)
+-- empty.txt --
+-- conflict.yaml --
+version: 2
+scope:
+  - "internal/shipping/**"
+tests:
+  e2e: ["e2e/**"]
+tools:
+  bd: /nonexistent
+design:
+  models: [design/model/depot.modelith.yaml]
+  machines: design/other-machines
+waivers:
+  - {rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}
+-- conflict-baseline.yaml --
+version: 2
+scope:
+  - "internal/shipping/**"
+tests:
+  e2e: ["e2e/**"]
+  baseline: design/unit-tests.yaml
+tools:
+  bd: /nonexistent
+design:
+  models: [design/model/depot.modelith.yaml]
+waivers:
+  - {rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}
+-- same.yaml --
+version: 2
+scope:
+  - "internal/shipping/**"
+tests:
+  e2e: ["e2e/**"]
+tools:
+  bd: /nonexistent
+design:
+  models: [design/model/depot.modelith.yaml]
+  machines: design/machines
+waivers:
+  - {rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}
+-- hooks.part --
+hooks:
+  commit: off
+-- second.part --
+---
+version: 1
+-- exotic.yaml --
+version: 2
+scope: &s ["internal/shipping/**"]	# a tab before this comment
+tools: {bd: /nonexistent}
+tests: {e2e:	["e2e/**"]}
+trace:
+  code: *s
+  tests: [
+    "e2e/**",
+  ]
+contracts: [
+]
+<<: {waivers: [{rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}]}
+-- team.yaml --
+# owned by the platform team: hand-edited
+
+version: 2   # the format
+
+# the riskiest area first
+scope:
+  - "internal/shipping/**"   # shipping only, for now
+
+tests:
+  e2e: ["e2e/**"]   # end-to-end tests only
+
+tools:
+  bd: /nonexistent    # no backlog here
+
+design:
+  models: [design/model/depot.modelith.yaml]   # the one model
+
+waivers:
+  # a waiver the team wrote
+  - {rule: entity-machine, id: "entity:Carrier", reason: "carriers come later"}
+
+# the end of the file
+-- want-adoption.yaml --
+# machinery adopt writes this file whole: what adoption added to the configuration. machinery.yaml is yours; adopt never edits it.
+version: 1
+scope:
+  - "internal/billing/**"
+design:
+  machines: design/machines
+trace:
+  code:
+    - "internal/shipping/**"
+    - "internal/billing/**"
+  tests:
+    - "e2e/**"
+tests:
+  baseline: design/tests-baseline.yaml
+waivers:
+  - {rule: machine-binding, id: "courierRun", reason: "unbound at adoption (SHA)"}
+-- want-widened.yaml --
+# machinery adopt writes this file whole: what adoption added to the configuration. machinery.yaml is yours; adopt never edits it.
+version: 1
+scope:
+  - "internal/billing/**"
+  - "cmd/**"
+design:
+  machines: design/machines
+trace:
+  code:
+    - "internal/shipping/**"
+    - "internal/billing/**"
+    - "cmd/**"
+  tests:
+    - "e2e/**"
+tests:
+  baseline: design/tests-baseline.yaml
+waivers:
+  - {rule: machine-binding, id: "courierRun", reason: "unbound at adoption (SHA)"}
+-- depot-model.yaml --
+kind: DomainModel
+version: v1
+title: Depot
+enums:
+  ShipmentStatus:
+    values:
+      - {name: Created, definition: "Registered, not yet packed."}
+      - {name: Packed, definition: "Packed; terminal here."}
+      - {name: Cancelled, definition: "Abandoned; terminal."}
+entities:
+  Shipment:
+    definition: "One parcel moving through the depot."
+    attributes:
+      - {name: status, type: ShipmentStatus}
+    actions:
+      - {name: pack, actor: Warehouse}
+      - {name: cancel, actor: Warehouse}
+  Carrier:
+    definition: "A company that moves parcels."
+    attributes:
+      - {name: name, type: string}
+    actions:
+      - {name: onboard, actor: Warehouse}
+-- shipment.json --
+{
+  "id": "shipment",
+  "initial": "Created",
+  "states": {
+    "Created": {"on": {"pack": {"target": "Packed"}, "cancel": {"target": "Cancelled"}}},
+    "Packed": {"type": "final"},
+    "Cancelled": {"type": "final"}
+  }
+}
+-- courier.json --
+{
+  "id": "courierRun",
+  "_role": "operational",
+  "initial": "Waiting",
+  "states": {
+    "Waiting": {"on": {"pickUp": {"target": "Driving"}}, "_ignores": {"dropOff": "nothing is picked up yet"}},
+    "Driving": {"on": {"dropOff": {"target": "Waiting"}}, "_ignores": {"pickUp": "already carrying a load"}}
+  }
+}

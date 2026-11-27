@@ -49,6 +49,7 @@ type assessment struct {
 	out      string // absolute
 	snap     string
 	cfgBytes []byte
+	adoption []byte // the project's design/adoption.yaml, nil when it has none
 	cfgLabel string
 	name     string
 	head     string // short sha
@@ -134,7 +135,11 @@ func (a *assessment) inputs() error {
 		}
 		a.cfgBytes, a.cfgLabel = data, project.ConfigName
 	}
-	if _, perr := project.Parse(a.cfgBytes); perr != nil {
+	// the project's design/adoption.yaml goes with either config (section 18.1)
+	if a.adoption, err = project.ReadAdoption(a.root); err != nil {
+		return err
+	}
+	if _, perr := project.ParseWith(a.cfgBytes, a.adoption); perr != nil {
 		return perr
 	}
 
@@ -156,7 +161,7 @@ func (a *assessment) inputs() error {
 // makes it a repository with one commit (section 18.2).
 func (a *assessment) snapshot() error {
 	var err error
-	if a.snap, a.outside, err = TakeSnapshot(a.root, a.out, a.head, a.cfgBytes); err != nil {
+	if a.snap, a.outside, err = TakeSnapshot(a.root, a.out, a.head, a.cfgBytes, a.adoption); err != nil {
 		return err
 	}
 	p, err := project.Load(a.snap)

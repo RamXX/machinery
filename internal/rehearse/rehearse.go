@@ -140,8 +140,13 @@ func Run(o Options) error {
 	} else if data, rerr := os.ReadFile(filepath.Join(root, project.ConfigName)); rerr == nil {
 		cfg, r.cfgLabel = data, project.ConfigName
 	}
+	// the project's design/adoption.yaml goes with either config (section 17.3)
+	adoption, err := project.ReadAdoption(root)
+	if err != nil {
+		return err
+	}
 	if cfg != nil {
-		if _, perr := project.Parse(cfg); perr != nil {
+		if _, perr := project.ParseWith(cfg, adoption); perr != nil {
 			return perr
 		}
 	}
@@ -154,7 +159,7 @@ func Run(o Options) error {
 	}
 	w := o.Stdout
 	fmt.Fprintf(w, "out: %s\n", out)
-	snap, outside, err := assess.TakeSnapshot(root, out, r.head, cfg)
+	snap, outside, err := assess.TakeSnapshot(root, out, r.head, cfg, adoption)
 	if err != nil {
 		return fmt.Errorf("%s: cannot take the snapshot: %v", verb, err)
 	}
@@ -313,18 +318,14 @@ func boolInt(b bool) int {
 	return 0
 }
 
-// waiverCounts counts the waivers of the snapshot's machinery.yaml by rule.
+// waiverCounts counts the waivers of the snapshot's configuration by rule.
 func waiverCounts(snap string) map[string]int {
 	res := map[string]int{}
-	data, err := os.ReadFile(filepath.Join(snap, project.ConfigName))
+	p, err := project.Load(snap)
 	if err != nil {
 		return res
 	}
-	cfg, err := project.Parse(data)
-	if err != nil {
-		return res
-	}
-	for _, w := range cfg.Waivers {
+	for _, w := range p.Cfg.Waivers {
 		res[w.Rule]++
 	}
 	return res
