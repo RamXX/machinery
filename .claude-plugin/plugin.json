@@ -3,8 +3,8 @@
   "version": "2.0.0",
   "description": "Join a design (Modelith model, XState machines, contracts) to evidence from real end-to-end runs, plan the unproven as a backlog graph, and gate each story by its risk tier.",
   "author": {
-    "name": "RamXX",
-    "url": "https://github.com/RamXX"
+    "name": "The Machinery Authors",
+    "url": "https://github.com/RamXX/machinery"
   },
   "homepage": "https://github.com/RamXX/machinery",
   "repository": "https://github.com/RamXX/machinery",

@@ -1,5 +1,6 @@
-# The plugin manifests are valid JSON and every path they name exists; the
-# agent surfaces stay small; the hooks only call machinery hook (docs/formats.md section 21).
+# The plugin manifests are valid JSON and every path they name exists; their author is the
+# project, never a person or an account; the agent surfaces stay small; the hooks only call
+# machinery hook (docs/formats.md section 21).
 exec node check.cjs $REPO
 stdout 'manifests ok'
 exec node hooks.cjs $REPO
@@ -52,9 +53,13 @@ stderr 'agents/bad.md: machinery waves has no flag --dispatch'
 const fs = require("fs");
 const path = require("path");
 const repo = process.argv[2];
+const authors = {name: "The Machinery Authors", url: "https://github.com/RamXX/machinery"};
 for (const f of [".claude-plugin/plugin.json", ".claude-plugin/marketplace.json", ".codex-plugin/plugin.json"]) {
   const m = JSON.parse(fs.readFileSync(path.join(repo, f), "utf8"));
   if (m.name !== "machinery") throw new Error(f + ": name");
+  const who = m.author || m.owner;
+  if (!who || who.name !== authors.name || who.url !== authors.url || Object.keys(who).length !== 2) throw new Error(f + ": author " + JSON.stringify(who));
+  if (m.interface && m.interface.developerName !== authors.name) throw new Error(f + ": developerName " + m.interface.developerName);
   if (f.endsWith("plugin.json") && m.version !== "2.0.0") throw new Error(f + ": version");
   for (const k of ["skills", "agents"]) {
     if (m[k] && !fs.existsSync(path.join(repo, m[k]))) throw new Error(f + ": missing " + m[k]);
