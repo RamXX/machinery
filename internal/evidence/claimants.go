@@ -462,8 +462,6 @@ type Partly struct {
 	Missing  []Claimant
 	Skipped  map[Claimant]bool
 	Unjudged map[Claimant]string
-	// BySet: those of them a run judged by their set (section 10.3)
-	BySet map[Claimant]bool
 }
 
 // Text is "<n> of <m> claimants passed", with the excused ones when there are.
@@ -548,12 +546,8 @@ func (e *Evaluation) PartlyFindings(only map[string]bool, all bool) []report.Fin
 			switch why, cannot := pr.Unjudged[cl]; {
 			case cannot:
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: %s", id, cannotJudge(cl.File, why)))
-			case pr.Skipped[cl] && pr.BySet[cl]:
-				msgs = append(msgs, fmt.Sprintf("partly run: %s: skipped: %s (by its set)", id, cl))
-			case pr.Skipped[cl]:
+			case pr.Skipped[cl]: // a helper whose set skipped too: by its set only for a pass
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: skipped: %s", id, cl))
-			case pr.BySet[cl]:
-				msgs = append(msgs, fmt.Sprintf("partly run: %s: no verdict: %s (by its set)", id, cl))
 			default:
 				msgs = append(msgs, fmt.Sprintf("partly run: %s: no verdict: %s", id, cl))
 			}

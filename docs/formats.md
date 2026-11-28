@@ -2652,19 +2652,23 @@ that carries no build constraint) is a candidate of a package the run saw ("Whos
 below), the functions its claims belong to are **its set**: for every such package, every test function defined in that package's candidate
 files, each judged by its verdict in that package and by the state of its own file (a fail that
 went to the file by name or from another package included). The table of "Which receipt" applies
-to them as to the functions of a file: the file gets a `pass` only when, in this one run, every
-test function of the set passed and the package ended every run of it with `pass`; a `fail`
-when one of them failed, a function that claims nothing included (a false fail rather than a
-lost one); and nothing when one of them has no verdict in that package (a `-run` filter, a build
-constraint that left a file out, a binary stopped before it), so a set that did not run in full
-never credits the file. A candidate that does not parse leaves the set ambiguous, and a
+to them as to the functions of a file, but for a skip: the file gets a `pass` only when, in this
+one run, every test function of the set passed and the package ended every run of it with
+`pass`; a `fail` when one of them failed, a function that claims nothing included (a false fail
+rather than a lost one), whether or not the set ran in full; a `skip` when every one of them has
+a verdict in that package, none failed and one skipped; and nothing when one of them has no
+verdict in that package (a `-run` or `-skip` filter, a build constraint that left a file out, a
+binary stopped before it) and none failed, even when another one skipped (where the functions of
+a file give a `skip`). So a set that did not run in full never credits the file and never gives
+it a `skip`. A candidate that does not parse leaves the set ambiguous, and a
 candidate outside `trace.tests`, whose verdicts count nothing, leaves it without a pass. A
 package whose candidate files have no test function gives the file no set. The receipt names
 the file at `granularity: file`, and its `observed` says so:
 `go test: all <n> test function(s) of its set passed (package <import path>)`
 (`packages <a>, <b>` for several), and `go test: <functions> of its set failed` (`skipped`,
 `: started, no verdict; the package failed`, `: the package did not run its tests`). The end line
-of the run names every file it judged by its set (below). A file with no test function that is
+of the run says of every such file whether its set passed, skipped, failed or did not run in full
+(below). A file with no test function that is
 a candidate of no package of a run, or only of packages with no test function, is judged by no
 set in that run.
 
@@ -2840,7 +2844,9 @@ An adapter receipt is a receipt line with three more keys:
 Receipts are written sorted by id, then file, then function, the file-level one first. They and
 the end line are written in one append, after the command has exited, and the end line of an
 adapter run has one more key, `adapter_receipts`, the number of lines the adapter wrote right
-before it, and, when a file with no test function is a candidate of a package it saw (the file is judged by its set, section 10.3), `adapter_sets`, those files, sorted, whether their sets ran in full in this run or not:
+before it, and, when a file with no test function is a candidate of a package it saw (the file
+is judged by its set, section 10.3), `adapter_sets`, those files, sorted, whether their sets ran
+in full in this run or not:
 
 ```json
 {"v":1,"type":"end","exit":0,"finished":"2026-01-02T03:04:09Z","adapter_receipts":6,"adapter_sets":["e2e/suite/helpers_test.go"]}
@@ -2990,6 +2996,8 @@ adapter: <file>::<function>: <verdict> in package <import path>, <verdict> in pa
 adapter: <function>: failed in <where>, so read as failed in <files>: a fail goes by name to every file of evidence.adapter.sources that defines it; rename one of the functions if they are unrelated
 adapter: <file>: <id>: the adapter does not judge <function>; put the marker above a Test function or at file level
 adapter: <file>: no test function; its claims are judged by its set: every test function of package <import path>
+adapter: <file>: no test function; <functions> of its set skipped: its claims are skipped
+adapter: <file>: no test function; its set failed in this run: its claims fail
 adapter: <file>: no test function; its set did not run in full in this run: its claims count nothing
 adapter: <file>: no test function; it carries a build constraint, so no set judges it: its claims count nothing
 adapter: <file>: no test function; its claims count nothing
@@ -3039,10 +3047,14 @@ name included. A claim in a file of no package of the run does not count there.
 replayed from the cache, a package that did not end with pass, or an ambiguous name. A claim
 above a function the adapter does not judge counts in neither. The `no test function` lines
 name only the candidate files of the packages the run saw: `its claims are judged by its set`
-for one whose set ran in full in this run (a receipt was written for it), with the packages of its
-set (`packages <a>, <b>` for several), `its set did not run in full in this run` for one whose set
-a filter, a build tag or a failure cut (it has no receipt), `it carries a build constraint, so no set judges it` for one that carries a build
-constraint, and `its claims count nothing` for the others. `in the whole project` counts the
+for one whose set ran in full in this run and passed (a `pass` was written for it), with the
+packages of its set (`packages <a>, <b>` for several), `<functions> of its set skipped` for one
+whose set ran in full with a skip and no fail (a `skip` was written for it; `<functions>` as in
+its `observed`), `its set failed in this run` for one a function of whose set failed, whether
+or not the set ran in full (a `fail` was written for it), `its set did not run in full in this
+run` for one whose set a filter, a build tag or a failure cut with no fail (it has no receipt,
+a skip of a function that ran included), `it carries a build constraint, so no set judges it`
+for one that carries a build constraint, and `its claims count nothing` for the others. `in the whole project` counts the
 ids without a receipt with a claim whose function did not run, the claiming files with no
 test function, and the distinct file, id and function combinations of claims above functions
 the adapter does not judge, across every file the adapter reads. In a run that wrote no receipt
@@ -3129,12 +3141,17 @@ the function-granularity passes of its other claimants.
 the file, the file parses, a marker for the id claims the whole file, and it has a test function
 or a run judges it by its set ("Which receipt", above). A file with no test function is judged
 by its set at the commit when a run used at the commit saw its set (it names the file in
-`adapter_sets`) and judged it in full: a receipt of the run for the file, a `pass` that satisfies
-it, or a `skip` or a `fail` of a function of its set, a verdict of its set. `verify` says `by its set`
-(section 12) only of such a file. A run that saw the set and cut it (a `-run` or `-skip` filter, a
-build tag, a package that failed) left the file without a receipt: it is no claimant judged by its
-set, and `verify` names it with the `<why>` `no test function; its set did not run in full`
-(below). A file claimant that lacks one of these never has (a):
+`adapter_sets`), ran every test function of the set and every one of them passed: that run wrote
+a `pass` for the file, which satisfies it. `verify` says `by its set` (section 12) only of such
+a file. A set that ran in full with a function that skipped and none that failed gave the file a
+`skip`: `verify` says `skipped: <file>` of it, as of any claimant whose receipt is a `skip`,
+never `by its set`. A function of the set that failed gave the file a `fail`, whether or not the
+set ran in full, and the id fails. A run that saw the set and cut it (a `-run` or `-skip` filter,
+a build tag, a package that failed) with no function of the set failing left the file without a
+receipt, even when a function that ran skipped: when no run used at the commit gave the file a
+receipt, it is no claimant judged by its set, and `verify` names it with the `<why>` `no test
+function; its set did not run in full` (below), never `skipped` or `by its set`. A file
+claimant that lacks one of these never has (a):
 it is satisfied by (b), or excused (below), and by nothing else. `verify` names it with why
 (section 12):
 
@@ -3474,10 +3491,10 @@ Findings:
   not owed, in place of `unproven: <id>`, and the same line as a `warn` for one that is owed.
   Then one line per claimant that is not satisfied (section 10.3):
   `warn   partly run: <id>: no verdict: <claimant>` for one the adapter can judge
-  (`skipped: <claimant>` for one whose receipt is a `skip`), `<claimant>` as
-  `<file>::<function>` or `<file>`, followed by ` (by its set)` for a file with no test function
-  whose set a run judged in full (section 10.3: a set cut by a filter, a build tag or a failure is
-  a file the adapter cannot judge), and for a file the adapter cannot judge
+  (`skipped: <claimant>` for one whose receipt is a `skip`, a file with no test function whose
+  set ran in full with a skip included), `<claimant>` as `<file>::<function>` or `<file>` (a file
+  with no test function whose set was cut by a filter, a build tag or a failure is a file the
+  adapter cannot judge, section 10.3), and for a file the adapter cannot judge
   `warn   partly run: <id>: <file>: cannot be judged by the adapter (<why>); <what to do>`,
   `<why>` as in section 10.3 ("A file the adapter cannot judge"), `<what to do>` as
   `fix the file so that it can be read as Go, or give it an excused entry with a reason` for
@@ -4226,7 +4243,8 @@ that is not proven and has an adapter pass which does not count is
 (with ` (<k> claimant(s) excused)` after `passed` when some are), and an id that
 is not proven because every claimant of it is excused is
 `ERROR  unproven: <id>; no claimant can run here: <k> claimant(s) excused: run a claimant of it here and narrow <excused place>, or prove it with a receipt a test emits`
-(section 10.3). An id that a file the adapter cannot judge leaves partly run is partly run here
+(section 10.3), `<excused place>` as in `verify` (section 12): `design/excused.yaml` when the
+project has that file, `evidence.adapter.excused` otherwise. An id that a file the adapter cannot judge leaves partly run is partly run here
 too; `machinery verify` names the file and says what it needs. A refused receipts file or an incomplete run fails the gate of every
 story with the finding `verify` has for it (`ERROR  receipts: <file>: ...`,
 `ERROR  incomplete run: <file>`; sections 10.2 and 12): the failure of the story may be in it.

@@ -1075,8 +1075,10 @@ func (a *GoTest) Receipts() [][]byte {
 	// a helper judged by its set (section 10.3): its file -> the packages of
 	// its set
 	sets := map[string][]string{}
-	// the helpers whose set ran in full here: a receipt was written for them
-	setJudged := map[string]bool{}
+	// what the run says of a helper its set gave a receipt: judged by its set
+	// only for a pass, a set that ran in full and passed (section 10.3)
+	setSaid := map[string]string{}
+	const setFailed = "its set failed in this run: its claims fail"
 	for _, u := range a.units {
 		f := a.files[u.File]
 		var funcs []fileFn
@@ -1109,6 +1111,7 @@ func (a *GoTest) Receipts() [][]byte {
 			}
 		}
 		var failedFns, startedFns, unranFns, skippedFns []string
+		cut := false // a function of the set has no verdict here: the set did not run in full
 		for _, ff := range funcs {
 			file, fn := ff.file, ff.fn
 			fst, ran := state[file][fn]
@@ -1116,11 +1119,13 @@ func (a *GoTest) Receipts() [][]byte {
 				fst = stNotRun
 			}
 			if ff.pkg != "" { // in a set the function is judged in the package of the set as well
-				if pst, ok := pkgState[ff.pkg][fn]; !ok {
+				pst, ok := pkgState[ff.pkg][fn]
+				if !ok {
 					fst = min(fst, stNotRun)
 				} else {
 					fst = min(fst, pst)
 				}
+				cut = cut || !ran || !ok
 			}
 			if fst < st {
 				st = fst
@@ -1137,6 +1142,11 @@ func (a *GoTest) Receipts() [][]byte {
 			case fst == stSkip:
 				skippedFns = append(skippedFns, fn)
 			}
+		}
+		// a skip of a set that did not run in full is no verdict of the set, a
+		// fail is: the helper gets nothing for it (section 10.3)
+		if cut && st == stSkip {
+			st = stNotRun
 		}
 		ofSet := "" // how the observed text says the functions are those of a set
 		if bySet {
@@ -1189,7 +1199,16 @@ func (a *GoTest) Receipts() [][]byte {
 		}
 		wrote[r.Outcome]++
 		has[u.ID] = true
-		setJudged[u.File] = setJudged[u.File] || bySet
+		if bySet && setSaid[u.File] != setFailed { // a fail of the set is what the run says
+			switch r.Outcome {
+			case Pass:
+				setSaid[u.File] = "its claims are judged by its set: every test function of " + packageWords(pkgs)
+			case Skip:
+				setSaid[u.File] = nameList(skippedFns) + " of its set skipped: its claims are skipped"
+			default:
+				setSaid[u.File] = setFailed
+			}
+		}
 		lines = append(lines, jsonLine(r))
 		switch r.Outcome {
 		case Pass:
@@ -1275,8 +1294,8 @@ func (a *GoTest) Receipts() [][]byte {
 			case !scope[rel]:
 			case f.Constrained:
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; it carries a build constraint, so no set judges it: its claims count nothing", rel))
-			case setJudged[rel]:
-				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its claims are judged by its set: every test function of %s", rel, packageWords(sets[rel])))
+			case setSaid[rel] != "":
+				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; %s", rel, setSaid[rel]))
 			case len(sets[rel]) > 0: // a candidate of a package of the run whose set did not run in full
 				empty = append(empty, fmt.Sprintf("adapter: %s: no test function; its set did not run in full in this run: its claims count nothing", rel))
 			default:

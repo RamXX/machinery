@@ -85,7 +85,16 @@ cp excused-outage-only.yaml design/excused.yaml
 gitcommit 'the second shop is no longer excused'
 exec mrun 1 verify
 stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed \(1 claimant\(s\) excused\): run the claimants without a pass at this commit, or excuse those that cannot run here in design/excused\.yaml$'
+# and so does the story gate, for a partly run id and for an id no claimant of which can run here
+exec bd init --stealth --non-interactive -p shop
+exec bd create --id shop-x1 --title 'Ship only what is paid, through an outage' --body-file x1.txt --silent
+exec mrun 1 story shop-x1
+stdout '^  ERROR  partly run: inv:paid-before-shipped: 1 of 2 claimants passed \(1 claimant\(s\) excused\): run the claimants without a pass at this commit, or excuse those that cannot run here in design/excused\.yaml$'
+stdout '^  ERROR  unproven: fm:payment-provider-down; no claimant can run here: 1 claimant\(s\) excused: run a claimant of it here and narrow design/excused\.yaml, or prove it with a receipt a test emits$'
 
+-- x1.txt --
+machinery:ids inv:paid-before-shipped fm:payment-provider-down
+machinery:scope internal/domain/**
 -- e2e/cluster/cluster_test.go --
 package cluster
 

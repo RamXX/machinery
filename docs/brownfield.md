@@ -273,8 +273,10 @@ marker above no function, or above a helper, claims for every test function of t
 named in the summary (its file is then a claimant the adapter cannot judge, below). A file of
 helpers with no test function of its own is judged by its set: it passes when every test
 function of its package passed in the same run, and a `-run` filter or a build tag that leaves
-one out gives it nothing: `verify` then says `no test function; its set did not run in full` and
-says `by its set` only of a helper whose set ran in full. A pass
+one out gives it nothing, even when one that ran skipped: `verify` then says `no test function;
+its set did not run in full`. A set that ran in full with a skip gives the helper a skip, which
+`verify` names as a skip: it says `by its set` only of a helper whose set ran in full and
+passed. A pass
 through a parent test records how many subtests ran (`subtests: 2`).
 
 **Every claimant.** An id that several tests claim is proven by the adapter only when every one

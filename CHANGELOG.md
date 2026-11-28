@@ -46,10 +46,13 @@ Notable changes to machinery, newest first. v1, the 0.x releases, keeps its hist
   with one line that names the git command with its arguments, the directory, what git said and
   what to do; none reads as "nothing changed".
 - A helper with no test function is said to be judged `by its set` only when its set ran in full
-  in the run: a set cut by a `-run` or `-skip` filter, a build tag or a failed package leaves
-  it without a receipt, and `verify` says `cannot be judged by the adapter (no test function;
-  its set did not run in full)` of it, as the run summary says `its set did not run in full in
-  this run`.
+  in one run and every test function of it passed. A set that ran in full with a skip gives it a
+  `skip`, which `verify` names as a skip. A set cut by a `-run` or `-skip` filter, a build tag
+  or a failed package leaves it without a receipt, even when a function that ran skipped (a fail
+  of the set still fails it), and `verify` says `cannot be judged by the adapter (no test
+  function; its set did not run in full)` of it, as the run summary says `its set did not run in
+  full in this run`. The run summary says `<functions> of its set skipped` and `its set failed
+  in this run` for the others.
 - The advice of a partly run id, and of an id no claimant of which can run here, names where
   excused entries go: `design/excused.yaml` when the project has that file, the configuration
   key `evidence.adapter.excused` otherwise.

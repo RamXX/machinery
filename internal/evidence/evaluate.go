@@ -404,12 +404,15 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 			}
 		case !used[o.ID]: // no adapter evidence: not under the rule
 		default:
-			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}, Unjudged: map[Claimant]string{}, BySet: map[Claimant]bool{}}
+			pr := Partly{Of: len(open), Excused: excused, Skipped: map[Claimant]bool{}, Unjudged: map[Claimant]string{}}
 			var bySet []string // the helpers of the id its set satisfied
 			for _, c := range open {
 				unit := claimUnit{ID: o.ID, File: c.File, Func: c.Func}
 				why, cannot := cs.unjudged[unit]
 				set := cs.bySet[unit] && sets[c.File] // a helper a run met a package of
+				// its set did not run in full in any run: no run gave the helper a
+				// verdict (a set that ran in full and passed gives a pass; with a
+				// skip, a skip, said as a skip)
 				cut := set && !passed[o.ID][c] && !skipped[o.ID][c]
 				if set {
 					cannot = false
@@ -423,8 +426,6 @@ func (ev *Evaluation) everyClaimant(p *project.Project, d *design.Design, cl *cl
 				default:
 					pr.Missing = append(pr.Missing, c)
 					pr.Skipped[c] = skipped[o.ID][c]
-					// judged by its set only when a run judged the set in full: it left a verdict
-					pr.BySet[c] = set && !cut
 					switch {
 					case cut:
 						pr.Unjudged[c] = whySetCut

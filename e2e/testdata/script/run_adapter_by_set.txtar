@@ -1,8 +1,9 @@
 # a claiming file with no test function of its own that is a candidate file of a package of the
 # run (a helper) is judged by its set: it is satisfied when, in one run, that package ended with
 # pass and every test function of the package's candidate files passed. A set that did not run in
-# full (a -run filter, a build tag) gives it nothing, a fail of the set fails it, and a helper
-# that is a candidate of no package of any run cannot be judged. A marker directly above a
+# full (a -run filter, a build tag) gives it nothing, a skip of a set that ran in full gives it a
+# skip, a fail of the set fails it, and a helper that is a candidate of no package of any run
+# cannot be judged. A marker directly above a
 # function that is not a test function is a marker of its file (sections 10.3 and 12)
 fixture shop
 fixture shop-gotests
@@ -59,16 +60,29 @@ exec machinery run --adapter go-test-json -- go test ./e2e/suite
 exec mrun 1 verify
 stdout '^  warn   partly run: inv:customer-email-unique: e2e/suite/support_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
 
-# a fail of the set fails the ids of the helper, also a fail of a test that claims nothing
+# a fail of the set fails the ids of the helper, also a fail of a test that claims nothing; the
+# run says the set failed, not that it judged the helper by its set
 rm .machinery/receipts
 env SHOP_ROUTING=fail
 exec mrun 1 run --adapter go-test-json -- go test -tags faults ./e2e/suite
 env SHOP_ROUTING=
+stderr '^machinery run: adapter: e2e/suite/support_test\.go: no test function; its set failed in this run: its claims fail$'
+! stderr 'judged by its set'
 exec sh -c 'grep -c "\"outcome\":\"fail\",\"test\":\"e2e/suite/support_test.go\",\"observed\":\"go test: TestRouting of its set failed\"" .machinery/receipts/*.jsonl'
 stdout '^2$'
 exec mrun 1 verify
 stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/support_test\.go\)$'
 stdout '^  ERROR  failed: inv:terminal-is-final \(e2e/suite/support_test\.go\)$'
+# so does a fail of a set that did not run in full: a fail is never lost to a filter
+rm .machinery/receipts
+env SHOP_ROUTING=fail
+exec mrun 1 run --adapter go-test-json -- go test -tags faults -run TestRouting ./e2e/suite
+env SHOP_ROUTING=
+stderr '^machinery run: adapter: e2e/suite/support_test\.go: no test function; its set failed in this run: its claims fail$'
+exec sh -c 'grep -c "\"outcome\":\"fail\",\"test\":\"e2e/suite/support_test.go\",\"observed\":\"go test: TestRouting of its set failed\"" .machinery/receipts/*.jsonl'
+stdout '^2$'
+exec mrun 1 verify
+stdout '^  ERROR  failed: inv:customer-email-unique \(e2e/suite/support_test\.go\)$'
 
 # a helper that is a candidate of no package of any run cannot be judged, and neither can one
 # whose package has no test function at all
@@ -196,8 +210,9 @@ exec mrun 1 verify --partly
 stdout '^  warn   partly run: inv:customer-email-unique: e2e/set/helper_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
 ! stdout 'by its set: inv:customer-email-unique: e2e/set/helper_test\.go'
 
-# a set that ran in full with a function that skipped is judged by its set: its receipt is a skip
-# and verify says so. The same set cut by a -run filter is not: it says its set did not run in full
+# by its set needs every test function of the set to pass in one run. A set that ran in full with a
+# function that skipped gives the helper a skip, said as a skip: neither the run nor verify says it
+# is judged by its set
 rm .machinery/receipts
 mkdir e2e/skipset
 cp skipset_a_test.go.txt e2e/skipset/a_test.go
@@ -205,16 +220,36 @@ cp skipset_b_test.go.txt e2e/skipset/b_test.go
 cp skipset_helper_test.go.txt e2e/skipset/helper_test.go
 gitcommit 'a set with a test that skips'
 exec machinery run --adapter go-test-json -- go test ./e2e/skipset
-stderr '^machinery run: adapter: e2e/skipset/helper_test\.go: no test function; its claims are judged by its set: every test function of package example\.test/shop/e2e/skipset$'
+stderr '^machinery run: adapter: e2e/skipset/helper_test\.go: no test function; TestA of its set skipped: its claims are skipped$'
+! stderr 'judged by its set'
+exec sh -c 'grep -c "\"outcome\":\"skip\",\"test\":\"e2e/skipset/helper_test.go\",\"observed\":\"go test: TestA of its set skipped\"" .machinery/receipts/*.jsonl'
+stdout '^1$'
 exec mrun 1 verify --partly
-stdout '^  warn   partly run: inv:paid-before-shipped: skipped: e2e/skipset/helper_test\.go \(by its set\)$'
+stdout '^  warn   partly run: inv:paid-before-shipped: skipped: e2e/skipset/helper_test\.go$'
+! stdout 'by its set'
 ! stdout 'inv:paid-before-shipped: e2e/skipset/helper_test\.go: cannot be judged'
+# the same set cut by a -run filter gives it nothing: its set did not run in full
 rm .machinery/receipts
 exec machinery run --adapter go-test-json -- go test -run TestB ./e2e/skipset
 stderr '^machinery run: adapter: e2e/skipset/helper_test\.go: no test function; its set did not run in full in this run: its claims count nothing$'
 exec mrun 1 verify --partly
 stdout '^  warn   partly run: inv:paid-before-shipped: e2e/skipset/helper_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); '
-! stdout 'skipset/helper_test\.go \(by its set\)'
+! stdout 'by its set'
+# so does a cut that leaves only the function that skips: the skip of a set that did not run in
+# full is no verdict of the set, and the run writes nothing for the helper
+rm .machinery/receipts
+exec machinery run --adapter go-test-json -- go test -run TestA ./e2e/skipset
+stderr '^machinery run: adapter: receipts written: 0 pass, 0 fail, 0 skip$'
+stderr '^machinery run: adapter: e2e/skipset/helper_test\.go: no test function; its set did not run in full in this run: its claims count nothing$'
+! stderr 'judged by its set'
+exec sh -c '! grep -q "\"test\":\"e2e/skipset/helper_test.go\"" .machinery/receipts/*.jsonl'
+# and the function left out, run at the same commit in another run, does not make the set whole:
+# verify says the helper cannot be judged, never that it skipped or passed by its set
+exec machinery run --adapter go-test-json -- go test -run TestB ./e2e/skipset
+exec mrun 1 verify --partly
+stdout '^  warn   partly run: inv:paid-before-shipped: e2e/skipset/helper_test\.go: cannot be judged by the adapter \(no test function; its set did not run in full\); run its whole set, every test function of its package, in one run, emit a receipt from its own test, or give it an excused entry with a reason$'
+! stdout 'by its set'
+! stdout 'skipped: e2e/skipset/helper_test\.go'
 
 -- e2e/suite/support_test.go --
 package suite
